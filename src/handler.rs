@@ -1,5 +1,17 @@
+use std::fs;
+
+use url::Url;
+
 use crate::loggers::{DefaultLogger, Logger};
 use crate::structs::*;
+
+use flux::ast::*;
+use flux::parser::Parser;
+
+fn parse(contents: &str) -> File {
+    let mut p = Parser::new(contents);
+    return p.parse_file(String::from(""));
+}
 
 pub struct Handler {
     logger: Box<dyn Logger>,
@@ -27,6 +39,7 @@ impl Handler {
 
     fn handle_document_did_open(&mut self, prequest: PolymorphicRequest) -> Result<String, String> {
         let request = TextDocumentDidOpenRequest::from_json(prequest.data.as_str())?;
+
         self.logger.log(format!("File Opened\n"))?;
         self.logger
             .log(format!("Path: {}\n", request.params.text_document.uri))?;
@@ -35,9 +48,21 @@ impl Handler {
             request.params.text_document.language_id
         ))?;
 
-        // TODO: read file
-        // TODO: parse file
-        // TODO: cache results
+        let file_path = match Url::parse(request.params.text_document.uri.as_str()) {
+            Ok(s) => s,
+            Err(e) => return Err(format!("Failed to get file path: {}", e)),
+        };
+
+        let contents = match fs::read_to_string(file_path.path()) {
+            Ok(c) => c,
+            Err(e) => return Err(format!("Failed to read file: {}", e)),
+        };
+
+        let file = parse(contents.as_str());
+        for statement in file.body {
+            self.logger
+                .log(format!("\nstatement: {}\n", statement.base().location))?;
+        }
 
         return Ok(String::from(""));
     }

@@ -110,7 +110,7 @@ impl Server {
 
         match self.write(msg) {
             Ok(_) => return Ok(()),
-            Err(_) => return Err("Failed to write response".to_string()),
+            Err(_) => return Err(format!("Failed to write response")),
         }
     }
 
