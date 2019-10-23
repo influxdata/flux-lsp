@@ -103,13 +103,20 @@ impl Handler {
         return Ok(json);
     }
 
+    fn handle_unknown(&mut self, prequest: PolymorphicRequest) -> Result<String, String> {
+        let msg =
+            create_log_show_message_notification(format!("Unknown method {}", prequest.method()))?;
+
+        return msg.to_json();
+    }
+
     pub fn handle(&mut self, request: PolymorphicRequest) -> Result<String, String> {
         match request.method().as_str() {
             "initialize" => return self.handle_initialize(request),
             "initialized" => Ok(String::from("")),
             "textDocument/didOpen" => return self.handle_document_open(request),
             "textDocument/didChange" => return self.handle_document_change(request),
-            _ => Ok(String::from("")),
+            _ => return self.handle_unknown(request),
         }
     }
 }

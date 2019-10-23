@@ -174,6 +174,13 @@ pub struct PublishDiagnosticsParams {
     pub diagnostics: Vec<Diagnostic>,
 }
 
+#[derive(Serialize, Deserialize)]
+pub struct ShowMessageParams {
+    #[serde(rename = "type")]
+    pub message_type: u32,
+    message: String,
+}
+
 pub fn create_diagnostics_notification(
     uri: String,
     diagnostics: Vec<Diagnostic>,
@@ -182,5 +189,17 @@ pub fn create_diagnostics_notification(
     let params = PublishDiagnosticsParams { uri, diagnostics };
     let request = Notification { method, params };
 
+    return Ok(request);
+}
+
+pub fn create_log_show_message_notification(
+    message: String,
+) -> Result<Notification<ShowMessageParams>, &'static str> {
+    let method = String::from("window/showMessage");
+    let params = ShowMessageParams {
+        message,
+        message_type: 4,
+    };
+    let request = Notification { method, params };
     return Ok(request);
 }
