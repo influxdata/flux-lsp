@@ -1,20 +1,59 @@
-use std::fs;
-
-use url::Url;
-
 use crate::loggers::{DefaultLogger, Logger};
+use crate::structs;
 use crate::structs::*;
+use crate::utils::get_file_contents_from_uri;
 
 use flux::ast::*;
-use flux::parser::Parser;
-
-fn parse(contents: &str) -> File {
-    let mut p = Parser::new(contents);
-    return p.parse_file(String::from(""));
-}
+use flux::parser::parse_string;
 
 pub struct Handler {
-    logger: Box<dyn Logger>,
+    pub logger: Box<dyn Logger>,
+}
+
+// TODO: figure out if all clients are zero based or if its just vim-lsp
+//       if not remove the hard coded subtraction in favor of runtime options
+fn map_error_to_diagnostic(error: check::Error) -> Diagnostic {
+    Diagnostic {
+        severity: 1,
+        code: 1,
+        message: error.message,
+        range: Range {
+            start: structs::Position {
+                line: error.location.start.line - 1,
+                character: error.location.start.column - 1,
+            },
+            end: structs::Position {
+                line: error.location.end.line - 1,
+                character: error.location.end.column - 1,
+            },
+        },
+    }
+}
+
+fn map_errors_to_diagnostics(errors: Vec<check::Error>) -> Vec<Diagnostic> {
+    let mut result = vec![];
+
+    for error in errors {
+        result.push(map_error_to_diagnostic(error));
+    }
+
+    return result;
+}
+
+fn create_file_diagnostics(uri: String) -> Result<Notification<PublishDiagnosticsParams>, String> {
+    let file = parse_string(
+        uri.clone().as_str(),
+        &get_file_contents_from_uri(uri.clone())?,
+    );
+    let walker = walk::Node::File(&file);
+
+    let errors = check::check(walker);
+    let diagnostics = map_errors_to_diagnostics(errors);
+
+    match create_diagnostics_notification(uri.clone(), diagnostics) {
+        Ok(msg) => return Ok(msg),
+        Err(e) => return Err(format!("Failed to create diagnostic: {}", e)),
+    };
 }
 
 impl Handler {
@@ -22,10 +61,6 @@ impl Handler {
         return Handler {
             logger: Box::new(DefaultLogger {}),
         };
-    }
-
-    pub fn set_logger(&mut self, logger: Box<dyn Logger>) {
-        self.logger = logger;
     }
 
     fn handle_initialize(&self, request: PolymorphicRequest) -> Result<String, String> {
@@ -39,32 +74,18 @@ impl Handler {
 
     fn handle_document_did_open(&mut self, prequest: PolymorphicRequest) -> Result<String, String> {
         let request = TextDocumentDidOpenRequest::from_json(prequest.data.as_str())?;
+        let uri = request.params.text_document.uri;
+        let lang = request.params.text_document.language_id;
 
-        self.logger.log(format!("File Opened\n"))?;
         self.logger
-            .log(format!("Path: {}\n", request.params.text_document.uri))?;
-        self.logger.log(format!(
-            "Language: {}\n",
-            request.params.text_document.language_id
-        ))?;
+            .info(format!("File Opened, type: {}, uri: {}", lang, uri.clone()))?;
 
-        let file_path = match Url::parse(request.params.text_document.uri.as_str()) {
-            Ok(s) => s,
-            Err(e) => return Err(format!("Failed to get file path: {}", e)),
-        };
+        let msg = create_file_diagnostics(uri.clone())?;
+        let json = msg.to_json()?;
 
-        let contents = match fs::read_to_string(file_path.path()) {
-            Ok(c) => c,
-            Err(e) => return Err(format!("Failed to read file: {}", e)),
-        };
+        self.logger.info(format!("Request: {}", json.clone()))?;
 
-        let file = parse(contents.as_str());
-        for statement in file.body {
-            self.logger
-                .log(format!("\nstatement: {}\n", statement.base().location))?;
-        }
-
-        return Ok(String::from(""));
+        return Ok(json);
     }
 
     pub fn handle(&mut self, request: PolymorphicRequest) -> Result<String, String> {

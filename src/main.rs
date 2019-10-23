@@ -44,17 +44,8 @@ impl Server {
         let full = String::from(format!("Content-Length: {}\r\n\r\n{}", size, s));
         let data = Vec::from(full.as_bytes());
 
-        match self.log(full) {
-            Ok(_) => (()),
-            Err(_) => (()),
-        }
-
         self.writer.write_all(&data)?;
         return self.writer.flush();
-    }
-
-    fn log(&mut self, s: String) -> Result<(), String> {
-        return self.logger.log(s.clone());
     }
 
     fn read_spacer(&mut self) -> Result<(), String> {
@@ -65,18 +56,13 @@ impl Server {
         }
     }
 
-    fn read_contents(&mut self, size: usize) -> Result<Vec<u8>, String> {
-        let mut vec = vec![0; size];
-
-        match self.reader.read_exact(&mut vec) {
-            Ok(_) => return Ok(vec),
-            Err(_) => return Err("Failed to get input".to_string()),
-        }
-    }
-
     fn read_content_body(&mut self, size: usize) -> Result<String, String> {
         self.read_spacer()?;
-        let vec = self.read_contents(size)?;
+        let mut vec = vec![0; size];
+        match self.reader.read_exact(&mut vec) {
+            Ok(_) => (),
+            Err(_) => return Err("Failed to get input".to_string()),
+        }
 
         match std::str::from_utf8(&vec) {
             Ok(contents) => return Ok(contents.to_string()),
@@ -97,21 +83,24 @@ impl Server {
         }
 
         let content_size = utils::get_content_size(line.clone())?;
-        self.log(format!(
-            "\n------\nContent Size: {}\n------\n",
-            content_size
-        ))?;
+        self.logger
+            .info(format!("Request Content Size: {}", content_size))?;
 
         let content_body = self.read_content_body(content_size)?;
-        self.log(format!("\n------\n{}\n------\n", content_body))?;
+        self.logger
+            .info(format!("Request Content Body: {}", content_body))?;
 
         let request = utils::parse_request(content_body)?;
         let msg = self.handler.handle(request)?;
 
-        match self.write(msg) {
-            Ok(_) => return Ok(()),
-            Err(_) => return Err(format!("Failed to write response")),
+        if msg != String::from("") {
+            match self.write(msg) {
+                Ok(_) => return Ok(()),
+                Err(_) => return Err("Failed to write response".to_string()),
+            }
         }
+
+        return Ok(());
     }
 
     fn start(&mut self) {
@@ -120,7 +109,7 @@ impl Server {
                 Ok(_) => (),
                 Err(e) => {
                     let msg = format!("Request failed: {}\n", e);
-                    self.log(msg).unwrap();
+                    self.logger.error(msg).unwrap();
                 }
             }
         }
@@ -133,7 +122,7 @@ fn main() {
 
     let mut server = Server::with_stdio();
     server.logger = Box::new(server_log);
-    server.handler.set_logger(Box::new(handler_log));
+    server.handler.logger = Box::new(handler_log);
 
     server.start();
 }

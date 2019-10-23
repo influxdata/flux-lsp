@@ -128,3 +128,58 @@ impl InitializeResponse {
         };
     }
 }
+
+#[derive(Serialize, Deserialize)]
+pub struct Notification<T> {
+    method: String,
+    params: T,
+}
+
+impl<T> Notification<T>
+where
+    T: Serialize,
+{
+    pub fn to_json(&self) -> Result<String, String> {
+        match serde_json::to_string(self) {
+            Ok(s) => return Ok(s),
+            Err(_) => return Err(String::from("Failed to serialize initialize response")),
+        };
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct Position {
+    pub line: u32,
+    pub character: u32,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct Range {
+    pub start: Position,
+    pub end: Position,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct Diagnostic {
+    pub range: Range,
+    pub message: String,
+    pub severity: u32,
+    pub code: u32,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct PublishDiagnosticsParams {
+    pub uri: String,
+    pub diagnostics: Vec<Diagnostic>,
+}
+
+pub fn create_diagnostics_notification(
+    uri: String,
+    diagnostics: Vec<Diagnostic>,
+) -> Result<Notification<PublishDiagnosticsParams>, &'static str> {
+    let method = String::from("textDocument/publishDiagnostics");
+    let params = PublishDiagnosticsParams { uri, diagnostics };
+    let request = Notification { method, params };
+
+    return Ok(request);
+}

@@ -1,4 +1,6 @@
 use crate::structs;
+use std::fs;
+use url::Url;
 
 pub fn get_content_size(s: String) -> Result<usize, String> {
     let tmp = String::from(s.trim_end());
@@ -19,4 +21,18 @@ pub fn parse_request(content: String) -> Result<structs::PolymorphicRequest, Str
     };
 
     return Ok(result);
+}
+
+pub fn get_file_contents_from_uri(uri: String) -> Result<String, String> {
+    let file_path = match Url::parse(uri.as_str()) {
+        Ok(s) => s,
+        Err(e) => return Err(format!("Failed to get file path: {}", e)),
+    };
+
+    let contents = match fs::read_to_string(file_path.path()) {
+        Ok(c) => c,
+        Err(e) => return Err(format!("Failed to read file: {}", e)),
+    };
+
+    return Ok(contents);
 }
