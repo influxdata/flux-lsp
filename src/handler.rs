@@ -72,8 +72,8 @@ impl Handler {
         return response.to_json();
     }
 
-    fn handle_document_did_open(&mut self, prequest: PolymorphicRequest) -> Result<String, String> {
-        let request = TextDocumentDidOpenRequest::from_json(prequest.data.as_str())?;
+    fn handle_document_open(&mut self, prequest: PolymorphicRequest) -> Result<String, String> {
+        let request = TextDocumentRequest::from_json(prequest.data.as_str())?;
         let uri = request.params.text_document.uri;
         let lang = request.params.text_document.language_id;
 
@@ -88,11 +88,27 @@ impl Handler {
         return Ok(json);
     }
 
+    fn handle_document_change(&mut self, prequest: PolymorphicRequest) -> Result<String, String> {
+        let request = TextDocumentRequest::from_json(prequest.data.as_str())?;
+        let uri = request.params.text_document.uri;
+
+        self.logger
+            .info(format!("File Changed, uri: {}", uri.clone()))?;
+
+        let msg = create_file_diagnostics(uri.clone())?;
+        let json = msg.to_json()?;
+
+        self.logger.info(format!("Request: {}", json.clone()))?;
+
+        return Ok(json);
+    }
+
     pub fn handle(&mut self, request: PolymorphicRequest) -> Result<String, String> {
         match request.method().as_str() {
             "initialize" => return self.handle_initialize(request),
             "initialized" => Ok(String::from("")),
-            "textDocument/didOpen" => return self.handle_document_did_open(request),
+            "textDocument/didOpen" => return self.handle_document_open(request),
+            "textDocument/didChange" => return self.handle_document_change(request),
             _ => Ok(String::from("")),
         }
     }

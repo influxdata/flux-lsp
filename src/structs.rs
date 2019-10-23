@@ -4,6 +4,14 @@ fn default_id() -> u32 {
     return 0;
 }
 
+fn default_language_id() -> String {
+    return "".to_string();
+}
+
+fn default_text() -> String {
+    return "".to_string();
+}
+
 #[derive(Serialize, Deserialize, Clone)]
 pub struct BaseRequest {
     #[serde(default = "default_id")]
@@ -47,28 +55,29 @@ impl InitializeRequest {
 #[derive(Serialize, Deserialize)]
 pub struct TextDocument {
     pub uri: String,
-    #[serde(rename = "languageId")]
+    #[serde(rename = "languageId", default = "default_language_id")]
     pub language_id: String,
     pub version: u32,
+    #[serde(default = "default_text")]
     pub text: String,
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct TextDocumentDidOpenParams {
+pub struct TextDocumentParams {
     #[serde(rename = "textDocument")]
     pub text_document: TextDocument,
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct TextDocumentDidOpenRequest {
+pub struct TextDocumentRequest {
     #[serde(default = "default_id")]
     pub id: u32,
     pub method: String,
-    pub params: TextDocumentDidOpenParams,
+    pub params: TextDocumentParams,
 }
 
-impl TextDocumentDidOpenRequest {
-    pub fn from_json(s: &str) -> Result<TextDocumentDidOpenRequest, String> {
+impl TextDocumentRequest {
+    pub fn from_json(s: &str) -> Result<TextDocumentRequest, String> {
         match serde_json::from_str(s) {
             Ok(c) => return Ok(c),
             Err(e) => {
@@ -82,12 +91,7 @@ impl TextDocumentDidOpenRequest {
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct ServerCapabilities {
-    #[serde(rename = "hoverProvider")]
-    pub hover_provider: bool,
-    #[serde(rename = "renameProvider")]
-    pub rename_provider: bool,
-}
+pub struct ServerCapabilities {}
 
 #[derive(Serialize, Deserialize)]
 pub struct InitializeResult {
@@ -97,10 +101,7 @@ pub struct InitializeResult {
 impl InitializeResult {
     pub fn new() -> InitializeResult {
         return InitializeResult {
-            capabilities: ServerCapabilities {
-                hover_provider: true,
-                rename_provider: true,
-            },
+            capabilities: ServerCapabilities {},
         };
     }
 }
