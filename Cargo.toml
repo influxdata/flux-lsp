@@ -4,6 +4,15 @@ version = "0.1.0"
 authors = ["Brandon Farmer <bthesorceror@gmail.com>"]
 edition = "2018"
 
+[lib]
+name = "flux_lsp_lib"
+crate-type = ["cdylib", "rlib"]
+path = "src/lib.rs"
+
+[[bin]]
+name = "flux-lsp"
+path = "src/main.rs"
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
