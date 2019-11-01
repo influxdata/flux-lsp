@@ -18,5 +18,5 @@ path = "src/main.rs"
 [dependencies]
 serde_json = "1.0"
 serde = { version = "1.0.101", features = ["derive"] }
-flux = { git = "https://github.com/influxdata/flux" }
+flux = { git = "https://github.com/influxdata/flux", branch = "rc-walk" }
 url = "2.1.0"
