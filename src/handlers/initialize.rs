@@ -16,7 +16,7 @@ impl RequestHandler for InitializeHandler {
 
         let result = InitializeResult::new();
         let response =
-            Response::new(prequest.base_request.id, result);
+            Response::new(prequest.base_request.id, Some(result));
 
         return response.to_json();
     }

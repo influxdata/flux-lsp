@@ -2,6 +2,7 @@ pub mod document_change;
 pub mod document_open;
 pub mod initialize;
 pub mod references;
+pub mod shutdown;
 
 use crate::structs::{
     create_diagnostics_notification, Notification,

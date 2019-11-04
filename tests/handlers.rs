@@ -57,7 +57,7 @@ fn test_unknown() {
 fn test_initialize() {
     let initialize_request = Request {
         id: 1,
-        params: InitializeRequestParams {},
+        params: Some(InitializeRequestParams {}),
         method: "initialize".to_string(),
     };
     let initialize_request_json =
@@ -75,7 +75,7 @@ fn test_initialize() {
     let response = handler.handle(request).unwrap().unwrap();
     let expected = Response {
         id: 1,
-        result: InitializeResult::new(),
+        result: Some(InitializeResult::new()),
         jsonrpc: "2.0".to_string(),
     };
     let expected_json = expected.to_json().unwrap();
@@ -109,14 +109,14 @@ fn test_document_open_ok() {
     let did_open_request = Request {
         id: 1,
         method: "textDocument/didOpen".to_string(),
-        params: TextDocumentParams {
+        params: Some(TextDocumentParams {
             text_document: TextDocument {
                 uri: uri.clone(),
                 language_id: "flux".to_string(),
                 version: 1,
                 text: "".to_string(),
             },
-        },
+        }),
     };
 
     let did_open_request_json =
@@ -149,14 +149,14 @@ fn test_document_open_error() {
     let did_open_request = Request {
         id: 1,
         method: "textDocument/didOpen".to_string(),
-        params: TextDocumentParams {
+        params: Some(TextDocumentParams {
             text_document: TextDocument {
                 uri: uri.clone(),
                 language_id: "flux".to_string(),
                 version: 1,
                 text: "".to_string(),
             },
-        },
+        }),
     };
 
     let did_open_request_json =
@@ -207,14 +207,14 @@ fn test_document_change_ok() {
     let did_change_request = Request {
         id: 1,
         method: "textDocument/didChange".to_string(),
-        params: TextDocumentParams {
+        params: Some(TextDocumentParams {
             text_document: TextDocument {
                 uri: uri.clone(),
                 language_id: "flux".to_string(),
                 version: 1,
                 text: "".to_string(),
             },
-        },
+        }),
     };
 
     let did_change_request_json =
@@ -248,14 +248,14 @@ fn test_document_change_error() {
     let did_change_request = Request {
         id: 1,
         method: "textDocument/didChange".to_string(),
-        params: TextDocumentParams {
+        params: Some(TextDocumentParams {
             text_document: TextDocument {
                 uri: uri.clone(),
                 language_id: "flux".to_string(),
                 version: 1,
                 text: "".to_string(),
             },
-        },
+        }),
     };
 
     let did_change_request_json =
@@ -306,7 +306,7 @@ fn test_find_references() {
     let find_references_request = Request {
         id: 1,
         method: "textDocument/didChange".to_string(),
-        params: ReferenceParams {
+        params: Some(ReferenceParams {
             context: ReferenceContext {},
             text_document: TextDocument {
                 uri: uri.clone(),
@@ -318,7 +318,7 @@ fn test_find_references() {
                 line: 1,
                 character: 1,
             },
-        },
+        }),
     };
 
     let find_references_request_json =
@@ -336,7 +336,7 @@ fn test_find_references() {
 
     let expected: Response<Vec<Location>> = Response {
         id: 1,
-        result: vec![
+        result: Some(vec![
             Location {
                 uri: uri.clone(),
                 range: Range {
@@ -363,7 +363,41 @@ fn test_find_references() {
                     },
                 },
             },
-        ],
+        ]),
+        jsonrpc: "2.0".to_string(),
+    };
+
+    assert_eq!(
+        expected.to_json().unwrap(),
+        response.unwrap(),
+        "expects to find all references"
+    );
+}
+
+#[test]
+fn test_shutdown() {
+    let shutdown_request: Request<ShutdownParams> = Request {
+        id: 1,
+        method: "shutdown".to_string(),
+        params: None,
+    };
+
+    let shutdown_request_json =
+        serde_json::to_string(&shutdown_request).unwrap();
+    let request = PolymorphicRequest {
+        base_request: BaseRequest {
+            id: 1,
+            method: "shutdown".to_string(),
+        },
+        data: shutdown_request_json,
+    };
+    let mut handler = create_handler();
+
+    let response = handler.handle(request).unwrap();
+
+    let expected: Response<ShutdownResult> = Response {
+        id: 1,
+        result: None,
         jsonrpc: "2.0".to_string(),
     };
 
