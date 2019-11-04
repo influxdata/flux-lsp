@@ -126,7 +126,7 @@ impl Server {
         ))?;
 
         let request = utils::parse_request(content_body)?;
-        let option = self.handler.handle(request)?;
+        let option = self.handler.handle(request.clone())?;
 
         if let Some(msg) = option {
             self.log_info(format!("Response Body: {}", msg))?;
@@ -137,6 +137,11 @@ impl Server {
                     return Err("Failed to write response".to_string())
                 }
             }
+        }
+
+        match request.method().as_str() {
+            "exit" => std::process::exit(0),
+            _ => (),
         }
 
         return Ok(());

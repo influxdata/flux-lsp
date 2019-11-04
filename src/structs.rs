@@ -48,7 +48,7 @@ pub struct Request<T> {
     #[serde(default = "default_id")]
     pub id: u32,
     pub method: String,
-    pub params: T,
+    pub params: Option<T>,
 }
 
 impl<T> Request<T>
@@ -71,7 +71,7 @@ where
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Response<T> {
     pub id: u32,
-    pub result: T,
+    pub result: Option<T>,
     pub jsonrpc: String,
 }
 
@@ -79,7 +79,7 @@ impl<T> Response<T>
 where
     T: Serialize + Clone,
 {
-    pub fn new(id: u32, result: T) -> Response<T> {
+    pub fn new(id: u32, result: Option<T>) -> Response<T> {
         return Response {
             id,
             result,
@@ -153,6 +153,9 @@ impl PolymorphicRequest {
 }
 
 #[derive(Serialize, Deserialize, Clone)]
+pub struct ShutdownParams {}
+
+#[derive(Serialize, Deserialize, Clone)]
 pub struct ReferenceContext {}
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -193,6 +196,9 @@ pub struct ServerCapabilities {
 pub struct InitializeResult {
     pub capabilities: ServerCapabilities,
 }
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct ShutdownResult {}
 
 impl InitializeResult {
     pub fn new() -> InitializeResult {

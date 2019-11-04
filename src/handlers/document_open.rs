@@ -19,21 +19,25 @@ impl RequestHandler for DocumentOpenHandler {
         let mut logger = self.logger.borrow_mut();
         let request: Request<TextDocumentParams> =
             Request::from_json(prequest.data.as_str())?;
-        let uri = request.params.text_document.uri;
-        let lang = request.params.text_document.language_id;
+        if let Some(params) = request.params {
+            let uri = params.text_document.uri;
+            let lang = params.text_document.language_id;
 
-        logger.info(format!(
-            "File Opened, type: {}, uri: {}",
-            lang,
-            uri.clone()
-        ))?;
+            logger.info(format!(
+                "File Opened, type: {}, uri: {}",
+                lang,
+                uri.clone()
+            ))?;
 
-        let msg = create_file_diagnostics(uri.clone())?;
-        let json = msg.to_json()?;
+            let msg = create_file_diagnostics(uri.clone())?;
+            let json = msg.to_json()?;
 
-        logger.info(format!("Request: {}", json.clone()))?;
+            logger.info(format!("Request: {}", json.clone()))?;
 
-        return Ok(json);
+            return Ok(json);
+        }
+
+        Err("invalid textDocument/didOpen request".to_string())
     }
 }
 

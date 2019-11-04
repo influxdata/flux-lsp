@@ -2,6 +2,7 @@ use crate::handlers::document_change::DocumentChangeHandler;
 use crate::handlers::document_open::DocumentOpenHandler;
 use crate::handlers::initialize::InitializeHandler;
 use crate::handlers::references::FindReferencesHandler;
+use crate::handlers::shutdown::ShutdownHandler;
 use crate::handlers::RequestHandler;
 use crate::loggers::Logger;
 use crate::structs::*;
@@ -34,6 +35,10 @@ impl Handler {
         mapping.insert(
             "initialize".to_string(),
             Box::new(InitializeHandler::new()),
+        );
+        mapping.insert(
+            "shutdown".to_string(),
+            Box::new(ShutdownHandler::new()),
         );
         return Handler { logger, mapping };
     }
