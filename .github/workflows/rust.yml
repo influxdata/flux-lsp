@@ -9,8 +9,8 @@ jobs:
 
     steps:
     - uses: actions/checkout@v1
-    - name: Istall Regal
-      run: sudo apt install regal
+    - name: Install Ragel
+      run: sudo apt-get install ragel
     - name: Build
       run: cargo build --verbose
     - name: Run tests
