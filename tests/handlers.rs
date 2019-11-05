@@ -305,7 +305,7 @@ fn test_find_references() {
     let uri = flux_fixture_uri("ok");
     let find_references_request = Request {
         id: 1,
-        method: "textDocument/didChange".to_string(),
+        method: "textDocument/references".to_string(),
         params: Some(ReferenceParams {
             context: ReferenceContext {},
             text_document: TextDocument {
@@ -371,6 +371,64 @@ fn test_find_references() {
         expected.to_json().unwrap(),
         response.unwrap(),
         "expects to find all references"
+    );
+}
+
+#[test]
+fn test_goto_definition() {
+    let uri = flux_fixture_uri("ok");
+    let find_references_request = Request {
+        id: 1,
+        method: "textDocument/definition".to_string(),
+        params: Some(TextDocumentPositionParams {
+            text_document: TextDocument {
+                uri: uri.clone(),
+                language_id: "flux".to_string(),
+                version: 1,
+                text: "".to_string(),
+            },
+            position: Position {
+                line: 8,
+                character: 35,
+            },
+        }),
+    };
+
+    let find_references_request_json =
+        serde_json::to_string(&find_references_request).unwrap();
+    let request = PolymorphicRequest {
+        base_request: BaseRequest {
+            id: 1,
+            method: "textDocument/definition".to_string(),
+        },
+        data: find_references_request_json,
+    };
+    let mut handler = create_handler();
+
+    let response = handler.handle(request).unwrap();
+
+    let expected: Response<Location> = Response {
+        id: 1,
+        result: Some(Location {
+            uri: uri.clone(),
+            range: Range {
+                start: Position {
+                    line: 1,
+                    character: 0,
+                },
+                end: Position {
+                    line: 1,
+                    character: 24,
+                },
+            },
+        }),
+        jsonrpc: "2.0".to_string(),
+    };
+
+    assert_eq!(
+        expected.to_json().unwrap(),
+        response.unwrap(),
+        "expects to find definition"
     );
 }
 

@@ -1,5 +1,6 @@
 use crate::handlers::document_change::DocumentChangeHandler;
 use crate::handlers::document_open::DocumentOpenHandler;
+use crate::handlers::goto_definition::GotoDefinitionHandler;
 use crate::handlers::initialize::InitializeHandler;
 use crate::handlers::references::FindReferencesHandler;
 use crate::handlers::shutdown::ShutdownHandler;
@@ -31,6 +32,10 @@ impl Handler {
         mapping.insert(
             "textDocument/didOpen".to_string(),
             Box::new(DocumentOpenHandler::new(logger.clone())),
+        );
+        mapping.insert(
+            "textDocument/definition".to_string(),
+            Box::new(GotoDefinitionHandler::new()),
         );
         mapping.insert(
             "initialize".to_string(),

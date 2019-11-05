@@ -13,6 +13,71 @@ use std::rc::Rc;
 
 use flux::ast::walk;
 
+fn function_defines(
+    ident: &flux::ast::Identifier,
+    f: &flux::ast::FunctionExpr,
+) -> bool {
+    for param in f.params.clone() {
+        if let flux::ast::PropertyKey::Identifier(i) = param.key {
+            if i.name == ident.name {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
+fn is_scope<'a>(
+    ident: &flux::ast::Identifier,
+    n: Rc<walk::Node<'a>>,
+) -> bool {
+    let dvisitor: DefinitionFinderVisitor =
+        DefinitionFinderVisitor::new(ident.name.clone());
+
+    walk::walk_rc(&dvisitor, n.clone());
+
+    let state = dvisitor.state.borrow();
+
+    if let Some(_) = state.node.clone() {
+        return true;
+    }
+
+    return false;
+}
+
+fn find_scope<'a>(
+    path: Vec<Rc<walk::Node<'a>>>,
+    node: Rc<walk::Node<'a>>,
+) -> Option<Rc<walk::Node<'a>>> {
+    if let walk::Node::Identifier(ident) = node.as_ref() {
+        let path_iter = path.iter().rev();
+        for n in path_iter {
+            match n.as_ref() {
+                walk::Node::FunctionExpr(_)
+                | walk::Node::Package(_)
+                | walk::Node::File(_) => {
+                    if let walk::Node::FunctionExpr(f) = n.as_ref() {
+                        if function_defines(ident, f) {
+                            return Some(n.clone());
+                        }
+                    }
+
+                    if is_scope(ident, n.clone()) {
+                        return Some(n.clone());
+                    }
+                }
+                _ => (),
+            }
+        }
+
+        if path.len() > 1 {
+            return Some(path[0].clone());
+        }
+    }
+    return None;
+}
+
 pub struct FindReferencesHandler {
     logger: Rc<RefCell<dyn Logger>>,
 }
@@ -22,6 +87,7 @@ impl RequestHandler for FindReferencesHandler {
         &self,
         prequest: PolymorphicRequest,
     ) -> Result<String, String> {
+        let mut locations: Vec<Location> = vec![];
         let request: Request<ReferenceParams> =
             Request::from_json(prequest.data.as_str())?;
         if let Some(params) = request.params {
@@ -36,49 +102,10 @@ impl RequestHandler for FindReferencesHandler {
             let node = (*state).node.clone();
             let path = (*state).path.clone();
 
-            let mut scope: Option<Rc<walk::Node>> = None;
-
-            let mut locations: Vec<Location> = vec![];
             if let Some(node) = node {
                 if let walk::Node::Identifier(ident) = node.as_ref() {
-                    let path_iter = path.iter().rev();
-                    for n in path_iter {
-                        match n.as_ref() {
-                            walk::Node::FunctionExpr(_)
-                            | walk::Node::Package(_)
-                            | walk::Node::File(_) => {
-                                if let walk::Node::FunctionExpr(f) =
-                                    n.as_ref()
-                                {
-                                    for p in f.params.clone() {
-                                        if let flux::ast::PropertyKey::Identifier(i) = p.key {
-                                        if i.name == ident.name {
-                                            scope = Some(n.clone());
-                                            break;
-                                        }
-                                    }
-                                    }
-                                }
-
-                                let dvisitor: DefinitionFinderVisitor =
-                                DefinitionFinderVisitor::new(
-                                    ident.name.clone(),
-                                );
-
-                                walk::walk_rc(&dvisitor, n.clone());
-
-                                let state = dvisitor.state.borrow();
-
-                                if state.found {
-                                    scope = Some(n.clone());
-                                    break;
-                                }
-                            }
-                            _ => {
-                                continue;
-                            }
-                        }
-                    }
+                    let mut scope: Option<Rc<walk::Node>> =
+                        find_scope(path.clone(), node.clone());
 
                     if scope.is_none() && path.len() > 1 {
                         scope = Some(path[0].clone());
@@ -108,24 +135,17 @@ impl RequestHandler for FindReferencesHandler {
                             locations.push(loc);
                         }
                     }
-                } else {
-                    let mut logger = self.logger.borrow_mut();
-                    logger.info(format!("Node Found: {}", node))?;
                 }
-            }
-
-            let response = Response::new(request.id, Some(locations));
-
-            if let Ok(json) = response.to_json() {
-                return Ok(json);
-            } else {
-                return Err(
-                    "Could not create response json".to_string()
-                );
             }
         }
 
-        Err("invalid textDocument/references request".to_string())
+        let response = Response::new(request.id, Some(locations));
+
+        if let Ok(json) = response.to_json() {
+            return Ok(json);
+        } else {
+            return Err("Could not create response json".to_string());
+        }
     }
 }
 

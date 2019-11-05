@@ -1,5 +1,6 @@
 pub mod document_change;
 pub mod document_open;
+pub mod goto_definition;
 pub mod initialize;
 pub mod references;
 pub mod shutdown;

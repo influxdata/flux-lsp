@@ -170,6 +170,13 @@ pub struct ReferenceParams {
 pub struct InitializeRequestParams {}
 
 #[derive(Serialize, Deserialize, Clone)]
+pub struct TextDocumentPositionParams {
+    #[serde(rename = "textDocument")]
+    pub text_document: TextDocument,
+    pub position: Position,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
 pub struct TextDocument {
     pub uri: String,
     #[serde(rename = "languageId", default = "default_language_id")]
@@ -190,6 +197,9 @@ pub struct TextDocumentParams {
 pub struct ServerCapabilities {
     #[serde(rename = "referencesProvider")]
     references_provider: bool,
+
+    #[serde(rename = "definitionProvider")]
+    definition_provider: bool,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -205,6 +215,7 @@ impl InitializeResult {
         return InitializeResult {
             capabilities: ServerCapabilities {
                 references_provider: true,
+                definition_provider: true,
             },
         };
     }
