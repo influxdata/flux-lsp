@@ -27,7 +27,7 @@ impl RequestHandler for FindReferencesHandler {
         if let Some(params) = request.params {
             let uri = params.text_document.uri;
             let file = utils::create_file_node(uri.clone())?;
-            let walker = Rc::new(walk::Node::File(&file));
+            let walker = walk::Node::File(&file);
             let visitor = NodeFinderVisitor::new(params.position);
 
             walk::walk(&visitor, walker);
@@ -65,7 +65,7 @@ impl RequestHandler for FindReferencesHandler {
                                     ident.name.clone(),
                                 );
 
-                                walk::walk(&dvisitor, n.clone());
+                                walk::walk_rc(&dvisitor, n.clone());
 
                                 let state = dvisitor.state.borrow();
 
@@ -94,7 +94,7 @@ impl RequestHandler for FindReferencesHandler {
                         let visitor = IdentFinderVisitor::new(
                             ident.name.clone(),
                         );
-                        walk::walk(&visitor, scope);
+                        walk::walk_rc(&visitor, scope);
 
                         let state = visitor.state.borrow();
                         let identifiers =
