@@ -5,23 +5,22 @@ use flux_lsp_lib::loggers::Logger;
 use flux_lsp_lib::structs::*;
 
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::rc::Rc;
 
 struct TestLogger {}
 impl Logger for TestLogger {
     fn info(&mut self, _: String) -> Result<(), String> {
-        return Ok(());
+        Ok(())
     }
     fn error(&mut self, _: String) -> Result<(), String> {
-        return Ok(());
+        Ok(())
     }
 }
 
 fn create_handler() -> Handler {
     let logger = Rc::new(RefCell::new(TestLogger {}));
-    let h = Handler::new(logger);
-
-    return h;
+    Handler::new(logger)
 }
 
 fn flux_fixture_uri(filename: &'static str) -> String {
@@ -33,7 +32,7 @@ fn flux_fixture_uri(filename: &'static str) -> String {
 
     let p = pwd.as_path().to_str().unwrap().to_string();
 
-    return format!("file://{}", p);
+    format!("file://{}", p)
 }
 
 #[test]
@@ -75,7 +74,7 @@ fn test_initialize() {
     let response = handler.handle(request).unwrap().unwrap();
     let expected = Response {
         id: 1,
-        result: Some(InitializeResult::new()),
+        result: Some(InitializeResult::default()),
         jsonrpc: "2.0".to_string(),
     };
     let expected_json = expected.to_json().unwrap();
@@ -456,6 +455,92 @@ fn test_shutdown() {
     let expected: Response<ShutdownResult> = Response {
         id: 1,
         result: None,
+        jsonrpc: "2.0".to_string(),
+    };
+
+    assert_eq!(
+        expected.to_json().unwrap(),
+        response.unwrap(),
+        "expects to find all references"
+    );
+}
+
+#[test]
+fn test_rename() {
+    let uri = flux_fixture_uri("ok");
+    let new_name = "environment".to_string();
+    let rename_request = Request {
+        id: 1,
+        method: "textDocument/rename".to_string(),
+        params: Some(RenameParams {
+            text_document: TextDocument {
+                uri: uri.clone(),
+                language_id: "flux".to_string(),
+                version: 1,
+                text: "".to_string(),
+            },
+            position: Position {
+                line: 1,
+                character: 1,
+            },
+            new_name: new_name.clone(),
+        }),
+    };
+
+    let rename_request_json =
+        serde_json::to_string(&rename_request).unwrap();
+    let request = PolymorphicRequest {
+        base_request: BaseRequest {
+            id: 1,
+            method: "textDocument/rename".to_string(),
+        },
+        data: rename_request_json,
+    };
+    let mut handler = create_handler();
+
+    let response = handler.handle(request).unwrap();
+
+    let mut expected_changes: HashMap<String, Vec<TextEdit>> =
+        HashMap::new();
+
+    let edits = vec![
+        TextEdit {
+            new_text: new_name.clone(),
+            range: Range {
+                start: Position {
+                    line: 1,
+                    character: 0,
+                },
+                end: Position {
+                    line: 1,
+                    character: 3,
+                },
+            },
+        },
+        TextEdit {
+            new_text: new_name.clone(),
+            range: Range {
+                start: Position {
+                    line: 8,
+                    character: 34,
+                },
+                end: Position {
+                    line: 8,
+                    character: 37,
+                },
+            },
+        },
+    ];
+
+    expected_changes.insert(uri.clone(), edits);
+
+    let workspace_edit = WorkspaceEditResult {
+        changes: expected_changes.clone(),
+    };
+
+    let expected: Response<WorkspaceEditResult> = Response {
+        id: 1,
+        result: Some(workspace_edit),
         jsonrpc: "2.0".to_string(),
     };
 

@@ -3,13 +3,17 @@ pub mod document_open;
 pub mod goto_definition;
 pub mod initialize;
 pub mod references;
+pub mod rename;
 pub mod shutdown;
 
 use crate::structs::{
     create_diagnostics_notification, Notification,
-    PolymorphicRequest, PublishDiagnosticsParams,
+    PolymorphicRequest, Position, PublishDiagnosticsParams,
 };
 use crate::utils;
+use crate::visitors::NodeFinderVisitor;
+
+use std::rc::Rc;
 
 use flux::ast::{check, walk};
 
@@ -35,4 +39,28 @@ pub fn create_file_diagnostics(
             return Err(format!("Failed to create diagnostic: {}", e))
         }
     };
+}
+
+#[derive(Default, Clone)]
+pub struct NodeFinderResult<'a> {
+    node: Option<Rc<walk::Node<'a>>>,
+    path: Vec<Rc<walk::Node<'a>>>,
+}
+
+pub fn find_node<'a>(
+    file: &'a flux::ast::File,
+    position: Position,
+) -> NodeFinderResult<'a> {
+    let mut result = NodeFinderResult::default();
+    let walker: walk::Node<'a> = walk::Node::File(file);
+    let visitor = NodeFinderVisitor::new(position);
+
+    walk::walk(&visitor, walker);
+
+    let state = visitor.state.borrow();
+
+    result.node = (*state).node.clone();
+    result.path = (*state).path.clone();
+
+    result
 }

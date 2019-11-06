@@ -1,20 +1,21 @@
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 fn default_id() -> u32 {
-    return 0;
+    0
 }
 
 fn default_version() -> u32 {
-    return 1;
+    1
 }
 
 fn default_language_id() -> String {
-    return "".to_string();
+    "".to_string()
 }
 
 fn default_text() -> String {
-    return "".to_string();
+    "".to_string()
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -57,12 +58,9 @@ where
 {
     pub fn from_json(s: &str) -> Result<Request<T>, String> {
         match serde_json::from_str(s) {
-            Ok(c) => return Ok(c),
+            Ok(c) => Ok(c),
             Err(e) => {
-                return Err(format!(
-                    "Failed to parse json of Request: {}",
-                    e
-                ))
+                Err(format!("Failed to parse json of Request: {}", e))
             }
         }
     }
@@ -80,21 +78,21 @@ where
     T: Serialize + Clone,
 {
     pub fn new(id: u32, result: Option<T>) -> Response<T> {
-        return Response {
+        Response {
             id,
             result,
             jsonrpc: String::from("2.0"),
-        };
+        }
     }
 
     pub fn to_json(&self) -> Result<String, String> {
         match serde_json::to_string(self) {
-            Ok(s) => return Ok(s),
+            Ok(s) => Ok(s),
             Err(_) => {
-                return Err("Failed to serialize initialize response"
+                Err("Failed to serialize initialize response"
                     .to_string())
             }
-        };
+        }
     }
 }
 
@@ -110,13 +108,11 @@ where
 {
     pub fn to_json(&self) -> Result<String, String> {
         match serde_json::to_string(self) {
-            Ok(s) => return Ok(s),
-            Err(_) => {
-                return Err(String::from(
-                    "Failed to serialize initialize response",
-                ))
-            }
-        };
+            Ok(s) => Ok(s),
+            Err(_) => Err(String::from(
+                "Failed to serialize initialize response",
+            )),
+        }
     }
 }
 
@@ -130,11 +126,9 @@ pub struct BaseRequest {
 impl BaseRequest {
     pub fn from_json(s: &str) -> Result<BaseRequest, String> {
         match serde_json::from_str(s) {
-            Ok(c) => return Ok(c),
+            Ok(c) => Ok(c),
             Err(_) => {
-                return Err(
-                    "Failed to parse json of BaseRequest".to_string()
-                )
+                Err("Failed to parse json of BaseRequest".to_string())
             }
         }
     }
@@ -148,7 +142,7 @@ pub struct PolymorphicRequest {
 
 impl PolymorphicRequest {
     pub fn method(&self) -> String {
-        return self.base_request.method.clone();
+        self.base_request.method.clone()
     }
 }
 
@@ -168,6 +162,15 @@ pub struct ReferenceParams {
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct InitializeRequestParams {}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct RenameParams {
+    #[serde(rename = "textDocument")]
+    pub text_document: TextDocument,
+    pub position: Position,
+    #[serde(rename = "newName")]
+    pub new_name: String,
+}
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct TextDocumentPositionParams {
@@ -193,31 +196,35 @@ pub struct TextDocumentParams {
     pub text_document: TextDocument,
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Default)]
 pub struct ServerCapabilities {
     #[serde(rename = "referencesProvider")]
     references_provider: bool,
 
     #[serde(rename = "definitionProvider")]
     definition_provider: bool,
+
+    #[serde(rename = "renameProvider")]
+    rename_provider: bool,
 }
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct ShutdownResult {}
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct InitializeResult {
     pub capabilities: ServerCapabilities,
 }
 
-#[derive(Serialize, Deserialize, Clone)]
-pub struct ShutdownResult {}
-
-impl InitializeResult {
-    pub fn new() -> InitializeResult {
-        return InitializeResult {
+impl Default for InitializeResult {
+    fn default() -> Self {
+        InitializeResult {
             capabilities: ServerCapabilities {
-                references_provider: true,
                 definition_provider: true,
+                references_provider: true,
+                rename_provider: true,
             },
-        };
+        }
     }
 }
 
@@ -234,6 +241,18 @@ pub struct ShowMessageParams {
     message: String,
 }
 
+#[derive(Serialize, Deserialize, Clone)]
+pub struct TextEdit {
+    #[serde(rename = "newText")]
+    pub new_text: String,
+    pub range: Range,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct WorkspaceEditResult {
+    pub changes: HashMap<String, Vec<TextEdit>>,
+}
+
 pub fn create_diagnostics_notification(
     uri: String,
     diagnostics: Vec<Diagnostic>,
@@ -242,5 +261,5 @@ pub fn create_diagnostics_notification(
     let params = PublishDiagnosticsParams { uri, diagnostics };
     let request = Notification { method, params };
 
-    return Ok(request);
+    Ok(request)
 }
