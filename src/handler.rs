@@ -36,7 +36,7 @@ impl Handler {
         );
         mapping.insert(
             "textDocument/definition".to_string(),
-            Box::new(GotoDefinitionHandler::new()),
+            Box::new(GotoDefinitionHandler::default()),
         );
         mapping.insert(
             "textDocument/rename".to_string(),
@@ -48,7 +48,7 @@ impl Handler {
         );
         mapping.insert(
             "shutdown".to_string(),
-            Box::new(ShutdownHandler::new()),
+            Box::new(ShutdownHandler::default()),
         );
 
         Handler { logger, mapping }

@@ -25,16 +25,16 @@ pub struct FileLogger {
 
 impl Logger for FileLogger {
     fn info(&mut self, s: String) -> Result<(), String> {
-        return self.logln(format!("INFO: {}", s));
+        self.logln(format!("INFO: {}", s))
     }
 
     fn error(&mut self, s: String) -> Result<(), String> {
-        return self.logln(format!("ERROR: {}", s));
+        self.logln(format!("ERROR: {}", s))
     }
 }
 
 impl FileLogger {
-    pub fn new<'a>(path: &'a str) -> Result<FileLogger, String> {
+    pub fn new(path: &'_ str) -> Result<FileLogger, String> {
         let mut options = OpenOptions::new();
         options.append(true).create(true);
 
@@ -45,17 +45,17 @@ impl FileLogger {
             }
         };
 
-        return Ok(FileLogger { file: file });
+        Ok(FileLogger { file })
     }
 
     fn log(&mut self, s: String) -> Result<(), String> {
         match self.file.write_all(s.as_bytes()) {
-            Ok(_) => return Ok(()),
-            Err(_) => return Err("Failed to write log".to_string()),
+            Ok(_) => Ok(()),
+            Err(_) => Err("Failed to write log".to_string()),
         }
     }
 
     fn logln(&mut self, s: String) -> Result<(), String> {
-        return self.log(format!("{}\n", s));
+        self.log(format!("{}\n", s))
     }
 }

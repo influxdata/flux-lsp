@@ -35,9 +35,7 @@ impl RequestHandler for DocumentChangeHandler {
             return Ok(json);
         }
 
-        return Err(
-            "invalid textDocument/didChange request".to_string()
-        );
+        Err("invalid textDocument/didChange request".to_string())
     }
 }
 

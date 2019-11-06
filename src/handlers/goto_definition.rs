@@ -71,13 +71,13 @@ fn find_scoped_definition<'a>(
             _ => (),
         }
     }
-    return None;
+    None
 }
 
 pub struct GotoDefinitionHandler {}
 
-impl GotoDefinitionHandler {
-    pub fn new() -> GotoDefinitionHandler {
+impl Default for GotoDefinitionHandler {
+    fn default() -> Self {
         GotoDefinitionHandler {}
     }
 }
