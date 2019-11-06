@@ -12,10 +12,8 @@ pub fn get_content_size(s: String) -> Result<usize, String> {
     let stmp: Vec<&str> = tmp.split(": ").collect();
 
     match String::from(stmp[1]).parse::<usize>() {
-        Ok(size) => return Ok(size),
-        Err(_) => {
-            return Err("Failed to parse content size".to_string())
-        }
+        Ok(size) => Ok(size),
+        Err(_) => Err("Failed to parse content size".to_string()),
     }
 }
 
@@ -29,7 +27,7 @@ pub fn parse_request(
         data: content.clone(),
     };
 
-    return Ok(result);
+    Ok(result)
 }
 
 pub fn map_node_to_location(
@@ -65,18 +63,16 @@ pub fn map_errors_to_diagnostics(
         result.push(map_error_to_diagnostic(error));
     }
 
-    return result;
+    result
 }
 
-pub fn create_file_node<'a>(
-    uri: String,
-) -> Result<ast::File, String> {
+pub fn create_file_node(uri: String) -> Result<ast::File, String> {
     let file = parse_string(
         uri.as_str(),
         &get_file_contents_from_uri(uri.clone())?,
     );
 
-    return Ok(file);
+    Ok(file)
 }
 
 fn get_file_contents_from_uri(uri: String) -> Result<String, String> {
@@ -92,7 +88,7 @@ fn get_file_contents_from_uri(uri: String) -> Result<String, String> {
         Err(e) => return Err(format!("Failed to read file: {}", e)),
     };
 
-    return Ok(contents);
+    Ok(contents)
 }
 
 // TODO: figure out if all clients are zero based or if its

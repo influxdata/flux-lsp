@@ -3,6 +3,7 @@ use crate::handlers::document_open::DocumentOpenHandler;
 use crate::handlers::goto_definition::GotoDefinitionHandler;
 use crate::handlers::initialize::InitializeHandler;
 use crate::handlers::references::FindReferencesHandler;
+use crate::handlers::rename::RenameHandler;
 use crate::handlers::shutdown::ShutdownHandler;
 use crate::handlers::RequestHandler;
 use crate::loggers::Logger;
@@ -23,7 +24,7 @@ impl Handler {
             HashMap::new();
         mapping.insert(
             "textDocument/references".to_string(),
-            Box::new(FindReferencesHandler::new(logger.clone())),
+            Box::new(FindReferencesHandler::default()),
         );
         mapping.insert(
             "textDocument/didChange".to_string(),
@@ -35,17 +36,22 @@ impl Handler {
         );
         mapping.insert(
             "textDocument/definition".to_string(),
-            Box::new(GotoDefinitionHandler::new()),
+            Box::new(GotoDefinitionHandler::default()),
+        );
+        mapping.insert(
+            "textDocument/rename".to_string(),
+            Box::new(RenameHandler::default()),
         );
         mapping.insert(
             "initialize".to_string(),
-            Box::new(InitializeHandler::new()),
+            Box::new(InitializeHandler::default()),
         );
         mapping.insert(
             "shutdown".to_string(),
-            Box::new(ShutdownHandler::new()),
+            Box::new(ShutdownHandler::default()),
         );
-        return Handler { logger, mapping };
+
+        Handler { logger, mapping }
     }
 
     pub fn handle(
@@ -56,11 +62,11 @@ impl Handler {
             method => {
                 if let Some(m) = self.mapping.get(method) {
                     match m.handle(request) {
-                        Ok(r) => return Ok(Some(r)),
-                        Err(e) => return Err(e),
+                        Ok(r) => Ok(Some(r)),
+                        Err(e) => Err(e),
                     }
                 } else {
-                    return Ok(None);
+                    Ok(None)
                 }
             }
         }

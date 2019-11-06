@@ -14,16 +14,16 @@ impl RequestHandler for InitializeHandler {
         let _: Request<InitializeRequestParams> =
             Request::from_json(prequest.data.as_str())?;
 
-        let result = InitializeResult::new();
+        let result = InitializeResult::default();
         let response =
             Response::new(prequest.base_request.id, Some(result));
 
-        return response.to_json();
+        response.to_json()
     }
 }
 
-impl InitializeHandler {
-    pub fn new() -> InitializeHandler {
+impl Default for InitializeHandler {
+    fn default() -> Self {
         InitializeHandler {}
     }
 }

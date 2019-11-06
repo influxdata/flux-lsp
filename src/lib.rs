@@ -30,23 +30,17 @@ impl Server {
         reader: Box<dyn ServerInput>,
         writer: Box<dyn Write>,
     ) -> Server {
-        let server = Server {
-            reader: reader,
-            writer: writer,
+        Server {
+            reader,
+            writer,
             logger: logger.clone(),
             handler: Handler::new(logger.clone()),
-        };
-
-        return server;
+        }
     }
 
     pub fn with_stdio(logger: Rc<RefCell<dyn Logger>>) -> Server {
         let reader = BufReader::new(io::stdin());
-        return Server::new(
-            logger,
-            Box::new(reader),
-            Box::new(io::stdout()),
-        );
+        Server::new(logger, Box::new(reader), Box::new(io::stdout()))
     }
 
     fn write(&mut self, s: String) -> io::Result<()> {
@@ -54,24 +48,19 @@ impl Server {
         let st = s.clone();
         let result = st.as_bytes();
         let size = result.len();
-        let full = String::from(format!(
-            "Content-Length: {}\r\n\r\n{}",
-            size, s
-        ));
+        let full = format!("Content-Length: {}\r\n\r\n{}", size, s);
         let data = Vec::from(full.as_bytes());
 
         self.writer.write_all(&data)?;
-        return self.writer.flush();
+        self.writer.flush()
     }
 
     fn read_spacer(&mut self) -> Result<(), String> {
         let _logger = self.logger.borrow_mut();
         let mut s = String::new();
         match &self.reader.read_line(&mut s) {
-            Ok(_) => return Ok(()),
-            Err(_) => {
-                return Err("Failed to read spacer line".to_string())
-            }
+            Ok(_) => Ok(()),
+            Err(_) => Err("Failed to read spacer line".to_string()),
         }
     }
 
@@ -87,16 +76,14 @@ impl Server {
         }
 
         match std::str::from_utf8(&vec) {
-            Ok(contents) => return Ok(contents.to_string()),
-            Err(_) => {
-                return Err("Failed to parse contents".to_string())
-            }
+            Ok(contents) => Ok(contents.to_string()),
+            Err(_) => Err("Failed to parse contents".to_string()),
         }
     }
 
     fn log_info(&mut self, s: String) -> Result<(), String> {
         let mut logger = self.logger.borrow_mut();
-        return logger.info(s);
+        logger.info(s)
     }
 
     fn handle_request(&mut self) -> Result<(), String> {
@@ -139,12 +126,11 @@ impl Server {
             }
         }
 
-        match request.method().as_str() {
-            "exit" => std::process::exit(0),
-            _ => (),
+        if request.method() == "exit" {
+            std::process::exit(0);
         }
 
-        return Ok(());
+        Ok(())
     }
 
     pub fn start(&mut self) {

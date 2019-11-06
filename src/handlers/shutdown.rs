@@ -19,8 +19,8 @@ impl RequestHandler for ShutdownHandler {
     }
 }
 
-impl ShutdownHandler {
-    pub fn new() -> ShutdownHandler {
+impl Default for ShutdownHandler {
+    fn default() -> Self {
         ShutdownHandler {}
     }
 }

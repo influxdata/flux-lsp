@@ -11,6 +11,10 @@ jobs:
     - uses: actions/checkout@v1
     - name: Install Ragel
       run: sudo apt-get install ragel
+    - name: Install Clippy
+      run: rustup component add clippy
+    - name: Lint
+      run: cargo clippy --all -- -D warnings
     - name: Build
       run: cargo build --verbose
     - name: Run tests

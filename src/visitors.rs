@@ -6,8 +6,8 @@ use std::rc::Rc;
 use flux::ast::walk::{self, Visitor};
 
 // TODO: figure out if this offset is common among lsp clients
-fn contains_position<'a>(
-    node: Rc<walk::Node<'a>>,
+fn contains_position(
+    node: Rc<walk::Node<'_>>,
     pos: Position,
 ) -> bool {
     let start_line = node.base().location.start.line - 1;
@@ -45,7 +45,7 @@ pub struct DefinitionFinderVisitor<'a> {
 }
 
 impl<'a> Visitor<'a> for DefinitionFinderVisitor<'a> {
-    fn visit<'b>(&self, node: Rc<walk::Node<'a>>) -> Option<Self> {
+    fn visit(&self, node: Rc<walk::Node<'a>>) -> Option<Self> {
         let mut state = self.state.borrow_mut();
 
         match node.as_ref() {
@@ -57,9 +57,7 @@ impl<'a> Visitor<'a> for DefinitionFinderVisitor<'a> {
 
                 Some(self.clone())
             }
-            walk::Node::FunctionExpr(_) => {
-                return None;
-            }
+            walk::Node::FunctionExpr(_) => None,
             _ => Some(self.clone()),
         }
     }
@@ -88,7 +86,7 @@ pub struct NodeFinderVisitor<'a> {
 }
 
 impl<'a> Visitor<'a> for NodeFinderVisitor<'a> {
-    fn visit<'b>(&self, node: Rc<walk::Node<'a>>) -> Option<Self> {
+    fn visit(&self, node: Rc<walk::Node<'a>>) -> Option<Self> {
         let mut state = self.state.borrow_mut();
 
         let contains = contains_position(
@@ -101,7 +99,7 @@ impl<'a> Visitor<'a> for NodeFinderVisitor<'a> {
             (*state).node = Some(node.clone());
         }
 
-        return Some(self.clone());
+        Some(self.clone())
     }
 }
 
@@ -128,7 +126,7 @@ pub struct IdentFinderVisitor<'a> {
 }
 
 impl<'a> Visitor<'a> for IdentFinderVisitor<'a> {
-    fn visit<'b>(&self, node: Rc<walk::Node<'a>>) -> Option<Self> {
+    fn visit(&self, node: Rc<walk::Node<'a>>) -> Option<Self> {
         let mut state = self.state.borrow_mut();
         match node.clone().as_ref() {
             walk::Node::MemberExpr(m) => {
@@ -148,7 +146,7 @@ impl<'a> Visitor<'a> for IdentFinderVisitor<'a> {
             }
             _ => {}
         }
-        return Some(self.clone());
+        Some(self.clone())
     }
 }
 
