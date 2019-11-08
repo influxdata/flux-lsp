@@ -6,12 +6,14 @@ pub mod references;
 pub mod rename;
 pub mod shutdown;
 
-use crate::structs::{
+use crate::protocol::notifications::{
     create_diagnostics_notification, Notification,
-    PolymorphicRequest, Position, PublishDiagnosticsParams,
+    PublishDiagnosticsParams,
 };
+use crate::protocol::properties::Position;
+use crate::protocol::requests::PolymorphicRequest;
 use crate::utils;
-use crate::visitors::NodeFinderVisitor;
+use crate::visitors::ast::NodeFinderVisitor;
 
 use std::rc::Rc;
 

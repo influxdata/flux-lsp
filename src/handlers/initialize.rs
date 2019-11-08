@@ -1,8 +1,8 @@
 use crate::handlers::RequestHandler;
-use crate::structs::{
-    InitializeRequestParams, InitializeResult, PolymorphicRequest,
-    Request, Response,
+use crate::protocol::requests::{
+    InitializeParams, PolymorphicRequest, Request,
 };
+use crate::protocol::responses::{InitializeResult, Response};
 
 pub struct InitializeHandler {}
 
@@ -11,7 +11,7 @@ impl RequestHandler for InitializeHandler {
         &self,
         prequest: PolymorphicRequest,
     ) -> Result<String, String> {
-        let _: Request<InitializeRequestParams> =
+        let _: Request<InitializeParams> =
             Request::from_json(prequest.data.as_str())?;
 
         let result = InitializeResult::default();

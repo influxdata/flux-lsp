@@ -1,6 +1,6 @@
 use crate::handlers::{create_file_diagnostics, RequestHandler};
 use crate::loggers::Logger;
-use crate::structs::{
+use crate::protocol::requests::{
     PolymorphicRequest, Request, TextDocumentParams,
 };
 

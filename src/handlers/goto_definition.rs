@@ -1,12 +1,15 @@
 use std::rc::Rc;
 
 use crate::handlers::RequestHandler;
-use crate::structs::{
-    Location, PolymorphicRequest, Position, Range, Request, Response,
-    TextDocumentPositionParams,
+use crate::protocol::properties::{Location, Position, Range};
+use crate::protocol::requests::{
+    PolymorphicRequest, Request, TextDocumentPositionParams,
 };
+use crate::protocol::responses::Response;
 use crate::utils;
-use crate::visitors::{DefinitionFinderVisitor, NodeFinderVisitor};
+use crate::visitors::ast::{
+    DefinitionFinderVisitor, NodeFinderVisitor,
+};
 
 use flux::ast::walk;
 

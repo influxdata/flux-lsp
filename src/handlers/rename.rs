@@ -1,9 +1,10 @@
 use crate::handlers::references::find_references;
 use crate::handlers::RequestHandler;
-use crate::structs::{
-    PolymorphicRequest, RenameParams, Request, Response, TextEdit,
-    WorkspaceEditResult,
+use crate::protocol::properties::TextEdit;
+use crate::protocol::requests::{
+    PolymorphicRequest, RenameParams, Request,
 };
+use crate::protocol::responses::{Response, WorkspaceEditResult};
 
 use std::collections::HashMap;
 

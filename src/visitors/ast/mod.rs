@@ -1,4 +1,4 @@
-use crate::structs::Position;
+use crate::protocol::properties::Position;
 
 use std::cell::RefCell;
 use std::rc::Rc;

@@ -1,7 +1,10 @@
 use std::fs;
 use std::rc::Rc;
 
-use crate::structs;
+use crate::protocol::properties::{
+    Diagnostic, Location, Position, Range,
+};
+use crate::protocol::requests::{BaseRequest, PolymorphicRequest};
 
 use flux::ast::{self, check, walk};
 use flux::parser::parse_string;
@@ -19,10 +22,10 @@ pub fn get_content_size(s: String) -> Result<usize, String> {
 
 pub fn parse_request(
     content: String,
-) -> Result<structs::PolymorphicRequest, String> {
-    let request = structs::BaseRequest::from_json(content.as_str())?;
+) -> Result<PolymorphicRequest, String> {
+    let request = BaseRequest::from_json(content.as_str())?;
 
-    let result = structs::PolymorphicRequest {
+    let result = PolymorphicRequest {
         base_request: request,
         data: content.clone(),
     };
@@ -33,20 +36,20 @@ pub fn parse_request(
 pub fn map_node_to_location(
     uri: String,
     node: Rc<walk::Node>,
-) -> structs::Location {
+) -> Location {
     let start_line = node.base().location.start.line - 1;
     let start_col = node.base().location.start.column - 1;
     let end_line = node.base().location.end.line - 1;
     let end_col = node.base().location.end.column - 1;
 
-    structs::Location {
+    Location {
         uri,
-        range: structs::Range {
-            start: structs::Position {
+        range: Range {
+            start: Position {
                 line: start_line,
                 character: start_col,
             },
-            end: structs::Position {
+            end: Position {
                 line: end_line,
                 character: end_col,
             },
@@ -56,7 +59,7 @@ pub fn map_node_to_location(
 
 pub fn map_errors_to_diagnostics(
     errors: Vec<check::Error>,
-) -> Vec<structs::Diagnostic> {
+) -> Vec<Diagnostic> {
     let mut result = vec![];
 
     for error in errors {
@@ -94,19 +97,17 @@ fn get_file_contents_from_uri(uri: String) -> Result<String, String> {
 // TODO: figure out if all clients are zero based or if its
 //       just vim-lsp if not remove the hard coded
 //       subtraction in favor of runtime options
-fn map_error_to_diagnostic(
-    error: check::Error,
-) -> structs::Diagnostic {
-    structs::Diagnostic {
+fn map_error_to_diagnostic(error: check::Error) -> Diagnostic {
+    Diagnostic {
         severity: 1,
         code: 1,
         message: error.message,
-        range: structs::Range {
-            start: structs::Position {
+        range: Range {
+            start: Position {
                 line: error.location.start.line - 1,
                 character: error.location.start.column - 1,
             },
-            end: structs::Position {
+            end: Position {
                 line: error.location.end.line - 1,
                 character: error.location.end.column - 1,
             },

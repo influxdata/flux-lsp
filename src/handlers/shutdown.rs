@@ -1,6 +1,7 @@
 use crate::handlers::RequestHandler;
 
-use crate::structs::{PolymorphicRequest, Response, ShutdownResult};
+use crate::protocol::requests::PolymorphicRequest;
+use crate::protocol::responses::{Response, ShutdownResult};
 
 pub struct ShutdownHandler {}
 

@@ -1,11 +1,14 @@
 use crate::handlers::find_node;
 use crate::handlers::RequestHandler;
-use crate::structs::{
-    Location, PolymorphicRequest, Position, ReferenceParams, Request,
-    Response,
+use crate::protocol::properties::{Location, Position};
+use crate::protocol::requests::{
+    PolymorphicRequest, ReferenceParams, Request,
 };
+use crate::protocol::responses::Response;
 use crate::utils;
-use crate::visitors::{DefinitionFinderVisitor, IdentFinderVisitor};
+use crate::visitors::ast::{
+    DefinitionFinderVisitor, IdentFinderVisitor,
+};
 
 use std::rc::Rc;
 

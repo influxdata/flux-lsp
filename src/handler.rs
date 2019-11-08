@@ -7,7 +7,7 @@ use crate::handlers::rename::RenameHandler;
 use crate::handlers::shutdown::ShutdownHandler;
 use crate::handlers::RequestHandler;
 use crate::loggers::Logger;
-use crate::structs::*;
+use crate::protocol::requests::PolymorphicRequest;
 
 use std::cell::RefCell;
 use std::collections::HashMap;
