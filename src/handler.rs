@@ -31,6 +31,10 @@ impl Handler {
             Box::new(DocumentChangeHandler::new(logger.clone())),
         );
         mapping.insert(
+            "textDocument/didSave".to_string(),
+            Box::new(DocumentChangeHandler::new(logger.clone())),
+        );
+        mapping.insert(
             "textDocument/didOpen".to_string(),
             Box::new(DocumentOpenHandler::new(logger.clone())),
         );
