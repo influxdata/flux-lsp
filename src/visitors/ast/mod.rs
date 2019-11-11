@@ -149,14 +149,3 @@ impl<'a> Visitor<'a> for IdentFinderVisitor<'a> {
         Some(self.clone())
     }
 }
-
-impl<'a> IdentFinderVisitor<'a> {
-    pub fn new(name: String) -> IdentFinderVisitor<'a> {
-        IdentFinderVisitor {
-            state: Rc::new(RefCell::new(IdentFinderState {
-                name,
-                identifiers: vec![],
-            })),
-        }
-    }
-}

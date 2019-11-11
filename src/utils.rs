@@ -78,7 +78,9 @@ pub fn create_file_node(uri: String) -> Result<ast::File, String> {
     Ok(file)
 }
 
-fn get_file_contents_from_uri(uri: String) -> Result<String, String> {
+pub fn get_file_contents_from_uri(
+    uri: String,
+) -> Result<String, String> {
     let file_path = match Url::parse(uri.as_str()) {
         Ok(s) => s,
         Err(e) => {
