@@ -125,7 +125,7 @@ impl RequestHandler for FindReferencesHandler {
     fn handle(
         &self,
         prequest: PolymorphicRequest,
-    ) -> Result<String, String> {
+    ) -> Result<Option<String>, String> {
         let mut locations: Vec<Location> = vec![];
         let request: Request<ReferenceParams> =
             Request::from_json(prequest.data.as_str())?;
@@ -137,11 +137,8 @@ impl RequestHandler for FindReferencesHandler {
         }
 
         let response = Response::new(request.id, Some(locations));
+        let json = response.to_json()?;
 
-        if let Ok(json) = response.to_json() {
-            Ok(json)
-        } else {
-            Err("Could not create response json".to_string())
-        }
+        Ok(Some(json))
     }
 }

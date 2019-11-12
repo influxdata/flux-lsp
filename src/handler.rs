@@ -65,10 +65,7 @@ impl Handler {
         match request.method().as_str() {
             method => {
                 if let Some(m) = self.mapping.get(method) {
-                    match m.handle(request) {
-                        Ok(r) => Ok(Some(r)),
-                        Err(e) => Err(e),
-                    }
+                    m.handle(request)
                 } else {
                     Ok(None)
                 }

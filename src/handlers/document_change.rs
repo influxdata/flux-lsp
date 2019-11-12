@@ -10,7 +10,7 @@ impl RequestHandler for DocumentChangeHandler {
     fn handle(
         &self,
         prequest: PolymorphicRequest,
-    ) -> Result<String, String> {
+    ) -> Result<Option<String>, String> {
         let request: Request<TextDocumentParams> =
             Request::from_json(prequest.data.as_str())?;
         if let Some(params) = request.params {
@@ -18,7 +18,7 @@ impl RequestHandler for DocumentChangeHandler {
             let msg = create_file_diagnostics(uri.clone())?;
             let json = msg.to_json()?;
 
-            return Ok(json);
+            return Ok(Some(json));
         }
 
         Err("invalid textDocument/didChange request".to_string())

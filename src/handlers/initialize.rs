@@ -10,7 +10,7 @@ impl RequestHandler for InitializeHandler {
     fn handle(
         &self,
         prequest: PolymorphicRequest,
-    ) -> Result<String, String> {
+    ) -> Result<Option<String>, String> {
         let _: Request<InitializeParams> =
             Request::from_json(prequest.data.as_str())?;
 
@@ -18,7 +18,9 @@ impl RequestHandler for InitializeHandler {
         let response =
             Response::new(prequest.base_request.id, Some(result));
 
-        response.to_json()
+        let json = response.to_json()?;
+
+        Ok(Some(json))
     }
 }
 

@@ -23,7 +23,7 @@ pub trait RequestHandler {
     fn handle(
         &self,
         prequest: PolymorphicRequest,
-    ) -> Result<String, String>;
+    ) -> Result<Option<String>, String>;
 }
 
 pub fn create_file_diagnostics(
