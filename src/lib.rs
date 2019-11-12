@@ -81,11 +81,6 @@ impl Server {
         }
     }
 
-    fn log_info(&mut self, s: String) -> Result<(), String> {
-        let mut logger = self.logger.borrow_mut();
-        logger.info(s)
-    }
-
     fn handle_request(&mut self) -> Result<(), String> {
         let mut line = String::new();
 
@@ -101,23 +96,11 @@ impl Server {
         }
 
         let content_size = utils::get_content_size(line.clone())?;
-        self.log_info(format!(
-            "Request Content Size: {}",
-            content_size
-        ))?;
-
         let content_body = self.read_content_body(content_size)?;
-        self.log_info(format!(
-            "Request Content Body: {}",
-            content_body
-        ))?;
-
         let request = utils::parse_request(content_body)?;
         let option = self.handler.handle(request.clone())?;
 
         if let Some(msg) = option {
-            self.log_info(format!("Response Body: {}", msg))?;
-
             match self.write(msg) {
                 Ok(_) => return Ok(()),
                 Err(_) => {

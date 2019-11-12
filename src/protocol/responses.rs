@@ -48,6 +48,7 @@ impl Default for InitializeResult {
                 definition_provider: true,
                 references_provider: true,
                 rename_provider: true,
+                folding_range_provider: true,
             },
         }
     }

@@ -18,6 +18,18 @@ pub struct Handler {
     mapping: HashMap<String, Box<dyn RequestHandler>>,
 }
 
+#[derive(Default)]
+struct NoOpHandler {}
+
+impl RequestHandler for NoOpHandler {
+    fn handle(
+        &self,
+        _: PolymorphicRequest,
+    ) -> Result<Option<String>, String> {
+        Ok(None)
+    }
+}
+
 impl Handler {
     pub fn new(logger: Rc<RefCell<dyn Logger>>) -> Handler {
         let mut mapping: HashMap<String, Box<dyn RequestHandler>> =
@@ -54,6 +66,10 @@ impl Handler {
             "shutdown".to_string(),
             Box::new(ShutdownHandler::default()),
         );
+        mapping.insert(
+            "textDocument/foldingRange".to_string(),
+            Box::new(NoOpHandler::default()),
+        );
 
         Handler { logger, mapping }
     }
@@ -62,14 +78,22 @@ impl Handler {
         &mut self,
         request: PolymorphicRequest,
     ) -> Result<Option<String>, String> {
-        match request.method().as_str() {
-            method => {
-                if let Some(m) = self.mapping.get(method) {
-                    m.handle(request)
-                } else {
-                    Ok(None)
-                }
+        let req = request.clone();
+
+        let mut logger = self.logger.borrow_mut();
+        logger.info(format!("Request -> {:?}", req.data))?;
+
+        let method = request.method();
+        if let Some(m) = self.mapping.get(&method) {
+            let resp = m.handle(request)?;
+
+            if let Some(resp) = resp.clone() {
+                logger.info(format!("Response -> {}", resp))?;
             }
+
+            Ok(resp)
+        } else {
+            Ok(None)
         }
     }
 }

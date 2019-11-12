@@ -66,4 +66,7 @@ pub struct ServerCapabilities {
 
     #[serde(rename = "renameProvider")]
     pub rename_provider: bool,
+
+    #[serde(rename = "foldingRangeProvider")]
+    pub folding_range_provider: bool,
 }
