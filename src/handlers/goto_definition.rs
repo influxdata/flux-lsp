@@ -6,25 +6,22 @@ use crate::protocol::requests::{
     PolymorphicRequest, Request, TextDocumentPositionParams,
 };
 use crate::protocol::responses::Response;
-use crate::utils;
-use crate::visitors::ast::{
+use crate::visitors::semantic::utils;
+use crate::visitors::semantic::{
     DefinitionFinderVisitor, NodeFinderVisitor,
 };
 
-use flux::ast::walk;
+use crate::visitors::semantic::walk::{self, Node};
 
-fn ident_to_location(
-    uri: String,
-    i: flux::ast::Identifier,
-) -> Location {
+fn ident_to_location(uri: String, node: Rc<Node<'_>>) -> Location {
     let start = Position {
-        line: i.base.location.start.line - 1,
-        character: i.base.location.start.column - 1,
+        line: node.loc().start.line - 1,
+        character: node.loc().start.column - 1,
     };
 
     let end = Position {
-        line: i.base.location.end.line - 1,
-        character: i.base.location.end.column - 1,
+        line: node.loc().end.line - 1,
+        character: node.loc().end.column - 1,
     };
 
     let range = Range { start, end };
@@ -35,8 +32,8 @@ fn ident_to_location(
 
 fn find_scoped_definition<'a>(
     uri: String,
-    ident: &flux::ast::Identifier,
-    path: Vec<Rc<walk::Node<'a>>>,
+    ident_name: String,
+    path: Vec<Rc<Node<'a>>>,
 ) -> Option<Location> {
     let path_iter = path.iter().rev();
     for n in path_iter {
@@ -46,23 +43,22 @@ fn find_scoped_definition<'a>(
             | walk::Node::File(_) => {
                 if let walk::Node::FunctionExpr(f) = n.as_ref() {
                     for param in f.params.clone() {
-                        if let flux::ast::PropertyKey::Identifier(i) =
-                            param.key
-                        {
-                            if i.name != ident.name {
-                                continue;
-                            }
-                            let loc =
-                                ident_to_location(uri.clone(), i);
-                            return Some(loc);
+                        let name = param.key.name;
+                        if name != ident_name {
+                            continue;
                         }
+                        let loc = ident_to_location(
+                            uri.clone(),
+                            (*n).clone(),
+                        );
+                        return Some(loc);
                     }
                 }
 
-                let dvisitor: DefinitionFinderVisitor =
-                    DefinitionFinderVisitor::new(ident.name.clone());
+                let mut dvisitor: DefinitionFinderVisitor =
+                    DefinitionFinderVisitor::new(ident_name.clone());
 
-                walk::walk_rc(&dvisitor, n.clone());
+                walk::walk(&mut dvisitor, n.clone());
 
                 let state = dvisitor.state.borrow();
 
@@ -77,13 +73,8 @@ fn find_scoped_definition<'a>(
     None
 }
 
+#[derive(Default)]
 pub struct GotoDefinitionHandler {}
-
-impl Default for GotoDefinitionHandler {
-    fn default() -> Self {
-        GotoDefinitionHandler {}
-    }
-}
 
 impl RequestHandler for GotoDefinitionHandler {
     fn handle(
@@ -97,22 +88,33 @@ impl RequestHandler for GotoDefinitionHandler {
 
         if let Some(params) = request.params {
             let uri = params.text_document.uri;
-            let file = utils::create_file_node(uri.clone())?;
-            let walker = Rc::new(walk::Node::File(&file));
+            let pkg = utils::create_semantic_package(uri.clone())?;
+            let walker = Rc::new(walk::Node::Package(&pkg));
 
-            let node_finder = NodeFinderVisitor::new(params.position);
+            let mut node_finder =
+                NodeFinderVisitor::new(params.position);
 
-            walk::walk_rc(&node_finder, walker);
+            walk::walk(&mut node_finder, walker);
 
             let state = node_finder.state.borrow();
             let node = (*state).node.clone();
             let path = (*state).path.clone();
 
             if let Some(node) = node {
-                if let walk::Node::Identifier(ident) = node.as_ref() {
+                let name = match node.as_ref() {
+                    Node::Identifier(ident) => {
+                        Some(ident.name.clone())
+                    }
+                    Node::IdentifierExpr(ident) => {
+                        Some(ident.name.clone())
+                    }
+                    _ => None,
+                };
+
+                if let Some(name) = name {
                     result = find_scoped_definition(
                         uri.clone(),
-                        ident,
+                        name,
                         path,
                     );
                 }

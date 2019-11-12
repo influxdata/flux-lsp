@@ -1,12 +1,9 @@
 use std::fs;
-use std::rc::Rc;
 
-use crate::protocol::properties::{
-    Diagnostic, Location, Position, Range,
-};
+use crate::protocol::properties::{Diagnostic, Position, Range};
 use crate::protocol::requests::{BaseRequest, PolymorphicRequest};
 
-use flux::ast::{self, check, walk};
+use flux::ast::{self, check};
 use flux::parser::parse_string;
 use url::Url;
 
@@ -31,30 +28,6 @@ pub fn parse_request(
     };
 
     Ok(result)
-}
-
-pub fn map_node_to_location(
-    uri: String,
-    node: Rc<walk::Node>,
-) -> Location {
-    let start_line = node.base().location.start.line - 1;
-    let start_col = node.base().location.start.column - 1;
-    let end_line = node.base().location.end.line - 1;
-    let end_col = node.base().location.end.column - 1;
-
-    Location {
-        uri,
-        range: Range {
-            start: Position {
-                line: start_line,
-                character: start_col,
-            },
-            end: Position {
-                line: end_line,
-                character: end_col,
-            },
-        },
-    }
 }
 
 pub fn map_errors_to_diagnostics(
