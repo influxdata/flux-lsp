@@ -6,7 +6,7 @@ use std::rc::Rc;
 pub mod handler;
 pub mod handlers;
 pub mod loggers;
-pub mod structs;
+pub mod protocol;
 
 mod utils;
 mod visitors;

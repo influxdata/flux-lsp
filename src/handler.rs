@@ -7,7 +7,7 @@ use crate::handlers::rename::RenameHandler;
 use crate::handlers::shutdown::ShutdownHandler;
 use crate::handlers::RequestHandler;
 use crate::loggers::Logger;
-use crate::structs::*;
+use crate::protocol::requests::PolymorphicRequest;
 
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -28,15 +28,15 @@ impl Handler {
         );
         mapping.insert(
             "textDocument/didChange".to_string(),
-            Box::new(DocumentChangeHandler::new(logger.clone())),
+            Box::new(DocumentChangeHandler::default()),
         );
         mapping.insert(
             "textDocument/didSave".to_string(),
-            Box::new(DocumentChangeHandler::new(logger.clone())),
+            Box::new(DocumentChangeHandler::default()),
         );
         mapping.insert(
             "textDocument/didOpen".to_string(),
-            Box::new(DocumentOpenHandler::new(logger.clone())),
+            Box::new(DocumentOpenHandler::default()),
         );
         mapping.insert(
             "textDocument/definition".to_string(),

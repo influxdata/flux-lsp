@@ -1,4 +1,4 @@
-use crate::structs::Position;
+use crate::protocol::properties::Position;
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -63,17 +63,6 @@ impl<'a> Visitor<'a> for DefinitionFinderVisitor<'a> {
     }
 }
 
-impl<'a> DefinitionFinderVisitor<'a> {
-    pub fn new(name: String) -> DefinitionFinderVisitor<'a> {
-        DefinitionFinderVisitor {
-            state: Rc::new(RefCell::new(DefinitionFinderState {
-                name,
-                node: None,
-            })),
-        }
-    }
-}
-
 pub struct NodeFinderState<'a> {
     pub node: Option<Rc<walk::Node<'a>>>,
     pub position: Position,
@@ -100,18 +89,6 @@ impl<'a> Visitor<'a> for NodeFinderVisitor<'a> {
         }
 
         Some(self.clone())
-    }
-}
-
-impl<'a> NodeFinderVisitor<'a> {
-    pub fn new(pos: Position) -> NodeFinderVisitor<'a> {
-        NodeFinderVisitor {
-            state: Rc::new(RefCell::new(NodeFinderState {
-                node: None,
-                position: pos,
-                path: vec![],
-            })),
-        }
     }
 }
 
@@ -147,16 +124,5 @@ impl<'a> Visitor<'a> for IdentFinderVisitor<'a> {
             _ => {}
         }
         Some(self.clone())
-    }
-}
-
-impl<'a> IdentFinderVisitor<'a> {
-    pub fn new(name: String) -> IdentFinderVisitor<'a> {
-        IdentFinderVisitor {
-            state: Rc::new(RefCell::new(IdentFinderState {
-                name,
-                identifiers: vec![],
-            })),
-        }
     }
 }

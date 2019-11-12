@@ -2,7 +2,10 @@ extern crate flux_lsp_lib;
 
 use flux_lsp_lib::handler::Handler;
 use flux_lsp_lib::loggers::Logger;
-use flux_lsp_lib::structs::*;
+use flux_lsp_lib::protocol::notifications::*;
+use flux_lsp_lib::protocol::properties::*;
+use flux_lsp_lib::protocol::requests::*;
+use flux_lsp_lib::protocol::responses::*;
 
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -56,7 +59,7 @@ fn test_unknown() {
 fn test_initialize() {
     let initialize_request = Request {
         id: 1,
-        params: Some(InitializeRequestParams {}),
+        params: Some(InitializeParams {}),
         method: "initialize".to_string(),
     };
     let initialize_request_json =

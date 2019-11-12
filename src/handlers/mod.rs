@@ -6,12 +6,14 @@ pub mod references;
 pub mod rename;
 pub mod shutdown;
 
-use crate::structs::{
+use crate::protocol::notifications::{
     create_diagnostics_notification, Notification,
-    PolymorphicRequest, Position, PublishDiagnosticsParams,
+    PublishDiagnosticsParams,
 };
+use crate::protocol::properties::Position;
+use crate::protocol::requests::PolymorphicRequest;
 use crate::utils;
-use crate::visitors::NodeFinderVisitor;
+use crate::visitors::semantic::NodeFinderVisitor;
 
 use std::rc::Rc;
 
@@ -41,19 +43,21 @@ pub fn create_file_diagnostics(
 
 #[derive(Default, Clone)]
 pub struct NodeFinderResult<'a> {
-    node: Option<Rc<walk::Node<'a>>>,
-    path: Vec<Rc<walk::Node<'a>>>,
+    node: Option<Rc<crate::visitors::semantic::walk::Node<'a>>>,
+    path: Vec<Rc<crate::visitors::semantic::walk::Node<'a>>>,
 }
 
-pub fn find_node<'a>(
-    file: &'a flux::ast::File,
+pub fn find_node(
+    node: crate::visitors::semantic::walk::Node<'_>,
     position: Position,
-) -> NodeFinderResult<'a> {
+) -> NodeFinderResult<'_> {
     let mut result = NodeFinderResult::default();
-    let walker: walk::Node<'a> = walk::Node::File(file);
-    let visitor = NodeFinderVisitor::new(position);
+    let mut visitor = NodeFinderVisitor::new(position);
 
-    walk::walk(&visitor, walker);
+    crate::visitors::semantic::walk::walk(
+        &mut visitor,
+        Rc::new(node),
+    );
 
     let state = visitor.state.borrow();
 
