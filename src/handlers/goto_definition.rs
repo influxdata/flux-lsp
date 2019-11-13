@@ -80,7 +80,7 @@ impl RequestHandler for GotoDefinitionHandler {
     fn handle(
         &self,
         prequest: PolymorphicRequest,
-    ) -> Result<String, String> {
+    ) -> Result<Option<String>, String> {
         let mut result: Option<Location> = None;
 
         let request: Request<TextDocumentPositionParams> =
@@ -120,13 +120,11 @@ impl RequestHandler for GotoDefinitionHandler {
                 }
             }
 
-            let response = Response {
-                result,
-                id: prequest.base_request.id,
-                jsonrpc: "2.0".to_string(),
-            };
+            let id = prequest.base_request.id;
+            let response = Response::new(id, result);
+            let json = response.to_json()?;
 
-            return response.to_json();
+            return Ok(Some(json));
         }
 
         Err("invalid textDocument/definition request".to_string())

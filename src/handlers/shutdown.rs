@@ -9,14 +9,13 @@ impl RequestHandler for ShutdownHandler {
     fn handle(
         &self,
         prequest: PolymorphicRequest,
-    ) -> Result<String, String> {
-        let response: Response<ShutdownResult> = Response {
-            id: prequest.base_request.id,
-            result: None,
-            jsonrpc: "2.0".to_string(),
-        };
+    ) -> Result<Option<String>, String> {
+        let id = prequest.base_request.id;
+        let response: Response<ShutdownResult> =
+            Response::new(id, None);
 
-        response.to_json()
+        let json = response.to_json()?;
+        Ok(Some(json))
     }
 }
 

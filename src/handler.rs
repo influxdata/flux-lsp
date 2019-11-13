@@ -1,5 +1,6 @@
 use crate::handlers::document_change::DocumentChangeHandler;
 use crate::handlers::document_open::DocumentOpenHandler;
+use crate::handlers::folding::FoldingHandler;
 use crate::handlers::goto_definition::GotoDefinitionHandler;
 use crate::handlers::initialize::InitializeHandler;
 use crate::handlers::references::FindReferencesHandler;
@@ -16,6 +17,19 @@ use std::rc::Rc;
 pub struct Handler {
     pub logger: Rc<RefCell<dyn Logger>>,
     mapping: HashMap<String, Box<dyn RequestHandler>>,
+    default_handler: Box<dyn RequestHandler>,
+}
+
+#[derive(Default)]
+struct NoOpHandler {}
+
+impl RequestHandler for NoOpHandler {
+    fn handle(
+        &self,
+        _: PolymorphicRequest,
+    ) -> Result<Option<String>, String> {
+        Ok(None)
+    }
 }
 
 impl Handler {
@@ -54,25 +68,39 @@ impl Handler {
             "shutdown".to_string(),
             Box::new(ShutdownHandler::default()),
         );
+        mapping.insert(
+            "textDocument/foldingRange".to_string(),
+            Box::new(FoldingHandler::default()),
+        );
 
-        Handler { logger, mapping }
+        Handler {
+            logger,
+            mapping,
+            default_handler: Box::new(NoOpHandler::default()),
+        }
     }
 
     pub fn handle(
         &mut self,
         request: PolymorphicRequest,
     ) -> Result<Option<String>, String> {
-        match request.method().as_str() {
-            method => {
-                if let Some(m) = self.mapping.get(method) {
-                    match m.handle(request) {
-                        Ok(r) => Ok(Some(r)),
-                        Err(e) => Err(e),
-                    }
-                } else {
-                    Ok(None)
-                }
-            }
+        let req = request.clone();
+
+        let mut logger = self.logger.borrow_mut();
+        logger.info(format!("Request -> {:?}", req.data))?;
+
+        let method = request.method();
+        let handler = match self.mapping.get(&method) {
+            Some(h) => h,
+            None => &self.default_handler,
+        };
+
+        let resp = handler.handle(request)?;
+
+        if let Some(resp) = resp.clone() {
+            logger.info(format!("Response -> {}", resp))?;
         }
+
+        Ok(resp)
     }
 }

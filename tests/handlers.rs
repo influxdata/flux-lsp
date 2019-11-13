@@ -553,3 +553,59 @@ fn test_rename() {
         "expects to find all references"
     );
 }
+
+#[test]
+fn test_folding() {
+    let uri = flux_fixture_uri("ok");
+    let folding_request = Request {
+        id: 1,
+        method: "textDocument/foldingRange".to_string(),
+        params: Some(FoldingRangeParams {
+            text_document: TextDocument {
+                uri: uri.clone(),
+                language_id: "flux".to_string(),
+                version: 1,
+                text: "".to_string(),
+            },
+        }),
+    };
+
+    let folding_request_json =
+        serde_json::to_string(&folding_request).unwrap();
+    let request = PolymorphicRequest {
+        base_request: BaseRequest {
+            id: 1,
+            method: "textDocument/foldingRange".to_string(),
+        },
+        data: folding_request_json,
+    };
+    let mut handler = create_handler();
+
+    let response = handler.handle(request).unwrap();
+
+    let areas = vec![
+        FoldingRange {
+            start_line: 5,
+            start_character: 25,
+            end_line: 8,
+            end_character: 37,
+            kind: "region".to_string(),
+        },
+        FoldingRange {
+            start_line: 14,
+            start_character: 25,
+            end_line: 14,
+            end_character: 95,
+            kind: "region".to_string(),
+        },
+    ];
+
+    let expected: Response<Vec<FoldingRange>> =
+        Response::new(1, Some(areas));
+
+    assert_eq!(
+        expected.to_json().unwrap(),
+        response.unwrap(),
+        "expects to find all references"
+    );
+}

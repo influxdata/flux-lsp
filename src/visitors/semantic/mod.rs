@@ -164,3 +164,25 @@ impl<'a> DefinitionFinderVisitor<'a> {
         }
     }
 }
+
+#[derive(Default)]
+pub struct FoldFinderState<'a> {
+    pub nodes: Vec<Rc<Node<'a>>>,
+}
+
+#[derive(Default)]
+pub struct FoldFinderVisitor<'a> {
+    pub state: Rc<RefCell<FoldFinderState<'a>>>,
+}
+
+impl<'a> Visitor<'a> for FoldFinderVisitor<'a> {
+    fn visit(&self, node: Rc<Node<'a>>) -> bool {
+        let mut state = self.state.borrow_mut();
+
+        if let Node::Block(_) = node.as_ref() {
+            (*state).nodes.push(node.clone());
+        }
+
+        true
+    }
+}

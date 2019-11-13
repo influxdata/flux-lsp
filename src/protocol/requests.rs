@@ -7,7 +7,7 @@ fn default_id() -> u32 {
     0
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct BaseRequest {
     #[serde(default = "default_id")]
     pub id: u32,
@@ -25,7 +25,7 @@ impl BaseRequest {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct PolymorphicRequest {
     pub base_request: BaseRequest,
     pub data: String,
@@ -94,6 +94,12 @@ pub struct TextDocumentPositionParams {
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct TextDocumentParams {
+    #[serde(rename = "textDocument")]
+    pub text_document: TextDocument,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct FoldingRangeParams {
     #[serde(rename = "textDocument")]
     pub text_document: TextDocument,
 }

@@ -1,5 +1,6 @@
 pub mod document_change;
 pub mod document_open;
+pub mod folding;
 pub mod goto_definition;
 pub mod initialize;
 pub mod references;
@@ -23,7 +24,7 @@ pub trait RequestHandler {
     fn handle(
         &self,
         prequest: PolymorphicRequest,
-    ) -> Result<String, String>;
+    ) -> Result<Option<String>, String>;
 }
 
 pub fn create_file_diagnostics(

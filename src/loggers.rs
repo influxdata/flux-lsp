@@ -50,8 +50,13 @@ impl FileLogger {
 
     fn log(&mut self, s: String) -> Result<(), String> {
         match self.file.write_all(s.as_bytes()) {
+            Ok(_) => (),
+            Err(_) => return Err("Failed to write log".to_string()),
+        };
+
+        match self.file.flush() {
             Ok(_) => Ok(()),
-            Err(_) => Err("Failed to write log".to_string()),
+            Err(_) => Err("Failed to flush log".to_string()),
         }
     }
 

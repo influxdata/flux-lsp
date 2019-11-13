@@ -15,7 +15,7 @@ impl RequestHandler for RenameHandler {
     fn handle(
         &self,
         prequest: PolymorphicRequest,
-    ) -> Result<String, String> {
+    ) -> Result<Option<String>, String> {
         let request: Request<RenameParams> =
             Request::from_json(prequest.data.as_str())?;
 
@@ -55,10 +55,8 @@ impl RequestHandler for RenameHandler {
         let response =
             Response::new(request.id, Some(workspace_edit));
 
-        if let Ok(json) = response.to_json() {
-            Ok(json)
-        } else {
-            Err("Could not create response json".to_string())
-        }
+        let json = response.to_json()?;
+
+        Ok(Some(json))
     }
 }
