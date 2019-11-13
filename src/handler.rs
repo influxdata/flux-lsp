@@ -1,5 +1,6 @@
 use crate::handlers::document_change::DocumentChangeHandler;
 use crate::handlers::document_open::DocumentOpenHandler;
+use crate::handlers::folding::FoldingHandler;
 use crate::handlers::goto_definition::GotoDefinitionHandler;
 use crate::handlers::initialize::InitializeHandler;
 use crate::handlers::references::FindReferencesHandler;
@@ -16,6 +17,7 @@ use std::rc::Rc;
 pub struct Handler {
     pub logger: Rc<RefCell<dyn Logger>>,
     mapping: HashMap<String, Box<dyn RequestHandler>>,
+    default_handler: Box<dyn RequestHandler>,
 }
 
 #[derive(Default)]
@@ -68,10 +70,14 @@ impl Handler {
         );
         mapping.insert(
             "textDocument/foldingRange".to_string(),
-            Box::new(NoOpHandler::default()),
+            Box::new(FoldingHandler::default()),
         );
 
-        Handler { logger, mapping }
+        Handler {
+            logger,
+            mapping,
+            default_handler: Box::new(NoOpHandler::default()),
+        }
     }
 
     pub fn handle(
@@ -84,16 +90,17 @@ impl Handler {
         logger.info(format!("Request -> {:?}", req.data))?;
 
         let method = request.method();
-        if let Some(m) = self.mapping.get(&method) {
-            let resp = m.handle(request)?;
+        let handler = match self.mapping.get(&method) {
+            Some(h) => h,
+            None => &self.default_handler,
+        };
 
-            if let Some(resp) = resp.clone() {
-                logger.info(format!("Response -> {}", resp))?;
-            }
+        let resp = handler.handle(request)?;
 
-            Ok(resp)
-        } else {
-            Ok(None)
+        if let Some(resp) = resp.clone() {
+            logger.info(format!("Response -> {}", resp))?;
         }
+
+        Ok(resp)
     }
 }

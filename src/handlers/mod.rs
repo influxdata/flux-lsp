@@ -1,5 +1,6 @@
 pub mod document_change;
 pub mod document_open;
+pub mod folding;
 pub mod goto_definition;
 pub mod initialize;
 pub mod references;

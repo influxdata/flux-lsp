@@ -42,6 +42,19 @@ pub struct Range {
     pub end: Position,
 }
 
+#[derive(Serialize, Deserialize, Clone)]
+pub struct FoldingRange {
+    #[serde(rename = "startLine")]
+    pub start_line: u32,
+    #[serde(rename = "startCharacter")]
+    pub start_character: u32,
+    #[serde(rename = "endLine")]
+    pub end_line: u32,
+    #[serde(rename = "endCharacter")]
+    pub end_character: u32,
+    pub kind: String,
+}
+
 #[derive(Serialize, Deserialize)]
 pub struct Diagnostic {
     pub range: Range,

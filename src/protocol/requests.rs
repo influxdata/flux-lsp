@@ -97,3 +97,9 @@ pub struct TextDocumentParams {
     #[serde(rename = "textDocument")]
     pub text_document: TextDocument,
 }
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct FoldingRangeParams {
+    #[serde(rename = "textDocument")]
+    pub text_document: TextDocument,
+}
