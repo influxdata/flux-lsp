@@ -1,0 +1,20 @@
+version: 2
+
+jobs:
+  lint:
+    docker:
+      - image: circleci/rust:1.39-stretch
+    steps:
+    - checkout
+    - run: sudo apt-get install ragel
+    - run: rustup component add clippy
+    - run: cargo clippy --all -- -D warnings
+
+  test:
+    docker:
+      - image: circleci/rust:1.39-stretch
+    steps:
+    - checkout
+    - run: sudo apt-get install ragel
+    - run: cargo build --verbose
+    - run: cargo test --verbose
