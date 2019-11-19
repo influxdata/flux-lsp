@@ -2,6 +2,7 @@ pub mod document_change;
 pub mod document_close;
 pub mod document_open;
 pub mod document_save;
+pub mod document_symbol;
 pub mod folding;
 pub mod goto_definition;
 pub mod initialize;

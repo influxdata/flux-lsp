@@ -51,6 +51,7 @@ impl InitializeResult {
                 references_provider: true,
                 rename_provider: true,
                 folding_range_provider,
+                document_symbol_provider: true,
                 text_document_sync: TextDocumentSyncKind::Full,
             },
         }

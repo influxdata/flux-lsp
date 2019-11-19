@@ -5,10 +5,13 @@ use crate::protocol::properties::Position;
 
 // pub mod walk;
 
-use flux::semantic::nodes::Expression;
+use flux::semantic::nodes::*;
 use flux::semantic::walk::{self, Node, Visitor};
 
+mod symbols;
 pub mod utils;
+
+pub use symbols::SymbolsVisitor;
 
 fn contains_position(node: Rc<Node<'_>>, pos: Position) -> bool {
     let start_line = node.loc().start.line - 1;
