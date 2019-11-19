@@ -1,13 +1,52 @@
-version: 2
+version: 2.1
+
+commands:
+  install-deps:
+    description: install flux-lsp dependencies
+    steps:
+      - run: sudo apt-get install ragel llvm clang libclang-dev
 
 jobs:
+  lint:
+    docker:
+      - image: circleci/rust:1.39-stretch
+    steps:
+    - checkout
+    - install-deps
+    - run:
+        name: "install clippy"
+        command: rustup component add clippy
+    - run:
+        name: "run lint"
+        command: cargo clippy --all -- -D warnings
+
+  test:
+    docker:
+      - image: circleci/rust:1.39-stretch
+    steps:
+    - install-deps
+    - checkout
+    - install-deps
+    - run:
+        name: "run tests"
+        command: cargo test --verbose
+
   build:
     docker:
       - image: circleci/rust:1.39-stretch
     steps:
     - checkout
-    - run: sudo apt-get install ragel llvm clang libclang-dev
+    - install-deps
     - run: cargo build --verbose
-    - run: rustup component add clippy
-    - run: cargo clippy --all -- -D warnings
-    - run: cargo test --verbose
+
+workflows:
+  version: 2.1
+  build-and-test:
+    jobs:
+      - lint
+      - test:
+          requires:
+            - lint
+      - build:
+          requires:
+            - lint
