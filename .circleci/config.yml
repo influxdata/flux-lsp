@@ -39,6 +39,33 @@ jobs:
     - install-deps
     - run: cargo build --verbose
 
+  build-linux:
+    docker:
+      - image: circleci/rust:1.39-stretch
+    steps:
+    - checkout
+    - install-deps
+    - run: mkdir -p /tmp/workspace/releases
+    - run: cargo build --release
+    - run: cp target/release/flux-lsp /tmp/workspace/releases/flux-lsp-linux
+    - persist_to_workspace:
+        root: /tmp/workspace
+        paths:
+          - releases
+
+  publish:
+    docker:
+      - image: circleci/golang:1.12
+    steps:
+      - attach_workspace:
+          at: /tmp/workspace
+      - run:
+          name: "Install GHR"
+          command: go get github.com/tcnksm/ghr
+      - run:
+          name: "Publish release to github"
+          command: ghr -t ${GITHUB_TOKEN} -u ${CIRCLE_PROJECT_USERNAME} -r ${CIRCLE_PROJECT_REPONAME} -c ${CIRCLE_SHA1} -delete v1.0 /tmp/workspace/releases
+
 workflows:
   version: 2.1
   build-and-test:
@@ -50,3 +77,9 @@ workflows:
       - build:
           requires:
             - lint
+  publish:
+    jobs:
+      - build-linux
+      - publish:
+          requires:
+            - build-linux
