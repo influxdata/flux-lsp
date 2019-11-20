@@ -1,13 +1,131 @@
-version: 2
+version: 2.1
+
+commands:
+  install-deps:
+    description: install flux-lsp dependencies
+    steps:
+      - run: sudo apt-get update
+      - run: sudo apt-get install ragel llvm clang libclang-dev
 
 jobs:
+  lint:
+    docker:
+      - image: circleci/rust:1.39-stretch
+    steps:
+    - checkout
+    - install-deps
+    - run:
+        name: "install clippy"
+        command: rustup component add clippy
+    - run:
+        name: "run lint"
+        command: cargo clippy --all -- -D warnings
+
+  test:
+    docker:
+      - image: circleci/rust:1.39-stretch
+    steps:
+    - install-deps
+    - checkout
+    - install-deps
+    - run:
+        name: "run tests"
+        command: cargo test --verbose
+
   build:
     docker:
       - image: circleci/rust:1.39-stretch
     steps:
     - checkout
-    - run: sudo apt-get install ragel llvm clang libclang-dev
+    - install-deps
     - run: cargo build --verbose
-    - run: rustup component add clippy
-    - run: cargo clippy --all -- -D warnings
-    - run: cargo test --verbose
+
+  build-linux:
+    docker:
+      - image: circleci/rust:1.39-stretch
+    steps:
+    - checkout
+    - install-deps
+    - run: mkdir -p /tmp/workspace/releases
+    - run: cargo build --release
+    - run: cp target/release/flux-lsp /tmp/workspace/releases/flux-lsp-linux
+    - persist_to_workspace:
+        root: /tmp/workspace
+        paths:
+          - releases
+
+  build-macos:
+    macos:
+      xcode: 11.2.1
+    steps:
+    - checkout
+    - run:
+        name: "make releases folder"
+        command: mkdir -p /tmp/workspace/releases
+    - run:
+        name: "install homebrew"
+        command: /usr/bin/ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
+    - run:
+        name: "install deps"
+        command: brew install rustup-init llvm ragel
+    - run:
+        name: "install rust"
+        command: rustup-init -y
+    - run:
+        name: "cargo build"
+        command: cargo build --release
+    - run:
+        name: "copy binary"
+        command: cp target/release/flux-lsp /tmp/workspace/releases/flux-lsp-macos
+    - persist_to_workspace:
+        root: /tmp/workspace
+        paths:
+          - releases
+
+  publish:
+    docker:
+      - image: circleci/golang:1.12
+    steps:
+      - attach_workspace:
+          at: /tmp/workspace
+      - run:
+          name: "Install GHR"
+          command: go get github.com/tcnksm/ghr
+      - run:
+          name: "Publish release to github"
+          command: ghr -t ${GITHUB_TOKEN} -u ${CIRCLE_PROJECT_USERNAME} -r ${CIRCLE_PROJECT_REPONAME} -c ${CIRCLE_SHA1} -delete ${CIRCLE_TAG} /tmp/workspace/releases
+
+workflows:
+  version: 2.1
+  build-and-test:
+    jobs:
+      - lint
+      - test:
+          requires:
+            - lint
+      - build:
+          requires:
+            - lint
+  publish:
+    jobs:
+      - build-linux:
+          filters:
+            branches:
+              ignore: /.*/
+            tags:
+              only: /^\d+\.\d+\.\d+$/
+      - build-macos:
+          filters:
+            branches:
+              ignore: /.*/
+            tags:
+              only: /^\d+\.\d+\.\d+$/
+      - publish:
+          filters:
+            branches:
+              ignore: /.*/
+            tags:
+              only: /^\d+\.\d+\.\d+$/
+          requires:
+            - build-linux
+            - build-macos
