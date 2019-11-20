@@ -53,3 +53,15 @@ Requires [vim-coc](https://github.com/neoclide/coc.nvim). `vim-coc` uses a `coc-
 }
 ```
 If you need to debug what flux-lsp is doing you can add arguments after the `command` field in the json `"args": ["-l", "/tmp/fluxlsp"],`. It will start logging into `/tmp/fluxlsp`
+
+# Supported LSP features
+
+- initialize
+- shutdown
+- textDocument/definition
+- textDocument/didChange
+- textDocument/didOpen
+- textDocument/didSave
+- textDocument/foldingRange
+- textDocument/references
+- textDocument/rename
