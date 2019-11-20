@@ -1,6 +1,6 @@
 # Flux LSP
 
-Implementation of Language Server Protocol for the flux language
+An implementation of the [Language Server Protocol](https://microsoft.github.io/language-server-protocol/) for the [Flux language](https://github.com/influxdata/flux).
 
 # Install
 
@@ -19,7 +19,7 @@ In any case, you need to recognize the `filetype`. This is done looking at the f
 au BufRead,BufNewFile *.flux		set filetype=flux
 ```
 
-## with vim-lsp
+### with vim-lsp
 Requires [vim-lsp](https://github.com/prabirshrestha/vim-lsp)
 
 in your .vimrc
@@ -38,7 +38,7 @@ endif
 autocmd FileType flux nmap gd <plug>(lsp-definition)
 ```
 
-## with vim-coc
+### with vim-coc
 
 Requires [vim-coc](https://github.com/neoclide/coc.nvim). `vim-coc` uses a `coc-settings.json` file and it is located in your `~/.vim` directory. In order to run the `flux-lsp` you need to add the `flux` section in the `languageserver`.
 
@@ -52,7 +52,19 @@ Requires [vim-coc](https://github.com/neoclide/coc.nvim). `vim-coc` uses a `coc-
   }
 }
 ```
-If you need to debug what flux-lsp is doing you can add arguments after the `command` field in the json `"args": ["-l", "/tmp/fluxlsp"],`. It will start logging into `/tmp/fluxlsp`
+If you need to debug what flux-lsp is doing, you can configure it to log to `/tmp/fluxlsp`:
+
+```json
+{
+  "languageserver": {
+      "flux": {
+        "command": "flux-lsp",
+        "args": ["-l", "/tmp/fluxlsp"],
+        "filetypes": ["flux"]
+      }
+  }
+}
+```
 
 # Supported LSP features
 
