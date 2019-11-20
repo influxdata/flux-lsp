@@ -4,6 +4,7 @@ commands:
   install-deps:
     description: install flux-lsp dependencies
     steps:
+      - run: sudo apt-get update
       - run: sudo apt-get install ragel llvm clang libclang-dev
 
 jobs:
@@ -92,7 +93,7 @@ jobs:
           command: go get github.com/tcnksm/ghr
       - run:
           name: "Publish release to github"
-          command: ghr -t ${GITHUB_TOKEN} -u ${CIRCLE_PROJECT_USERNAME} -r ${CIRCLE_PROJECT_REPONAME} -c ${CIRCLE_SHA1} -delete v1.0 /tmp/workspace/releases
+          command: ghr -t ${GITHUB_TOKEN} -u ${CIRCLE_PROJECT_USERNAME} -r ${CIRCLE_PROJECT_REPONAME} -c ${CIRCLE_SHA1} -delete ${CIRCLE_TAG} /tmp/workspace/releases
 
 workflows:
   version: 2.1
@@ -107,9 +108,24 @@ workflows:
             - lint
   publish:
     jobs:
-      - build-linux
-      - build-macos
+      - build-linux:
+          filters:
+            branches:
+              ignore: /.*/
+            tags:
+              only: /^\d+\.\d+\.\d+$/
+      - build-macos:
+          filters:
+            branches:
+              ignore: /.*/
+            tags:
+              only: /^\d+\.\d+\.\d+$/
       - publish:
+          filters:
+            branches:
+              ignore: /.*/
+            tags:
+              only: /^\d+\.\d+\.\d+$/
           requires:
             - build-linux
             - build-macos
