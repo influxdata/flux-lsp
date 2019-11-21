@@ -23,7 +23,7 @@ impl Logger for TestLogger {
 
 fn create_handler() -> Handler {
     let logger = Rc::new(RefCell::new(TestLogger {}));
-    Handler::new(logger)
+    Handler::new(logger, false)
 }
 
 fn flux_fixture_uri(filename: &'static str) -> String {
@@ -77,7 +77,7 @@ fn test_initialize() {
     let response = handler.handle(request).unwrap().unwrap();
     let expected = Response {
         id: 1,
-        result: Some(InitializeResult::default()),
+        result: Some(InitializeResult::new(true)),
         jsonrpc: "2.0".to_string(),
     };
     let expected_json = expected.to_json().unwrap();
