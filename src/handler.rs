@@ -33,7 +33,10 @@ impl RequestHandler for NoOpHandler {
 }
 
 impl Handler {
-    pub fn new(logger: Rc<RefCell<dyn Logger>>) -> Handler {
+    pub fn new(
+        logger: Rc<RefCell<dyn Logger>>,
+        disable_folding: bool,
+    ) -> Handler {
         let mut mapping: HashMap<String, Box<dyn RequestHandler>> =
             HashMap::new();
         mapping.insert(
@@ -62,7 +65,7 @@ impl Handler {
         );
         mapping.insert(
             "initialize".to_string(),
-            Box::new(InitializeHandler::default()),
+            Box::new(InitializeHandler::new(disable_folding)),
         );
         mapping.insert(
             "shutdown".to_string(),

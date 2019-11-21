@@ -41,14 +41,14 @@ pub struct InitializeResult {
     pub capabilities: ServerCapabilities,
 }
 
-impl Default for InitializeResult {
-    fn default() -> Self {
+impl InitializeResult {
+    pub fn new(folding_range_provider: bool) -> Self {
         InitializeResult {
             capabilities: ServerCapabilities {
                 definition_provider: true,
                 references_provider: true,
                 rename_provider: true,
-                folding_range_provider: true,
+                folding_range_provider,
             },
         }
     }

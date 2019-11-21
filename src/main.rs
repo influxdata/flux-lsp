@@ -17,9 +17,15 @@ fn main() {
                 .long("logfile")
                 .takes_value(true),
         )
+        .arg(
+            Arg::with_name("disable-folding")
+            .help("set this flag to disable the range folding capacity")
+            .long("disable-folding")
+            .takes_value(false),
+        )
         .get_matches();
     let logger: Rc<RefCell<dyn loggers::Logger>>;
-
+    let disable_folding = flags.is_present("disable-folding");
     if let Some(ref logfile) = flags.value_of("logfile") {
         logger = Rc::new(RefCell::new(
             loggers::FileLogger::new(logfile).unwrap(),
@@ -28,7 +34,6 @@ fn main() {
         logger =
             Rc::new(RefCell::new(loggers::DefaultLogger::default()));
     }
-
-    let mut server = Server::with_stdio(logger);
+    let mut server = Server::with_stdio(logger, disable_folding);
     server.start();
 }

@@ -29,18 +29,27 @@ impl Server {
         logger: Rc<RefCell<dyn Logger>>,
         reader: Box<dyn ServerInput>,
         writer: Box<dyn Write>,
+        disable_folding: bool,
     ) -> Server {
         Server {
             reader,
             writer,
             logger: logger.clone(),
-            handler: Handler::new(logger.clone()),
+            handler: Handler::new(logger.clone(), disable_folding),
         }
     }
 
-    pub fn with_stdio(logger: Rc<RefCell<dyn Logger>>) -> Server {
+    pub fn with_stdio(
+        logger: Rc<RefCell<dyn Logger>>,
+        disable_folding: bool,
+    ) -> Server {
         let reader = BufReader::new(io::stdin());
-        Server::new(logger, Box::new(reader), Box::new(io::stdout()))
+        Server::new(
+            logger,
+            Box::new(reader),
+            Box::new(io::stdout()),
+            disable_folding,
+        )
     }
 
     fn write(&mut self, s: String) -> io::Result<()> {
