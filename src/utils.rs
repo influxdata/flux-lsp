@@ -54,14 +54,19 @@ pub fn create_file_node(uri: String) -> Result<ast::File, String> {
 pub fn get_file_contents_from_uri(
     uri: String,
 ) -> Result<String, String> {
-    let file_path = match Url::parse(uri.as_str()) {
+    let url = match Url::parse(uri.as_str()) {
         Ok(s) => s,
         Err(e) => {
             return Err(format!("Failed to get file path: {}", e))
         }
     };
 
-    let contents = match fs::read_to_string(file_path.path()) {
+    let file_path = match Url::to_file_path(&url) {
+        Ok(s) => s,
+        Err(_) => return Err("Faild to get file_path".to_string()),
+    };
+
+    let contents = match fs::read_to_string(file_path) {
         Ok(c) => c,
         Err(e) => return Err(format!("Failed to read file: {}", e)),
     };
