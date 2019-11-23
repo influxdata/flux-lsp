@@ -44,21 +44,18 @@ pub fn create_file_diagnostics(
 
 #[derive(Default, Clone)]
 pub struct NodeFinderResult<'a> {
-    node: Option<Rc<crate::visitors::semantic::walk::Node<'a>>>,
-    path: Vec<Rc<crate::visitors::semantic::walk::Node<'a>>>,
+    node: Option<Rc<flux::semantic::walk::Node<'a>>>,
+    path: Vec<Rc<flux::semantic::walk::Node<'a>>>,
 }
 
 pub fn find_node(
-    node: crate::visitors::semantic::walk::Node<'_>,
+    node: flux::semantic::walk::Node<'_>,
     position: Position,
 ) -> NodeFinderResult<'_> {
     let mut result = NodeFinderResult::default();
     let mut visitor = NodeFinderVisitor::new(position);
 
-    crate::visitors::semantic::walk::walk(
-        &mut visitor,
-        Rc::new(node),
-    );
+    flux::semantic::walk::walk(&mut visitor, Rc::new(node));
 
     let state = visitor.state.borrow();
 

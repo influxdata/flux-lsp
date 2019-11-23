@@ -11,7 +11,7 @@ use crate::visitors::semantic::{
     DefinitionFinderVisitor, NodeFinderVisitor,
 };
 
-use crate::visitors::semantic::walk::{self, Node};
+use flux::semantic::walk::{self, Node};
 
 fn ident_to_location(uri: String, node: Rc<Node<'_>>) -> Location {
     let start = Position {

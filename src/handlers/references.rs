@@ -8,10 +8,10 @@ use crate::protocol::responses::Response;
 use crate::visitors::semantic::utils::{
     create_semantic_package, map_node_to_location,
 };
-use crate::visitors::semantic::walk::{self, Node};
 use crate::visitors::semantic::{
     DefinitionFinderVisitor, IdentFinderVisitor,
 };
+use flux::semantic::walk::{self, Node};
 
 use std::rc::Rc;
 

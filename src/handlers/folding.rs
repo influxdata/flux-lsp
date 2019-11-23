@@ -5,8 +5,8 @@ use crate::protocol::requests::{
 };
 use crate::protocol::responses::Response;
 use crate::utils::get_file_contents_from_uri;
-use crate::visitors::semantic::walk::{self, Node};
 use crate::visitors::semantic::FoldFinderVisitor;
+use flux::semantic::walk::{self, Node};
 
 use std::rc::Rc;
 

@@ -3,10 +3,10 @@ use std::rc::Rc;
 
 use crate::protocol::properties::Position;
 
-pub mod walk;
-use walk::{Node, Visitor};
+// pub mod walk;
 
 use flux::semantic::nodes::Expression;
+use flux::semantic::walk::{self, Node, Visitor};
 
 pub mod utils;
 
@@ -47,7 +47,7 @@ pub struct NodeFinderVisitor<'a> {
 }
 
 impl<'a> Visitor<'a> for NodeFinderVisitor<'a> {
-    fn visit(&self, node: Rc<Node<'a>>) -> bool {
+    fn visit(&mut self, node: Rc<Node<'a>>) -> bool {
         let mut state = self.state.borrow_mut();
 
         let contains = contains_position(
@@ -87,7 +87,7 @@ pub struct IdentFinderVisitor<'a> {
 }
 
 impl<'a> Visitor<'a> for IdentFinderVisitor<'a> {
-    fn visit(&self, node: Rc<walk::Node<'a>>) -> bool {
+    fn visit(&mut self, node: Rc<walk::Node<'a>>) -> bool {
         let mut state = self.state.borrow_mut();
         match node.clone().as_ref() {
             walk::Node::MemberExpr(m) => {
@@ -136,7 +136,7 @@ pub struct DefinitionFinderVisitor<'a> {
 }
 
 impl<'a> Visitor<'a> for DefinitionFinderVisitor<'a> {
-    fn visit(&self, node: Rc<Node<'a>>) -> bool {
+    fn visit(&mut self, node: Rc<Node<'a>>) -> bool {
         let mut state = self.state.borrow_mut();
 
         match node.as_ref() {
@@ -176,7 +176,7 @@ pub struct FoldFinderVisitor<'a> {
 }
 
 impl<'a> Visitor<'a> for FoldFinderVisitor<'a> {
-    fn visit(&self, node: Rc<Node<'a>>) -> bool {
+    fn visit(&mut self, node: Rc<Node<'a>>) -> bool {
         let mut state = self.state.borrow_mut();
 
         if let Node::Block(_) = node.as_ref() {

@@ -1,11 +1,11 @@
 use crate::protocol::properties::{Location, Position, Range};
 use crate::utils::get_file_contents_from_uri;
-use crate::visitors::semantic::walk::Node;
 
 use std::rc::Rc;
 
 use flux::semantic::analyze_source;
 use flux::semantic::nodes::Package;
+use flux::semantic::walk::Node;
 
 pub fn create_semantic_package(
     uri: String,
