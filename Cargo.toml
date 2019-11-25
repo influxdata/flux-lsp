@@ -19,5 +19,5 @@ path = "src/main.rs"
 serde_json = "1.0"
 clap = "2.31.2"
 serde = { version = "1.0.101", features = ["derive"] }
-flux = { git = "https://github.com/influxdata/flux", branch = "master" }
+flux = { git = "https://github.com/influxdata/flux", rev = "91e6a79" }
 url = "2.1.0"
