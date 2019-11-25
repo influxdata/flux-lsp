@@ -1,17 +1,36 @@
+use crate::cache;
 use crate::protocol::properties::{Location, Position, Range};
-use crate::utils::get_file_contents_from_uri;
 
 use std::rc::Rc;
 
-use flux::semantic::analyze_source;
 use flux::semantic::nodes::Package;
 use flux::semantic::walk::Node;
+
+use flux::parser::parse_string;
+use flux::semantic::analyze;
+
+pub fn analyze_source(
+    source: &str,
+) -> Result<flux::semantic::nodes::Package, String> {
+    let file = parse_string("", source);
+    let ast_pkg = flux::ast::Package {
+        base: file.base.clone(),
+        path: "".to_string(),
+        package: "main".to_string(),
+        files: vec![file],
+    };
+
+    match analyze(ast_pkg) {
+        Ok(p) => Ok(p),
+        Err(_) => Err("failed to analyze source".to_string()),
+    }
+}
 
 pub fn create_semantic_package(
     uri: String,
 ) -> Result<Package, String> {
-    let src = &get_file_contents_from_uri(uri.clone())?;
-    let pkg = match analyze_source(src) {
+    let cv = cache::get(uri.clone())?;
+    let pkg = match analyze_source(cv.contents.as_str()) {
         Ok(pkg) => pkg,
         Err(_) => {
             return Err("Failed to create semantic node".to_string())
