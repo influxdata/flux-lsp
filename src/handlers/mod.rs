@@ -1,5 +1,6 @@
 pub mod document_change;
 pub mod document_open;
+pub mod document_save;
 pub mod folding;
 pub mod goto_definition;
 pub mod initialize;
@@ -27,10 +28,10 @@ pub trait RequestHandler {
     ) -> Result<Option<String>, String>;
 }
 
-pub fn create_file_diagnostics(
+pub fn create_diagnostics(
     uri: String,
+    file: flux::ast::File,
 ) -> Result<Notification<PublishDiagnosticsParams>, String> {
-    let file = utils::create_file_node(uri.clone())?;
     let walker = walk::Node::File(&file);
 
     let errors = check::check(walker);
@@ -40,6 +41,13 @@ pub fn create_file_diagnostics(
         Ok(msg) => Ok(msg),
         Err(e) => Err(format!("Failed to create diagnostic: {}", e)),
     }
+}
+
+pub fn create_file_diagnostics(
+    uri: String,
+) -> Result<Notification<PublishDiagnosticsParams>, String> {
+    let file = utils::create_file_node(uri.clone())?;
+    create_diagnostics(uri.clone(), file)
 }
 
 #[derive(Default, Clone)]

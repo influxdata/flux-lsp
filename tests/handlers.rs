@@ -6,6 +6,7 @@ use flux_lsp_lib::protocol::notifications::*;
 use flux_lsp_lib::protocol::properties::*;
 use flux_lsp_lib::protocol::requests::*;
 use flux_lsp_lib::protocol::responses::*;
+use flux_lsp_lib::utils;
 
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -206,16 +207,23 @@ fn test_document_open_error() {
 #[test]
 fn test_document_change_ok() {
     let uri = flux_fixture_uri("ok");
+    let text =
+        utils::get_file_contents_from_uri(uri.clone()).unwrap();
     let did_change_request = Request {
         id: 1,
         method: "textDocument/didChange".to_string(),
-        params: Some(TextDocumentParams {
+        params: Some(TextDocumentChangeParams {
             text_document: TextDocument {
                 uri: uri.clone(),
                 language_id: "flux".to_string(),
                 version: 1,
-                text: "".to_string(),
+                text: text.clone(),
             },
+            content_changes: vec![ContentChange {
+                text,
+                range: None,
+                range_length: None,
+            }],
         }),
     };
 
@@ -247,16 +255,23 @@ fn test_document_change_ok() {
 #[test]
 fn test_document_change_error() {
     let uri = flux_fixture_uri("error");
+    let text =
+        utils::get_file_contents_from_uri(uri.clone()).unwrap();
     let did_change_request = Request {
         id: 1,
         method: "textDocument/didChange".to_string(),
-        params: Some(TextDocumentParams {
+        params: Some(TextDocumentChangeParams {
             text_document: TextDocument {
                 uri: uri.clone(),
                 language_id: "flux".to_string(),
                 version: 1,
-                text: "".to_string(),
+                text: text.clone(),
             },
+            content_changes: vec![ContentChange {
+                text,
+                range: None,
+                range_length: None,
+            }],
         }),
     };
 

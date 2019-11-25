@@ -1,7 +1,8 @@
-use crate::handlers::{create_file_diagnostics, RequestHandler};
+use crate::handlers::{create_diagnostics, RequestHandler};
 use crate::protocol::requests::{
-    PolymorphicRequest, Request, TextDocumentParams,
+    PolymorphicRequest, Request, TextDocumentChangeParams,
 };
+use crate::utils::create_file_node_from_text;
 
 #[derive(Default)]
 pub struct DocumentChangeHandler {}
@@ -11,11 +12,16 @@ impl RequestHandler for DocumentChangeHandler {
         &self,
         prequest: PolymorphicRequest,
     ) -> Result<Option<String>, String> {
-        let request: Request<TextDocumentParams> =
+        let request: Request<TextDocumentChangeParams> =
             Request::from_json(prequest.data.as_str())?;
         if let Some(params) = request.params {
+            let changes = params.content_changes.clone();
+            let first = changes.get(0).unwrap();
+            let text = first.clone().text;
             let uri = params.text_document.uri;
-            let msg = create_file_diagnostics(uri.clone())?;
+            let file =
+                create_file_node_from_text(uri.clone(), text.clone());
+            let msg = create_diagnostics(uri.clone(), file)?;
             let json = msg.to_json()?;
 
             return Ok(Some(json));

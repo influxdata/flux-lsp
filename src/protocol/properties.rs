@@ -83,3 +83,11 @@ pub struct ServerCapabilities {
     #[serde(rename = "foldingRangeProvider")]
     pub folding_range_provider: bool,
 }
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct ContentChange {
+    pub text: String,
+    pub range: Option<Range>,
+    #[serde(rename = "rangeLength")]
+    pub range_length: Option<u32>,
+}

@@ -51,6 +51,13 @@ pub fn create_file_node(uri: String) -> Result<ast::File, String> {
     Ok(file)
 }
 
+pub fn create_file_node_from_text(
+    uri: String,
+    text: String,
+) -> ast::File {
+    parse_string(uri.as_str(), text.as_str())
+}
+
 pub fn get_file_contents_from_uri(
     uri: String,
 ) -> Result<String, String> {

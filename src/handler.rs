@@ -1,5 +1,6 @@
 use crate::handlers::document_change::DocumentChangeHandler;
 use crate::handlers::document_open::DocumentOpenHandler;
+use crate::handlers::document_save::DocumentSaveHandler;
 use crate::handlers::folding::FoldingHandler;
 use crate::handlers::goto_definition::GotoDefinitionHandler;
 use crate::handlers::initialize::InitializeHandler;
@@ -49,7 +50,7 @@ impl Handler {
         );
         mapping.insert(
             "textDocument/didSave".to_string(),
-            Box::new(DocumentChangeHandler::default()),
+            Box::new(DocumentSaveHandler::default()),
         );
         mapping.insert(
             "textDocument/didOpen".to_string(),

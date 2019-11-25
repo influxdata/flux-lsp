@@ -7,8 +7,8 @@ pub mod handler;
 pub mod handlers;
 pub mod loggers;
 pub mod protocol;
+pub mod utils;
 
-mod utils;
 mod visitors;
 
 use handler::Handler;
