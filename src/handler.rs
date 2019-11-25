@@ -1,4 +1,5 @@
 use crate::handlers::document_change::DocumentChangeHandler;
+use crate::handlers::document_close::DocumentCloseHandler;
 use crate::handlers::document_open::DocumentOpenHandler;
 use crate::handlers::document_save::DocumentSaveHandler;
 use crate::handlers::folding::FoldingHandler;
@@ -51,6 +52,10 @@ impl Handler {
         mapping.insert(
             "textDocument/didSave".to_string(),
             Box::new(DocumentSaveHandler::default()),
+        );
+        mapping.insert(
+            "textDocument/didClose".to_string(),
+            Box::new(DocumentCloseHandler::default()),
         );
         mapping.insert(
             "textDocument/didOpen".to_string(),

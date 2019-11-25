@@ -19,6 +19,10 @@ pub fn get(uri: String) -> Result<CacheValue, String> {
     GLOBAL_CACHE.get(uri)
 }
 
+pub fn remove(uri: String) -> Result<(), String> {
+    GLOBAL_CACHE.remove(uri)
+}
+
 pub fn apply(
     uri: String,
     version: u32,
@@ -46,6 +50,21 @@ struct Cache {
 }
 
 impl Cache {
+    fn remove(&self, uri: String) -> Result<(), String> {
+        let mut store = match self.store.lock() {
+            Ok(s) => s,
+            Err(_) => {
+                return Err(
+                    "failed to get cache store lock".to_string()
+                )
+            }
+        };
+
+        store.remove(&uri);
+
+        Ok(())
+    }
+
     fn set(
         &self,
         uri: String,
@@ -61,13 +80,25 @@ impl Cache {
             }
         };
 
-        let val = CacheValue {
-            uri: uri.clone(),
-            version,
-            contents,
-        };
+        if let Some(val) = store.get(&uri) {
+            if val.version <= version {
+                let val = CacheValue {
+                    uri: uri.clone(),
+                    version,
+                    contents,
+                };
 
-        store.insert(uri, val);
+                store.insert(uri, val);
+            }
+        } else {
+            let val = CacheValue {
+                uri: uri.clone(),
+                version,
+                contents,
+            };
+
+            store.insert(uri, val);
+        }
 
         Ok(())
     }
