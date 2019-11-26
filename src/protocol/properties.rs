@@ -30,6 +30,18 @@ pub struct TextDocument {
 }
 
 #[derive(Serialize, Deserialize, Clone)]
+pub struct TextDocumentIdentifier {
+    pub uri: String,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct VersionedTextDocumentIdentifier {
+    pub uri: String,
+    #[serde(default = "default_version")]
+    pub version: u32,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
 pub struct TextEdit {
     #[serde(rename = "newText")]
     pub new_text: String,

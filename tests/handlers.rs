@@ -288,11 +288,9 @@ fn test_document_change_ok() {
             id: 1,
             method: "textDocument/didChange".to_string(),
             params: Some(TextDocumentChangeParams {
-                text_document: TextDocument {
+                text_document: VersionedTextDocumentIdentifier {
                     uri: uri.clone(),
-                    language_id: "flux".to_string(),
                     version: 1,
-                    text: text.clone(),
                 },
                 content_changes: vec![ContentChange {
                     text: text.clone(),
@@ -338,11 +336,9 @@ fn test_document_change_error() {
             id: 1,
             method: "textDocument/didChange".to_string(),
             params: Some(TextDocumentChangeParams {
-                text_document: TextDocument {
+                text_document: VersionedTextDocumentIdentifier {
                     uri: uri.clone(),
-                    language_id: "flux".to_string(),
                     version: 1,
-                    text: text.clone(),
                 },
                 content_changes: vec![ContentChange {
                     text: text.clone(),
