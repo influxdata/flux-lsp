@@ -1,7 +1,10 @@
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 
-use crate::protocol::properties::{Position, TextDocument};
+use crate::protocol::properties::{
+    ContentChange, Position, TextDocument, TextDocumentIdentifier,
+    VersionedTextDocumentIdentifier,
+};
 
 fn default_id() -> u32 {
     0
@@ -96,6 +99,20 @@ pub struct TextDocumentPositionParams {
 pub struct TextDocumentParams {
     #[serde(rename = "textDocument")]
     pub text_document: TextDocument,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct TextDocumentSaveParams {
+    #[serde(rename = "textDocument")]
+    pub text_document: TextDocumentIdentifier,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct TextDocumentChangeParams {
+    #[serde(rename = "textDocument")]
+    pub text_document: VersionedTextDocumentIdentifier,
+    #[serde(rename = "contentChanges")]
+    pub content_changes: Vec<ContentChange>,
 }
 
 #[derive(Serialize, Deserialize, Clone)]

@@ -1,3 +1,6 @@
+#[macro_use]
+extern crate lazy_static;
+
 // Stdlib
 use std::cell::RefCell;
 use std::io::{self, BufRead, BufReader, Read, Write};
@@ -7,8 +10,9 @@ pub mod handler;
 pub mod handlers;
 pub mod loggers;
 pub mod protocol;
+pub mod utils;
 
-mod utils;
+mod cache;
 mod visitors;
 
 use handler::Handler;

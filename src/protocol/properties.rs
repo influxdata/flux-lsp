@@ -30,6 +30,18 @@ pub struct TextDocument {
 }
 
 #[derive(Serialize, Deserialize, Clone)]
+pub struct TextDocumentIdentifier {
+    pub uri: String,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct VersionedTextDocumentIdentifier {
+    pub uri: String,
+    #[serde(default = "default_version")]
+    pub version: u32,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
 pub struct TextEdit {
     #[serde(rename = "newText")]
     pub new_text: String,
@@ -82,4 +94,12 @@ pub struct ServerCapabilities {
 
     #[serde(rename = "foldingRangeProvider")]
     pub folding_range_provider: bool,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct ContentChange {
+    pub text: String,
+    pub range: Option<Range>,
+    #[serde(rename = "rangeLength")]
+    pub range_length: Option<u32>,
 }

@@ -1,13 +1,13 @@
 use crate::cache;
-use crate::handlers::{create_file_diagnostics, RequestHandler};
+use crate::handlers::RequestHandler;
 use crate::protocol::requests::{
     PolymorphicRequest, Request, TextDocumentParams,
 };
 
 #[derive(Default)]
-pub struct DocumentOpenHandler {}
+pub struct DocumentCloseHandler {}
 
-impl RequestHandler for DocumentOpenHandler {
+impl RequestHandler for DocumentCloseHandler {
     fn handle(
         &self,
         prequest: PolymorphicRequest,
@@ -16,15 +16,10 @@ impl RequestHandler for DocumentOpenHandler {
             Request::from_json(prequest.data.as_str())?;
         if let Some(params) = request.params {
             let uri = params.text_document.uri;
-            let version = params.text_document.version;
-            let text = params.text_document.text;
 
-            cache::set(uri.clone(), version, text)?;
+            cache::remove(uri)?;
 
-            let msg = create_file_diagnostics(uri.clone())?;
-            let json = msg.to_json()?;
-
-            return Ok(Some(json));
+            return Ok(None);
         }
 
         Err("invalid textDocument/didOpen request".to_string())

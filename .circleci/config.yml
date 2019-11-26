@@ -33,7 +33,7 @@ jobs:
     - install-linux-deps
     - run:
         name: "run tests"
-        command: cargo test --verbose
+        command: cargo test -- --test-threads=1
 
   build:
     docker:
