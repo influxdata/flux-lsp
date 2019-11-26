@@ -4,5 +4,8 @@ build:
 install:
 	cargo install --path . --force
 
-test: install
+test:
+	cargo test -- --test-threads=1
+
+manual-test: test install
 	vim me.flux

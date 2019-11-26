@@ -16,11 +16,11 @@ pub fn set(
 }
 
 pub fn get(uri: String) -> Result<CacheValue, String> {
-    GLOBAL_CACHE.get(uri)
+    GLOBAL_CACHE.get(uri.as_str())
 }
 
 pub fn remove(uri: String) -> Result<(), String> {
-    GLOBAL_CACHE.remove(uri)
+    GLOBAL_CACHE.remove(uri.as_str())
 }
 
 pub fn apply(
@@ -50,7 +50,7 @@ struct Cache {
 }
 
 impl Cache {
-    fn remove(&self, uri: String) -> Result<(), String> {
+    fn remove(&self, uri: &'_ str) -> Result<(), String> {
         let mut store = match self.store.lock() {
             Ok(s) => s,
             Err(_) => {
@@ -60,7 +60,7 @@ impl Cache {
             }
         };
 
-        store.remove(&uri);
+        store.remove(uri);
 
         Ok(())
     }
@@ -80,7 +80,7 @@ impl Cache {
             }
         };
 
-        if let Some(val) = store.get(&uri) {
+        if let Some(val) = store.get(uri.as_str()) {
             if val.version <= version {
                 let val = CacheValue {
                     uri: uri.clone(),
@@ -103,7 +103,7 @@ impl Cache {
         Ok(())
     }
 
-    fn get(&self, uri: String) -> Result<CacheValue, String> {
+    fn get(&self, uri: &'_ str) -> Result<CacheValue, String> {
         let store = match self.store.lock() {
             Ok(s) => s,
             Err(_) => {
@@ -113,10 +113,10 @@ impl Cache {
             }
         };
 
-        if let Some(cv) = store.get(&uri) {
+        if let Some(cv) = store.get(uri) {
             Ok((*cv).clone())
         } else {
-            Err(format!("unknown uri: {}", uri.clone()))
+            Err(format!("unknown uri: {}", uri))
         }
     }
 }
