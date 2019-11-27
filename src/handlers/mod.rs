@@ -44,13 +44,6 @@ pub fn create_diagnostics(
     }
 }
 
-pub fn create_file_diagnostics(
-    uri: String,
-) -> Result<Notification<PublishDiagnosticsParams>, String> {
-    let file = utils::create_file_node(uri.clone())?;
-    create_diagnostics(uri.clone(), file)
-}
-
 #[derive(Default, Clone)]
 pub struct NodeFinderResult<'a> {
     node: Option<Rc<flux::semantic::walk::Node<'a>>>,

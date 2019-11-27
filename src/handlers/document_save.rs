@@ -1,5 +1,5 @@
 use crate::cache;
-use crate::handlers::{create_file_diagnostics, RequestHandler};
+use crate::handlers::{create_diagnostics, RequestHandler};
 use crate::protocol::requests::{
     PolymorphicRequest, Request, TextDocumentSaveParams,
 };
@@ -17,12 +17,13 @@ impl RequestHandler for DocumentSaveHandler {
             Request::from_json(prequest.data.as_str())?;
         if let Some(params) = request.params {
             let uri = params.text_document.uri;
-            let text =
-                utils::get_file_contents_from_uri(uri.clone())?;
+            let cv = cache::get(uri.clone())?;
+            let node = utils::create_file_node_from_text(
+                uri.clone(),
+                cv.contents,
+            );
 
-            cache::force(uri.clone(), text)?;
-
-            let msg = create_file_diagnostics(uri.clone())?;
+            let msg = create_diagnostics(uri.clone(), node)?;
             let json = msg.to_json()?;
 
             return Ok(Some(json));

@@ -15,10 +15,6 @@ pub fn set(
     GLOBAL_CACHE.set(uri, version, contents)
 }
 
-pub fn force(uri: String, contents: String) -> Result<(), String> {
-    GLOBAL_CACHE.force(uri, contents)
-}
-
 pub fn get(uri: String) -> Result<CacheValue, String> {
     GLOBAL_CACHE.get(uri.as_str())
 }
@@ -103,31 +99,6 @@ impl Cache {
 
             store.insert(uri, val);
         }
-
-        Ok(())
-    }
-
-    fn force(
-        &self,
-        uri: String,
-        contents: String,
-    ) -> Result<(), String> {
-        let mut store = match self.store.lock() {
-            Ok(s) => s,
-            Err(_) => {
-                return Err(
-                    "failed to get cache store lock".to_string()
-                )
-            }
-        };
-
-        let val = CacheValue {
-            uri: uri.clone(),
-            version: 0,
-            contents,
-        };
-
-        store.insert(uri, val);
 
         Ok(())
     }

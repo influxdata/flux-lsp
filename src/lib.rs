@@ -57,7 +57,6 @@ impl Server {
     }
 
     fn write(&mut self, s: String) -> io::Result<()> {
-        let _logger = self.logger.borrow_mut();
         let st = s.clone();
         let result = st.as_bytes();
         let size = result.len();
@@ -69,7 +68,7 @@ impl Server {
     }
 
     fn read_spacer(&mut self) -> Result<(), String> {
-        let _logger = self.logger.borrow_mut();
+        // let _logger = self.logger.borrow_mut();
         let mut s = String::new();
         match &self.reader.read_line(&mut s) {
             Ok(_) => Ok(()),
