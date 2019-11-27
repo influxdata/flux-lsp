@@ -7,7 +7,7 @@ use std::rc::Rc;
 
 fn main() {
     let flags: ArgMatches = App::new("flux-lsp")
-        .version("0.0.1")
+        .version("0.0.4")
         .arg(
             Arg::with_name("logfile")
                 .help(
