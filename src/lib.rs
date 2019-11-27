@@ -10,6 +10,7 @@ pub mod handler;
 pub mod handlers;
 pub mod loggers;
 pub mod protocol;
+pub mod shared;
 pub mod utils;
 
 mod cache;

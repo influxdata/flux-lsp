@@ -1,6 +1,4 @@
 use std::collections::hash_map::HashMap;
-
-use crate::protocol::properties::ContentChange;
 use std::sync::{Arc, Mutex};
 
 lazy_static! {
@@ -21,20 +19,6 @@ pub fn get(uri: String) -> Result<CacheValue, String> {
 
 pub fn remove(uri: String) -> Result<(), String> {
     GLOBAL_CACHE.remove(uri.as_str())
-}
-
-pub fn apply(
-    uri: String,
-    version: u32,
-    changes: Vec<ContentChange>,
-) -> Result<(), String> {
-    for change in changes {
-        if change.range.is_none() {
-            return set(uri, version, change.text);
-        }
-    }
-
-    Ok(())
 }
 
 #[derive(Clone)]
