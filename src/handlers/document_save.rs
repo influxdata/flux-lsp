@@ -1,9 +1,7 @@
 use crate::cache;
-use crate::handlers::{create_diagnostics, RequestHandler};
-use crate::protocol::requests::{
-    PolymorphicRequest, Request, TextDocumentSaveParams,
-};
-use crate::utils;
+use crate::handlers::RequestHandler;
+use crate::protocol::requests::PolymorphicRequest;
+use crate::shared;
 
 #[derive(Default)]
 pub struct DocumentSaveHandler {}
@@ -13,22 +11,16 @@ impl RequestHandler for DocumentSaveHandler {
         &self,
         prequest: PolymorphicRequest,
     ) -> Result<Option<String>, String> {
-        let request: Request<TextDocumentSaveParams> =
-            Request::from_json(prequest.data.as_str())?;
+        let request = shared::parse_save_request(prequest.data)?;
         if let Some(params) = request.params {
             let uri = params.text_document.uri;
             let cv = cache::get(uri.clone())?;
-            let node = utils::create_file_node_from_text(
-                uri.clone(),
-                cv.contents,
-            );
-
-            let msg = create_diagnostics(uri.clone(), node)?;
+            let msg = shared::create_diagnoistics(uri, cv.contents)?;
             let json = msg.to_json()?;
 
             return Ok(Some(json));
         }
 
-        Err("invalid textDocument/didChange request".to_string())
+        Err("invalid textDocument/didSave request".to_string())
     }
 }
