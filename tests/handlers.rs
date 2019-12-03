@@ -1,16 +1,13 @@
 extern crate flux_lsp_lib;
 
 use flux_lsp_lib::handler::Handler;
-use flux_lsp_lib::loggers::Logger;
 use flux_lsp_lib::protocol::notifications::*;
 use flux_lsp_lib::protocol::properties::*;
 use flux_lsp_lib::protocol::requests::*;
 use flux_lsp_lib::protocol::responses::*;
 
-use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fs;
-use std::rc::Rc;
 use url::Url;
 
 fn flux_fixture_uri(filename: &'static str) -> String {
@@ -48,19 +45,8 @@ pub fn get_file_contents_from_uri(
     Ok(contents)
 }
 
-struct TestLogger {}
-impl Logger for TestLogger {
-    fn info(&mut self, _: String) -> Result<(), String> {
-        Ok(())
-    }
-    fn error(&mut self, _: String) -> Result<(), String> {
-        Ok(())
-    }
-}
-
 fn create_handler() -> Handler {
-    let logger = Rc::new(RefCell::new(TestLogger {}));
-    Handler::new(logger, false)
+    Handler::new(false)
 }
 
 fn open_file(uri: String, handler: &mut Handler) {
@@ -240,6 +226,7 @@ fn test_document_open_ok() {
 #[test]
 fn test_document_open_error() {
     let uri = flux_fixture_uri("error");
+    let text = get_file_contents_from_uri(uri.clone()).unwrap();
     let did_open_request = Request {
         id: 1,
         method: "textDocument/didOpen".to_string(),
@@ -248,7 +235,7 @@ fn test_document_open_error() {
                 uri: uri.clone(),
                 language_id: "flux".to_string(),
                 version: 1,
-                text: "".to_string(),
+                text,
             },
         }),
     };

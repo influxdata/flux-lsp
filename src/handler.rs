@@ -9,15 +9,14 @@ use crate::handlers::references::FindReferencesHandler;
 use crate::handlers::rename::RenameHandler;
 use crate::handlers::shutdown::ShutdownHandler;
 use crate::handlers::RequestHandler;
-use crate::loggers::Logger;
 use crate::protocol::requests::PolymorphicRequest;
 
-use std::cell::RefCell;
 use std::collections::HashMap;
-use std::rc::Rc;
 
+use wasm_bindgen::prelude::*;
+
+#[wasm_bindgen]
 pub struct Handler {
-    pub logger: Rc<RefCell<dyn Logger>>,
     mapping: HashMap<String, Box<dyn RequestHandler>>,
     default_handler: Box<dyn RequestHandler>,
 }
@@ -35,10 +34,7 @@ impl RequestHandler for NoOpHandler {
 }
 
 impl Handler {
-    pub fn new(
-        logger: Rc<RefCell<dyn Logger>>,
-        disable_folding: bool,
-    ) -> Handler {
+    pub fn new(disable_folding: bool) -> Handler {
         let mut mapping: HashMap<String, Box<dyn RequestHandler>> =
             HashMap::new();
         mapping.insert(
@@ -83,7 +79,6 @@ impl Handler {
         );
 
         Handler {
-            logger,
             mapping,
             default_handler: Box::new(NoOpHandler::default()),
         }
@@ -93,11 +88,6 @@ impl Handler {
         &mut self,
         request: PolymorphicRequest,
     ) -> Result<Option<String>, String> {
-        let req = request.clone();
-
-        let mut logger = self.logger.borrow_mut();
-        logger.info(format!("Request -> {:?}", req.data))?;
-
         let method = request.method();
         let handler = match self.mapping.get(&method) {
             Some(h) => h,
@@ -105,10 +95,6 @@ impl Handler {
         };
 
         let resp = handler.handle(request)?;
-
-        if let Some(resp) = resp.clone() {
-            logger.info(format!("Response -> {}", resp))?;
-        }
 
         Ok(resp)
     }

@@ -4,6 +4,14 @@ use crate::protocol::requests::{BaseRequest, PolymorphicRequest};
 use flux::ast::{self, check};
 use flux::parser::parse_string;
 
+pub fn wrap_message(s: String) -> String {
+    let st = s.clone();
+    let result = st.as_bytes();
+    let size = result.len();
+
+    format!("Content-Length: {}\r\n\r\n{}", size, s)
+}
+
 pub fn get_content_size(s: String) -> Result<usize, String> {
     let tmp = String::from(s.trim_end());
     let stmp: Vec<&str> = tmp.split(": ").collect();
