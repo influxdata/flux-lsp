@@ -2,13 +2,10 @@
 extern crate lazy_static;
 
 // Stdlib
-use std::cell::RefCell;
 use std::io::{self, BufRead, BufReader, Read, Write};
-use std::rc::Rc;
 
 pub mod handler;
 pub mod handlers;
-pub mod loggers;
 pub mod protocol;
 pub mod shared;
 pub mod utils;
@@ -18,7 +15,6 @@ mod cache;
 mod visitors;
 
 use handler::Handler;
-use loggers::Logger;
 
 pub trait ServerInput: BufRead + Read {}
 impl<T> ServerInput for T where T: BufRead + Read {}
@@ -27,12 +23,10 @@ pub struct Server {
     reader: Box<dyn ServerInput>,
     writer: Box<dyn Write>,
     pub handler: Handler,
-    pub logger: Rc<RefCell<dyn Logger>>,
 }
 
 impl Server {
     pub fn new(
-        logger: Rc<RefCell<dyn Logger>>,
         reader: Box<dyn ServerInput>,
         writer: Box<dyn Write>,
         disable_folding: bool,
@@ -40,18 +34,13 @@ impl Server {
         Server {
             reader,
             writer,
-            logger,
             handler: Handler::new(disable_folding),
         }
     }
 
-    pub fn with_stdio(
-        logger: Rc<RefCell<dyn Logger>>,
-        disable_folding: bool,
-    ) -> Server {
+    pub fn with_stdio(disable_folding: bool) -> Server {
         let reader = BufReader::new(io::stdin());
         Server::new(
-            logger,
             Box::new(reader),
             Box::new(io::stdout()),
             disable_folding,
@@ -107,21 +96,12 @@ impl Server {
 
         let content_size = utils::get_content_size(line.clone())?;
         let content_body = self.read_content_body(content_size)?;
-        self.logger
-            .borrow_mut()
-            .info(format!("Resquest -> {}", content_body.clone()))?;
         let request = utils::parse_request(content_body)?;
         let option = self.handler.handle(request.clone())?;
 
         if let Some(msg) = option {
-            let resp = msg.clone();
             match self.write(msg) {
-                Ok(_) => {
-                    self.logger
-                        .borrow_mut()
-                        .info(format!("Response -> {}", resp))?;
-                    return Ok(());
-                }
+                Ok(_) => return Ok(()),
                 Err(_) => {
                     return Err(
                         "Failed to write response".to_string()
@@ -139,14 +119,7 @@ impl Server {
 
     pub fn start(&mut self) {
         loop {
-            match self.handle_request() {
-                Ok(_) => (),
-                Err(e) => {
-                    let mut logger = self.logger.borrow_mut();
-                    let msg = format!("Request failed: {}\n", e);
-                    logger.error(msg).unwrap();
-                }
-            }
+            if self.handle_request().is_ok() {}
         }
     }
 }
