@@ -28,7 +28,7 @@ fn test_wasm_server() {
     let request = create_did_open(text);
     let json = serde_json::to_string(&request).unwrap();
     let msg = utils::wrap_message(json);
-    let mut server = wasm::Server::new();
+    let mut server = wasm::Server::default();
 
     let result = server.process(msg);
     let message = result.get_message().unwrap();

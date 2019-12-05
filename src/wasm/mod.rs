@@ -29,18 +29,16 @@ impl ServerResponse {
 
 impl Default for Server {
     fn default() -> Server {
-        Server {
-            handler: Handler::new(false),
-        }
+        Server::new(false)
     }
 }
 
 #[wasm_bindgen]
 impl Server {
     #[wasm_bindgen(constructor)]
-    pub fn new() -> Server {
+    pub fn new(disable_folding: bool) -> Server {
         Server {
-            handler: Handler::new(false),
+            handler: Handler::new(disable_folding),
         }
     }
 
