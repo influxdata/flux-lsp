@@ -10,7 +10,9 @@ pub mod handler;
 pub mod handlers;
 pub mod loggers;
 pub mod protocol;
+pub mod shared;
 pub mod utils;
+pub mod wasm;
 
 mod cache;
 mod visitors;
@@ -38,8 +40,8 @@ impl Server {
         Server {
             reader,
             writer,
-            logger: logger.clone(),
-            handler: Handler::new(logger.clone(), disable_folding),
+            logger,
+            handler: Handler::new(disable_folding),
         }
     }
 
@@ -57,11 +59,7 @@ impl Server {
     }
 
     fn write(&mut self, s: String) -> io::Result<()> {
-        let _logger = self.logger.borrow_mut();
-        let st = s.clone();
-        let result = st.as_bytes();
-        let size = result.len();
-        let full = format!("Content-Length: {}\r\n\r\n{}", size, s);
+        let full = utils::wrap_message(s);
         let data = Vec::from(full.as_bytes());
 
         self.writer.write_all(&data)?;
@@ -69,7 +67,6 @@ impl Server {
     }
 
     fn read_spacer(&mut self) -> Result<(), String> {
-        let _logger = self.logger.borrow_mut();
         let mut s = String::new();
         match &self.reader.read_line(&mut s) {
             Ok(_) => Ok(()),

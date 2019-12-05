@@ -1,11 +1,16 @@
-use std::fs;
-
 use crate::protocol::properties::{Diagnostic, Position, Range};
 use crate::protocol::requests::{BaseRequest, PolymorphicRequest};
 
 use flux::ast::{self, check};
 use flux::parser::parse_string;
-use url::Url;
+
+pub fn wrap_message(s: String) -> String {
+    let st = s.clone();
+    let result = st.as_bytes();
+    let size = result.len();
+
+    format!("Content-Length: {}\r\n\r\n{}", size, s)
+}
 
 pub fn get_content_size(s: String) -> Result<usize, String> {
     let tmp = String::from(s.trim_end());
@@ -42,43 +47,11 @@ pub fn map_errors_to_diagnostics(
     result
 }
 
-pub fn create_file_node(uri: String) -> Result<ast::File, String> {
-    let file = parse_string(
-        uri.as_str(),
-        &get_file_contents_from_uri(uri.clone())?,
-    );
-
-    Ok(file)
-}
-
 pub fn create_file_node_from_text(
     uri: String,
     text: String,
 ) -> ast::File {
     parse_string(uri.as_str(), text.as_str())
-}
-
-pub fn get_file_contents_from_uri(
-    uri: String,
-) -> Result<String, String> {
-    let url = match Url::parse(uri.as_str()) {
-        Ok(s) => s,
-        Err(e) => {
-            return Err(format!("Failed to get file path: {}", e))
-        }
-    };
-
-    let file_path = match Url::to_file_path(&url) {
-        Ok(s) => s,
-        Err(_) => return Err("Faild to get file_path".to_string()),
-    };
-
-    let contents = match fs::read_to_string(file_path) {
-        Ok(c) => c,
-        Err(e) => return Err(format!("Failed to read file: {}", e)),
-    };
-
-    Ok(contents)
 }
 
 // TODO: figure out if all clients are zero based or if its

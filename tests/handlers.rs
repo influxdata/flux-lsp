@@ -1,16 +1,14 @@
 extern crate flux_lsp_lib;
 
 use flux_lsp_lib::handler::Handler;
-use flux_lsp_lib::loggers::Logger;
 use flux_lsp_lib::protocol::notifications::*;
 use flux_lsp_lib::protocol::properties::*;
 use flux_lsp_lib::protocol::requests::*;
 use flux_lsp_lib::protocol::responses::*;
-use flux_lsp_lib::utils;
 
-use std::cell::RefCell;
 use std::collections::HashMap;
-use std::rc::Rc;
+use std::fs;
+use url::Url;
 
 fn flux_fixture_uri(filename: &'static str) -> String {
     let mut pwd = std::env::current_dir().unwrap();
@@ -24,24 +22,35 @@ fn flux_fixture_uri(filename: &'static str) -> String {
     format!("file://{}", p)
 }
 
-struct TestLogger {}
-impl Logger for TestLogger {
-    fn info(&mut self, _: String) -> Result<(), String> {
-        Ok(())
-    }
-    fn error(&mut self, _: String) -> Result<(), String> {
-        Ok(())
-    }
+pub fn get_file_contents_from_uri(
+    uri: String,
+) -> Result<String, String> {
+    let url = match Url::parse(uri.as_str()) {
+        Ok(s) => s,
+        Err(e) => {
+            return Err(format!("Failed to get file path: {}", e))
+        }
+    };
+
+    let file_path = match Url::to_file_path(&url) {
+        Ok(s) => s,
+        Err(_) => return Err("Faild to get file_path".to_string()),
+    };
+
+    let contents = match fs::read_to_string(file_path) {
+        Ok(c) => c,
+        Err(e) => return Err(format!("Failed to read file: {}", e)),
+    };
+
+    Ok(contents)
 }
 
 fn create_handler() -> Handler {
-    let logger = Rc::new(RefCell::new(TestLogger {}));
-    Handler::new(logger, false)
+    Handler::new(false)
 }
 
 fn open_file(uri: String, handler: &mut Handler) {
-    let text =
-        utils::get_file_contents_from_uri(uri.clone()).unwrap();
+    let text = get_file_contents_from_uri(uri.clone()).unwrap();
     let did_open_request = Request {
         id: 1,
         method: "textDocument/didOpen".to_string(),
@@ -69,8 +78,7 @@ fn open_file(uri: String, handler: &mut Handler) {
 }
 
 fn close_file(uri: String, handler: &mut Handler) {
-    let text =
-        utils::get_file_contents_from_uri(uri.clone()).unwrap();
+    let text = get_file_contents_from_uri(uri.clone()).unwrap();
     let did_close_request = Request {
         id: 1,
         method: "textDocument/didClose".to_string(),
@@ -218,6 +226,7 @@ fn test_document_open_ok() {
 #[test]
 fn test_document_open_error() {
     let uri = flux_fixture_uri("error");
+    let text = get_file_contents_from_uri(uri.clone()).unwrap();
     let did_open_request = Request {
         id: 1,
         method: "textDocument/didOpen".to_string(),
@@ -226,7 +235,7 @@ fn test_document_open_error() {
                 uri: uri.clone(),
                 language_id: "flux".to_string(),
                 version: 1,
-                text: "".to_string(),
+                text,
             },
         }),
     };
@@ -278,8 +287,7 @@ fn test_document_open_error() {
 #[test]
 fn test_document_change_ok() {
     let uri = flux_fixture_uri("ok");
-    let text =
-        utils::get_file_contents_from_uri(uri.clone()).unwrap();
+    let text = get_file_contents_from_uri(uri.clone()).unwrap();
 
     let mut handler = create_handler();
 
@@ -327,8 +335,7 @@ fn test_document_change_ok() {
 #[test]
 fn test_document_change_error() {
     let uri = flux_fixture_uri("error");
-    let text =
-        utils::get_file_contents_from_uri(uri.clone()).unwrap();
+    let text = get_file_contents_from_uri(uri.clone()).unwrap();
     let mut handler = create_handler();
 
     with_file_open(uri.clone(), &mut handler, move |handler| {

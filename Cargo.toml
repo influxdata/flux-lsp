@@ -3,6 +3,9 @@ name = "flux-lsp"
 version = "0.1.0"
 authors = ["Brandon Farmer <bthesorceror@gmail.com>"]
 edition = "2018"
+license = "MIT"
+description = "LSP support for the flux language"
+repository = "https://github.com/influxdata/flux-lsp"
 
 [lib]
 name = "flux_lsp_lib"
@@ -22,3 +25,4 @@ serde = { version = "1.0.101", features = ["derive"] }
 flux = { git = "https://github.com/influxdata/flux", rev = "91e6a79" }
 url = "2.1.0"
 lazy_static = "1.4.0"
+wasm-bindgen = "0.2.55"

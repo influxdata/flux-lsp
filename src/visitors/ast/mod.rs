@@ -1,8 +1,10 @@
 use crate::protocol::properties::Position;
+use crate::utils;
 
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use flux::ast::check;
 use flux::ast::walk::{self, Visitor};
 
 // TODO: figure out if this offset is common among lsp clients
@@ -32,6 +34,16 @@ fn contains_position(
     }
 
     true
+}
+
+pub fn check_source(
+    uri: String,
+    source: String,
+) -> Vec<check::Error> {
+    let file = utils::create_file_node_from_text(uri.clone(), source);
+    let walker = walk::Node::File(&file);
+
+    check::check(walker)
 }
 
 pub struct DefinitionFinderState<'a> {
