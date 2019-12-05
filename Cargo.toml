@@ -3,6 +3,9 @@ name = "flux-lsp"
 version = "0.1.0"
 authors = ["Brandon Farmer <bthesorceror@gmail.com>"]
 edition = "2018"
+license = "MIT"
+description = "LSP support for the flux language"
+repository = "https://github.com/influxdata/flux-lsp"
 
 [lib]
 name = "flux_lsp_lib"

@@ -2,4 +2,4 @@
 **/*.rs.bk
 me.flux
 lsp.log
-pkg
+pkg*
