@@ -1,7 +1,9 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-use crate::protocol::properties::{ServerCapabilities, TextEdit};
+use crate::protocol::properties::{
+    ServerCapabilities, TextDocumentSyncKind, TextEdit,
+};
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Response<T> {
@@ -49,6 +51,7 @@ impl InitializeResult {
                 references_provider: true,
                 rename_provider: true,
                 folding_range_provider,
+                text_document_sync: TextDocumentSyncKind::Full,
             },
         }
     }

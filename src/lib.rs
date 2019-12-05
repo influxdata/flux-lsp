@@ -107,14 +107,25 @@ impl Server {
 
         let content_size = utils::get_content_size(line.clone())?;
         let content_body = self.read_content_body(content_size)?;
+        self.logger
+            .borrow_mut()
+            .info(format!("Resquest -> {}", content_body.clone()))?;
         let request = utils::parse_request(content_body)?;
         let option = self.handler.handle(request.clone())?;
 
         if let Some(msg) = option {
+            let resp = msg.clone();
             match self.write(msg) {
-                Ok(_) => return Ok(()),
+                Ok(_) => {
+                    self.logger
+                        .borrow_mut()
+                        .info(format!("Response -> {}", resp))?;
+                    return Ok(());
+                }
                 Err(_) => {
-                    return Err("Failed to write response".to_string())
+                    return Err(
+                        "Failed to write response".to_string()
+                    );
                 }
             }
         }
