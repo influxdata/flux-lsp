@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use serde_repr::{Deserialize_repr, Serialize_repr};
 
 fn default_version() -> u32 {
     1
@@ -81,8 +82,29 @@ pub struct Location {
     pub range: Range,
 }
 
-#[derive(Serialize, Deserialize, Clone, Default)]
+#[derive(Serialize_repr, Deserialize_repr, PartialEq, Clone)]
+#[repr(u8)]
+pub enum TextDocumentSyncKind {
+    /**
+     * Documents should not be synced at all.
+     */
+    None = 0,
+    /**
+     * Documents are synced by always sending the full content of the document.
+     */
+    Full = 1,
+    /**
+     * Documents are synced by sending the full content on open. After that only incremental
+     * updates to the document are sent.
+     */
+    Incremental = 2,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
 pub struct ServerCapabilities {
+    #[serde(rename = "textDocumentSync")]
+    pub text_document_sync: TextDocumentSyncKind,
+
     #[serde(rename = "referencesProvider")]
     pub references_provider: bool,
 
