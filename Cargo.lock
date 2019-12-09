@@ -202,7 +202,6 @@ dependencies = [
 name = "flux-lsp"
 version = "0.1.0"
 dependencies = [
- "clap 2.33.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "flux 0.3.0 (git+https://github.com/influxdata/flux?rev=8e956e67)",
  "lazy_static 1.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.103 (registry+https://github.com/rust-lang/crates.io-index)",

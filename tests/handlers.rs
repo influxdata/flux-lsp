@@ -1,10 +1,10 @@
-extern crate flux_lsp_lib;
+extern crate flux_lsp;
 
-use flux_lsp_lib::handler::Handler;
-use flux_lsp_lib::protocol::notifications::*;
-use flux_lsp_lib::protocol::properties::*;
-use flux_lsp_lib::protocol::requests::*;
-use flux_lsp_lib::protocol::responses::*;
+use flux_lsp::handler::Handler;
+use flux_lsp::protocol::notifications::*;
+use flux_lsp::protocol::properties::*;
+use flux_lsp::protocol::requests::*;
+use flux_lsp::protocol::responses::*;
 
 use std::collections::HashMap;
 use std::fs;

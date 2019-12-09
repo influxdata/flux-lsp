@@ -1,10 +1,10 @@
-extern crate flux_lsp_lib;
+extern crate flux_lsp;
 
-use flux_lsp_lib::protocol::notifications::*;
-use flux_lsp_lib::protocol::properties::*;
-use flux_lsp_lib::protocol::requests::*;
-use flux_lsp_lib::utils;
-use flux_lsp_lib::wasm;
+use flux_lsp::protocol::notifications::*;
+use flux_lsp::protocol::properties::*;
+use flux_lsp::protocol::requests::*;
+use flux_lsp::utils;
+use flux_lsp::wasm;
 
 fn create_did_open(text: String) -> Request<TextDocumentParams> {
     Request {
