@@ -3,9 +3,9 @@
 ./build.sh
 
 cd pkg-node
-npm publish
+npm publish --access public
 cd ..
 
 cd pkg-browser
-npm publish
+npm publish --access public
 cd ..
