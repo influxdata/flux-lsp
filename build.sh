@@ -1,15 +1,11 @@
 #!/bin/bash
 
-imagename=flux-lsp-builder
+source ./vars.sh
 
-SRC_DIR=/src
-DIR=$(pwd)
-
-# Build new docker image
-docker build \
-    -f Dockerfile \
-    -t $imagename \
-    $DIR
+if [[ "$(docker images -q $imagename:$imagetag 2> /dev/null)" == "" ]]; then
+  echo "Building docker image"
+  ./build-docker-image.sh
+fi
 
 docker run \
     --rm \
