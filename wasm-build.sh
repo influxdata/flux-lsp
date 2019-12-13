@@ -2,8 +2,8 @@
 
 source $HOME/.cargo/env
 
-rm -rf pkg-node
-rm -rf pkg-browser
+[ ! -e pkg-node ] || rm -rf pkg-node
+[ ! -e pkg-browser ] || rm -rf pkg-browser
 
 wasm-pack build -t nodejs -d pkg-node --out-name flux-lsp-node --scope influxdata
 wasm-pack build -t browser -d pkg-browser --out-name flux-lsp-browser --scope influxdata
