@@ -3,7 +3,8 @@ use serde_repr::{Deserialize_repr, Serialize_repr};
 
 use flux::ast::SourceLocation;
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize_repr, Deserialize_repr, Clone)]
+#[repr(u32)]
 pub enum SymbolKind {
     File = 1,
     Module = 2,

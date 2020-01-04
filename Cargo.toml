@@ -22,3 +22,6 @@ flux = { git = "https://github.com/influxdata/flux", rev = "8e956e67" }
 url = "2.1.0"
 lazy_static = "1.4.0"
 wasm-bindgen = "0.2.55"
+
+[dev-dependencies]
+speculate = "0.1.2"
