@@ -120,3 +120,9 @@ pub struct FoldingRangeParams {
     #[serde(rename = "textDocument")]
     pub text_document: TextDocument,
 }
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct DocumentSymbolParams {
+    #[serde(rename = "textDocument")]
+    pub text_document: TextDocumentIdentifier,
+}

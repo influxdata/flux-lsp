@@ -1,6 +1,115 @@
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 
+use flux::ast::SourceLocation;
+
+#[derive(Serialize_repr, Deserialize_repr, Clone)]
+#[repr(u32)]
+pub enum SymbolKind {
+    File = 1,
+    Module = 2,
+    Namespace = 3,
+    Package = 4,
+    Class = 5,
+    Method = 6,
+    Property = 7,
+    Field = 8,
+    Constructor = 9,
+    Enum = 10,
+    Interface = 11,
+    Function = 12,
+    Variable = 13,
+    Constant = 14,
+    String = 15,
+    Number = 16,
+    Boolean = 17,
+    Array = 18,
+    Object = 19,
+    Key = 20,
+    Null = 21,
+    EnumMember = 22,
+    Struct = 23,
+    Event = 24,
+    Operator = 25,
+    TypeParameter = 26,
+}
+
+pub fn loc_to_range(loc: &SourceLocation) -> Range {
+    Range {
+        start: Position {
+            character: loc.start.column - 1,
+            line: loc.start.line - 1,
+        },
+        end: Position {
+            character: loc.end.column - 1,
+            line: loc.end.line - 1,
+        },
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct DocumentSymbol {
+    pub name: String,
+    pub detail: Option<String>,
+    pub kind: SymbolKind,
+    pub deprecated: Option<bool>,
+    pub range: Range,
+    #[serde(rename = "selectionRange")]
+    pub selection_range: Range,
+    pub children: Option<Vec<DocumentSymbol>>,
+}
+
+impl DocumentSymbol {
+    pub fn new(
+        kind: SymbolKind,
+        name: String,
+        detail: String,
+        loc: &SourceLocation,
+    ) -> DocumentSymbol {
+        let range = loc_to_range(loc);
+        DocumentSymbol {
+            children: None,
+            deprecated: None,
+            kind,
+            selection_range: range.clone(),
+            range,
+            name,
+            detail: Some(detail),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct SymbolInformation {
+    pub name: String,
+    pub kind: SymbolKind,
+    pub deprecated: Option<bool>,
+    pub location: Location,
+
+    #[serde(rename = "containerName")]
+    pub container_name: Option<String>,
+}
+
+impl SymbolInformation {
+    pub fn new(
+        kind: SymbolKind,
+        name: String,
+        uri: String,
+        loc: &SourceLocation,
+    ) -> SymbolInformation {
+        SymbolInformation {
+            name,
+            kind,
+            deprecated: Some(false),
+            container_name: None,
+            location: Location {
+                uri,
+                range: loc_to_range(loc),
+            },
+        }
+    }
+}
+
 fn default_version() -> u32 {
     1
 }
@@ -116,6 +225,9 @@ pub struct ServerCapabilities {
 
     #[serde(rename = "foldingRangeProvider")]
     pub folding_range_provider: bool,
+
+    #[serde(rename = "documentSymbolProvider")]
+    pub document_symbol_provider: bool,
 }
 
 #[derive(Serialize, Deserialize, Clone)]

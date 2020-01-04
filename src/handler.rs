@@ -2,6 +2,7 @@ use crate::handlers::document_change::DocumentChangeHandler;
 use crate::handlers::document_close::DocumentCloseHandler;
 use crate::handlers::document_open::DocumentOpenHandler;
 use crate::handlers::document_save::DocumentSaveHandler;
+use crate::handlers::document_symbol::DocumentSymbolHandler;
 use crate::handlers::folding::FoldingHandler;
 use crate::handlers::goto_definition::GotoDefinitionHandler;
 use crate::handlers::initialize::InitializeHandler;
@@ -76,6 +77,10 @@ impl Handler {
         mapping.insert(
             "textDocument/foldingRange".to_string(),
             Box::new(FoldingHandler::default()),
+        );
+        mapping.insert(
+            "textDocument/documentSymbol".to_string(),
+            Box::new(DocumentSymbolHandler::default()),
         );
 
         Handler {
