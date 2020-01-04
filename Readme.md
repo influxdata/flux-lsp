@@ -5,11 +5,13 @@
 
 An implementation of the [Language Server Protocol](https://microsoft.github.io/language-server-protocol/) for the [Flux language](https://github.com/influxdata/flux).
 
-# Install
+# Installing command line server
 
 ```
-cargo install --git git@github.com:influxdata/flux-lsp.git
+npm i -g @influxdata/flux-lsp-cli
 ```
+
+This will allow you to run an LSP instance with the command `flux-lsp`
 
 # Vim setup
 
