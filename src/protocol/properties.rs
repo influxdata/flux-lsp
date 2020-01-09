@@ -209,7 +209,13 @@ pub enum TextDocumentSyncKind {
     Incremental = 2,
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Clone)]
+pub struct CompletionOptions {
+    #[serde(rename = "resolveProvider")]
+    pub resolve_provider: Option<bool>,
+}
+
+#[derive(Serialize, Clone)]
 pub struct ServerCapabilities {
     #[serde(rename = "textDocumentSync")]
     pub text_document_sync: TextDocumentSyncKind,
@@ -228,6 +234,9 @@ pub struct ServerCapabilities {
 
     #[serde(rename = "documentSymbolProvider")]
     pub document_symbol_provider: bool,
+
+    #[serde(rename = "completionProvider")]
+    pub completion_provider: CompletionOptions,
 }
 
 #[derive(Serialize, Deserialize, Clone)]

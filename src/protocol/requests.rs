@@ -126,3 +126,19 @@ pub struct DocumentSymbolParams {
     #[serde(rename = "textDocument")]
     pub text_document: TextDocumentIdentifier,
 }
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct CompletionParams {
+    pub context: Option<CompletionContext>,
+    #[serde(rename = "textDocument")]
+    pub text_document: TextDocument,
+    pub position: Position,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct CompletionContext {
+    #[serde(rename = "triggerKind")]
+    trigger_kind: i32,
+    #[serde(rename = "triggerCharacter")]
+    trigger_character: Option<String>,
+}

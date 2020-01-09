@@ -181,7 +181,7 @@ dependencies = [
 [[package]]
 name = "flux"
 version = "0.3.0"
-source = "git+https://github.com/influxdata/flux?rev=8e956e67#8e956e677930ea26f05a9ee93946fa1487029109"
+source = "git+https://github.com/influxdata/flux?rev=1c7cc9f0#1c7cc9f036783592d8176df629495894dfd4f692"
 dependencies = [
  "bindgen 0.49.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "cc 1.0.48 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -202,8 +202,9 @@ dependencies = [
 name = "flux-lsp"
 version = "0.1.0"
 dependencies = [
- "flux 0.3.0 (git+https://github.com/influxdata/flux?rev=8e956e67)",
+ "flux 0.3.0 (git+https://github.com/influxdata/flux?rev=1c7cc9f0)",
  "lazy_static 1.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "libstd 0.1.0 (git+https://github.com/influxdata/flux?rev=1c7cc9f0)",
  "serde 1.0.104 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_json 1.0.44 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_repr 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -265,6 +266,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "cc 1.0.48 (registry+https://github.com/rust-lang/crates.io-index)",
  "winapi 0.3.8 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "libstd"
+version = "0.1.0"
+source = "git+https://github.com/influxdata/flux?rev=1c7cc9f0#1c7cc9f036783592d8176df629495894dfd4f692"
+dependencies = [
+ "flatbuffers 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "flux 0.3.0 (git+https://github.com/influxdata/flux?rev=1c7cc9f0)",
 ]
 
 [[package]]
@@ -732,7 +742,7 @@ dependencies = [
 "checksum env_logger 0.6.2 (registry+https://github.com/rust-lang/crates.io-index)" = "aafcde04e90a5226a6443b7aabdb016ba2f8307c847d524724bd9b346dd1a2d3"
 "checksum failure 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)" = "f8273f13c977665c5db7eb2b99ae520952fe5ac831ae4cd09d80c4c7042b5ed9"
 "checksum flatbuffers 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)" = "2fc1af59fd8248b59beb048d614a869ce211315c195f5412334e47f5b7e22726"
-"checksum flux 0.3.0 (git+https://github.com/influxdata/flux?rev=8e956e67)" = "<none>"
+"checksum flux 0.3.0 (git+https://github.com/influxdata/flux?rev=1c7cc9f0)" = "<none>"
 "checksum fxhash 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)" = "c31b6d751ae2c7f11320402d34e41349dd1016f8d5d45e48c4312bc8625af50c"
 "checksum glob 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)" = "9b919933a397b79c37e33b77bb2aa3dc8eb6e165ad809e58ff75bc7db2e34574"
 "checksum humantime 1.3.0 (registry+https://github.com/rust-lang/crates.io-index)" = "df004cfca50ef23c36850aaaa59ad52cc70d0e90243c3c7737a4dd32dc7a3c4f"
@@ -741,6 +751,7 @@ dependencies = [
 "checksum lazy_static 1.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "e2abad23fbc42b3700f2f279844dc832adb2b2eb069b2df918f455c4e18cc646"
 "checksum libc 0.2.66 (registry+https://github.com/rust-lang/crates.io-index)" = "d515b1f41455adea1313a4a2ac8a8a477634fbae63cc6100e3aebb207ce61558"
 "checksum libloading 0.5.2 (registry+https://github.com/rust-lang/crates.io-index)" = "f2b111a074963af1d37a139918ac6d49ad1d0d5e47f72fd55388619691a7d753"
+"checksum libstd 0.1.0 (git+https://github.com/influxdata/flux?rev=1c7cc9f0)" = "<none>"
 "checksum log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)" = "14b6052be84e6b71ab17edffc2eeabf5c2c3ae1fdb464aae35ac50c67a44e1f7"
 "checksum maplit 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)" = "3e2e65a1a2e43cfcb47a895c4c8b10d1f4a61097f9f254f183aee60cad9c651d"
 "checksum matches 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)" = "7ffc5c5338469d4d3ea17d269fa8ea3512ad247247c30bd2df69e68309ed0a08"
