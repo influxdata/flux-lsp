@@ -5,9 +5,7 @@ use crate::protocol::properties::Position;
 use crate::protocol::requests::{
     CompletionParams, PolymorphicRequest, Request,
 };
-use crate::protocol::responses::{
-    CompletionList, Response,
-};
+use crate::protocol::responses::{CompletionList, Response};
 use crate::stdlib::{get_stdlib_functions, Completable};
 use crate::visitors::semantic::utils;
 use crate::visitors::semantic::NodeFinderVisitor;
@@ -50,6 +48,15 @@ fn get_ident_name(
                 let name = ident.name.clone();
                 return Ok(Some(name));
             }
+            Node::MemberExpr(mexpr) => {
+                if let flux::semantic::nodes::Expression::Identifier(
+                    ident,
+                ) = &mexpr.object
+                {
+                    let name = ident.name.clone();
+                    return Ok(Some(format!("{}.", name)));
+                }
+            }
             _ => {}
         }
     }
@@ -65,7 +72,7 @@ fn find_completions(
     let mut items = vec![];
 
     if let Some(name) = name {
-        let matches = get_matches(name);
+        let matches = get_matches(name.clone());
 
         for m in matches.iter() {
             items.push(m.completion_item());

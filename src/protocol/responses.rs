@@ -56,6 +56,7 @@ impl InitializeResult {
                 document_symbol_provider: true,
                 completion_provider: CompletionOptions {
                     resolve_provider: Some(true),
+                    trigger_characters: Some(vec![".".to_string()]),
                 },
                 text_document_sync: TextDocumentSyncKind::Full,
             },
