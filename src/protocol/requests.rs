@@ -131,7 +131,7 @@ pub struct DocumentSymbolParams {
 pub struct CompletionParams {
     pub context: Option<CompletionContext>,
     #[serde(rename = "textDocument")]
-    pub text_document: TextDocument,
+    pub text_document: TextDocumentIdentifier,
     pub position: Position,
 }
 

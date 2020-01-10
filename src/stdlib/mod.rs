@@ -72,7 +72,7 @@ impl Completable for VarResult {
     }
 
     fn matches(&self, text: String) -> bool {
-        if text.ends_with(".") {
+        if text.ends_with('.') {
             let mtext = text[..text.len() - 1].to_string();
             return Some(mtext) == self.package_name;
         }
@@ -107,7 +107,7 @@ impl Completable for PackageResult {
     }
 
     fn matches(&self, text: String) -> bool {
-        if !text.ends_with(".") {
+        if !text.ends_with('.') {
             let name = self.name.to_lowercase();
             let mtext = text.to_lowercase();
             return name.starts_with(mtext.as_str());
@@ -166,7 +166,7 @@ impl Completable for FunctionResult {
     }
 
     fn matches(&self, text: String) -> bool {
-        if text.ends_with(".") {
+        if text.ends_with('.') {
             let mtext = text[..text.len() - 1].to_string();
             return Some(mtext) == self.package_name;
         }
@@ -176,7 +176,7 @@ impl Completable for FunctionResult {
 }
 
 fn create_function_signature(
-    f: Box<flux::semantic::types::Function>,
+    f: flux::semantic::types::Function,
 ) -> String {
     let required = f
         .req
@@ -240,7 +240,7 @@ fn walk(
                         name: head.k,
                         package: package.clone(),
                         signature: create_function_signature(
-                            f.clone(),
+                            (*f).clone(),
                         ),
                         required_args: f
                             .req
@@ -346,7 +346,7 @@ fn walk(
 }
 
 pub fn get_package_name(name: String) -> Option<String> {
-    let items = name.split("/");
+    let items = name.split('/');
 
     if let Some(n) = items.last() {
         Some(n.to_string())
