@@ -6,19 +6,35 @@ use crate::protocol::requests::{
     CompletionParams, PolymorphicRequest, Request,
 };
 use crate::protocol::responses::{CompletionList, Response};
-use crate::stdlib::{get_stdlib_functions, Completable};
-use crate::visitors::semantic::utils;
-use crate::visitors::semantic::NodeFinderVisitor;
+use crate::stdlib::{get_stdlib, Completable};
+use crate::visitors::semantic::{
+    utils, ImportFinderVisitor, NodeFinderVisitor,
+};
 
 use flux::semantic::walk::{self, Node};
 
-fn get_matches(v: String) -> Vec<Box<dyn Completable>> {
-    let mut matches = vec![];
-    let functions = get_stdlib_functions();
+fn get_imports(uri: String) -> Result<Vec<String>, String> {
+    let pkg = utils::create_semantic_package(uri.clone())?;
+    let walker = Rc::new(walk::Node::Package(&pkg));
+    let mut visitor = ImportFinderVisitor::default();
 
-    for fun in functions.into_iter() {
-        if fun.matches(v.clone()) {
-            matches.push(fun);
+    walk::walk(&mut visitor, walker);
+
+    let state = visitor.state.borrow();
+
+    Ok((*state).imports.clone())
+}
+
+fn get_matches(
+    v: String,
+    imports: Vec<String>,
+) -> Vec<Box<dyn Completable>> {
+    let mut matches = vec![];
+    let completes = get_stdlib();
+
+    for c in completes.into_iter() {
+        if c.matches(v.clone(), imports.clone()) {
+            matches.push(c);
         }
     }
 
@@ -68,11 +84,12 @@ fn find_completions(
     params: CompletionParams,
 ) -> Result<CompletionList, String> {
     let uri = params.text_document.uri;
-    let name = get_ident_name(uri, params.position)?;
+    let name = get_ident_name(uri.clone(), params.position)?;
     let mut items = vec![];
+    let imports = get_imports(uri.clone())?;
 
     if let Some(name) = name {
-        let matches = get_matches(name.clone());
+        let matches = get_matches(name.clone(), imports);
 
         for m in matches.iter() {
             items.push(m.completion_item());

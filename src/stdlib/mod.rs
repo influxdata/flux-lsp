@@ -9,9 +9,13 @@ use libstd::imports;
 use std::collections::BTreeMap;
 use std::iter::Iterator;
 
+fn contains(l: Vec<String>, m: String) -> bool {
+    l.into_iter().find(|x| x.as_str() == m.as_str()) != None
+}
+
 pub trait Completable {
     fn completion_item(&self) -> CompletionItem;
-    fn matches(&self, text: String) -> bool;
+    fn matches(&self, text: String, imports: Vec<String>) -> bool;
 }
 
 #[derive(Clone)]
@@ -71,7 +75,11 @@ impl Completable for VarResult {
         }
     }
 
-    fn matches(&self, text: String) -> bool {
+    fn matches(&self, text: String, imports: Vec<String>) -> bool {
+        if !contains(imports, self.package.clone()) {
+            return false;
+        }
+
         if text.ends_with('.') {
             let mtext = text[..text.len() - 1].to_string();
             return Some(mtext) == self.package_name;
@@ -106,7 +114,10 @@ impl Completable for PackageResult {
         }
     }
 
-    fn matches(&self, text: String) -> bool {
+    fn matches(&self, text: String, imports: Vec<String>) -> bool {
+        if !contains(imports, self.full_name.clone()) {
+            return false;
+        }
         if !text.ends_with('.') {
             let name = self.name.to_lowercase();
             let mtext = text.to_lowercase();
@@ -165,7 +176,11 @@ impl Completable for FunctionResult {
         }
     }
 
-    fn matches(&self, text: String) -> bool {
+    fn matches(&self, text: String, imports: Vec<String>) -> bool {
+        if !contains(imports, self.package.clone()) {
+            return false;
+        }
+
         if text.ends_with('.') {
             let mtext = text[..text.len() - 1].to_string();
             return Some(mtext) == self.package_name;
@@ -368,7 +383,7 @@ pub fn add_package_result(
     }
 }
 
-pub fn get_stdlib_functions() -> Vec<Box<dyn Completable>> {
+pub fn get_stdlib() -> Vec<Box<dyn Completable>> {
     let env = imports().unwrap();
     let mut list = vec![];
 

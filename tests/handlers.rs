@@ -221,7 +221,7 @@ speculate! {
                         context: None,
                         position: Position {
                             character: 1,
-                            line: 3,
+                            line: 5,
                         },
                         text_document: TextDocumentIdentifier {
                             uri: uri.clone(),
