@@ -12,3 +12,6 @@ manual-test: test install
 
 wasm: build
 	./build.sh
+
+publish: build
+	./publish.sh
