@@ -200,7 +200,7 @@ dependencies = [
 
 [[package]]
 name = "flux-lsp"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "flux 0.3.0 (git+https://github.com/influxdata/flux?rev=1c7cc9f0)",
  "lazy_static 1.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
