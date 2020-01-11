@@ -18,7 +18,8 @@ path = "src/lib.rs"
 serde_json = "1.0"
 serde_repr = "0.1"
 serde = { version = "1.0.101", features = ["derive"] }
-flux = { git = "https://github.com/influxdata/flux", rev = "8e956e67" }
+flux = { git = "https://github.com/influxdata/flux", rev = "1c7cc9f0" }
+libstd = { git = "https://github.com/influxdata/flux", rev = "1c7cc9f0" }
 url = "2.1.0"
 lazy_static = "1.4.0"
 wasm-bindgen = "0.2.55"

@@ -189,3 +189,25 @@ impl<'a> Visitor<'a> for FoldFinderVisitor<'a> {
         true
     }
 }
+
+#[derive(Default)]
+pub struct ImportFinderState {
+    pub imports: Vec<String>,
+}
+
+#[derive(Default)]
+pub struct ImportFinderVisitor {
+    pub state: Rc<RefCell<ImportFinderState>>,
+}
+
+impl<'a> Visitor<'a> for ImportFinderVisitor {
+    fn visit(&mut self, node: Rc<Node<'a>>) -> bool {
+        let mut state = self.state.borrow_mut();
+
+        if let Node::ImportDeclaration(import) = node.as_ref() {
+            (*state).imports.push(import.path.value.clone());
+        }
+
+        true
+    }
+}

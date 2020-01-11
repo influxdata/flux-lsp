@@ -8,6 +8,7 @@ use flux_lsp::protocol::notifications::*;
 use flux_lsp::protocol::properties::*;
 use flux_lsp::protocol::requests::*;
 use flux_lsp::protocol::responses::*;
+use flux_lsp::stdlib::{Completable, PackageResult};
 
 use std::collections::HashMap;
 use std::fs;
@@ -196,6 +197,66 @@ speculate! {
                     expected_json,
                     response.unwrap(),
                     "expects publish diagnostic notification"
+                );
+            }
+        }
+    }
+
+    describe "Completion request" {
+        describe "when ok" {
+            before {
+                let uri = flux_fixture_uri("completion");
+                open_file(uri.clone(), &mut handler);
+            }
+
+            after {
+                close_file(uri.clone(), &mut handler);
+            }
+
+            it "returns the correct response" {
+                let completion_request = Request {
+                    id: 1,
+                    method: "textDocument/completion".to_string(),
+                    params: Some(CompletionParams {
+                        context: None,
+                        position: Position {
+                            character: 1,
+                            line: 5,
+                        },
+                        text_document: TextDocumentIdentifier {
+                            uri: uri.clone(),
+                        }
+                    }),
+                };
+
+                let completion_request_json =
+                    serde_json::to_string(&completion_request).unwrap();
+                let request = PolymorphicRequest {
+                    base_request: BaseRequest {
+                        id: 1,
+                        method: "textDocument/completion".to_string(),
+                    },
+                    data: completion_request_json,
+                };
+                let response = handler.handle(request).unwrap();
+                let items = vec![
+                    PackageResult {
+                        full_name: "csv".to_string(),
+                        name: "csv".to_string(),
+                    }.completion_item()
+                ];
+
+                let result = CompletionList {
+                    is_incomplete: false,
+                    items,
+                };
+
+                let expected_json = Response::new(1, Some(result)).to_json().unwrap();
+
+                assert_eq!(
+                    expected_json,
+                    response.unwrap(),
+                    "expects completion items"
                 );
             }
         }

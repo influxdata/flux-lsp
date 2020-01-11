@@ -57,16 +57,31 @@ impl Server {
             }
 
             if let Ok(req) = utils::parse_request(content) {
-                if let Ok(response) = self.handler.handle(req) {
-                    if let Some(response) = response {
+                match self.handler.handle(req) {
+                    Ok(response) => {
+                        if let Some(response) = response {
+                            return ServerResponse {
+                                message: Some(utils::wrap_message(
+                                    response,
+                                )),
+                                error: None,
+                            };
+                        }
+                    }
+                    Err(error) => {
                         return ServerResponse {
-                            message: Some(utils::wrap_message(
-                                response,
-                            )),
-                            error: None,
-                        };
+                            message: None,
+                            error: Some(error),
+                        }
                     }
                 }
+            } else {
+                return ServerResponse {
+                    message: None,
+                    error: Some(
+                        "Failed to parse message".to_string(),
+                    ),
+                };
             }
         }
 

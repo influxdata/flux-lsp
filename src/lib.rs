@@ -5,6 +5,7 @@ pub mod handler;
 pub mod handlers;
 pub mod protocol;
 pub mod shared;
+pub mod stdlib;
 pub mod utils;
 pub mod wasm;
 

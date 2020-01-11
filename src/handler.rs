@@ -1,3 +1,5 @@
+use crate::handlers::completion::CompletionHandler;
+use crate::handlers::completion_resolve::CompletionResolveHandler;
 use crate::handlers::document_change::DocumentChangeHandler;
 use crate::handlers::document_close::DocumentCloseHandler;
 use crate::handlers::document_open::DocumentOpenHandler;
@@ -38,6 +40,7 @@ impl Handler {
     pub fn new(disable_folding: bool) -> Handler {
         let mut mapping: HashMap<String, Box<dyn RequestHandler>> =
             HashMap::new();
+
         mapping.insert(
             "textDocument/references".to_string(),
             Box::new(FindReferencesHandler::default()),
@@ -81,6 +84,14 @@ impl Handler {
         mapping.insert(
             "textDocument/documentSymbol".to_string(),
             Box::new(DocumentSymbolHandler::default()),
+        );
+        mapping.insert(
+            "textDocument/completion".to_string(),
+            Box::new(CompletionHandler::default()),
+        );
+        mapping.insert(
+            "completionItem/resolve".to_string(),
+            Box::new(CompletionResolveHandler::default()),
         );
 
         Handler {
