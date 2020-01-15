@@ -151,6 +151,12 @@ impl FunctionResult {
             }
         }
 
+        if self.required_args.is_empty()
+            && !self.optional_args.is_empty()
+        {
+            insert_text += "$1";
+        }
+
         insert_text += ")$0";
 
         insert_text
