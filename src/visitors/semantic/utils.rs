@@ -7,7 +7,14 @@ use flux::semantic::nodes::Package;
 use flux::semantic::walk::Node;
 
 use flux::parser::parse_string;
-use flux::semantic::analyze;
+use flux::semantic::convert::convert_with;
+use flux::semantic::fresh::Fresher;
+
+fn analyze(
+    pkg: flux::ast::Package,
+) -> Result<flux::semantic::nodes::Package, String> {
+    convert_with(pkg, &mut Fresher::default())
+}
 
 pub fn analyze_source(
     source: &str,

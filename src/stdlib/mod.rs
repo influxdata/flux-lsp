@@ -4,7 +4,7 @@ use crate::protocol::responses::{
 
 use flux::semantic::types::MonoType;
 use flux::semantic::types::Row;
-use libstd::imports;
+use libstd::{imports, prelude};
 
 use std::collections::BTreeMap;
 use std::iter::Iterator;
@@ -28,6 +28,8 @@ pub enum VarType {
     Bytes,
     Duration,
     Regexp,
+    Uint,
+    Time,
 }
 
 #[derive(Clone)]
@@ -49,6 +51,8 @@ impl VarResult {
             VarType::Int => "Integer".to_string(),
             VarType::Regexp => "Regular Expression".to_string(),
             VarType::String => "String".to_string(),
+            VarType::Uint => "Uint".to_string(),
+            VarType::Time => "Time".to_string(),
         }
     }
 }
@@ -76,6 +80,10 @@ impl Completable for VarResult {
     }
 
     fn matches(&self, text: String, imports: Vec<String>) -> bool {
+        if self.package == "builtin" && !text.ends_with('.') {
+            return true;
+        }
+
         if !contains(imports, self.package.clone()) {
             return false;
         }
@@ -183,6 +191,10 @@ impl Completable for FunctionResult {
     }
 
     fn matches(&self, text: String, imports: Vec<String>) -> bool {
+        if self.package == "builtin" && !text.ends_with('.') {
+            return true;
+        }
+
         if !contains(imports, self.package.clone()) {
             return false;
         }
@@ -389,14 +401,106 @@ pub fn add_package_result(
     }
 }
 
-pub fn get_stdlib() -> Vec<Box<dyn Completable>> {
+fn get_imports(list: &mut Vec<Box<dyn Completable>>) {
     let env = imports().unwrap();
-    let mut list = vec![];
 
     for (key, val) in env.values {
-        add_package_result(key.clone(), &mut list);
-        walk(key, &mut list, val.expr);
+        add_package_result(key.clone(), list);
+        walk(key, list, val.expr);
     }
+}
+
+pub fn get_builtins(list: &mut Vec<Box<dyn Completable>>) {
+    let env = prelude().unwrap();
+
+    for (key, val) in env.values {
+        match val.expr {
+            MonoType::Fun(f) => list.push(Box::new(FunctionResult {
+                package: "builtin".to_string(),
+                package_name: None,
+                name: key.clone(),
+                signature: create_function_signature((*f).clone()),
+                required_args: f
+                    .req
+                    .keys()
+                    .map(String::from)
+                    .collect(),
+                optional_args: f
+                    .opt
+                    .keys()
+                    .map(String::from)
+                    .collect(),
+            })),
+            MonoType::String => list.push(Box::new(VarResult {
+                name: key.clone(),
+                package: "builtin".to_string(),
+                package_name: None,
+                var_type: VarType::String,
+            })),
+            MonoType::Int => list.push(Box::new(VarResult {
+                name: key.clone(),
+                package: "builtin".to_string(),
+                package_name: None,
+                var_type: VarType::Int,
+            })),
+            MonoType::Float => list.push(Box::new(VarResult {
+                name: key.clone(),
+                package: "builtin".to_string(),
+                package_name: None,
+                var_type: VarType::Float,
+            })),
+            MonoType::Arr(_) => list.push(Box::new(VarResult {
+                name: key.clone(),
+                package: "builtin".to_string(),
+                package_name: None,
+                var_type: VarType::Array,
+            })),
+            MonoType::Bool => list.push(Box::new(VarResult {
+                name: key.clone(),
+                package: "builtin".to_string(),
+                package_name: None,
+                var_type: VarType::Bool,
+            })),
+            MonoType::Bytes => list.push(Box::new(VarResult {
+                name: key.clone(),
+                package: "builtin".to_string(),
+                package_name: None,
+                var_type: VarType::Bytes,
+            })),
+            MonoType::Duration => list.push(Box::new(VarResult {
+                name: key.clone(),
+                package: "builtin".to_string(),
+                package_name: None,
+                var_type: VarType::Duration,
+            })),
+            MonoType::Uint => list.push(Box::new(VarResult {
+                name: key.clone(),
+                package: "builtin".to_string(),
+                package_name: None,
+                var_type: VarType::Uint,
+            })),
+            MonoType::Regexp => list.push(Box::new(VarResult {
+                name: key.clone(),
+                package: "builtin".to_string(),
+                package_name: None,
+                var_type: VarType::Regexp,
+            })),
+            MonoType::Time => list.push(Box::new(VarResult {
+                name: key.clone(),
+                package: "builtin".to_string(),
+                package_name: None,
+                var_type: VarType::Time,
+            })),
+            _ => {}
+        }
+    }
+}
+
+pub fn get_stdlib() -> Vec<Box<dyn Completable>> {
+    let mut list = vec![];
+
+    get_imports(&mut list);
+    get_builtins(&mut list);
 
     list
 }

@@ -12,4 +12,4 @@ docker run \
     --name $imagename \
     -v "$DIR:$SRC_DIR" \
     --env AR=llvm-ar \
-    $imagename ./wasm-build.sh
+    $imagename:$imagetag ./wasm-build.sh

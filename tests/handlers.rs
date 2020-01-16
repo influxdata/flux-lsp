@@ -1,6 +1,7 @@
 extern crate flux_lsp;
 extern crate speculate;
 
+use serde_json::from_str;
 use speculate::speculate;
 
 use flux_lsp::handler::Handler;
@@ -8,7 +9,7 @@ use flux_lsp::protocol::notifications::*;
 use flux_lsp::protocol::properties::*;
 use flux_lsp::protocol::requests::*;
 use flux_lsp::protocol::responses::*;
-use flux_lsp::stdlib::{Completable, PackageResult};
+use flux_lsp::stdlib::{get_builtins, Completable, PackageResult};
 
 use std::collections::HashMap;
 use std::fs;
@@ -239,24 +240,33 @@ speculate! {
                     data: completion_request_json,
                 };
                 let response = handler.handle(request).unwrap();
-                let items = vec![
+                let mut items = vec![
                     PackageResult {
                         full_name: "csv".to_string(),
                         name: "csv".to_string(),
                     }.completion_item()
                 ];
 
-                let result = CompletionList {
-                    is_incomplete: false,
-                    items,
-                };
+                let mut builtins = vec![];
+                get_builtins(&mut builtins);
 
-                let expected_json = Response::new(1, Some(result)).to_json().unwrap();
+                for b in builtins {
+                    items.push(b.completion_item());
+                }
+
+                let returned = from_str::<Response<CompletionList>>(response.unwrap().as_str()).unwrap();
+                let returned_items = returned.result.unwrap().items;
 
                 assert_eq!(
-                    expected_json,
-                    response.unwrap(),
+                    items.len(),
+                    returned_items.len(),
                     "expects completion items"
+                );
+
+                assert_eq!(
+                    returned_items.first().unwrap().label,
+                    "csv",
+                    "returns csv"
                 );
             }
         }
