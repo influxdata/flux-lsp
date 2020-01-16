@@ -29,7 +29,7 @@ fn function_defines(name: String, f: &FunctionExpr) -> bool {
 
 fn is_scope(name: String, n: Rc<Node<'_>>) -> bool {
     let mut dvisitor: DefinitionFinderVisitor =
-        DefinitionFinderVisitor::new(name.clone());
+        DefinitionFinderVisitor::new(name);
 
     walk::walk(&mut dvisitor, n.clone());
 
@@ -97,8 +97,7 @@ pub fn find_references(
                 find_scope(result.path.clone(), node.clone());
 
             if let Some(scope) = scope {
-                let mut visitor =
-                    IdentFinderVisitor::new(name.clone());
+                let mut visitor = IdentFinderVisitor::new(name);
                 walk::walk(&mut visitor, scope);
 
                 let state = visitor.state.borrow();

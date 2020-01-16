@@ -41,7 +41,7 @@ pub fn create_diagnostics(
     let errors = check::check(walker);
     let diagnostics = utils::map_errors_to_diagnostics(errors);
 
-    match create_diagnostics_notification(uri.clone(), diagnostics) {
+    match create_diagnostics_notification(uri, diagnostics) {
         Ok(msg) => Ok(msg),
         Err(e) => Err(format!("Failed to create diagnostic: {}", e)),
     }

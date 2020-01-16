@@ -30,7 +30,7 @@ fn find_symbols(
     let smp = utils::create_semantic_package(uri.clone())?;
     let pkg = Node::Package(&smp);
 
-    let mut visitor = SymbolsVisitor::new(uri.clone());
+    let mut visitor = SymbolsVisitor::new(uri);
     walk::walk(&mut visitor, Rc::new(pkg));
 
     let state = visitor.state.borrow();

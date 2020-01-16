@@ -67,7 +67,7 @@ pub fn create_diagnoistics(
     let errors = ast::check_source(uri.clone(), contents);
     let diagnostics = utils::map_errors_to_diagnostics(errors);
 
-    match create_diagnostics_notification(uri.clone(), diagnostics) {
+    match create_diagnostics_notification(uri, diagnostics) {
         Ok(msg) => Ok(msg),
         Err(e) => Err(format!("Failed to create diagnostic: {}", e)),
     }
@@ -96,7 +96,7 @@ pub fn handle_open(data: String) -> Result<Option<String>, String> {
         let text = params.text_document.text;
 
         cache::set(uri.clone(), version, text.clone())?;
-        let msg = create_diagnoistics(uri.clone(), text)?;
+        let msg = create_diagnoistics(uri, text)?;
 
         let json = msg.to_json()?;
 
@@ -118,7 +118,7 @@ pub fn handle_change(data: String) -> Result<Option<String>, String> {
 
         cache::set(uri.clone(), version, text.clone())?;
 
-        let msg = create_diagnoistics(uri.clone(), text.clone())?;
+        let msg = create_diagnoistics(uri, text)?;
         let json = msg.to_json()?;
 
         return Ok(Some(json));

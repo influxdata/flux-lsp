@@ -33,7 +33,7 @@ fn parse_variable_assignment(
         result.push(SymbolInformation::new(
             SymbolKind::Variable,
             va.id.name.clone(),
-            uri.clone(),
+            uri,
             node.loc(),
         ))
     }
@@ -50,7 +50,7 @@ fn parse_call_expression(
     if let Expression::Identifier(ident) = c.callee.clone() {
         result.push(SymbolInformation::new(
             SymbolKind::Function,
-            ident.name.clone(),
+            ident.name,
             uri.clone(),
             &c.loc,
         ))
@@ -96,7 +96,7 @@ fn parse_binary_expression(
         result.push(SymbolInformation::new(
             SymbolKind::Variable,
             ident.name.clone(),
-            uri.clone(),
+            uri,
             &ident.loc,
         ))
     }
@@ -145,25 +145,22 @@ impl<'a> Visitor<'a> for SymbolsVisitor<'a> {
 
         match node.as_ref() {
             Node::VariableAssgn(va) => {
-                let list = parse_variable_assignment(
-                    uri.clone(),
-                    node.clone(),
-                    va,
-                );
+                let list =
+                    parse_variable_assignment(uri, node.clone(), va);
 
                 for si in list {
                     (*state).symbols.push(si);
                 }
             }
             Node::CallExpr(c) => {
-                let list = parse_call_expression(uri.clone(), c);
+                let list = parse_call_expression(uri, c);
 
                 for si in list {
                     (*state).symbols.push(si);
                 }
             }
             Node::BinaryExpr(be) => {
-                let list = parse_binary_expression(uri.clone(), be);
+                let list = parse_binary_expression(uri, be);
 
                 for si in list {
                     (*state).symbols.push(si);
@@ -173,8 +170,8 @@ impl<'a> Visitor<'a> for SymbolsVisitor<'a> {
                 if let Some(source) = me.loc.source.clone() {
                     (*state).symbols.push(SymbolInformation::new(
                         SymbolKind::Object,
-                        source.clone(),
-                        uri.clone(),
+                        source,
+                        uri,
                         &me.loc,
                     ))
                 }
@@ -183,7 +180,7 @@ impl<'a> Visitor<'a> for SymbolsVisitor<'a> {
                 (*state).symbols.push(SymbolInformation::new(
                     SymbolKind::Number,
                     num.value.to_string(),
-                    uri.clone(),
+                    uri,
                     &num.loc,
                 ));
                 return false;
@@ -192,7 +189,7 @@ impl<'a> Visitor<'a> for SymbolsVisitor<'a> {
                 (*state).symbols.push(SymbolInformation::new(
                     SymbolKind::Number,
                     num.value.to_string(),
-                    uri.clone(),
+                    uri,
                     &num.loc,
                 ));
                 return false;
@@ -201,7 +198,7 @@ impl<'a> Visitor<'a> for SymbolsVisitor<'a> {
                 (*state).symbols.push(SymbolInformation::new(
                     SymbolKind::Constant,
                     d.value.to_string(),
-                    uri.clone(),
+                    uri,
                     &d.loc,
                 ));
                 return false;
@@ -210,7 +207,7 @@ impl<'a> Visitor<'a> for SymbolsVisitor<'a> {
                 (*state).symbols.push(SymbolInformation::new(
                     SymbolKind::Boolean,
                     b.value.to_string(),
-                    uri.clone(),
+                    uri,
                     &b.loc,
                 ));
                 return false;
@@ -219,7 +216,7 @@ impl<'a> Visitor<'a> for SymbolsVisitor<'a> {
                 (*state).symbols.push(SymbolInformation::new(
                     SymbolKind::String,
                     s.value.clone(),
-                    uri.clone(),
+                    uri,
                     &s.loc,
                 ));
                 return false;
@@ -228,7 +225,7 @@ impl<'a> Visitor<'a> for SymbolsVisitor<'a> {
                 (*state).symbols.push(SymbolInformation::new(
                     SymbolKind::Array,
                     String::from("[]"),
-                    uri.clone(),
+                    uri,
                     &a.loc,
                 ))
             }

@@ -20,7 +20,7 @@ fn get_imports(
     uri: String,
     pos: Position,
 ) -> Result<Vec<String>, String> {
-    let pkg = utils::create_completion_package(uri.clone(), pos)?;
+    let pkg = utils::create_completion_package(uri, pos)?;
     let walker = Rc::new(walk::Node::Package(&pkg));
     let mut visitor = ImportFinderVisitor::default();
 
@@ -35,7 +35,7 @@ fn get_ident_name(
     uri: String,
     position: Position,
 ) -> Result<Option<String>, String> {
-    let pkg = utils::create_semantic_package(uri.clone())?;
+    let pkg = utils::create_semantic_package(uri)?;
     let walker = Rc::new(walk::Node::Package(&pkg));
     let mut visitor = NodeFinderVisitor::new(position);
 
@@ -92,10 +92,9 @@ fn get_user_matches(
     imports: Vec<String>,
     pos: Position,
 ) -> Result<Vec<CompletionItem>, String> {
-    let pkg =
-        utils::create_completion_package(uri.clone(), pos.clone())?;
+    let pkg = utils::create_completion_package(uri, pos.clone())?;
     let walker = Rc::new(walk::Node::Package(&pkg));
-    let mut visitor = CompletableFinderVisitor::new(pos.clone());
+    let mut visitor = CompletableFinderVisitor::new(pos);
 
     walk::walk(&mut visitor, walker);
 
@@ -127,12 +126,8 @@ fn find_completions(
             get_stdlib_completions(name.clone(), imports.clone());
         items.append(&mut stdlib_matches);
 
-        let mut user_matches = get_user_matches(
-            uri.clone(),
-            name.clone(),
-            imports.clone(),
-            pos.clone(),
-        )?;
+        let mut user_matches =
+            get_user_matches(uri, name, imports, pos)?;
 
         items.append(&mut user_matches);
     }

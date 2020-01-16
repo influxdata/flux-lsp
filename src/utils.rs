@@ -54,7 +54,7 @@ pub fn parse_request(
 
     let result = PolymorphicRequest {
         base_request: request,
-        data: content.clone(),
+        data: content,
     };
 
     Ok(result)

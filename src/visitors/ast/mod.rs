@@ -40,7 +40,7 @@ pub fn check_source(
     uri: String,
     source: String,
 ) -> Vec<check::Error> {
-    let file = utils::create_file_node_from_text(uri.clone(), source);
+    let file = utils::create_file_node_from_text(uri, source);
     let walker = walk::Node::File(&file);
 
     check::check(walker)

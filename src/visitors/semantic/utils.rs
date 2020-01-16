@@ -31,17 +31,14 @@ pub fn analyze_source(
         files: vec![file],
     };
 
-    match local_analyze(ast_pkg) {
-        Ok(p) => Ok(p),
-        Err(e) => Err(format!("{}", e)),
-    }
+    local_analyze(ast_pkg)
 }
 
 pub fn create_completion_package(
     uri: String,
     pos: Position,
 ) -> Result<Package, String> {
-    let cv = cache::get(uri.clone())?;
+    let cv = cache::get(uri)?;
     let mut file = parse_string("", cv.contents.as_str());
 
     file.body = file
@@ -66,7 +63,7 @@ pub fn create_completion_package(
 pub fn create_semantic_package(
     uri: String,
 ) -> Result<Package, String> {
-    let cv = cache::get(uri.clone())?;
+    let cv = cache::get(uri)?;
     let pkg = analyze_source(cv.contents.as_str())?;
 
     Ok(pkg)

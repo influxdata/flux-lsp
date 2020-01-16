@@ -233,7 +233,7 @@ impl CompletableFinderVisitor {
             state: Rc::new(RefCell::new(
                 CompletableFinderState::default(),
             )),
-            pos: pos.clone(),
+            pos,
         }
     }
 }
@@ -261,135 +261,131 @@ impl<'a> Visitor<'a> for CompletableFinderVisitor {
             return true;
         }
 
-        match node.as_ref() {
-            Node::VariableAssgn(assgn) => {
-                let id = assgn.id.clone();
-                match assgn.init.clone() {
-                    Expression::Integer(_) => (*state)
-                        .completables
-                        .push(Rc::new(VarResult {
-                            name: id.name.clone(),
-                            var_type: VarType::Int,
-                        })),
-                    Expression::Boolean(_) => (*state)
-                        .completables
-                        .push(Rc::new(VarResult {
-                            name: id.name.clone(),
-                            var_type: VarType::Bool,
-                        })),
-                    Expression::Float(_) => (*state)
-                        .completables
-                        .push(Rc::new(VarResult {
-                            name: id.name.clone(),
-                            var_type: VarType::Float,
-                        })),
-                    Expression::StringLit(_) => (*state)
-                        .completables
-                        .push(Rc::new(VarResult {
-                            name: id.name.clone(),
-                            var_type: VarType::String,
-                        })),
-                    Expression::Array(_) => (*state)
-                        .completables
-                        .push(Rc::new(VarResult {
-                            name: id.name.clone(),
-                            var_type: VarType::Array,
-                        })),
-                    Expression::Regexp(_) => (*state)
-                        .completables
-                        .push(Rc::new(VarResult {
-                            name: id.name.clone(),
-                            var_type: VarType::Regexp,
-                        })),
-                    Expression::Duration(_) => (*state)
-                        .completables
-                        .push(Rc::new(VarResult {
-                            name: id.name.clone(),
-                            var_type: VarType::Duration,
-                        })),
-                    Expression::Call(c) => {
-                        let result_type =
-                            follow_function_pipes(c.clone());
-                        match result_type {
-                            MonoType::Int => {
-                                (*state).completables.push(Rc::new(
-                                    VarResult {
-                                        name: id.name.clone(),
-                                        var_type: VarType::Int,
-                                    },
-                                ));
-                            }
-                            MonoType::Float => {
-                                (*state).completables.push(Rc::new(
-                                    VarResult {
-                                        name: id.name.clone(),
-                                        var_type: VarType::Float,
-                                    },
-                                ));
-                            }
-                            MonoType::Bool => {
-                                (*state).completables.push(Rc::new(
-                                    VarResult {
-                                        name: id.name.clone(),
-                                        var_type: VarType::Bool,
-                                    },
-                                ));
-                            }
-                            MonoType::Arr(_) => {
-                                (*state).completables.push(Rc::new(
-                                    VarResult {
-                                        name: id.name.clone(),
-                                        var_type: VarType::Array,
-                                    },
-                                ));
-                            }
-                            MonoType::Duration => {
-                                (*state).completables.push(Rc::new(
-                                    VarResult {
-                                        name: id.name.clone(),
-                                        var_type: VarType::Duration,
-                                    },
-                                ));
-                            }
-                            MonoType::Row(_) => {
-                                (*state).completables.push(Rc::new(
-                                    VarResult {
-                                        name: id.name.clone(),
-                                        var_type: VarType::Row,
-                                    },
-                                ));
-                            }
-                            MonoType::String => {
-                                (*state).completables.push(Rc::new(
-                                    VarResult {
-                                        name: id.name.clone(),
-                                        var_type: VarType::String,
-                                    },
-                                ));
-                            }
-                            MonoType::Uint => {
-                                (*state).completables.push(Rc::new(
-                                    VarResult {
-                                        name: id.name.clone(),
-                                        var_type: VarType::Uint,
-                                    },
-                                ));
-                            }
-                            MonoType::Time => {
-                                (*state).completables.push(Rc::new(
-                                    VarResult {
-                                        name: id.name.clone(),
-                                        var_type: VarType::Time,
-                                    },
-                                ));
-                            }
-                            _ => {}
-                        }
-                    }
-                    _ => {}
+        if let Node::VariableAssgn(assgn) = node.as_ref() {
+            let id = assgn.id.clone();
+            match assgn.init.clone() {
+                Expression::Integer(_) => {
+                    (*state).completables.push(Rc::new(VarResult {
+                        name: id.name,
+                        var_type: VarType::Int,
+                    }))
                 }
+                Expression::Boolean(_) => {
+                    (*state).completables.push(Rc::new(VarResult {
+                        name: id.name,
+                        var_type: VarType::Bool,
+                    }))
+                }
+                Expression::Float(_) => {
+                    (*state).completables.push(Rc::new(VarResult {
+                        name: id.name.clone(),
+                        var_type: VarType::Float,
+                    }))
+                }
+                Expression::StringLit(_) => {
+                    (*state).completables.push(Rc::new(VarResult {
+                        name: id.name.clone(),
+                        var_type: VarType::String,
+                    }))
+                }
+                Expression::Array(_) => {
+                    (*state).completables.push(Rc::new(VarResult {
+                        name: id.name.clone(),
+                        var_type: VarType::Array,
+                    }))
+                }
+                Expression::Regexp(_) => {
+                    (*state).completables.push(Rc::new(VarResult {
+                        name: id.name.clone(),
+                        var_type: VarType::Regexp,
+                    }))
+                }
+                Expression::Duration(_) => {
+                    (*state).completables.push(Rc::new(VarResult {
+                        name: id.name.clone(),
+                        var_type: VarType::Duration,
+                    }))
+                }
+                Expression::Call(c) => {
+                    let result_type = follow_function_pipes(c);
+                    match result_type {
+                        MonoType::Int => {
+                            (*state).completables.push(Rc::new(
+                                VarResult {
+                                    name: id.name.clone(),
+                                    var_type: VarType::Int,
+                                },
+                            ));
+                        }
+                        MonoType::Float => {
+                            (*state).completables.push(Rc::new(
+                                VarResult {
+                                    name: id.name.clone(),
+                                    var_type: VarType::Float,
+                                },
+                            ));
+                        }
+                        MonoType::Bool => {
+                            (*state).completables.push(Rc::new(
+                                VarResult {
+                                    name: id.name.clone(),
+                                    var_type: VarType::Bool,
+                                },
+                            ));
+                        }
+                        MonoType::Arr(_) => {
+                            (*state).completables.push(Rc::new(
+                                VarResult {
+                                    name: id.name.clone(),
+                                    var_type: VarType::Array,
+                                },
+                            ));
+                        }
+                        MonoType::Duration => {
+                            (*state).completables.push(Rc::new(
+                                VarResult {
+                                    name: id.name.clone(),
+                                    var_type: VarType::Duration,
+                                },
+                            ));
+                        }
+                        MonoType::Row(_) => {
+                            (*state).completables.push(Rc::new(
+                                VarResult {
+                                    name: id.name.clone(),
+                                    var_type: VarType::Row,
+                                },
+                            ));
+                        }
+                        MonoType::String => {
+                            (*state).completables.push(Rc::new(
+                                VarResult {
+                                    name: id.name.clone(),
+                                    var_type: VarType::String,
+                                },
+                            ));
+                        }
+                        MonoType::Uint => {
+                            (*state).completables.push(Rc::new(
+                                VarResult {
+                                    name: id.name.clone(),
+                                    var_type: VarType::Uint,
+                                },
+                            ));
+                        }
+                        MonoType::Time => {
+                            (*state).completables.push(Rc::new(
+                                VarResult {
+                                    name: id.name.clone(),
+                                    var_type: VarType::Time,
+                                },
+                            ));
+                        }
+                        _ => {}
+                    }
+                }
+                _ => {}
             }
-            _ => {}
         }
 
         true

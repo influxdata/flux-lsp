@@ -95,7 +95,7 @@ speculate! {
             }
 
             after {
-                close_file(uri.clone(), &mut handler);
+                close_file(uri, &mut handler);
             }
 
             it "returns correct response" {
@@ -142,7 +142,7 @@ speculate! {
             }
 
             after {
-                close_file(uri.clone(), &mut handler);
+                close_file(uri, &mut handler);
             }
 
             it "returns an error" {
@@ -211,7 +211,7 @@ speculate! {
             }
 
             after {
-                close_file(uri.clone(), &mut handler);
+                close_file(uri, &mut handler);
             }
 
             it "returns the correct response" {
@@ -286,7 +286,7 @@ speculate! {
             }
 
             after {
-                close_file(uri.clone(), &mut handler);
+                close_file(uri, &mut handler);
             }
 
             it "returns the correct response" {
@@ -301,7 +301,7 @@ speculate! {
                             version: 1,
                         },
                         content_changes: vec![ContentChange {
-                            text: text.clone(),
+                            text: text,
                             range: None,
                             range_length: None,
                         }],
@@ -339,7 +339,7 @@ speculate! {
             }
 
             after {
-                close_file(uri.clone(), &mut handler);
+                close_file(uri, &mut handler);
             }
 
             it "returns the correct response" {
@@ -354,7 +354,7 @@ speculate! {
                             version: 1,
                         },
                         content_changes: vec![ContentChange {
-                            text: text.clone(),
+                            text: text,
                             range: None,
                             range_length: None,
                         }],
@@ -444,7 +444,7 @@ speculate! {
         }
 
         after {
-            close_file(uri.clone(), &mut handler);
+            close_file(uri, &mut handler);
         }
 
         it "returns the correct response" {
@@ -496,7 +496,7 @@ speculate! {
                     },
                 },
                 TextEdit {
-                    new_text: new_name.clone(),
+                    new_text: new_name,
                     range: Range {
                         start: Position {
                             line: 8,
@@ -513,7 +513,7 @@ speculate! {
             expected_changes.insert(uri.clone(), edits);
 
             let workspace_edit = WorkspaceEditResult {
-                changes: expected_changes.clone(),
+                changes: expected_changes,
             };
 
             let expected: Response<WorkspaceEditResult> = Response {
@@ -537,7 +537,7 @@ speculate! {
         }
 
         after {
-            close_file(uri.clone(), &mut handler);
+            close_file(uri, &mut handler);
         }
 
         it "returns the correct response" {
@@ -600,7 +600,7 @@ speculate! {
         }
 
         after {
-            close_file(uri.clone(), &mut handler);
+            close_file(uri, &mut handler);
         }
 
         it "returns correct response" {
@@ -665,7 +665,7 @@ speculate! {
         }
 
         after {
-            close_file(uri.clone(), &mut handler);
+            close_file(uri, &mut handler);
         }
 
         it "returns correct response" {
@@ -746,7 +746,7 @@ speculate! {
         }
 
         after {
-            close_file(uri.clone(), &mut handler);
+            close_file(uri, &mut handler);
         }
 
         it "returns the correct response" {
@@ -889,10 +889,10 @@ fn open_file(uri: String, handler: &mut Handler) {
         method: "textDocument/didOpen".to_string(),
         params: Some(TextDocumentParams {
             text_document: TextDocument {
-                uri: uri.clone(),
+                uri,
                 language_id: "flux".to_string(),
                 version: 1,
-                text: text.clone(),
+                text,
             },
         }),
     };
@@ -917,10 +917,10 @@ fn close_file(uri: String, handler: &mut Handler) {
         method: "textDocument/didClose".to_string(),
         params: Some(TextDocumentParams {
             text_document: TextDocument {
-                uri: uri.clone(),
+                uri,
                 language_id: "flux".to_string(),
                 version: 1,
-                text: text.clone(),
+                text,
             },
         }),
     };

@@ -15,7 +15,7 @@ fn create_did_open(text: String) -> Request<TextDocumentParams> {
                 uri: "some_uri".to_string(),
                 language_id: "flux".to_string(),
                 version: 1,
-                text: text.clone(),
+                text,
             },
         }),
     }
