@@ -222,7 +222,7 @@ speculate! {
                         context: None,
                         position: Position {
                             character: 1,
-                            line: 5,
+                            line: 6,
                         },
                         text_document: TextDocumentIdentifier {
                             uri: uri.clone(),
@@ -258,7 +258,7 @@ speculate! {
                 let returned_items = returned.result.unwrap().items;
 
                 assert_eq!(
-                    items.len(),
+                    212,
                     returned_items.len(),
                     "expects completion items"
                 );
@@ -267,6 +267,12 @@ speculate! {
                     returned_items.first().unwrap().label,
                     "csv",
                     "returns csv"
+                );
+
+                assert_eq!(
+                    returned_items.last().unwrap().label,
+                    "env (self)",
+                    "returns env"
                 );
             }
         }
