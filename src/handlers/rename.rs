@@ -26,8 +26,7 @@ impl RequestHandler for RenameHandler {
         if let Some(params) = request.params {
             let uri = params.text_document.uri;
             let new_name = params.new_name;
-            let locations =
-                find_references(uri.clone(), params.position)?;
+            let locations = find_references(uri, params.position)?;
 
             for location in locations.iter() {
                 let uri = location.uri.clone();

@@ -24,7 +24,7 @@ fn node_to_folding_range(node: Rc<Node>) -> FoldingRange {
 fn find_foldable_areas(
     uri: String,
 ) -> Result<Vec<FoldingRange>, String> {
-    let cv = cache::get(uri.clone())?;
+    let cv = cache::get(uri)?;
     let pkg = utils::analyze_source(cv.contents.as_str())?;
     let walker = walk::Node::Package(&pkg);
     let mut visitor = FoldFinderVisitor::default();

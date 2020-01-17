@@ -238,7 +238,7 @@ fn create_function_signature(
     let pipe = match f.pipe {
         Some(pipe) => {
             if pipe.k == "<-" {
-                vec![pipe.clone()]
+                vec![pipe]
             } else {
                 vec![flux::semantic::types::Property {
                     k: String::from("<-") + &pipe.k,
@@ -396,7 +396,7 @@ pub fn add_package_result(
     if let Some(package_name) = package_name {
         list.push(Box::new(PackageResult {
             name: package_name,
-            full_name: name.clone(),
+            full_name: name,
         }));
     }
 }
@@ -501,6 +501,28 @@ pub fn get_stdlib() -> Vec<Box<dyn Completable>> {
 
     get_imports(&mut list);
     get_builtins(&mut list);
+
+    let prelude = libstd::prelude().unwrap();
+    for (key, val) in prelude.values {
+        if let MonoType::Fun(f) = val.expr {
+            list.push(Box::new(FunctionResult {
+                name: key,
+                package: "builtin".to_string(),
+                signature: create_function_signature((*f).clone()),
+                required_args: f
+                    .req
+                    .keys()
+                    .map(String::from)
+                    .collect(),
+                optional_args: f
+                    .opt
+                    .keys()
+                    .map(String::from)
+                    .collect(),
+                package_name: get_package_name("builtin".to_string()),
+            }));
+        }
+    }
 
     list
 }

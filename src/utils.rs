@@ -12,6 +12,31 @@ pub fn wrap_message(s: String) -> String {
     format!("Content-Length: {}\r\n\r\n{}", size, s)
 }
 
+pub fn is_in_node(pos: Position, base: &flux::ast::BaseNode) -> bool {
+    let start_line = base.location.start.line - 1;
+    let start_col = base.location.start.column - 1;
+    let end_line = base.location.end.line - 1;
+    let end_col = base.location.end.column - 1;
+
+    if pos.line < start_line {
+        return false;
+    }
+
+    if pos.line > end_line {
+        return false;
+    }
+
+    if pos.line == start_line && pos.character < start_col {
+        return false;
+    }
+
+    if pos.line == end_line && pos.character > end_col {
+        return false;
+    }
+
+    true
+}
+
 pub fn get_content_size(s: String) -> Result<usize, String> {
     let tmp = String::from(s.trim_end());
     let stmp: Vec<&str> = tmp.split(": ").collect();
@@ -29,7 +54,7 @@ pub fn parse_request(
 
     let result = PolymorphicRequest {
         base_request: request,
-        data: content.clone(),
+        data: content,
     };
 
     Ok(result)

@@ -5,16 +5,22 @@ use crate::protocol::properties::Position;
 use crate::protocol::requests::{
     CompletionParams, PolymorphicRequest, Request,
 };
-use crate::protocol::responses::{CompletionList, Response};
-use crate::stdlib::{get_stdlib, Completable};
+use crate::protocol::responses::{
+    CompletionItem, CompletionList, Response,
+};
+use crate::stdlib::get_stdlib;
 use crate::visitors::semantic::{
-    utils, ImportFinderVisitor, NodeFinderVisitor,
+    utils, CompletableFinderVisitor, ImportFinderVisitor,
+    NodeFinderVisitor,
 };
 
 use flux::semantic::walk::{self, Node};
 
-fn get_imports(uri: String) -> Result<Vec<String>, String> {
-    let pkg = utils::create_semantic_package(uri.clone())?;
+fn get_imports(
+    uri: String,
+    pos: Position,
+) -> Result<Vec<String>, String> {
+    let pkg = utils::create_completion_package(uri, pos)?;
     let walker = Rc::new(walk::Node::Package(&pkg));
     let mut visitor = ImportFinderVisitor::default();
 
@@ -25,27 +31,11 @@ fn get_imports(uri: String) -> Result<Vec<String>, String> {
     Ok((*state).imports.clone())
 }
 
-fn get_matches(
-    v: String,
-    imports: Vec<String>,
-) -> Vec<Box<dyn Completable>> {
-    let mut matches = vec![];
-    let completes = get_stdlib();
-
-    for c in completes.into_iter() {
-        if c.matches(v.clone(), imports.clone()) {
-            matches.push(c);
-        }
-    }
-
-    matches
-}
-
 fn get_ident_name(
     uri: String,
     position: Position,
 ) -> Result<Option<String>, String> {
-    let pkg = utils::create_semantic_package(uri.clone())?;
+    let pkg = utils::create_semantic_package(uri)?;
     let walker = Rc::new(walk::Node::Package(&pkg));
     let mut visitor = NodeFinderVisitor::new(position);
 
@@ -80,20 +70,66 @@ fn get_ident_name(
     Ok(None)
 }
 
+fn get_stdlib_completions(
+    name: String,
+    imports: Vec<String>,
+) -> Vec<CompletionItem> {
+    let mut matches = vec![];
+    let completes = get_stdlib();
+
+    for c in completes.into_iter() {
+        if c.matches(name.clone(), imports.clone()) {
+            matches.push(c.completion_item());
+        }
+    }
+
+    matches
+}
+
+fn get_user_matches(
+    uri: String,
+    name: String,
+    imports: Vec<String>,
+    pos: Position,
+) -> Result<Vec<CompletionItem>, String> {
+    let pkg = utils::create_completion_package(uri, pos.clone())?;
+    let walker = Rc::new(walk::Node::Package(&pkg));
+    let mut visitor = CompletableFinderVisitor::new(pos);
+
+    walk::walk(&mut visitor, walker);
+
+    let state = visitor.state.borrow();
+
+    let result = (*state)
+        .completables
+        .clone()
+        .into_iter()
+        .filter(|x| x.matches(name.clone(), imports.clone()))
+        .map(|x| x.completion_item())
+        .collect();
+
+    Ok(result)
+}
+
 fn find_completions(
     params: CompletionParams,
 ) -> Result<CompletionList, String> {
     let uri = params.text_document.uri;
+    let pos = params.position.clone();
     let name = get_ident_name(uri.clone(), params.position)?;
-    let mut items = vec![];
-    let imports = get_imports(uri.clone())?;
+
+    let mut items: Vec<CompletionItem> = vec![];
+    let imports = get_imports(uri.clone(), pos.clone())?;
 
     if let Some(name) = name {
-        let matches = get_matches(name.clone(), imports);
+        let mut stdlib_matches =
+            get_stdlib_completions(name.clone(), imports.clone());
+        items.append(&mut stdlib_matches);
 
-        for m in matches.iter() {
-            items.push(m.completion_item());
-        }
+        let mut user_matches =
+            get_user_matches(uri, name, imports, pos)?;
+
+        items.append(&mut user_matches);
     }
 
     Ok(CompletionList {

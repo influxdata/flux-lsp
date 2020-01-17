@@ -214,7 +214,7 @@ pub struct CompletionOptions {
     #[serde(rename = "resolveProvider")]
     pub resolve_provider: Option<bool>,
     #[serde(rename = "triggerCharacters")]
-    pub trigger_characters: Option<Vec<String>>
+    pub trigger_characters: Option<Vec<String>>,
 }
 
 #[derive(Serialize, Clone)]

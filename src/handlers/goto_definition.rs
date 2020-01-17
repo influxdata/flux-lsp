@@ -25,7 +25,6 @@ fn ident_to_location(uri: String, node: Rc<Node<'_>>) -> Location {
     };
 
     let range = Range { start, end };
-    let uri = uri.clone();
 
     Location { uri, range }
 }
@@ -47,10 +46,8 @@ fn find_scoped_definition<'a>(
                         if name != ident_name {
                             continue;
                         }
-                        let loc = ident_to_location(
-                            uri.clone(),
-                            (*n).clone(),
-                        );
+                        let loc =
+                            ident_to_location(uri, (*n).clone());
                         return Some(loc);
                     }
                 }
@@ -112,11 +109,7 @@ impl RequestHandler for GotoDefinitionHandler {
                 };
 
                 if let Some(name) = name {
-                    result = find_scoped_definition(
-                        uri.clone(),
-                        name,
-                        path,
-                    );
+                    result = find_scoped_definition(uri, name, path);
                 }
             }
 
