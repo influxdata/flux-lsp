@@ -82,3 +82,6 @@ If you need to debug what flux-lsp is doing, you can configure it to log to `/tm
 - textDocument/foldingRange
 - textDocument/references
 - textDocument/rename
+- textDocument/completion
+- textDocument/documentSymbol
+- completionItem/resolve
