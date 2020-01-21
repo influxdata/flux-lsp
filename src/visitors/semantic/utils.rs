@@ -4,12 +4,12 @@ use crate::utils::is_in_node;
 
 use std::rc::Rc;
 
-use flux::semantic::nodes::Package;
-use flux::semantic::walk::Node;
-
 use flux::parser::parse_string;
 use flux::semantic::convert::convert_with;
 use flux::semantic::fresh::Fresher;
+use flux::semantic::nodes::{CallExpr, Expression, Package};
+use flux::semantic::types::MonoType;
+use flux::semantic::walk::Node;
 
 use libstd::analyze;
 
@@ -88,4 +88,14 @@ pub fn map_node_to_location(uri: String, node: Rc<Node>) -> Location {
             },
         },
     }
+}
+
+pub fn follow_function_pipes(c: &CallExpr) -> &MonoType {
+    if let Some(p) = &c.pipe {
+        if let Expression::Call(call) = p {
+            return follow_function_pipes(&call);
+        }
+    }
+
+    &c.typ
 }
