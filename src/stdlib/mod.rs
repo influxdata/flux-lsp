@@ -502,27 +502,5 @@ pub fn get_stdlib() -> Vec<Box<dyn Completable>> {
     get_imports(&mut list);
     get_builtins(&mut list);
 
-    let prelude = libstd::prelude().unwrap();
-    for (key, val) in prelude.values {
-        if let MonoType::Fun(f) = val.expr {
-            list.push(Box::new(FunctionResult {
-                name: key,
-                package: "builtin".to_string(),
-                signature: create_function_signature((*f).clone()),
-                required_args: f
-                    .req
-                    .keys()
-                    .map(String::from)
-                    .collect(),
-                optional_args: f
-                    .opt
-                    .keys()
-                    .map(String::from)
-                    .collect(),
-                package_name: get_package_name("builtin".to_string()),
-            }));
-        }
-    }
-
     list
 }
