@@ -222,7 +222,7 @@ speculate! {
                         context: None,
                         position: Position {
                             character: 1,
-                            line: 6,
+                            line: 8,
                         },
                         text_document: TextDocumentIdentifier {
                             uri: uri.clone(),
@@ -258,7 +258,7 @@ speculate! {
                 let returned_items = returned.result.unwrap().items;
 
                 assert_eq!(
-                    109,
+                    110,
                     returned_items.len(),
                     "expects completion items"
                 );
@@ -271,8 +271,8 @@ speculate! {
 
                 assert_eq!(
                     returned_items.last().unwrap().label,
-                    "env (self)",
-                    "returns env"
+                    "cool (self)",
+                    "returns user defined function"
                 );
             }
         }

@@ -5,7 +5,7 @@ use crate::protocol::properties::Position;
 use crate::protocol::responses::{
     CompletionItem, CompletionItemKind, InsertTextFormat,
 };
-use crate::stdlib::Completable;
+use crate::stdlib::{create_function_signature, Completable};
 use crate::visitors::semantic::utils;
 
 use flux::semantic::nodes::*;
@@ -62,6 +62,34 @@ fn get_var_type(expr: &Expression) -> Option<VarType> {
     }
 }
 
+fn create_function_result(
+    name: String,
+    expr: &Expression,
+) -> Option<FunctionResult> {
+    if let Expression::Function(f) = expr {
+        if let MonoType::Fun(fun) = f.typ.clone() {
+            return Some(FunctionResult {
+                name,
+                package: "self".to_string(),
+                package_name: Some("self".to_string()),
+                optional_args: fun
+                    .opt
+                    .keys()
+                    .map(String::from)
+                    .collect(),
+                required_args: fun
+                    .req
+                    .keys()
+                    .map(String::from)
+                    .collect(),
+                signature: create_function_signature((*fun).clone()),
+            });
+        }
+    }
+
+    None
+}
+
 impl<'a> Visitor<'a> for CompletableFinderVisitor {
     fn visit(&mut self, node: Rc<Node<'a>>) -> bool {
         let mut state = self.state.borrow_mut();
@@ -76,11 +104,18 @@ impl<'a> Visitor<'a> for CompletableFinderVisitor {
         }
 
         if let Node::VariableAssgn(assgn) = node.as_ref() {
+            let name = assgn.id.name.clone();
             if let Some(var_type) = get_var_type(&assgn.init) {
-                let name = assgn.id.name.clone();
-                (*state)
-                    .completables
-                    .push(Rc::new(VarResult { var_type, name }))
+                (*state).completables.push(Rc::new(VarResult {
+                    var_type,
+                    name: name.clone(),
+                }));
+            }
+
+            if let Some(fun) =
+                create_function_result(name, &assgn.init)
+            {
+                (*state).completables.push(Rc::new(fun));
             }
         }
 
@@ -139,7 +174,66 @@ impl Completable for VarResult {
             insert_text_format: InsertTextFormat::PlainText,
             kind: Some(CompletionItemKind::Variable),
             preselect: None,
-            sort_text: None,
+            sort_text: Some(self.name.clone()),
+            text_edit: None,
+        }
+    }
+
+    fn matches(&self, _text: String, _imports: Vec<String>) -> bool {
+        true
+    }
+}
+
+#[derive(Clone)]
+pub struct FunctionResult {
+    pub name: String,
+    pub package: String,
+    pub package_name: Option<String>,
+    pub required_args: Vec<String>,
+    pub optional_args: Vec<String>,
+    pub signature: String,
+}
+
+impl FunctionResult {
+    fn insert_text(&self) -> String {
+        let mut insert_text = format!("{}(", self.name);
+
+        for (index, arg) in self.required_args.iter().enumerate() {
+            insert_text +=
+                (format!("{}: ${}", arg, index + 1)).as_str();
+
+            if index != self.required_args.len() - 1 {
+                insert_text += ", ";
+            }
+        }
+
+        if self.required_args.is_empty()
+            && !self.optional_args.is_empty()
+        {
+            insert_text += "$1";
+        }
+
+        insert_text += ")$0";
+
+        insert_text
+    }
+}
+
+impl Completable for FunctionResult {
+    fn completion_item(&self) -> CompletionItem {
+        CompletionItem {
+            label: format!("{} ({})", self.name, "self".to_string()),
+            additional_text_edits: None,
+            commit_characters: None,
+            deprecated: false,
+            detail: Some(self.signature.clone()),
+            documentation: Some("from self".to_string()),
+            filter_text: Some(self.name.clone()),
+            insert_text: Some(self.insert_text()),
+            insert_text_format: InsertTextFormat::Snippet,
+            kind: Some(CompletionItemKind::Function),
+            preselect: None,
+            sort_text: Some(self.name.clone()),
             text_edit: None,
         }
     }

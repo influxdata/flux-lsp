@@ -6,7 +6,8 @@ use flux::semantic::types::MonoType;
 use flux::semantic::types::Row;
 use libstd::{imports, prelude};
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
+use std::fmt;
 use std::iter::Iterator;
 
 fn contains(l: Vec<String>, m: String) -> bool {
@@ -208,18 +209,77 @@ impl Completable for FunctionResult {
     }
 }
 
-fn create_function_signature(
+#[derive(Debug, Clone, PartialEq)]
+pub struct Property {
+    pub k: String,
+    pub v: String,
+}
+
+impl fmt::Display for Property {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}:{}", self.k, self.v)
+    }
+}
+
+struct TVarMap {
+    pub mapping: HashMap<flux::semantic::types::Tvar, char>,
+    pub current_letter: char,
+}
+
+impl TVarMap {
+    pub fn default() -> Self {
+        TVarMap {
+            mapping: HashMap::new(),
+            current_letter: 'A',
+        }
+    }
+
+    fn increment(&mut self) {
+        let c = std::char::from_u32(self.current_letter as u32 + 1)
+            .unwrap_or(self.current_letter);
+        self.current_letter = c
+    }
+
+    fn add(&mut self, v: flux::semantic::types::Tvar) -> String {
+        let c = self.current_letter;
+        self.increment();
+        self.mapping.insert(v, c);
+
+        format!("{}", c)
+    }
+
+    pub fn get_letter(
+        &mut self,
+        v: flux::semantic::types::Tvar,
+    ) -> String {
+        if let Some(result) = self.mapping.get(&v) {
+            format!("{}", *result)
+        } else {
+            self.add(v)
+        }
+    }
+}
+
+fn get_type_string(m: MonoType, map: &mut TVarMap) -> String {
+    if let MonoType::Var(t) = m {
+        return map.get_letter(t);
+    }
+    format!("{}", m)
+}
+
+pub fn create_function_signature(
     f: flux::semantic::types::Function,
 ) -> String {
+    let mut mapping = TVarMap::default();
     let required = f
         .req
         .iter()
         // Sort args with BTree
         .collect::<BTreeMap<_, _>>()
         .iter()
-        .map(|(&k, &v)| flux::semantic::types::Property {
+        .map(|(&k, &v)| Property {
             k: k.clone(),
-            v: v.clone(),
+            v: get_type_string(v.clone(), &mut mapping),
         })
         .collect::<Vec<_>>();
 
@@ -229,20 +289,23 @@ fn create_function_signature(
         // Sort args with BTree
         .collect::<BTreeMap<_, _>>()
         .iter()
-        .map(|(&k, &v)| flux::semantic::types::Property {
+        .map(|(&k, &v)| Property {
             k: String::from("?") + &k,
-            v: v.clone(),
+            v: get_type_string(v.clone(), &mut mapping),
         })
         .collect::<Vec<_>>();
 
     let pipe = match f.pipe {
         Some(pipe) => {
             if pipe.k == "<-" {
-                vec![pipe]
+                vec![Property {
+                    k: pipe.k.clone(),
+                    v: get_type_string(pipe.v, &mut mapping),
+                }]
             } else {
-                vec![flux::semantic::types::Property {
+                vec![Property {
                     k: String::from("<-") + &pipe.k,
-                    v: pipe.v.clone(),
+                    v: get_type_string(pipe.v, &mut mapping),
                 }]
             }
         }
@@ -256,7 +319,7 @@ fn create_function_signature(
             .map(|x| x.to_string())
             .collect::<Vec<_>>()
             .join(", "),
-        f.retn
+        get_type_string(f.retn, &mut mapping)
     )
 }
 

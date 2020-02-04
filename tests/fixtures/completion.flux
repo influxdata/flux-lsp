@@ -4,6 +4,8 @@ import "csv"
 cal = 10
 env = "prod01-us-west-2"
 
+cool = (a) => a + 1
+
 c
 
 errorCounts = from(bucket:"kube-infra/monthly")
