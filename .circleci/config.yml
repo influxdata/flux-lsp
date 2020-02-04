@@ -12,33 +12,39 @@ jobs:
     docker:
       - image: circleci/rust:1.39-stretch
     steps:
-    - checkout
-    - install-linux-deps
-    - run:
-        name: "install clippy"
-        command: rustup component add clippy
-    - run:
-        name: "run lint"
-        command: cargo clippy --all -- -D warnings
+      - checkout
+      - install-linux-deps
+      - run:
+          name: "install rustfmt"
+          command: rustup toolchain install nightly && rustup component add rustfmt --toolchain nightly
+      - run:
+          name: "run rustfmt"
+          command: cargo +nightly fmt --all -- --check
+      - run:
+          name: "install clippy"
+          command: rustup component add clippy
+      - run:
+          name: "run lint"
+          command: cargo clippy --all -- -D warnings
 
   test:
     docker:
       - image: circleci/rust:1.39-stretch
     steps:
-    - install-linux-deps
-    - checkout
-    - install-linux-deps
-    - run:
-        name: "run tests"
-        command: cargo test -- --test-threads=1
+      - install-linux-deps
+      - checkout
+      - install-linux-deps
+      - run:
+          name: "run tests"
+          command: cargo test -- --test-threads=1
 
   build:
     docker:
       - image: circleci/rust:1.39-stretch
     steps:
-    - checkout
-    - install-linux-deps
-    - run: cargo build --verbose
+      - checkout
+      - install-linux-deps
+      - run: cargo build --verbose
 
 workflows:
   version: 2.1
