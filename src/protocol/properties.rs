@@ -217,6 +217,20 @@ pub struct CompletionOptions {
     pub trigger_characters: Option<Vec<String>>,
 }
 
+impl Default for CompletionOptions {
+    fn default() -> Self {
+        CompletionOptions {
+            resolve_provider: Some(true),
+            trigger_characters: Some(vec![
+                ".".to_string(),
+                ":".to_string(),
+                "(".to_string(),
+                ",".to_string(),
+            ]),
+        }
+    }
+}
+
 #[derive(Serialize, Clone)]
 pub struct ServerCapabilities {
     #[serde(rename = "textDocumentSync")]
@@ -239,6 +253,9 @@ pub struct ServerCapabilities {
 
     #[serde(rename = "completionProvider")]
     pub completion_provider: CompletionOptions,
+
+    #[serde(rename = "signatureHelpProvider")]
+    pub signature_help_provider: SignatureHelpOptions,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -247,4 +264,21 @@ pub struct ContentChange {
     pub range: Option<Range>,
     #[serde(rename = "rangeLength")]
     pub range_length: Option<u32>,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct SignatureHelpOptions {
+    #[serde(rename = "triggerCharacters")]
+    pub trigger_characters: Option<Vec<String>>,
+    #[serde(rename = "retriggerCharacters")]
+    pub retrigger_characters: Option<Vec<String>>,
+}
+
+impl Default for SignatureHelpOptions {
+    fn default() -> Self {
+        SignatureHelpOptions {
+            trigger_characters: Some(vec!["(".to_string()]),
+            retrigger_characters: Some(vec!["(".to_string()]),
+        }
+    }
 }

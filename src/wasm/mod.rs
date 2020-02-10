@@ -66,6 +66,11 @@ impl Server {
                                 )),
                                 error: None,
                             };
+                        } else {
+                            return ServerResponse {
+                                message: None,
+                                error: None,
+                            };
                         }
                     }
                     Err(error) => {

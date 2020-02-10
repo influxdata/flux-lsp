@@ -1,5 +1,6 @@
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
+use serde_repr::{Deserialize_repr, Serialize_repr};
 
 use crate::protocol::properties::{
     ContentChange, Position, TextDocument, TextDocumentIdentifier,
@@ -138,7 +139,30 @@ pub struct CompletionParams {
 #[derive(Serialize, Deserialize, Clone)]
 pub struct CompletionContext {
     #[serde(rename = "triggerKind")]
-    trigger_kind: i32,
+    pub trigger_kind: i32,
     #[serde(rename = "triggerCharacter")]
-    trigger_character: Option<String>,
+    pub trigger_character: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct SignatureHelpParams {
+    #[serde(rename = "textDocument")]
+    pub text_document: TextDocumentIdentifier,
+    pub position: Position,
+    pub context: Option<SignatureHelpContext>,
+}
+
+#[derive(Serialize_repr, Deserialize_repr, Clone)]
+#[repr(u32)]
+pub enum SignatureHelpTriggerKind {
+    Invoked = 1,
+    TriggerCharacter = 2,
+    ContentChange = 3,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct SignatureHelpContext {
+    pub is_retrigger: bool,
+    pub trigger_character: Option<String>,
+    pub trigger_kind: SignatureHelpTriggerKind,
 }

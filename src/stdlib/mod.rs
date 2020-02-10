@@ -1,9 +1,9 @@
 use crate::protocol::responses::{
     CompletionItem, CompletionItemKind, InsertTextFormat,
 };
+use crate::shared::signatures::{get_argument_names, FunctionInfo};
 
-use flux::semantic::types::MonoType;
-use flux::semantic::types::Row;
+use flux::semantic::types::{MonoType, Row};
 use libstd::{imports, prelude};
 
 use std::collections::{BTreeMap, HashMap};
@@ -338,16 +338,8 @@ fn walk(
                         signature: create_function_signature(
                             (*f).clone(),
                         ),
-                        required_args: f
-                            .req
-                            .keys()
-                            .map(String::from)
-                            .collect(),
-                        optional_args: f
-                            .opt
-                            .keys()
-                            .map(String::from)
-                            .collect(),
+                        required_args: get_argument_names(f.req),
+                        optional_args: get_argument_names(f.opt),
                         package_name: get_package_name(
                             package.clone(),
                         ),
@@ -473,6 +465,53 @@ fn get_imports(list: &mut Vec<Box<dyn Completable>>) {
     }
 }
 
+fn walk_functions(
+    package: String,
+    list: &mut Vec<FunctionInfo>,
+    t: MonoType,
+) {
+    if let MonoType::Row(row) = t {
+        if let Row::Extension { head, tail } = *row {
+            if let MonoType::Fun(f) = head.v {
+                if let Some(package_name) =
+                    get_package_name(package.clone())
+                {
+                    list.push(FunctionInfo::new(
+                        head.k,
+                        f.as_ref(),
+                        package_name,
+                    ));
+                }
+            }
+
+            walk_functions(package, list, tail);
+        }
+    }
+}
+
+pub fn get_stdlib_functions() -> Vec<FunctionInfo> {
+    let mut results = vec![];
+    let env = prelude().unwrap();
+
+    for (name, val) in env.values {
+        if let MonoType::Fun(f) = val.expr {
+            results.push(FunctionInfo::new(
+                name,
+                f.as_ref(),
+                "builtin".to_string(),
+            ));
+        }
+    }
+
+    let impts = imports().unwrap();
+
+    for (name, val) in impts.values {
+        walk_functions(name, &mut results, val.expr);
+    }
+
+    results
+}
+
 pub fn get_builtins(list: &mut Vec<Box<dyn Completable>>) {
     let env = prelude().unwrap();
 
@@ -483,16 +522,8 @@ pub fn get_builtins(list: &mut Vec<Box<dyn Completable>>) {
                 package_name: None,
                 name: key.clone(),
                 signature: create_function_signature((*f).clone()),
-                required_args: f
-                    .req
-                    .keys()
-                    .map(String::from)
-                    .collect(),
-                optional_args: f
-                    .opt
-                    .keys()
-                    .map(String::from)
-                    .collect(),
+                required_args: get_argument_names(f.req),
+                optional_args: get_argument_names(f.opt),
             })),
             MonoType::String => list.push(Box::new(VarResult {
                 name: key.clone(),

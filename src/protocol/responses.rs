@@ -3,8 +3,8 @@ use serde_repr::{Deserialize_repr, Serialize_repr};
 use std::collections::HashMap;
 
 use crate::protocol::properties::{
-    CompletionOptions, ServerCapabilities, TextDocumentSyncKind,
-    TextEdit,
+    CompletionOptions, ServerCapabilities, SignatureHelpOptions,
+    TextDocumentSyncKind, TextEdit,
 };
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -54,10 +54,9 @@ impl InitializeResult {
                 rename_provider: true,
                 folding_range_provider,
                 document_symbol_provider: true,
-                completion_provider: CompletionOptions {
-                    resolve_provider: Some(true),
-                    trigger_characters: Some(vec![".".to_string()]),
-                },
+                completion_provider: CompletionOptions::default(),
+                signature_help_provider:
+                    SignatureHelpOptions::default(),
                 text_document_sync: TextDocumentSyncKind::Full,
             },
         }
@@ -154,4 +153,26 @@ impl CompletionItem {
             text_edit: None,
         }
     }
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct SignatureHelp {
+    pub signatures: Vec<SignatureInformation>,
+    #[serde(rename = "activeSignature")]
+    pub active_signature: Option<i32>,
+    #[serde(rename = "activeParameter")]
+    pub active_parameter: Option<i32>,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct SignatureInformation {
+    pub label: String,
+    pub documentation: Option<String>,
+    pub parameters: Option<Vec<ParameterInformation>>,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct ParameterInformation {
+    pub label: String,
+    pub documentation: Option<String>,
 }

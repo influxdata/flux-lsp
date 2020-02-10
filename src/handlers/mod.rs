@@ -11,6 +11,7 @@ pub mod initialize;
 pub mod references;
 pub mod rename;
 pub mod shutdown;
+pub mod signature_help;
 
 use crate::protocol::notifications::{
     create_diagnostics_notification, Notification,

@@ -5,6 +5,7 @@ use crate::protocol::properties::Position;
 use crate::protocol::responses::{
     CompletionItem, CompletionItemKind, InsertTextFormat,
 };
+use crate::shared::signatures::get_argument_names;
 use crate::stdlib::{create_function_signature, Completable};
 use crate::visitors::semantic::utils;
 
@@ -72,16 +73,8 @@ fn create_function_result(
                 name,
                 package: "self".to_string(),
                 package_name: Some("self".to_string()),
-                optional_args: fun
-                    .opt
-                    .keys()
-                    .map(String::from)
-                    .collect(),
-                required_args: fun
-                    .req
-                    .keys()
-                    .map(String::from)
-                    .collect(),
+                optional_args: get_argument_names(fun.clone().opt),
+                required_args: get_argument_names(fun.clone().req),
                 signature: create_function_signature((*fun).clone()),
             });
         }
