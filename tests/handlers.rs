@@ -203,6 +203,54 @@ speculate! {
         }
     }
 
+    describe "Signature help request" {
+        describe "when ok" {
+            before {
+                let uri = flux_fixture_uri("signatures");
+                open_file(uri.clone(), &mut handler);
+            }
+
+            after {
+                close_file(uri, &mut handler);
+            }
+
+            it "returns the correct response" {
+                let signature_help_request = Request {
+                    id: 1,
+                    method: "textDocument/signatureHelp".to_string(),
+                    params: Some(SignatureHelpParams {
+                        context: None,
+                        position: Position {
+                            line: 0,
+                            character: 5,
+                        },
+                        text_document: TextDocumentIdentifier {
+                            uri: uri.clone(),
+                        }
+                    }),
+                };
+                let request_json = serde_json::to_string(&signature_help_request).unwrap();
+                let request = PolymorphicRequest {
+                    base_request: BaseRequest {
+                        id: 1,
+                        method: "textDocument/signatureHelp".to_string(),
+                    },
+                    data: request_json,
+                };
+
+                let response = handler.handle(request).unwrap();
+                let returned = from_str::<Response<SignatureHelp>>(response.unwrap().as_str()).unwrap();
+
+                let signatures = returned.result.unwrap().signatures;
+
+                assert_eq!(
+                    signatures.len(),
+                    4,
+                    "returns the correct signatures");
+            }
+        }
+    }
+
     describe "Completion request" {
         describe "when ok" {
             before {

@@ -11,6 +11,7 @@ use crate::handlers::initialize::InitializeHandler;
 use crate::handlers::references::FindReferencesHandler;
 use crate::handlers::rename::RenameHandler;
 use crate::handlers::shutdown::ShutdownHandler;
+use crate::handlers::signature_help::SignatureHelpHandler;
 use crate::handlers::RequestHandler;
 use crate::protocol::requests::PolymorphicRequest;
 
@@ -92,6 +93,10 @@ impl Handler {
         mapping.insert(
             "completionItem/resolve".to_string(),
             Box::new(CompletionResolveHandler::default()),
+        );
+        mapping.insert(
+            "textDocument/signatureHelp".to_string(),
+            Box::new(SignatureHelpHandler::default()),
         );
 
         Handler {

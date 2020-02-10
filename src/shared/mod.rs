@@ -11,6 +11,28 @@ use crate::protocol::requests::{
 use crate::utils;
 use crate::visitors::ast;
 
+pub mod signatures;
+
+use combinations::Combinations;
+
+pub fn all_combos<T>(l: Vec<T>) -> Vec<Vec<T>>
+where
+    T: std::cmp::Ord + Clone,
+{
+    let mut result = vec![];
+    let length = l.len();
+
+    for i in 1..length {
+        let c: Vec<Vec<T>> =
+            Combinations::new(l.clone(), i).collect();
+        result.extend(c);
+    }
+
+    result.push(l);
+
+    result
+}
+
 pub fn parse_change_request(
     data: String,
 ) -> Result<Request<TextDocumentChangeParams>, String> {

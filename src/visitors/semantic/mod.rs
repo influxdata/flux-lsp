@@ -8,6 +8,8 @@ use flux::semantic::walk::{self, Node, Visitor};
 
 mod completion;
 mod symbols;
+
+pub mod functions;
 pub mod utils;
 
 pub use completion::CompletableFinderVisitor;
