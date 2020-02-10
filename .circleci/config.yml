@@ -16,10 +16,10 @@ jobs:
       - install-linux-deps
       - run:
           name: "install rustfmt"
-          command: rustup toolchain install nightly && rustup component add rustfmt --toolchain nightly
+          command: rustup component add rustfmt
       - run:
           name: "run rustfmt"
-          command: cargo +nightly fmt --all -- --check
+          command: cargo fmt --all -- --check
       - run:
           name: "install clippy"
           command: rustup component add clippy
