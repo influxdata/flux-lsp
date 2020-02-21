@@ -14,10 +14,13 @@ use crate::handlers::shutdown::ShutdownHandler;
 use crate::handlers::signature_help::SignatureHelpHandler;
 use crate::handlers::RequestHandler;
 use crate::protocol::requests::PolymorphicRequest;
+use crate::shared::RequestContext;
 
 use std::collections::HashMap;
 
 use wasm_bindgen::prelude::*;
+
+use async_trait::async_trait;
 
 #[wasm_bindgen]
 pub struct Handler {
@@ -28,10 +31,12 @@ pub struct Handler {
 #[derive(Default)]
 struct NoOpHandler {}
 
+#[async_trait]
 impl RequestHandler for NoOpHandler {
-    fn handle(
+    async fn handle(
         &self,
         _: PolymorphicRequest,
+        _: RequestContext,
     ) -> Result<Option<String>, String> {
         Ok(None)
     }
@@ -105,9 +110,10 @@ impl Handler {
         }
     }
 
-    pub fn handle(
+    pub async fn handle(
         &mut self,
         request: PolymorphicRequest,
+        ctx: RequestContext,
     ) -> Result<Option<String>, String> {
         let method = request.method();
         let handler = match self.mapping.get(&method) {
@@ -115,7 +121,7 @@ impl Handler {
             None => &self.default_handler,
         };
 
-        let resp = handler.handle(request)?;
+        let resp = handler.handle(request, ctx).await?;
 
         Ok(resp)
     }

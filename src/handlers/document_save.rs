@@ -6,10 +6,12 @@ use crate::shared;
 #[derive(Default)]
 pub struct DocumentSaveHandler {}
 
+#[async_trait::async_trait]
 impl RequestHandler for DocumentSaveHandler {
-    fn handle(
+    async fn handle(
         &self,
         prequest: PolymorphicRequest,
+        _: crate::shared::RequestContext,
     ) -> Result<Option<String>, String> {
         let request = shared::parse_save_request(prequest.data)?;
         if let Some(params) = request.params {

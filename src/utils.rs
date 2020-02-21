@@ -47,7 +47,7 @@ pub fn get_content_size(s: String) -> Result<usize, String> {
     }
 }
 
-pub fn parse_request(
+pub fn create_polymorphic_request(
     content: String,
 ) -> Result<PolymorphicRequest, String> {
     let request = BaseRequest::from_json(content.as_str())?;

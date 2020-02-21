@@ -11,9 +11,21 @@ use crate::protocol::requests::{
 use crate::utils;
 use crate::visitors::ast;
 
+pub mod callbacks;
 pub mod signatures;
 
 use combinations::Combinations;
+
+#[derive(Clone)]
+pub struct RequestContext {
+    pub callbacks: callbacks::Callbacks,
+}
+
+impl RequestContext {
+    pub fn new(callbacks: callbacks::Callbacks) -> Self {
+        RequestContext { callbacks }
+    }
+}
 
 pub fn all_combos<T>(l: Vec<T>) -> Vec<Vec<T>>
 where

@@ -9,11 +9,21 @@ use flux_lsp::protocol::notifications::*;
 use flux_lsp::protocol::properties::*;
 use flux_lsp::protocol::requests::*;
 use flux_lsp::protocol::responses::*;
+use flux_lsp::shared::callbacks::Callbacks;
+use flux_lsp::shared::RequestContext;
 use flux_lsp::stdlib::{get_builtins, Completable, PackageResult};
+
+use futures::executor::block_on;
 
 use std::collections::HashMap;
 use std::fs;
 use url::Url;
+
+fn create_request_context() -> RequestContext {
+    RequestContext {
+        callbacks: Callbacks::default(),
+    }
+}
 
 speculate! {
     before {
@@ -30,7 +40,7 @@ speculate! {
                 data: "".to_string(),
             };
 
-            let response = handler.handle(request).unwrap();
+            let response = block_on(handler.handle(request, create_request_context())).unwrap();
             let expected = None;
 
             assert_eq!(expected, response, "expects show message response");
@@ -56,7 +66,7 @@ speculate! {
                 data: initialize_request_json,
             };
 
-            let response = handler.handle(request).unwrap().unwrap();
+            let response = block_on(handler.handle(request, create_request_context())).unwrap().unwrap();
             let expected = Response {
                 id: 1,
                 result: Some(InitializeResult::new(true)),
@@ -81,7 +91,7 @@ speculate! {
                 data: "".to_string(),
             };
 
-            let response = handler.handle(request).unwrap();
+            let response = block_on(handler.handle(request, create_request_context())).unwrap();
             let expected = None;
 
             assert_eq!(expected, response, "expects empty response");
@@ -122,7 +132,7 @@ speculate! {
                     data: did_open_request_json,
                 };
 
-                let response = handler.handle(request).unwrap().unwrap();
+                let response = block_on(handler.handle(request, create_request_context())).unwrap().unwrap();
                 let expected_json =
                     create_diagnostics_notification(uri.clone(), vec![])
                     .unwrap()
@@ -170,7 +180,7 @@ speculate! {
                     data: did_open_request_json,
                 };
 
-                let response = handler.handle(request).unwrap();
+                let response = block_on(handler.handle(request, create_request_context())).unwrap();
                 let diagnostics = vec![Diagnostic {
                     range: Range {
                         start: Position {
@@ -238,7 +248,7 @@ speculate! {
                     data: request_json,
                 };
 
-                let response = handler.handle(request).unwrap();
+                let response = block_on(handler.handle(request, create_request_context())).unwrap();
                 let returned = from_str::<Response<SignatureHelp>>(response.unwrap().as_str()).unwrap();
 
                 let signatures = returned.result.unwrap().signatures;
@@ -287,19 +297,20 @@ speculate! {
                     },
                     data: completion_request_json,
                 };
-                let response = handler.handle(request).unwrap();
+                let response = block_on(handler.handle(request, create_request_context())).unwrap();
                 let mut items = vec![
-                    PackageResult {
+                    block_on(PackageResult {
                         full_name: "csv".to_string(),
                         name: "csv".to_string(),
-                    }.completion_item()
+                    }.completion_item(create_request_context()))
                 ];
 
                 let mut builtins = vec![];
                 get_builtins(&mut builtins);
 
                 for b in builtins {
-                    items.push(b.completion_item());
+                    let item = block_on(b.completion_item(create_request_context()));
+                    items.push(item);
                 }
 
                 let returned = from_str::<Response<CompletionList>>(response.unwrap().as_str()).unwrap();
@@ -365,7 +376,7 @@ speculate! {
                     },
                     data: did_change_request_json,
                 };
-                let response = handler.handle(request).unwrap();
+                let response = block_on(handler.handle(request, create_request_context())).unwrap();
                 let expected_json =
                     create_diagnostics_notification(uri.clone(), vec![])
                     .unwrap()
@@ -418,7 +429,7 @@ speculate! {
                     },
                     data: did_change_request_json,
                 };
-                let response = handler.handle(request).unwrap();
+                let response = block_on(handler.handle(request, create_request_context())).unwrap();
                 let diagnostics = vec![Diagnostic {
                     range: Range {
                         start: Position {
@@ -469,7 +480,7 @@ speculate! {
                 data: shutdown_request_json,
             };
 
-            let response = handler.handle(request).unwrap();
+            let response = block_on(handler.handle(request, create_request_context())).unwrap();
 
             let expected: Response<ShutdownResult> = Response {
                 id: 1,
@@ -524,7 +535,7 @@ speculate! {
                 },
                 data: rename_request_json,
             };
-            let response = handler.handle(request).unwrap();
+            let response = block_on(handler.handle(request, create_request_context())).unwrap();
 
             let mut expected_changes: HashMap<String, Vec<TextEdit>> =
                 HashMap::new();
@@ -611,7 +622,7 @@ speculate! {
                 },
                 data: folding_request_json,
             };
-            let response = handler.handle(request).unwrap();
+            let response = block_on(handler.handle(request, create_request_context())).unwrap();
 
             let areas = vec![
                 FoldingRange {
@@ -678,7 +689,7 @@ speculate! {
                 },
                 data: find_references_request_json,
             };
-            let response = handler.handle(request).unwrap();
+            let response = block_on(handler.handle(request, create_request_context())).unwrap();
 
             let expected: Response<Location> = Response {
                 id: 1,
@@ -744,7 +755,7 @@ speculate! {
                 },
                 data: find_references_request_json,
             };
-            let response = handler.handle(request).unwrap();
+            let response = block_on(handler.handle(request, create_request_context())).unwrap();
 
             let expected: Response<Vec<Location>> = Response {
                 id: 1,
@@ -817,7 +828,7 @@ speculate! {
                 },
                 data: symbols_request_json,
             };
-            let response = handler.handle(request).unwrap();
+            let response = block_on(handler.handle(request, create_request_context())).unwrap();
 
             let areas = vec![
                 SymbolInformation {
@@ -955,7 +966,8 @@ fn open_file(uri: String, handler: &mut Handler) {
         data: did_open_request_json,
     };
 
-    handler.handle(request).unwrap();
+    block_on(handler.handle(request, create_request_context()))
+        .unwrap();
 }
 
 fn close_file(uri: String, handler: &mut Handler) {
@@ -983,5 +995,6 @@ fn close_file(uri: String, handler: &mut Handler) {
         data: did_open_request_json,
     };
 
-    handler.handle(request).unwrap();
+    block_on(handler.handle(request, create_request_context()))
+        .unwrap();
 }

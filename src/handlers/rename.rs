@@ -11,10 +11,12 @@ use std::collections::HashMap;
 #[derive(Default)]
 pub struct RenameHandler {}
 
+#[async_trait::async_trait]
 impl RequestHandler for RenameHandler {
-    fn handle(
+    async fn handle(
         &self,
         prequest: PolymorphicRequest,
+        _: crate::shared::RequestContext,
     ) -> Result<Option<String>, String> {
         let request: Request<RenameParams> =
             Request::from_json(prequest.data.as_str())?;

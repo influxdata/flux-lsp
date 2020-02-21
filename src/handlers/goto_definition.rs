@@ -73,10 +73,12 @@ fn find_scoped_definition<'a>(
 #[derive(Default)]
 pub struct GotoDefinitionHandler {}
 
+#[async_trait::async_trait]
 impl RequestHandler for GotoDefinitionHandler {
-    fn handle(
+    async fn handle(
         &self,
         prequest: PolymorphicRequest,
+        _: crate::shared::RequestContext,
     ) -> Result<Option<String>, String> {
         let mut result: Option<Location> = None;
 

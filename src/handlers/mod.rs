@@ -19,17 +19,21 @@ use crate::protocol::notifications::{
 };
 use crate::protocol::properties::Position;
 use crate::protocol::requests::PolymorphicRequest;
+use crate::shared::RequestContext;
 use crate::utils;
 use crate::visitors::semantic::NodeFinderVisitor;
 
 use std::rc::Rc;
 
+use async_trait::async_trait;
 use flux::ast::{check, walk};
 
+#[async_trait]
 pub trait RequestHandler {
-    fn handle(
+    async fn handle(
         &self,
         prequest: PolymorphicRequest,
+        ctx: RequestContext,
     ) -> Result<Option<String>, String>;
 }
 
