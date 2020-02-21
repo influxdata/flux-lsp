@@ -45,10 +45,12 @@ fn find_foldable_areas(
 #[derive(Default)]
 pub struct FoldingHandler {}
 
+#[async_trait::async_trait]
 impl RequestHandler for FoldingHandler {
-    fn handle(
+    async fn handle(
         &self,
         prequest: PolymorphicRequest,
+        _: crate::shared::RequestContext,
     ) -> Result<Option<String>, String> {
         let request: Request<FoldingRangeParams> =
             Request::from_json(prequest.data.as_str())?;

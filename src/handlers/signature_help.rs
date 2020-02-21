@@ -116,10 +116,12 @@ fn find_signatures(
     Ok(result)
 }
 
+#[async_trait::async_trait]
 impl RequestHandler for SignatureHelpHandler {
-    fn handle(
+    async fn handle(
         &self,
         prequest: PolymorphicRequest,
+        _: crate::shared::RequestContext,
     ) -> Result<Option<String>, String> {
         let req: Request<SignatureHelpParams> =
             Request::from_json(prequest.data.as_str())?;

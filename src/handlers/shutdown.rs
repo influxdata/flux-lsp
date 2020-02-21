@@ -1,14 +1,15 @@
 use crate::handlers::RequestHandler;
-
 use crate::protocol::requests::PolymorphicRequest;
 use crate::protocol::responses::{Response, ShutdownResult};
 
 pub struct ShutdownHandler {}
 
+#[async_trait::async_trait]
 impl RequestHandler for ShutdownHandler {
-    fn handle(
+    async fn handle(
         &self,
         prequest: PolymorphicRequest,
+        _: crate::shared::RequestContext,
     ) -> Result<Option<String>, String> {
         let id = prequest.base_request.id;
         let response: Response<ShutdownResult> =

@@ -2,6 +2,7 @@ use crate::protocol::responses::{
     CompletionItem, CompletionItemKind, InsertTextFormat,
 };
 use crate::shared::signatures::{get_argument_names, FunctionInfo};
+use crate::shared::RequestContext;
 
 use flux::semantic::types::{MonoType, Row};
 use libstd::{imports, prelude};
@@ -10,12 +11,18 @@ use std::collections::{BTreeMap, HashMap};
 use std::fmt;
 use std::iter::Iterator;
 
+use async_trait::async_trait;
+
 fn contains(l: Vec<String>, m: String) -> bool {
     l.into_iter().find(|x| x.as_str() == m.as_str()) != None
 }
 
+#[async_trait]
 pub trait Completable {
-    fn completion_item(&self) -> CompletionItem;
+    async fn completion_item(
+        &self,
+        ctx: RequestContext,
+    ) -> CompletionItem;
     fn matches(&self, text: String, imports: Vec<String>) -> bool;
 }
 
@@ -58,8 +65,12 @@ impl VarResult {
     }
 }
 
+#[async_trait]
 impl Completable for VarResult {
-    fn completion_item(&self) -> CompletionItem {
+    async fn completion_item(
+        &self,
+        _ctx: RequestContext,
+    ) -> CompletionItem {
         CompletionItem {
             label: format!("{} ({})", self.name, self.package),
             additional_text_edits: None,
@@ -104,8 +115,12 @@ pub struct PackageResult {
     pub full_name: String,
 }
 
+#[async_trait]
 impl Completable for PackageResult {
-    fn completion_item(&self) -> CompletionItem {
+    async fn completion_item(
+        &self,
+        _ctx: RequestContext,
+    ) -> CompletionItem {
         CompletionItem {
             label: self.name.clone(),
             additional_text_edits: None,
@@ -147,13 +162,48 @@ pub struct FunctionResult {
     pub signature: String,
 }
 
+fn default_arg_insert_text(arg: &str, index: usize) -> String {
+    (format!("{}: ${}", arg, index + 1))
+}
+
+async fn get_bucket_insert_text(
+    arg: &str,
+    index: usize,
+    ctx: RequestContext,
+) -> String {
+    if let Ok(buckets) = ctx.callbacks.get_buckets().await {
+        if !buckets.is_empty() {
+            let list = buckets.join(",");
+            let i = format!("${{{}|{}|}}", index + 1, list);
+
+            return format!("{}: ${}", arg, i);
+        } else {
+            default_arg_insert_text(arg, index)
+        }
+    } else {
+        default_arg_insert_text(arg, index)
+    }
+}
+
+async fn arg_insert_text(
+    arg: &str,
+    index: usize,
+    ctx: RequestContext,
+) -> String {
+    match arg {
+        "bucket" => get_bucket_insert_text(arg, index, ctx).await,
+        _ => default_arg_insert_text(arg, index),
+    }
+}
+
 impl FunctionResult {
-    fn insert_text(&self) -> String {
+    async fn insert_text(&self, ctx: RequestContext) -> String {
         let mut insert_text = format!("{}(", self.name);
 
         for (index, arg) in self.required_args.iter().enumerate() {
-            insert_text +=
-                (format!("{}: ${}", arg, index + 1)).as_str();
+            insert_text += arg_insert_text(arg, index, ctx.clone())
+                .await
+                .as_str();
 
             if index != self.required_args.len() - 1 {
                 insert_text += ", ";
@@ -172,17 +222,27 @@ impl FunctionResult {
     }
 }
 
+fn make_documentation(package: String) -> String {
+    String::from("from ") + package.as_str()
+}
+
+#[async_trait]
 impl Completable for FunctionResult {
-    fn completion_item(&self) -> CompletionItem {
+    async fn completion_item(
+        &self,
+        ctx: RequestContext,
+    ) -> CompletionItem {
         CompletionItem {
             label: self.name.clone(),
             additional_text_edits: None,
             commit_characters: None,
             deprecated: false,
             detail: Some(self.signature.clone()),
-            documentation: Some(format!("from {}", self.package)),
+            documentation: Some(make_documentation(
+                self.package.clone(),
+            )),
             filter_text: Some(self.name.clone()),
-            insert_text: Some(self.insert_text()),
+            insert_text: Some(self.insert_text(ctx).await),
             insert_text_format: InsertTextFormat::Snippet,
             kind: Some(CompletionItemKind::Function),
             preselect: None,
@@ -325,7 +385,7 @@ pub fn create_function_signature(
 
 fn walk(
     package: String,
-    list: &mut Vec<Box<dyn Completable>>,
+    list: &mut Vec<Box<dyn Completable + Send + Sync>>,
     t: MonoType,
 ) {
     if let MonoType::Row(row) = t {
@@ -445,7 +505,7 @@ pub fn get_package_name(name: String) -> Option<String> {
 
 pub fn add_package_result(
     name: String,
-    list: &mut Vec<Box<dyn Completable>>,
+    list: &mut Vec<Box<dyn Completable + Send + Sync>>,
 ) {
     let package_name = get_package_name(name.clone());
     if let Some(package_name) = package_name {
@@ -456,7 +516,7 @@ pub fn add_package_result(
     }
 }
 
-fn get_imports(list: &mut Vec<Box<dyn Completable>>) {
+fn get_imports(list: &mut Vec<Box<dyn Completable + Send + Sync>>) {
     let env = imports().unwrap();
 
     for (key, val) in env.values {
@@ -512,7 +572,9 @@ pub fn get_stdlib_functions() -> Vec<FunctionInfo> {
     results
 }
 
-pub fn get_builtins(list: &mut Vec<Box<dyn Completable>>) {
+pub fn get_builtins(
+    list: &mut Vec<Box<dyn Completable + Sync + Send>>,
+) {
     let env = prelude().unwrap();
 
     for (key, val) in env.values {
@@ -590,7 +652,7 @@ pub fn get_builtins(list: &mut Vec<Box<dyn Completable>>) {
     }
 }
 
-pub fn get_stdlib() -> Vec<Box<dyn Completable>> {
+pub fn get_stdlib() -> Vec<Box<dyn Completable + Sync + Send>> {
     let mut list = vec![];
 
     get_imports(&mut list);

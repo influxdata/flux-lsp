@@ -14,10 +14,12 @@ impl InitializeHandler {
     }
 }
 
+#[async_trait::async_trait]
 impl RequestHandler for InitializeHandler {
-    fn handle(
+    async fn handle(
         &self,
         prequest: PolymorphicRequest,
+        _: crate::shared::RequestContext,
     ) -> Result<Option<String>, String> {
         let _: Request<InitializeParams> =
             Request::from_json(prequest.data.as_str())?;

@@ -10,7 +10,11 @@ test:
 manual-test: test install
 	vim me.flux
 
-wasm: build
+clean-wasm:
+	rm -rf pkg-node
+	rm -rf pkg-browser
+
+wasm: clean-wasm build
 	./build.sh
 
 publish: build

@@ -1,5 +1,6 @@
-use std::cell::RefCell;
 use std::rc::Rc;
+
+use std::sync::{Arc, Mutex};
 
 use crate::protocol::properties::Position;
 use crate::protocol::responses::{
@@ -15,18 +16,18 @@ use flux::semantic::walk::{Node, Visitor};
 
 #[derive(Default)]
 pub struct CompletableFinderState {
-    pub completables: Vec<Rc<dyn Completable>>,
+    pub completables: Vec<Arc<dyn Completable + Send + Sync>>,
 }
 
 pub struct CompletableFinderVisitor {
     pub pos: Position,
-    pub state: Rc<RefCell<CompletableFinderState>>,
+    pub state: Arc<Mutex<CompletableFinderState>>,
 }
 
 impl CompletableFinderVisitor {
     pub fn new(pos: Position) -> Self {
         CompletableFinderVisitor {
-            state: Rc::new(RefCell::new(
+            state: Arc::new(Mutex::new(
                 CompletableFinderState::default(),
             )),
             pos,
@@ -85,30 +86,31 @@ fn create_function_result(
 
 impl<'a> Visitor<'a> for CompletableFinderVisitor {
     fn visit(&mut self, node: Rc<Node<'a>>) -> bool {
-        let mut state = self.state.borrow_mut();
-        let loc = node.loc();
-        let pos = self.pos.clone();
+        if let Ok(mut state) = self.state.lock() {
+            let loc = node.loc();
+            let pos = self.pos.clone();
 
-        if loc.start.line > pos.line + 1
-            || (loc.start.line == pos.line + 1
-                && loc.start.column > pos.character + 1)
-        {
-            return true;
-        }
-
-        if let Node::VariableAssgn(assgn) = node.as_ref() {
-            let name = assgn.id.name.clone();
-            if let Some(var_type) = get_var_type(&assgn.init) {
-                (*state).completables.push(Rc::new(VarResult {
-                    var_type,
-                    name: name.clone(),
-                }));
+            if loc.start.line > pos.line + 1
+                || (loc.start.line == pos.line + 1
+                    && loc.start.column > pos.character + 1)
+            {
+                return true;
             }
 
-            if let Some(fun) =
-                create_function_result(name, &assgn.init)
-            {
-                (*state).completables.push(Rc::new(fun));
+            if let Node::VariableAssgn(assgn) = node.as_ref() {
+                let name = assgn.id.name.clone();
+                if let Some(var_type) = get_var_type(&assgn.init) {
+                    (*state).completables.push(Arc::new(VarResult {
+                        var_type,
+                        name: name.clone(),
+                    }));
+                }
+
+                if let Some(fun) =
+                    create_function_result(name, &assgn.init)
+                {
+                    (*state).completables.push(Arc::new(fun));
+                }
             }
         }
 
@@ -153,8 +155,12 @@ impl VarResult {
     }
 }
 
+#[async_trait::async_trait]
 impl Completable for VarResult {
-    fn completion_item(&self) -> CompletionItem {
+    async fn completion_item(
+        &self,
+        _ctx: crate::shared::RequestContext,
+    ) -> CompletionItem {
         CompletionItem {
             label: format!("{} ({})", self.name, "self".to_string()),
             additional_text_edits: None,
@@ -212,8 +218,12 @@ impl FunctionResult {
     }
 }
 
+#[async_trait::async_trait]
 impl Completable for FunctionResult {
-    fn completion_item(&self) -> CompletionItem {
+    async fn completion_item(
+        &self,
+        _ctx: crate::shared::RequestContext,
+    ) -> CompletionItem {
         CompletionItem {
             label: format!("{} ({})", self.name, "self".to_string()),
             additional_text_edits: None,

@@ -11,11 +11,11 @@ use crate::visitors::semantic::utils::{
 use crate::visitors::semantic::{
     DefinitionFinderVisitor, IdentFinderVisitor,
 };
+
+use flux::semantic::nodes::FunctionExpr;
 use flux::semantic::walk::{self, Node};
 
 use std::rc::Rc;
-
-use flux::semantic::nodes::FunctionExpr;
 
 fn function_defines(name: String, f: &FunctionExpr) -> bool {
     for param in f.params.clone() {
@@ -120,10 +120,12 @@ pub fn find_references(
 #[derive(Default)]
 pub struct FindReferencesHandler {}
 
+#[async_trait::async_trait]
 impl RequestHandler for FindReferencesHandler {
-    fn handle(
+    async fn handle(
         &self,
         prequest: PolymorphicRequest,
+        _: crate::shared::RequestContext,
     ) -> Result<Option<String>, String> {
         let mut locations: Vec<Location> = vec![];
         let request: Request<ReferenceParams> =

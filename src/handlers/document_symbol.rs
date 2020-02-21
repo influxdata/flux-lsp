@@ -44,10 +44,12 @@ fn find_symbols(
 #[derive(Default)]
 pub struct DocumentSymbolHandler {}
 
+#[async_trait::async_trait]
 impl RequestHandler for DocumentSymbolHandler {
-    fn handle(
+    async fn handle(
         &self,
         prequest: PolymorphicRequest,
+        _: crate::shared::RequestContext,
     ) -> Result<Option<String>, String> {
         let request: Request<DocumentSymbolParams> =
             Request::from_json(prequest.data.as_str())?;
