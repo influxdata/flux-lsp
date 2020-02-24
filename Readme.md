@@ -71,6 +71,32 @@ If you need to debug what flux-lsp is doing, you can configure it to log to `/tm
 }
 ```
 
+### with webpack
+
+This package is distributed as a wasm file, and since wasm files cannot be included in the main bundle, you need to import the library a little differently:
+
+```javascript
+import('@influxdata/flux-lsp-browser')
+    .then(({Server}) => {
+        let server = new Server(false);
+        // The LSP server is now ready to use
+    });
+
+```
+
+You might also have to add this snippet to your webpack configuration's 'module.rules' array to enable wasm file parsing:
+
+```javascript
+rules: [
+    {
+        test: /\.wasm$/,
+        loader: 'file-loader',
+        type: 'javascript/auto'
+    },
+    // ... all the rest of your loaders
+]
+```
+
 # Supported LSP features
 
 - initialize
