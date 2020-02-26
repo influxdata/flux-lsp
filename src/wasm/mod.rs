@@ -36,12 +36,6 @@ impl ServerResponse {
     }
 }
 
-impl Default for Server {
-    fn default() -> Server {
-        Server::new(false)
-    }
-}
-
 #[wasm_bindgen]
 impl Server {
     #[wasm_bindgen(constructor)]
@@ -56,19 +50,6 @@ impl Server {
 
     pub fn register_buckets_callback(&mut self, f: Function) {
         self.callbacks.register_buckets_callback(f);
-    }
-
-    pub fn get_buckets(&mut self) -> Promise {
-        let callbacks = self.callbacks.clone();
-
-        future_to_promise(async move {
-            let result = callbacks.get_buckets().await;
-
-            match result {
-                Ok(v) => Ok(JsValue::from(v.join(","))),
-                Err(e) => Err(JsValue::from(e)),
-            }
-        })
     }
 
     pub fn process(&mut self, msg: String) -> Promise {
