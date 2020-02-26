@@ -174,12 +174,12 @@ async fn find_completions(
     })
 }
 
-fn new_arg_completion(value: String) -> CompletionItem {
+fn new_string_arg_completion(value: String) -> CompletionItem {
     CompletionItem {
         deprecated: false,
         commit_characters: None,
         detail: None,
-        label: value,
+        label: format!("\"{}\"", value),
         additional_text_edits: None,
         filter_text: None,
         insert_text: None,
@@ -203,8 +203,10 @@ async fn find_arg_completions(
         if name == "bucket" {
             let buckets = ctx.callbacks.get_buckets().await?;
 
-            let items: Vec<CompletionItem> =
-                buckets.into_iter().map(new_arg_completion).collect();
+            let items: Vec<CompletionItem> = buckets
+                .into_iter()
+                .map(new_string_arg_completion)
+                .collect();
 
             return Ok(CompletionList {
                 is_incomplete: false,
