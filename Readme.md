@@ -5,6 +5,11 @@
 
 An implementation of the [Language Server Protocol](https://microsoft.github.io/language-server-protocol/) for the [Flux language](https://github.com/influxdata/flux).
 
+# LSP Development
+
+* LSP development requires rust version of 1.40.0 or newer.
+* run tests with `make test`
+
 # Installing command line server
 
 ```
