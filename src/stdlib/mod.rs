@@ -171,7 +171,11 @@ fn bucket_list_to_snippet(
     index: usize,
     arg: &str,
 ) -> String {
-    let list = buckets.join(",");
+    let list = buckets
+        .iter()
+        .map(|x| format!("\"{}\"", x))
+        .collect::<Vec<String>>()
+        .join(",");
     let text = format!("${{{}|{}|}}", index + 1, list);
 
     return format!("{}: {}", arg, text);
@@ -700,7 +704,7 @@ mod test {
 
         assert_eq!(
             bucket_list_to_snippet(names, index, &arg),
-            "bucket: ${2|one,two,three|}"
+            "bucket: ${2|\"one\",\"two\",\"three\"|}"
         );
     }
 }
