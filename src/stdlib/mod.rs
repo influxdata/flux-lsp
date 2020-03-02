@@ -166,6 +166,17 @@ fn default_arg_insert_text(arg: &str, index: usize) -> String {
     (format!("{}: ${}", arg, index + 1))
 }
 
+fn bucket_list_to_snippet(
+    buckets: Vec<String>,
+    index: usize,
+    arg: &str,
+) -> String {
+    let list = buckets.join(",");
+    let text = format!("${{{}|{}|}}", index + 1, list);
+
+    return format!("{}: {}", arg, text);
+}
+
 async fn get_bucket_insert_text(
     arg: &str,
     index: usize,
@@ -173,10 +184,7 @@ async fn get_bucket_insert_text(
 ) -> String {
     if let Ok(buckets) = ctx.callbacks.get_buckets().await {
         if !buckets.is_empty() {
-            let list = buckets.join(",");
-            let i = format!("${{{}|{}|}}", index + 1, list);
-
-            return format!("{}: ${}", arg, i);
+            bucket_list_to_snippet(buckets, index, arg)
         } else {
             default_arg_insert_text(arg, index)
         }
@@ -659,4 +667,24 @@ pub fn get_stdlib() -> Vec<Box<dyn Completable + Sync + Send>> {
     get_builtins(&mut list);
 
     list
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    #[test]
+    fn test_bucket_list_insert_text() {
+        let names = vec![
+            "one".to_string(),
+            "two".to_string(),
+            "three".to_string(),
+        ];
+        let arg = "bucket";
+        let index = 1;
+
+        assert_eq!(
+            bucket_list_to_snippet(names, index, &arg),
+            "bucket: ${2|one,two,three|}"
+        );
+    }
 }
