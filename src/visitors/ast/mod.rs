@@ -86,6 +86,18 @@ pub struct NodeFinderVisitor<'a> {
     pub state: Rc<RefCell<NodeFinderState<'a>>>,
 }
 
+impl<'a> NodeFinderVisitor<'a> {
+    pub fn new(position: Position) -> Self {
+        NodeFinderVisitor {
+            state: Rc::new(RefCell::new(NodeFinderState {
+                node: None,
+                position,
+                path: vec![],
+            })),
+        }
+    }
+}
+
 impl<'a> Visitor<'a> for NodeFinderVisitor<'a> {
     fn visit(&self, node: Rc<walk::Node<'a>>) -> Option<Self> {
         let mut state = self.state.borrow_mut();

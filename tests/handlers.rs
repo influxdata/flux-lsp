@@ -262,6 +262,56 @@ speculate! {
     }
 
     describe "Completion request" {
+        describe "when completion a package" {
+            before {
+                let uri = flux_fixture_uri("package_completion");
+                open_file(uri.clone(), &mut handler);
+            }
+
+            after {
+                close_file(uri, &mut handler);
+            }
+
+            it "returns the correct response" {
+                let completion_request = Request {
+                    id: 1,
+                    method: "textDocument/completion".to_string(),
+                    params: Some(CompletionParams {
+                        context: Some(CompletionContext {
+                            trigger_kind: 2,
+                            trigger_character: Some(".".to_string()),
+                        }),
+                        position: Position {
+                            character: 4,
+                            line: 2,
+                        },
+                        text_document: TextDocumentIdentifier {
+                            uri: uri.clone(),
+                        }
+                    }),
+                };
+
+                let completion_request_json =
+                    serde_json::to_string(&completion_request).unwrap();
+                let request = PolymorphicRequest {
+                    base_request: BaseRequest {
+                        id: 1,
+                        method: "textDocument/completion".to_string(),
+                    },
+                    data: completion_request_json,
+                };
+                let response = block_on(handler.handle(request, create_request_context())).unwrap();
+                let returned = from_str::<Response<CompletionList>>(response.unwrap().as_str()).unwrap();
+                let returned_items = returned.result.unwrap().items;
+
+                assert_eq!(
+                    returned_items.len(),
+                    2,
+                    "returns correct number of results"
+                );
+            }
+        }
+
         describe "when ok" {
             before {
                 let uri = flux_fixture_uri("completion");
