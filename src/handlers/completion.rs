@@ -1,6 +1,7 @@
 use std::rc::Rc;
 use std::sync::Arc;
 
+use crate::cache;
 use crate::handlers::RequestHandler;
 use crate::protocol::properties::Position;
 use crate::protocol::requests::{
@@ -12,12 +13,13 @@ use crate::protocol::responses::{
 };
 use crate::shared::RequestContext;
 use crate::stdlib::{get_stdlib, Completable};
+use crate::visitors::ast;
 use crate::visitors::semantic::{
     utils, CompletableFinderVisitor, ImportFinderVisitor,
-    NodeFinderVisitor,
 };
 
-use flux::semantic::walk::{self, Node};
+use flux::ast::walk::walk_rc;
+use flux::semantic::walk;
 
 use async_trait::async_trait;
 
@@ -40,40 +42,46 @@ fn get_ident_name(
     uri: String,
     position: Position,
 ) -> Result<Option<String>, String> {
-    let pkg = utils::create_semantic_package(uri)?;
-    let walker = Rc::new(walk::Node::Package(&pkg));
-    let mut visitor = NodeFinderVisitor::new(position);
+    let source = cache::get(uri.clone())?;
+    let file = crate::utils::create_file_node_from_text(
+        uri,
+        source.contents,
+    );
+    let walker = Rc::new(flux::ast::walk::Node::File(&file));
+    let visitor = ast::NodeFinderVisitor::new(Position {
+        line: position.line,
+        character: position.character - 1,
+    });
 
-    walk::walk(&mut visitor, walker);
+    walk_rc(&visitor, walker);
 
     let state = visitor.state.borrow();
     let node = (*state).node.clone();
 
     if let Some(node) = node {
         match node.as_ref() {
-            Node::Identifier(ident) => {
+            flux::ast::walk::Node::Identifier(ident) => {
                 let name = ident.name.clone();
                 return Ok(Some(name));
             }
-            Node::IdentifierExpr(ident) => {
-                let name = ident.name.clone();
+            flux::ast::walk::Node::BadExpr(expr) => {
+                let name = expr.text.clone();
                 return Ok(Some(name));
             }
-            Node::MemberExpr(mexpr) => {
-                if let flux::semantic::nodes::Expression::Identifier(
-                    ident,
-                ) = &mexpr.object
+            flux::ast::walk::Node::MemberExpr(mbr) => {
+                if let flux::ast::Expression::Identifier(ident) =
+                    &mbr.object
                 {
-                    let name = ident.name.clone();
-                    return Ok(Some(format!("{}.", name)));
+                    return Ok(Some(ident.name.clone()));
                 }
             }
-            Node::FunctionParameter(prm) => {
-                return Ok(Some(prm.key.clone().name))
-            }
-            Node::CallExpr(c) => {
+            flux::ast::walk::Node::CallExpr(c) => {
                 if let Some(arg) = c.arguments.last() {
-                    return Ok(Some(arg.key.clone().name));
+                    if let flux::ast::Expression::Identifier(ident) =
+                        arg
+                    {
+                        return Ok(Some(ident.name.clone()));
+                    }
                 }
             }
             _ => {}
@@ -144,6 +152,7 @@ async fn get_user_matches(
 
 async fn find_completions(
     params: CompletionParams,
+    trigger: Option<String>,
     ctx: RequestContext,
 ) -> Result<CompletionList, String> {
     let uri = params.text_document.uri;
@@ -153,7 +162,12 @@ async fn find_completions(
     let mut items: Vec<CompletionItem> = vec![];
     let imports = get_imports(uri.clone(), pos.clone())?;
 
-    if let Some(name) = name {
+    if let Some(mut name) = name {
+        if let Some(trigger) = trigger {
+            if trigger == "." {
+                name = format!("{}.", name)
+            }
+        }
         let mut stdlib_matches = get_stdlib_completions(
             name.clone(),
             imports.clone(),
@@ -229,11 +243,14 @@ async fn all_completions(
         if let Some(trigger) = context.trigger_character {
             if trigger == ":" {
                 return find_arg_completions(params, ctx).await;
+            } else {
+                return find_completions(params, Some(trigger), ctx)
+                    .await;
             }
         }
     }
 
-    find_completions(params, ctx).await
+    find_completions(params, None, ctx).await
 }
 
 #[derive(Default)]
