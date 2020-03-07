@@ -524,12 +524,28 @@ pub fn add_package_result(
     }
 }
 
-fn get_imports(list: &mut Vec<Box<dyn Completable + Send + Sync>>) {
+pub fn get_packages(
+    list: &mut Vec<Box<dyn Completable + Send + Sync>>,
+) {
+    let env = imports().unwrap();
+
+    for (key, _val) in env.values {
+        add_package_result(key, list);
+    }
+}
+
+pub fn get_specific_package_functions(
+    list: &mut Vec<Box<dyn Completable + Send + Sync>>,
+    name: String,
+) {
     let env = imports().unwrap();
 
     for (key, val) in env.values {
-        add_package_result(key.clone(), list);
-        walk(key, list, val.expr);
+        if let Some(package_name) = get_package_name(key.clone()) {
+            if package_name == name {
+                walk(key, list, val.expr);
+            }
+        }
     }
 }
 
@@ -663,7 +679,7 @@ pub fn get_builtins(
 pub fn get_stdlib() -> Vec<Box<dyn Completable + Sync + Send>> {
     let mut list = vec![];
 
-    get_imports(&mut list);
+    get_packages(&mut list);
     get_builtins(&mut list);
 
     list
