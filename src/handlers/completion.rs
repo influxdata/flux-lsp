@@ -12,7 +12,9 @@ use crate::protocol::responses::{
     InsertTextFormat, Response,
 };
 use crate::shared::RequestContext;
-use crate::stdlib::{get_stdlib, Completable};
+use crate::stdlib::{
+    get_specific_package_functions, get_stdlib, Completable,
+};
 use crate::visitors::ast;
 use crate::visitors::semantic::{
     utils, CompletableFinderVisitor, ImportFinderVisitor,
@@ -127,8 +129,6 @@ fn get_user_completables(
 
 async fn get_user_matches(
     uri: String,
-    name: String,
-    imports: Vec<String>,
     pos: Position,
     ctx: RequestContext,
 ) -> Result<Vec<CompletionItem>, String> {
@@ -136,11 +136,7 @@ async fn get_user_matches(
         get_user_completables(uri.clone(), pos.clone())?;
 
     let filtered: Vec<Arc<dyn Completable + Send + Sync>> =
-        completables
-            .clone()
-            .into_iter()
-            .filter(|x| x.matches(name.clone(), imports.clone()))
-            .collect();
+        completables.clone().into_iter().collect();
 
     let mut result: Vec<CompletionItem> = vec![];
     for x in filtered {
@@ -152,7 +148,6 @@ async fn get_user_matches(
 
 async fn find_completions(
     params: CompletionParams,
-    trigger: Option<String>,
     ctx: RequestContext,
 ) -> Result<CompletionList, String> {
     let uri = params.text_document.uri;
@@ -162,12 +157,7 @@ async fn find_completions(
     let mut items: Vec<CompletionItem> = vec![];
     let imports = get_imports(uri.clone(), pos.clone())?;
 
-    if let Some(mut name) = name {
-        if let Some(trigger) = trigger {
-            if trigger == "." {
-                name = format!("{}.", name)
-            }
-        }
+    if let Some(name) = name {
         let mut stdlib_matches = get_stdlib_completions(
             name.clone(),
             imports.clone(),
@@ -177,7 +167,7 @@ async fn find_completions(
         items.append(&mut stdlib_matches);
 
         let mut user_matches =
-            get_user_matches(uri, name, imports, pos, ctx).await?;
+            get_user_matches(uri, pos, ctx).await?;
 
         items.append(&mut user_matches);
     }
@@ -235,26 +225,54 @@ async fn find_arg_completions(
     })
 }
 
-async fn all_completions(
+async fn find_dot_completions(
     params: CompletionParams,
     ctx: RequestContext,
 ) -> Result<CompletionList, String> {
-    if let Some(context) = params.clone().context {
-        if let Some(trigger) = context.trigger_character {
-            if trigger == ":" {
-                return find_arg_completions(params, ctx).await;
-            } else {
-                return find_completions(params, Some(trigger), ctx)
-                    .await;
-            }
+    let uri = params.text_document.uri;
+    let name = get_ident_name(uri, params.position)?;
+
+    if let Some(name) = name {
+        let mut list = vec![];
+        get_specific_package_functions(&mut list, name);
+
+        let mut items = vec![];
+
+        for item in list.into_iter() {
+            items.push(item.completion_item(ctx.clone()).await);
         }
+
+        return Ok(CompletionList {
+            is_incomplete: false,
+            items,
+        });
     }
 
-    find_completions(params, None, ctx).await
+    Ok(CompletionList {
+        is_incomplete: false,
+        items: vec![],
+    })
 }
 
 #[derive(Default)]
 pub struct CompletionHandler {}
+
+async fn triggered_completion(
+    trigger: String,
+    params: CompletionParams,
+    ctx: RequestContext,
+) -> Result<CompletionList, String> {
+    if trigger == "." {
+        return find_dot_completions(params, ctx).await;
+    } else if trigger == ":" {
+        return find_arg_completions(params, ctx).await;
+    }
+
+    Ok(CompletionList {
+        is_incomplete: false,
+        items: vec![],
+    })
+}
 
 #[async_trait]
 impl RequestHandler for CompletionHandler {
@@ -266,7 +284,24 @@ impl RequestHandler for CompletionHandler {
         let req: Request<CompletionParams> =
             Request::from_json(prequest.data.as_str())?;
         if let Some(params) = req.params {
-            let completions = all_completions(params, ctx).await?;
+            if let Some(context) = params.clone().context {
+                if let Some(trigger) = context.trigger_character {
+                    let completions =
+                        triggered_completion(trigger, params, ctx)
+                            .await?;
+
+                    let response = Response::new(
+                        prequest.base_request.id,
+                        Some(completions),
+                    );
+
+                    let result = response.to_json()?;
+
+                    return Ok(Some(result));
+                }
+            }
+
+            let completions = find_completions(params, ctx).await?;
 
             let response = Response::new(
                 prequest.base_request.id,
