@@ -385,6 +385,60 @@ speculate! {
                 );
             }
         }
+
+        describe "when an option can be completed" {
+            before {
+                let uri = flux_fixture_uri("options");
+                open_file(uri.clone(), &mut handler);
+            }
+
+            after {
+                close_file(uri, &mut handler);
+            }
+
+            it "returns the correct response" {
+                let completion_request = Request {
+                    id: 1,
+                    method: "textDocument/completion".to_string(),
+                    params: Some(CompletionParams {
+                        context: None,
+                        position: Position {
+                            character: 10,
+                            line: 16,
+                        },
+                        text_document: TextDocumentIdentifier {
+                            uri: uri.clone(),
+                        }
+                    }),
+                };
+
+                let completion_request_json =
+                    serde_json::to_string(&completion_request).unwrap();
+                let request = PolymorphicRequest {
+                    base_request: BaseRequest {
+                        id: 1,
+                        method: "textDocument/completion".to_string(),
+                    },
+                    data: completion_request_json,
+                };
+                let response = block_on(handler.handle(request, create_request_context())).unwrap();
+
+                let returned = from_str::<Response<CompletionList>>(response.unwrap().as_str()).unwrap();
+                let returned_items = returned.result.unwrap().items;
+
+                assert_eq!(
+                    110,
+                    returned_items.len(),
+                    "expects completion items"
+                );
+
+                assert_eq!(
+                    returned_items.last().unwrap().label,
+                    "task (self)",
+                    "returns user defined task"
+                );
+            }
+        }
     }
 
     describe "Document change" {

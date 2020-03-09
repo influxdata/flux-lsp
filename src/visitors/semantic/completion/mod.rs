@@ -42,6 +42,7 @@ fn get_var_type(expr: &Expression) -> Option<VarType> {
         Expression::Float(_) => Some(VarType::Float),
         Expression::StringLit(_) => Some(VarType::String),
         Expression::Array(_) => Some(VarType::Array),
+        Expression::Object(_) => Some(VarType::Object),
         Expression::Regexp(_) => Some(VarType::Regexp),
         Expression::Duration(_) => Some(VarType::Duration),
         Expression::Call(c) => {
@@ -112,6 +113,24 @@ impl<'a> Visitor<'a> for CompletableFinderVisitor {
                     (*state).completables.push(Arc::new(fun));
                 }
             }
+
+            if let Node::OptionStmt(opt) = node.as_ref() {
+                if let flux::semantic::nodes::Assignment::Variable(
+                    var_assign,
+                ) = &opt.assignment
+                {
+                    let name = var_assign.id.name.clone();
+                    if let Some(var_type) =
+                        get_var_type(&var_assign.init)
+                    {
+                        (*state).completables.push(Arc::new(
+                            VarResult { var_type, name },
+                        ));
+
+                        return false;
+                    }
+                }
+            }
         }
 
         true
@@ -126,6 +145,7 @@ enum VarType {
     Float,
     Bool,
     Duration,
+    Object,
     Regexp,
     Row,
     Uint,
@@ -146,6 +166,7 @@ impl VarResult {
             VarType::Duration => "Duration".to_string(),
             VarType::Float => "Float".to_string(),
             VarType::Int => "Integer".to_string(),
+            VarType::Object => "Object".to_string(),
             VarType::Regexp => "Regular Expression".to_string(),
             VarType::String => "String".to_string(),
             VarType::Row => "Row".to_string(),
