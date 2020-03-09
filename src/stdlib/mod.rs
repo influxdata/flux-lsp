@@ -152,16 +152,6 @@ impl Completable for PackageResult {
     }
 }
 
-#[derive(Clone)]
-pub struct FunctionResult {
-    pub name: String,
-    pub package: String,
-    pub package_name: Option<String>,
-    pub required_args: Vec<String>,
-    pub optional_args: Vec<String>,
-    pub signature: String,
-}
-
 fn default_arg_insert_text(arg: &str, index: usize) -> String {
     (format!("{}: ${}", arg, index + 1))
 }
@@ -206,6 +196,16 @@ async fn arg_insert_text(
         "bucket" => get_bucket_insert_text(arg, index, ctx).await,
         _ => default_arg_insert_text(arg, index),
     }
+}
+
+#[derive(Clone)]
+pub struct FunctionResult {
+    pub name: String,
+    pub package: String,
+    pub package_name: Option<String>,
+    pub required_args: Vec<String>,
+    pub optional_args: Vec<String>,
+    pub signature: String,
 }
 
 impl FunctionResult {

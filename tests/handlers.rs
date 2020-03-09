@@ -146,6 +146,72 @@ speculate! {
             }
         }
 
+        describe "when incomplete option" {
+            before {
+                let uri = flux_fixture_uri("incomplete_option");
+            }
+
+            after {
+                close_file(uri, &mut handler);
+            }
+
+            it "returns an error" {
+                let text = get_file_contents_from_uri(uri.clone()).unwrap();
+                let did_open_request = Request {
+                    id: 1,
+                    method: "textDocument/didOpen".to_string(),
+                    params: Some(TextDocumentParams {
+                        text_document: TextDocument {
+                            uri: uri.clone(),
+                            language_id: "flux".to_string(),
+                            version: 1,
+                            text,
+                        },
+                    }),
+                };
+
+                let did_open_request_json =
+                    serde_json::to_string(&did_open_request).unwrap();
+                let request = PolymorphicRequest {
+                    base_request: BaseRequest {
+                        id: 1,
+                        method: "textDocument/didOpen".to_string(),
+                    },
+                    data: did_open_request_json,
+                };
+
+                let response = block_on(handler.handle(request, create_request_context())).unwrap();
+                let diagnostics = vec![Diagnostic {
+                    range: Range {
+                        start: Position {
+                            character: 0,
+                            line: 0,
+                        },
+                        end: Position {
+                            character: 6,
+                            line: 0,
+                        },
+                    },
+                    message: "invalid statement: option"
+                        .to_string(),
+                        code: 1,
+                        severity: 1,
+                }];
+
+                let expected_json =
+                    create_diagnostics_notification(uri.clone(), diagnostics)
+                    .unwrap()
+                    .to_json()
+                    .unwrap();
+
+                assert_eq!(
+                    expected_json,
+                    response.unwrap(),
+                    "expects publish diagnostic notification"
+                );
+            }
+        }
+
         describe "when there is an error" {
             before {
                 let uri = flux_fixture_uri("error");
@@ -436,6 +502,105 @@ speculate! {
                     returned_items.last().unwrap().label,
                     "task (self)",
                     "returns user defined task"
+                );
+            }
+        }
+
+        describe "when an option members can be completed" {
+            before {
+                let uri = flux_fixture_uri("options_object_members");
+                open_file(uri.clone(), &mut handler);
+            }
+
+            after {
+                close_file(uri, &mut handler);
+            }
+
+            it "returns the correct response" {
+                let completion_request = Request {
+                    id: 1,
+                    method: "textDocument/completion".to_string(),
+                    params: Some(CompletionParams {
+                        context: Some(CompletionContext{
+                            trigger_kind: 0,
+                            trigger_character: Some(".".to_string()),
+                        }),
+                        position: Position {
+                            character: 5,
+                            line: 16,
+                        },
+                        text_document: TextDocumentIdentifier {
+                            uri: uri.clone(),
+                        }
+                    }),
+                };
+
+                let completion_request_json =
+                    serde_json::to_string(&completion_request).unwrap();
+                let request = PolymorphicRequest {
+                    base_request: BaseRequest {
+                        id: 1,
+                        method: "textDocument/completion".to_string(),
+                    },
+                    data: completion_request_json,
+                };
+                let response = block_on(handler.handle(request, create_request_context())).unwrap();
+
+                let returned = from_str::<Response<CompletionList>>(response.unwrap().as_str()).unwrap();
+                let returned_items = returned.result.unwrap().items;
+
+                assert_eq!(
+                    5,
+                    returned_items.len(),
+                    "expects completion items"
+                );
+            }
+        }
+
+        describe "when an option functions can be completed" {
+            before {
+                let uri = flux_fixture_uri("options_function");
+                open_file(uri.clone(), &mut handler);
+            }
+
+            after {
+                close_file(uri, &mut handler);
+            }
+
+            it "returns the correct response" {
+                let completion_request = Request {
+                    id: 1,
+                    method: "textDocument/completion".to_string(),
+                    params: Some(CompletionParams {
+                        context: None,
+                        position: Position {
+                            character: 1,
+                            line: 10,
+                        },
+                        text_document: TextDocumentIdentifier {
+                            uri: uri.clone(),
+                        }
+                    }),
+                };
+
+                let completion_request_json =
+                    serde_json::to_string(&completion_request).unwrap();
+                let request = PolymorphicRequest {
+                    base_request: BaseRequest {
+                        id: 1,
+                        method: "textDocument/completion".to_string(),
+                    },
+                    data: completion_request_json,
+                };
+                let response = block_on(handler.handle(request, create_request_context())).unwrap();
+
+                let returned = from_str::<Response<CompletionList>>(response.unwrap().as_str()).unwrap();
+                let returned_items = returned.result.unwrap().items;
+
+                assert_eq!(
+                    110,
+                    returned_items.len(),
+                    "expects completion items"
                 );
             }
         }

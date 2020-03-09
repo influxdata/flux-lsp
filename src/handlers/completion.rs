@@ -17,7 +17,8 @@ use crate::stdlib::{
 };
 use crate::visitors::ast;
 use crate::visitors::semantic::{
-    utils, CompletableFinderVisitor, ImportFinderVisitor,
+    utils, CompletableFinderVisitor, CompletableObjectFinderVisitor,
+    ImportFinderVisitor,
 };
 
 use flux::ast::walk::walk_rc;
@@ -135,11 +136,8 @@ async fn get_user_matches(
     let completables =
         get_user_completables(uri.clone(), pos.clone())?;
 
-    let filtered: Vec<Arc<dyn Completable + Send + Sync>> =
-        completables.clone().into_iter().collect();
-
     let mut result: Vec<CompletionItem> = vec![];
-    for x in filtered {
+    for x in completables {
         result.push(x.completion_item(ctx.clone()).await)
     }
 
@@ -230,13 +228,21 @@ async fn find_dot_completions(
     ctx: RequestContext,
 ) -> Result<CompletionList, String> {
     let uri = params.text_document.uri;
-    let name = get_ident_name(uri, params.position)?;
+    let pos = params.position;
+    let name = get_ident_name(uri.clone(), pos.clone())?;
 
     if let Some(name) = name {
         let mut list = vec![];
-        get_specific_package_functions(&mut list, name);
+        get_specific_package_functions(&mut list, name.clone());
 
         let mut items = vec![];
+        let obj_results =
+            get_specific_object(name, pos, uri.clone())?;
+
+        for completable in obj_results.into_iter() {
+            items
+                .push(completable.completion_item(ctx.clone()).await);
+        }
 
         for item in list.into_iter() {
             items.push(item.completion_item(ctx.clone()).await);
@@ -252,6 +258,24 @@ async fn find_dot_completions(
         is_incomplete: false,
         items: vec![],
     })
+}
+
+pub fn get_specific_object(
+    name: String,
+    pos: Position,
+    uri: String,
+) -> Result<Vec<Arc<dyn Completable + Send + Sync>>, String> {
+    let pkg = utils::create_completion_package_removed(uri, pos)?;
+    let walker = Rc::new(walk::Node::Package(&pkg));
+    let mut visitor = CompletableObjectFinderVisitor::new(name);
+
+    walk::walk(&mut visitor, walker);
+
+    if let Ok(state) = visitor.state.lock() {
+        return Ok(state.completables.clone());
+    }
+
+    Ok(vec![])
 }
 
 #[derive(Default)]

@@ -24,6 +24,65 @@ pub struct CompletableFinderVisitor {
     pub state: Arc<Mutex<CompletableFinderState>>,
 }
 
+impl<'a> Visitor<'a> for CompletableFinderVisitor {
+    fn visit(&mut self, node: Rc<Node<'a>>) -> bool {
+        if let Ok(mut state) = self.state.lock() {
+            let loc = node.loc();
+            let pos = self.pos.clone();
+
+            if loc.start.line > pos.line + 1
+                || (loc.start.line == pos.line + 1
+                    && loc.start.column > pos.character + 1)
+            {
+                return true;
+            }
+
+            if let Node::VariableAssgn(assgn) = node.as_ref() {
+                let name = assgn.id.name.clone();
+                if let Some(var_type) = get_var_type(&assgn.init) {
+                    (*state).completables.push(Arc::new(VarResult {
+                        var_type,
+                        name: name.clone(),
+                    }));
+                }
+
+                if let Some(fun) =
+                    create_function_result(name, &assgn.init)
+                {
+                    (*state).completables.push(Arc::new(fun));
+                }
+            }
+
+            if let Node::OptionStmt(opt) = node.as_ref() {
+                if let flux::semantic::nodes::Assignment::Variable(
+                    var_assign,
+                ) = &opt.assignment
+                {
+                    let name = var_assign.id.name.clone();
+                    if let Some(var_type) =
+                        get_var_type(&var_assign.init)
+                    {
+                        (*state).completables.push(Arc::new(
+                            VarResult { var_type, name },
+                        ));
+
+                        return false;
+                    }
+
+                    if let Some(fun) =
+                        create_function_result(name, &var_assign.init)
+                    {
+                        (*state).completables.push(Arc::new(fun));
+                        return false;
+                    }
+                }
+            }
+        }
+
+        true
+    }
+}
+
 impl CompletableFinderVisitor {
     pub fn new(pos: Position) -> Self {
         CompletableFinderVisitor {
@@ -32,6 +91,103 @@ impl CompletableFinderVisitor {
             )),
             pos,
         }
+    }
+}
+
+#[derive(Default)]
+pub struct CompletableObjectFinderState {
+    pub completables: Vec<Arc<dyn Completable + Send + Sync>>,
+}
+
+pub struct CompletableObjectFinderVisitor {
+    pub name: String,
+    pub state: Arc<Mutex<CompletableObjectFinderState>>,
+}
+
+impl CompletableObjectFinderVisitor {
+    pub fn new(name: String) -> Self {
+        CompletableObjectFinderVisitor {
+            state: Arc::new(Mutex::new(
+                CompletableObjectFinderState::default(),
+            )),
+            name,
+        }
+    }
+}
+
+impl<'a> Visitor<'a> for CompletableObjectFinderVisitor {
+    fn visit(&mut self, node: Rc<Node<'a>>) -> bool {
+        if let Ok(mut state) = self.state.lock() {
+            let name = self.name.clone();
+
+            if let Node::ObjectExpr(obj) = node.as_ref() {
+                if let Some(ident) = &obj.with {
+                    if name == ident.name {
+                        for prop in obj.properties.clone() {
+                            if let Some(var_type) =
+                                get_var_type(&prop.value)
+                            {
+                                (*state).completables.push(Arc::new(
+                                    VarResult {
+                                        var_type,
+                                        name: prop.key.name,
+                                    },
+                                ));
+                            }
+                        }
+                    }
+                }
+            }
+
+            if let Node::VariableAssgn(assign) = node.as_ref() {
+                if assign.id.name == name {
+                    if let Expression::Object(obj) = &assign.init {
+                        for prop in obj.properties.clone() {
+                            if let Some(var_type) =
+                                get_var_type(&prop.value)
+                            {
+                                (*state).completables.push(Arc::new(
+                                    VarResult {
+                                        var_type,
+                                        name: prop.key.name,
+                                    },
+                                ));
+                            }
+                        }
+
+                        return false;
+                    }
+                }
+            }
+
+            if let Node::OptionStmt(opt) = node.as_ref() {
+                if let flux::semantic::nodes::Assignment::Variable(
+                    assign,
+                ) = opt.assignment.clone()
+                {
+                    if assign.id.name == name {
+                        if let Expression::Object(obj) = assign.init {
+                            for prop in obj.properties.clone() {
+                                if let Some(var_type) =
+                                    get_var_type(&prop.value)
+                                {
+                                    (*state).completables.push(
+                                        Arc::new(VarResult {
+                                            var_type,
+                                            name: prop.key.name,
+                                        }),
+                                    );
+                                }
+                            }
+
+                            return false;
+                        }
+                    }
+                }
+            }
+        }
+
+        true
     }
 }
 
@@ -83,58 +239,6 @@ fn create_function_result(
     }
 
     None
-}
-
-impl<'a> Visitor<'a> for CompletableFinderVisitor {
-    fn visit(&mut self, node: Rc<Node<'a>>) -> bool {
-        if let Ok(mut state) = self.state.lock() {
-            let loc = node.loc();
-            let pos = self.pos.clone();
-
-            if loc.start.line > pos.line + 1
-                || (loc.start.line == pos.line + 1
-                    && loc.start.column > pos.character + 1)
-            {
-                return true;
-            }
-
-            if let Node::VariableAssgn(assgn) = node.as_ref() {
-                let name = assgn.id.name.clone();
-                if let Some(var_type) = get_var_type(&assgn.init) {
-                    (*state).completables.push(Arc::new(VarResult {
-                        var_type,
-                        name: name.clone(),
-                    }));
-                }
-
-                if let Some(fun) =
-                    create_function_result(name, &assgn.init)
-                {
-                    (*state).completables.push(Arc::new(fun));
-                }
-            }
-
-            if let Node::OptionStmt(opt) = node.as_ref() {
-                if let flux::semantic::nodes::Assignment::Variable(
-                    var_assign,
-                ) = &opt.assignment
-                {
-                    let name = var_assign.id.name.clone();
-                    if let Some(var_type) =
-                        get_var_type(&var_assign.init)
-                    {
-                        (*state).completables.push(Arc::new(
-                            VarResult { var_type, name },
-                        ));
-
-                        return false;
-                    }
-                }
-            }
-        }
-
-        true
-    }
 }
 
 #[derive(Clone)]
