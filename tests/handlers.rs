@@ -378,7 +378,7 @@ speculate! {
             }
         }
 
-        describe "when ok" {
+        describe "when variable completion" {
             before {
                 let uri = flux_fixture_uri("completion");
                 open_file(uri.clone(), &mut handler);
@@ -602,6 +602,60 @@ speculate! {
                     returned_items.len(),
                     "expects completion items"
                 );
+            }
+        }
+
+        describe "when a completable is not in the scope of position" {
+            before {
+                let uri = flux_fixture_uri("completion_scope");
+                open_file(uri.clone(), &mut handler);
+            }
+
+            after {
+                close_file(uri, &mut handler);
+            }
+
+            it "returns the correct response" {
+                let completion_request = Request {
+                    id: 1,
+                    method: "textDocument/completion".to_string(),
+                    params: Some(CompletionParams {
+                        context: None,
+                        position: Position {
+                            character: 1,
+                            line: 9,
+                        },
+                        text_document: TextDocumentIdentifier {
+                            uri: uri.clone(),
+                        }
+                    }),
+                };
+
+                let completion_request_json =
+                    serde_json::to_string(&completion_request).unwrap();
+                let request = PolymorphicRequest {
+                    base_request: BaseRequest {
+                        id: 1,
+                        method: "textDocument/completion".to_string(),
+                    },
+                    data: completion_request_json,
+                };
+                let response = block_on(handler.handle(request, create_request_context())).unwrap();
+
+                let returned = from_str::<Response<CompletionList>>(response.unwrap().as_str()).unwrap();
+                let returned_items = returned.result.unwrap().items;
+
+                let mut userCompletables = vec![];
+                for item in returned_items {
+                    let label = item.label.clone();
+                    if label.ends_with("(self)") {
+                        userCompletables.push(label);
+                    }
+                }
+
+                for completable in userCompletables {
+                    assert!(completable != "alpha (self)" && completable != "beta (self)")
+                }
             }
         }
     }
