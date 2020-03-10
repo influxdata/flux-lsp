@@ -12,7 +12,9 @@ mod symbols;
 pub mod functions;
 pub mod utils;
 
-pub use completion::CompletableFinderVisitor;
+pub use completion::{
+    CompletableFinderVisitor, CompletableObjectFinderVisitor,
+};
 pub use symbols::SymbolsVisitor;
 
 fn contains_position(node: Rc<Node<'_>>, pos: Position) -> bool {

@@ -2,6 +2,7 @@ use crate::cache;
 use crate::protocol::properties::{Location, Position, Range};
 use crate::utils::is_in_node;
 
+use std::convert::TryFrom;
 use std::rc::Rc;
 
 use flux::parser::parse_string;
@@ -34,6 +35,65 @@ pub fn analyze_source(
     local_analyze(ast_pkg)
 }
 
+fn valid_node(
+    node: &flux::ast::Statement,
+    position: Position,
+) -> bool {
+    !is_in_node(position, node.base())
+}
+
+fn remove_character(source: String, pos: Position) -> String {
+    source
+        .split('\n')
+        .enumerate()
+        .map(|(index, line)| {
+            if pos.line != u32::try_from(index).unwrap() {
+                return line.to_string();
+            }
+
+            line.split("").enumerate().fold(
+                String::from(""),
+                |mut acc, (index, c)| {
+                    if pos.character != u32::try_from(index).unwrap()
+                    {
+                        acc.push_str(c)
+                    }
+
+                    acc
+                },
+            )
+        })
+        .collect::<Vec<String>>()
+        .join("\n")
+}
+
+pub fn create_completion_package_removed(
+    uri: String,
+    pos: Position,
+) -> Result<Package, String> {
+    let cv = cache::get(uri)?;
+    let contents = remove_character(cv.contents, pos.clone());
+    let mut file = parse_string("", contents.as_str());
+
+    file.body = file
+        .body
+        .into_iter()
+        .filter(|x| valid_node(x, pos.clone()))
+        .collect();
+
+    let ast_pkg = flux::ast::Package {
+        base: file.base.clone(),
+        path: "".to_string(),
+        package: "main".to_string(),
+        files: vec![file],
+    };
+
+    match analyze(ast_pkg) {
+        Ok(p) => Ok(p),
+        Err(e) => Err(format!("{}", e)),
+    }
+}
+
 pub fn create_completion_package(
     uri: String,
     pos: Position,
@@ -44,7 +104,7 @@ pub fn create_completion_package(
     file.body = file
         .body
         .into_iter()
-        .filter(|x| !is_in_node(pos.clone(), x.base()))
+        .filter(|x| valid_node(x, pos.clone()))
         .collect();
 
     let ast_pkg = flux::ast::Package {
