@@ -150,3 +150,13 @@ impl<'a> Visitor<'a> for IdentFinderVisitor<'a> {
         Some(self.clone())
     }
 }
+
+pub struct AstVisitor<'a> {
+    pub state: Rc<RefCell<IdentFinderState<'a>>>,
+}
+
+impl<'a> Visitor<'a> for AstVisitor<'a> {
+    fn visit(&self, node: Rc<walk::Node<'a>>) -> Option<Self> {
+        
+    }
+}

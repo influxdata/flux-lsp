@@ -39,7 +39,36 @@ fn valid_node(
     node: &flux::ast::Statement,
     position: Position,
 ) -> bool {
-    !is_in_node(position, node.base())
+    match node {
+        flux::ast::Statement::Bad(_) => false,
+        flux::ast::Statement::Expr(expr) => {
+            println!(
+                "start_line: {} start_col: {}",
+                node.base().location.start.line,
+                node.base().location.start.column,
+            );
+            match expr.expression {
+                flux::ast::Expression::Identifier(_) => {
+                    println!("2");
+                    !is_in_node(position, node.base())
+                }
+                flux::ast::Expression::Bad(_) => {
+                    println!("bad expr");
+                    false
+                }
+                _ => true,
+            }
+        }
+        stmt => {
+            println!(
+                "stmt_type: {} start_line: {} start_col: {}",
+                stmt.typ(),
+                node.base().location.start.line,
+                node.base().location.start.column,
+            );
+            true
+        },
+    }
 }
 
 fn remove_character(source: String, pos: Position) -> String {
@@ -100,6 +129,12 @@ pub fn create_completion_package(
 ) -> Result<Package, String> {
     let cv = cache::get(uri)?;
     let mut file = parse_string("", cv.contents.as_str());
+
+    // problem: when completion is inside a nested scope, the node that encapsulates
+    //  the nested scope is completely removed
+    // solutions:
+    //   1. capture filtered node and make a package out of it
+    //   2. soem nastly munging of the source code...
 
     file.body = file
         .body

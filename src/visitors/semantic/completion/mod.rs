@@ -37,6 +37,14 @@ impl<'a> Visitor<'a> for CompletableFinderVisitor {
                 return true;
             }
 
+            if let Node::FunctionExpr(_) = node.as_ref() {
+                println!("visitor func expr")
+            }
+
+            if let Node::FunctionParameter(_) = node.as_ref() {
+                println!("visitor func parameter")
+            }
+
             if let Node::VariableAssgn(assgn) = node.as_ref() {
                 let name = assgn.id.name.clone();
                 if let Some(var_type) = get_var_type(&assgn.init) {
@@ -201,7 +209,12 @@ fn get_var_type(expr: &Expression) -> Option<VarType> {
         Expression::Object(_) => Some(VarType::Object),
         Expression::Regexp(_) => Some(VarType::Regexp),
         Expression::Duration(_) => Some(VarType::Duration),
+        Expression::Function(_) => {
+            println!("i'm a func");
+            Some(VarType::Function)
+        }
         Expression::Call(c) => {
+            println!("enter call");
             let result_type = utils::follow_function_pipes(c);
 
             match result_type {
@@ -210,6 +223,10 @@ fn get_var_type(expr: &Expression) -> Option<VarType> {
                 MonoType::Bool => Some(VarType::Bool),
                 MonoType::Arr(_) => Some(VarType::Array),
                 MonoType::Duration => Some(VarType::Duration),
+                MonoType::Fun(_) => {
+                    println!("nested fun");
+                    Some(VarType::Function)
+                }
                 MonoType::Row(_) => Some(VarType::Row),
                 MonoType::String => Some(VarType::String),
                 MonoType::Uint => Some(VarType::Uint),
@@ -243,17 +260,18 @@ fn create_function_result(
 
 #[derive(Clone)]
 enum VarType {
-    Int,
-    String,
     Array,
-    Float,
     Bool,
     Duration,
+    Float,
+    Function,
+    Int,
     Object,
     Regexp,
     Row,
-    Uint,
+    String,
     Time,
+    Uint,
 }
 
 #[derive(Clone)]
@@ -269,6 +287,7 @@ impl VarResult {
             VarType::Bool => "Boolean".to_string(),
             VarType::Duration => "Duration".to_string(),
             VarType::Float => "Float".to_string(),
+            VarType::Function => "Function".to_string(),
             VarType::Int => "Integer".to_string(),
             VarType::Object => "Object".to_string(),
             VarType::Regexp => "Regular Expression".to_string(),

@@ -34,6 +34,12 @@ pub fn is_in_node(pos: Position, base: &flux::ast::BaseNode) -> bool {
         return false;
     }
 
+    println!(
+        "base line_start: {}  line_end: {}  char: {}",
+        start_line, end_line, start_col
+    );
+    println!("pos line: {}\tchar: {}", pos.line, pos.character);
+
     true
 }
 

@@ -120,7 +120,6 @@ fn get_user_completables(
     let mut visitor = CompletableFinderVisitor::new(pos);
 
     walk::walk(&mut visitor, walker);
-
     if let Ok(state) = visitor.state.lock() {
         return Ok((*state).completables.clone());
     }
