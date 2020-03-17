@@ -46,11 +46,11 @@ fn get_ident_name(
     position: Position,
 ) -> Result<Option<String>, String> {
     let source = cache::get(uri.clone())?;
-    let file = crate::utils::create_file_node_from_text(
+    let pkg = crate::utils::create_file_node_from_text(
         uri,
         source.contents,
     );
-    let walker = Rc::new(flux::ast::walk::Node::File(&file));
+    let walker = Rc::new(flux::ast::walk::Node::File(&pkg.files[0]));
     let visitor = ast::NodeFinderVisitor::new(Position {
         line: position.line,
         character: position.character - 1,

@@ -71,7 +71,7 @@ pub fn create_completion_package_removed(
     uri: String,
     pos: Position,
 ) -> Result<Package, String> {
-    let cv = cache::get(uri)?;
+    let cv = cache::get(uri.clone())?;
     let contents = remove_character(cv.contents, pos.clone());
     let mut file = parse_string("", contents.as_str());
 
@@ -81,14 +81,16 @@ pub fn create_completion_package_removed(
         .filter(|x| valid_node(x, pos.clone()))
         .collect();
 
-    let ast_pkg = flux::ast::Package {
-        base: file.base.clone(),
-        path: "".to_string(),
-        package: "main".to_string(),
-        files: vec![file],
-    };
+    let mut pkg = crate::shared::create_ast_package(uri.clone())?;
+    pkg.files = pkg
+        .files
+        .into_iter()
+        .map(
+            |curr| if curr.name == uri { file.clone() } else { curr },
+        )
+        .collect();
 
-    match analyze(ast_pkg) {
+    match analyze(pkg) {
         Ok(p) => Ok(p),
         Err(e) => Err(format!("{}", e)),
     }
@@ -98,21 +100,23 @@ pub fn create_completion_package(
     uri: String,
     pos: Position,
 ) -> Result<Package, String> {
-    let cv = cache::get(uri)?;
-    let mut file = parse_string("", cv.contents.as_str());
+    let mut ast_pkg = crate::shared::create_ast_package(uri.clone())?;
 
-    file.body = file
-        .body
+    ast_pkg.files = ast_pkg
+        .files
         .into_iter()
-        .filter(|x| valid_node(x, pos.clone()))
-        .collect();
+        .map(|mut file| {
+            if file.name == uri.clone() {
+                file.body = file
+                    .body
+                    .into_iter()
+                    .filter(|x| valid_node(x, pos.clone()))
+                    .collect();
+            }
 
-    let ast_pkg = flux::ast::Package {
-        base: file.base.clone(),
-        path: "".to_string(),
-        package: "main".to_string(),
-        files: vec![file],
-    };
+            file
+        })
+        .collect();
 
     match analyze(ast_pkg) {
         Ok(p) => Ok(p),

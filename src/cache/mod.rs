@@ -5,6 +5,27 @@ lazy_static! {
     static ref GLOBAL_CACHE: Cache = Cache::default();
 }
 
+fn get_dir(uri: String) -> String {
+    let mut parts = uri.split('/').collect::<Vec<&str>>();
+    parts.pop();
+    parts.join("/")
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    #[test]
+    fn test_get_dir() {
+        let uri = String::from("file:///users/test/mine.flux");
+        let dir = get_dir(uri);
+
+        assert_eq!(
+            dir, "file:///users/test",
+            "returns correct directory"
+        )
+    }
+}
+
 pub fn set(
     uri: String,
     version: u32,
@@ -17,8 +38,16 @@ pub fn get(uri: String) -> Result<CacheValue, String> {
     GLOBAL_CACHE.get(uri.as_str())
 }
 
+pub fn get_package(uri: String) -> Result<Vec<CacheValue>, String> {
+    GLOBAL_CACHE.get_package(uri)
+}
+
 pub fn remove(uri: String) -> Result<(), String> {
     GLOBAL_CACHE.remove(uri.as_str())
+}
+
+pub fn clear() -> Result<(), String> {
+    GLOBAL_CACHE.clear()
 }
 
 #[derive(Clone)]
@@ -47,6 +76,49 @@ impl Cache {
         store.remove(uri);
 
         Ok(())
+    }
+
+    #[allow(dead_code)]
+    fn clear(&self) -> Result<(), String> {
+        let keys = self.keys()?;
+
+        for key in keys {
+            self.remove(key.as_str())?;
+        }
+
+        Ok(())
+    }
+
+    fn keys(&self) -> Result<Vec<String>, String> {
+        let store = match self.store.lock() {
+            Ok(s) => s,
+            Err(_) => {
+                return Err(
+                    "failed to get cache store lock".to_string()
+                )
+            }
+        };
+
+        Ok(store.keys().map(|k| (*k).clone()).collect())
+    }
+
+    fn get_package(
+        &self,
+        uri: String,
+    ) -> Result<Vec<CacheValue>, String> {
+        let dir = get_dir(uri);
+        let keys = self.keys()?;
+
+        Ok(keys
+            .into_iter()
+            .filter(|x: &String| x.starts_with(dir.as_str()))
+            .fold(vec![], |mut acc, x| {
+                if let Ok(v) = self.get(x.as_str()) {
+                    acc.push(v);
+                }
+
+                acc
+            }))
     }
 
     fn set(

@@ -9,7 +9,6 @@ use crate::protocol::requests::{
     TextDocumentSaveParams,
 };
 use crate::utils;
-use crate::visitors::ast;
 
 pub mod callbacks;
 pub mod signatures;
@@ -94,11 +93,57 @@ pub fn apply_changes(
     original
 }
 
+pub fn create_ast_package(
+    uri: String,
+) -> Result<flux::ast::Package, String> {
+    let values = cache::get_package(uri.clone())?;
+
+    let pkgs = values
+        .into_iter()
+        .map(|v: cache::CacheValue| {
+            utils::create_file_node_from_text(
+                v.uri.clone(),
+                v.contents,
+            )
+        })
+        .collect::<Vec<flux::ast::Package>>();
+
+    let pkg = pkgs.into_iter().fold(
+        None,
+        |acc: Option<flux::ast::Package>, pkg| {
+            if let Some(mut p) = acc {
+                let mut files = pkg.files;
+                p.files.append(&mut files);
+                return Some(p);
+            }
+
+            Some(pkg)
+        },
+    );
+
+    if let Some(mut pkg) = pkg {
+        let mut files = pkg.files;
+        files.sort_by(|a, _b| {
+            if a.name == uri.clone() {
+                std::cmp::Ordering::Greater
+            } else {
+                std::cmp::Ordering::Less
+            }
+        });
+        pkg.files = files;
+
+        return Ok(pkg);
+    }
+
+    Err("Failed to create package".to_string())
+}
+
 pub fn create_diagnoistics(
     uri: String,
-    contents: String,
 ) -> Result<Notification<PublishDiagnosticsParams>, String> {
-    let errors = ast::check_source(uri.clone(), contents);
+    let package = create_ast_package(uri.clone())?;
+    let walker = flux::ast::walk::Node::Package(&package);
+    let errors = flux::ast::check::check(walker);
     let diagnostics = utils::map_errors_to_diagnostics(errors);
 
     match create_diagnostics_notification(uri, diagnostics) {
@@ -129,8 +174,8 @@ pub fn handle_open(data: String) -> Result<Option<String>, String> {
         let version = params.text_document.version;
         let text = params.text_document.text;
 
-        cache::set(uri.clone(), version, text.clone())?;
-        let msg = create_diagnoistics(uri, text)?;
+        cache::set(uri.clone(), version, text)?;
+        let msg = create_diagnoistics(uri)?;
 
         let json = msg.to_json()?;
 
@@ -150,9 +195,9 @@ pub fn handle_change(data: String) -> Result<Option<String>, String> {
         let cv = cache::get(uri.clone())?;
         let text = apply_changes(cv.contents, changes);
 
-        cache::set(uri.clone(), version, text.clone())?;
+        cache::set(uri.clone(), version, text)?;
 
-        let msg = create_diagnoistics(uri, text)?;
+        let msg = create_diagnoistics(uri)?;
         let json = msg.to_json()?;
 
         return Ok(Some(json));
@@ -165,8 +210,7 @@ pub fn handle_save(data: String) -> Result<Option<String>, String> {
     let request = parse_save_request(data)?;
     if let Some(params) = request.params {
         let uri = params.text_document.uri;
-        let cv = cache::get(uri.clone())?;
-        let msg = create_diagnoistics(uri, cv.contents)?;
+        let msg = create_diagnoistics(uri)?;
         let json = msg.to_json()?;
 
         return Ok(Some(json));
