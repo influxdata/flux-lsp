@@ -292,10 +292,7 @@ async fn triggered_completion(
         return find_arg_completions(params, ctx).await;
     }
 
-    Ok(CompletionList {
-        is_incomplete: false,
-        items: vec![],
-    })
+    find_completions(params, ctx).await
 }
 
 #[async_trait]
