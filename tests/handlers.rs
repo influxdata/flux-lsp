@@ -22,12 +22,33 @@ use url::Url;
 fn create_request_context() -> RequestContext {
     RequestContext {
         callbacks: Callbacks::default(),
+        support_multiple_files: true,
     }
 }
 
 speculate! {
     before {
         let mut handler = create_handler();
+    }
+
+    describe "multiple packages" {
+        before {
+            flux_lsp::cache::clear().unwrap();
+            let uri1 = flux_fixture_uri("incomplete_option");
+            let uri2 = flux_fixture_uri("options_function");
+            open_file(uri1.clone(), &mut handler);
+            open_file(uri2.clone(), &mut handler);
+        }
+
+        after {
+            close_file(uri1, &mut handler);
+            close_file(uri2, &mut handler);
+        }
+
+        it "returns packages in directory" {
+            let files = flux_lsp::cache::get_package(uri1.clone(), true).unwrap();
+            assert_eq!(files.len(), 2, "returns correct number of files");
+        }
     }
 
     describe "unknown request" {
@@ -101,6 +122,7 @@ speculate! {
     describe "Document open" {
         describe "when ok" {
             before {
+                flux_lsp::cache::clear().unwrap();
                 let uri = flux_fixture_uri("ok");
             }
 
@@ -148,6 +170,7 @@ speculate! {
 
         describe "when incomplete option" {
             before {
+                flux_lsp::cache::clear().unwrap();
                 let uri = flux_fixture_uri("incomplete_option");
             }
 
@@ -214,6 +237,7 @@ speculate! {
 
         describe "when there is an error" {
             before {
+                flux_lsp::cache::clear().unwrap();
                 let uri = flux_fixture_uri("error");
             }
 
@@ -282,6 +306,7 @@ speculate! {
     describe "Signature help request" {
         describe "when ok" {
             before {
+                flux_lsp::cache::clear().unwrap();
                 let uri = flux_fixture_uri("signatures");
                 open_file(uri.clone(), &mut handler);
             }
@@ -328,8 +353,64 @@ speculate! {
     }
 
     describe "Completion request" {
+        describe "when there are multiple files" {
+            before {
+                flux_lsp::cache::clear().unwrap();
+
+                let uri1 = flux_fixture_uri("multiple_1");
+                let uri2 = flux_fixture_uri("multiple_2");
+
+                open_file(uri1.clone(), &mut handler);
+                open_file(uri2.clone(), &mut handler);
+            }
+
+            after {
+                close_file(uri1, &mut handler);
+                close_file(uri2, &mut handler);
+            }
+
+            it "returns the correct response" {
+                let completion_request = Request {
+                    id: 1,
+                    method: "textDocument/completion".to_string(),
+                    params: Some(CompletionParams {
+                        context: Some(CompletionContext {
+                            trigger_kind: 2,
+                            trigger_character: Some(".".to_string()),
+                        }),
+                        position: Position {
+                            character: 2,
+                            line: 0,
+                        },
+                        text_document: TextDocumentIdentifier {
+                            uri: uri2.clone(),
+                        }
+                    }),
+                };
+
+                let completion_request_json =
+                    serde_json::to_string(&completion_request).unwrap();
+                let request = PolymorphicRequest {
+                    base_request: BaseRequest {
+                        id: 1,
+                        method: "textDocument/completion".to_string(),
+                    },
+                    data: completion_request_json,
+                };
+                let response = block_on(handler.handle(request, create_request_context())).unwrap();
+                let returned = from_str::<Response<CompletionList>>(response.unwrap().as_str()).unwrap();
+                let returned_items = returned.result.unwrap().items;
+
+                assert_eq!(
+                    returned_items.len(),
+                    2,
+                    "returns correct number of results"
+                );
+            }
+        }
         describe "when completion a package" {
             before {
+                flux_lsp::cache::clear().unwrap();
                 let uri = flux_fixture_uri("package_completion");
                 open_file(uri.clone(), &mut handler);
             }
@@ -380,6 +461,7 @@ speculate! {
 
         describe "when ok" {
             before {
+                flux_lsp::cache::clear().unwrap();
                 let uri = flux_fixture_uri("completion");
                 open_file(uri.clone(), &mut handler);
             }
@@ -454,6 +536,7 @@ speculate! {
 
         describe "when an option can be completed" {
             before {
+                flux_lsp::cache::clear().unwrap();
                 let uri = flux_fixture_uri("options");
                 open_file(uri.clone(), &mut handler);
             }

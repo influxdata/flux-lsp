@@ -29,8 +29,9 @@ use async_trait::async_trait;
 fn get_imports(
     uri: String,
     pos: Position,
+    ctx: RequestContext,
 ) -> Result<Vec<String>, String> {
-    let pkg = utils::create_completion_package(uri, pos)?;
+    let pkg = utils::create_completion_package(uri, pos, ctx)?;
     let walker = Rc::new(walk::Node::Package(&pkg));
     let mut visitor = ImportFinderVisitor::default();
 
@@ -46,11 +47,11 @@ fn get_ident_name(
     position: Position,
 ) -> Result<Option<String>, String> {
     let source = cache::get(uri.clone())?;
-    let file = crate::utils::create_file_node_from_text(
+    let pkg = crate::utils::create_file_node_from_text(
         uri,
         source.contents,
     );
-    let walker = Rc::new(flux::ast::walk::Node::File(&file));
+    let walker = Rc::new(flux::ast::walk::Node::File(&pkg.files[0]));
     let visitor = ast::NodeFinderVisitor::new(Position {
         line: position.line,
         character: position.character - 1,
@@ -114,8 +115,10 @@ async fn get_stdlib_completions(
 fn get_user_completables(
     uri: String,
     pos: Position,
+    ctx: RequestContext,
 ) -> Result<Vec<Arc<dyn Completable + Send + Sync>>, String> {
-    let pkg = utils::create_completion_package(uri, pos.clone())?;
+    let pkg =
+        utils::create_completion_package(uri, pos.clone(), ctx)?;
     let walker = Rc::new(walk::Node::Package(&pkg));
     let mut visitor = CompletableFinderVisitor::new(pos);
 
@@ -134,7 +137,7 @@ async fn get_user_matches(
     ctx: RequestContext,
 ) -> Result<Vec<CompletionItem>, String> {
     let completables =
-        get_user_completables(uri.clone(), pos.clone())?;
+        get_user_completables(uri.clone(), pos.clone(), ctx.clone())?;
 
     let mut result: Vec<CompletionItem> = vec![];
     for x in completables {
@@ -153,7 +156,7 @@ async fn find_completions(
     let name = get_ident_name(uri.clone(), params.position)?;
 
     let mut items: Vec<CompletionItem> = vec![];
-    let imports = get_imports(uri.clone(), pos.clone())?;
+    let imports = get_imports(uri.clone(), pos.clone(), ctx.clone())?;
 
     if let Some(name) = name {
         let mut stdlib_matches = get_stdlib_completions(
@@ -237,7 +240,7 @@ async fn find_dot_completions(
 
         let mut items = vec![];
         let obj_results =
-            get_specific_object(name, pos, uri.clone())?;
+            get_specific_object(name, pos, uri.clone(), ctx.clone())?;
 
         for completable in obj_results.into_iter() {
             items
@@ -264,8 +267,10 @@ pub fn get_specific_object(
     name: String,
     pos: Position,
     uri: String,
+    ctx: RequestContext,
 ) -> Result<Vec<Arc<dyn Completable + Send + Sync>>, String> {
-    let pkg = utils::create_completion_package_removed(uri, pos)?;
+    let pkg =
+        utils::create_completion_package_removed(uri, pos, ctx)?;
     let walker = Rc::new(walk::Node::Package(&pkg));
     let mut visitor = CompletableObjectFinderVisitor::new(name);
 

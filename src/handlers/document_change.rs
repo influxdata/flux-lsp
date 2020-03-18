@@ -12,8 +12,8 @@ impl RequestHandler for DocumentChangeHandler {
     async fn handle(
         &self,
         prequest: PolymorphicRequest,
-        _: crate::shared::RequestContext,
+        ctx: crate::shared::RequestContext,
     ) -> Result<Option<String>, String> {
-        shared::handle_change(prequest.data)
+        shared::handle_change(prequest.data, ctx)
     }
 }

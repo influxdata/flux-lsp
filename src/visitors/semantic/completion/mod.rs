@@ -7,6 +7,7 @@ use crate::protocol::responses::{
     CompletionItem, CompletionItemKind, InsertTextFormat,
 };
 use crate::shared::signatures::get_argument_names;
+use crate::shared::RequestContext;
 use crate::stdlib::{create_function_signature, Completable};
 use crate::visitors::semantic::utils;
 
@@ -192,15 +193,19 @@ impl<'a> Visitor<'a> for CompletableObjectFinderVisitor {
 }
 
 fn get_var_type(expr: &Expression) -> Option<VarType> {
+    match expr.type_of() {
+        MonoType::Duration => return Some(VarType::Duration),
+        MonoType::Int => return Some(VarType::Int),
+        MonoType::Bool => return Some(VarType::Bool),
+        MonoType::Float => return Some(VarType::Float),
+        MonoType::String => return Some(VarType::String),
+        MonoType::Arr(_) => return Some(VarType::Array),
+        MonoType::Regexp => return Some(VarType::Regexp),
+        _ => {}
+    }
+
     match expr {
-        Expression::Integer(_) => Some(VarType::Int),
-        Expression::Boolean(_) => Some(VarType::Bool),
-        Expression::Float(_) => Some(VarType::Float),
-        Expression::StringLit(_) => Some(VarType::String),
-        Expression::Array(_) => Some(VarType::Array),
         Expression::Object(_) => Some(VarType::Object),
-        Expression::Regexp(_) => Some(VarType::Regexp),
-        Expression::Duration(_) => Some(VarType::Duration),
         Expression::Call(c) => {
             let result_type = utils::follow_function_pipes(c);
 
@@ -284,7 +289,7 @@ impl VarResult {
 impl Completable for VarResult {
     async fn completion_item(
         &self,
-        _ctx: crate::shared::RequestContext,
+        _ctx: RequestContext,
     ) -> CompletionItem {
         CompletionItem {
             label: format!("{} ({})", self.name, "self".to_string()),
@@ -347,7 +352,7 @@ impl FunctionResult {
 impl Completable for FunctionResult {
     async fn completion_item(
         &self,
-        _ctx: crate::shared::RequestContext,
+        _ctx: RequestContext,
     ) -> CompletionItem {
         CompletionItem {
             label: format!("{} ({})", self.name, "self".to_string()),
