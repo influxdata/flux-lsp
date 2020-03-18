@@ -7,6 +7,7 @@ use crate::protocol::responses::{
     Response, SignatureHelp, SignatureInformation,
 };
 use crate::shared::signatures::FunctionSignature;
+use crate::shared::RequestContext;
 use crate::stdlib::get_stdlib_functions;
 use crate::visitors::semantic::functions::FunctionFinderVisitor;
 use crate::visitors::semantic::utils::{
@@ -53,8 +54,9 @@ fn find_user_defined_signatures(
     pos: Position,
     uri: String,
     name: String,
+    ctx: RequestContext,
 ) -> Result<Vec<SignatureInformation>, String> {
-    let pkg = create_completion_package(uri, pos.clone())?;
+    let pkg = create_completion_package(uri, pos.clone(), ctx)?;
     let mut visitor = FunctionFinderVisitor::new(pos);
 
     walk(&mut visitor, Rc::new(Node::Package(&pkg)));
@@ -78,6 +80,7 @@ fn find_user_defined_signatures(
 
 fn find_signatures(
     request: Request<SignatureHelpParams>,
+    ctx: RequestContext,
 ) -> Result<Vec<SignatureInformation>, String> {
     let mut result = vec![];
 
@@ -106,7 +109,7 @@ fn find_signatures(
                         "builtin".to_string(),
                     ));
                     result.extend(find_user_defined_signatures(
-                        pos, uri, ident.name,
+                        pos, uri, ident.name, ctx,
                     )?);
                 }
             }
@@ -121,13 +124,13 @@ impl RequestHandler for SignatureHelpHandler {
     async fn handle(
         &self,
         prequest: PolymorphicRequest,
-        _: crate::shared::RequestContext,
+        ctx: RequestContext,
     ) -> Result<Option<String>, String> {
         let req: Request<SignatureHelpParams> =
             Request::from_json(prequest.data.as_str())?;
 
         let sh = SignatureHelp {
-            signatures: find_signatures(req.clone())?,
+            signatures: find_signatures(req.clone(), ctx)?,
             active_signature: None,
             active_parameter: None,
         };

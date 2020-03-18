@@ -10,8 +10,8 @@ impl RequestHandler for DocumentOpenHandler {
     async fn handle(
         &self,
         prequest: PolymorphicRequest,
-        _: crate::shared::RequestContext,
+        ctx: crate::shared::RequestContext,
     ) -> Result<Option<String>, String> {
-        shared::handle_open(prequest.data)
+        shared::handle_open(prequest.data, ctx)
     }
 }

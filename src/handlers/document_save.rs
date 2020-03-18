@@ -10,12 +10,12 @@ impl RequestHandler for DocumentSaveHandler {
     async fn handle(
         &self,
         prequest: PolymorphicRequest,
-        _: crate::shared::RequestContext,
+        ctx: crate::shared::RequestContext,
     ) -> Result<Option<String>, String> {
         let request = shared::parse_save_request(prequest.data)?;
         if let Some(params) = request.params {
             let uri = params.text_document.uri;
-            let msg = shared::create_diagnoistics(uri)?;
+            let msg = shared::create_diagnoistics(uri, ctx)?;
             let json = msg.to_json()?;
 
             return Ok(Some(json));

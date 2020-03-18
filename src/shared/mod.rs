@@ -17,12 +17,19 @@ use combinations::Combinations;
 
 #[derive(Clone)]
 pub struct RequestContext {
+    pub support_multiple_files: bool,
     pub callbacks: callbacks::Callbacks,
 }
 
 impl RequestContext {
-    pub fn new(callbacks: callbacks::Callbacks) -> Self {
-        RequestContext { callbacks }
+    pub fn new(
+        callbacks: callbacks::Callbacks,
+        support_multiple_files: bool,
+    ) -> Self {
+        RequestContext {
+            callbacks,
+            support_multiple_files,
+        }
     }
 }
 
@@ -95,8 +102,10 @@ pub fn apply_changes(
 
 pub fn create_ast_package(
     uri: String,
+    ctx: RequestContext,
 ) -> Result<flux::ast::Package, String> {
-    let values = cache::get_package(uri.clone())?;
+    let values =
+        cache::get_package(uri.clone(), ctx.support_multiple_files)?;
 
     let pkgs = values
         .into_iter()
@@ -140,8 +149,9 @@ pub fn create_ast_package(
 
 pub fn create_diagnoistics(
     uri: String,
+    ctx: RequestContext,
 ) -> Result<Notification<PublishDiagnosticsParams>, String> {
-    let package = create_ast_package(uri.clone())?;
+    let package = create_ast_package(uri.clone(), ctx)?;
     let walker = flux::ast::walk::Node::Package(&package);
     let errors = flux::ast::check::check(walker);
     let diagnostics = utils::map_errors_to_diagnostics(errors);
@@ -166,7 +176,10 @@ pub fn handle_close(data: String) -> Result<Option<String>, String> {
     Err("invalid textDocument/didClose request".to_string())
 }
 
-pub fn handle_open(data: String) -> Result<Option<String>, String> {
+pub fn handle_open(
+    data: String,
+    ctx: RequestContext,
+) -> Result<Option<String>, String> {
     let request = parse_open_request(data)?;
 
     if let Some(params) = request.params {
@@ -175,7 +188,7 @@ pub fn handle_open(data: String) -> Result<Option<String>, String> {
         let text = params.text_document.text;
 
         cache::set(uri.clone(), version, text)?;
-        let msg = create_diagnoistics(uri)?;
+        let msg = create_diagnoistics(uri, ctx)?;
 
         let json = msg.to_json()?;
 
@@ -185,7 +198,10 @@ pub fn handle_open(data: String) -> Result<Option<String>, String> {
     Err("invalid textDocument/didOpen request".to_string())
 }
 
-pub fn handle_change(data: String) -> Result<Option<String>, String> {
+pub fn handle_change(
+    data: String,
+    ctx: RequestContext,
+) -> Result<Option<String>, String> {
     let request = parse_change_request(data)?;
     if let Some(params) = request.params {
         let uri = params.text_document.uri;
@@ -197,7 +213,7 @@ pub fn handle_change(data: String) -> Result<Option<String>, String> {
 
         cache::set(uri.clone(), version, text)?;
 
-        let msg = create_diagnoistics(uri)?;
+        let msg = create_diagnoistics(uri, ctx)?;
         let json = msg.to_json()?;
 
         return Ok(Some(json));
@@ -206,11 +222,14 @@ pub fn handle_change(data: String) -> Result<Option<String>, String> {
     Err("invalid textDocument/didChange request".to_string())
 }
 
-pub fn handle_save(data: String) -> Result<Option<String>, String> {
+pub fn handle_save(
+    data: String,
+    ctx: RequestContext,
+) -> Result<Option<String>, String> {
     let request = parse_save_request(data)?;
     if let Some(params) = request.params {
         let uri = params.text_document.uri;
-        let msg = create_diagnoistics(uri)?;
+        let msg = create_diagnoistics(uri, ctx)?;
         let json = msg.to_json()?;
 
         return Ok(Some(json));

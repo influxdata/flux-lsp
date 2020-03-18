@@ -1,5 +1,6 @@
 use crate::cache;
 use crate::protocol::properties::{Location, Position, Range};
+use crate::shared::RequestContext;
 use crate::utils::is_in_node;
 
 use std::convert::TryFrom;
@@ -70,6 +71,7 @@ fn remove_character(source: String, pos: Position) -> String {
 pub fn create_completion_package_removed(
     uri: String,
     pos: Position,
+    ctx: RequestContext,
 ) -> Result<Package, String> {
     let cv = cache::get(uri.clone())?;
     let contents = remove_character(cv.contents, pos.clone());
@@ -81,7 +83,8 @@ pub fn create_completion_package_removed(
         .filter(|x| valid_node(x, pos.clone()))
         .collect();
 
-    let mut pkg = crate::shared::create_ast_package(uri.clone())?;
+    let mut pkg =
+        crate::shared::create_ast_package(uri.clone(), ctx)?;
     pkg.files = pkg
         .files
         .into_iter()
@@ -99,8 +102,10 @@ pub fn create_completion_package_removed(
 pub fn create_completion_package(
     uri: String,
     pos: Position,
+    ctx: RequestContext,
 ) -> Result<Package, String> {
-    let mut ast_pkg = crate::shared::create_ast_package(uri.clone())?;
+    let mut ast_pkg =
+        crate::shared::create_ast_package(uri.clone(), ctx)?;
 
     ast_pkg.files = ast_pkg
         .files

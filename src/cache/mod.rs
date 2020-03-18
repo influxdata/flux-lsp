@@ -38,8 +38,11 @@ pub fn get(uri: String) -> Result<CacheValue, String> {
     GLOBAL_CACHE.get(uri.as_str())
 }
 
-pub fn get_package(uri: String) -> Result<Vec<CacheValue>, String> {
-    GLOBAL_CACHE.get_package(uri)
+pub fn get_package(
+    uri: String,
+    multiple_files: bool,
+) -> Result<Vec<CacheValue>, String> {
+    GLOBAL_CACHE.get_package(uri, multiple_files)
 }
 
 pub fn remove(uri: String) -> Result<(), String> {
@@ -105,7 +108,13 @@ impl Cache {
     fn get_package(
         &self,
         uri: String,
+        multiple_files: bool,
     ) -> Result<Vec<CacheValue>, String> {
+        if !multiple_files {
+            let result = self.get(uri.as_str())?;
+            return Ok(vec![result]);
+        }
+
         let dir = get_dir(uri);
         let keys = self.keys()?;
 

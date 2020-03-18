@@ -7,6 +7,7 @@ use crate::protocol::responses::{
     CompletionItem, CompletionItemKind, InsertTextFormat,
 };
 use crate::shared::signatures::get_argument_names;
+use crate::shared::RequestContext;
 use crate::stdlib::{create_function_signature, Completable};
 use crate::visitors::semantic::utils;
 
@@ -288,7 +289,7 @@ impl VarResult {
 impl Completable for VarResult {
     async fn completion_item(
         &self,
-        _ctx: crate::shared::RequestContext,
+        _ctx: RequestContext,
     ) -> CompletionItem {
         CompletionItem {
             label: format!("{} ({})", self.name, "self".to_string()),
@@ -351,7 +352,7 @@ impl FunctionResult {
 impl Completable for FunctionResult {
     async fn completion_item(
         &self,
-        _ctx: crate::shared::RequestContext,
+        _ctx: RequestContext,
     ) -> CompletionItem {
         CompletionItem {
             label: format!("{} ({})", self.name, "self".to_string()),
