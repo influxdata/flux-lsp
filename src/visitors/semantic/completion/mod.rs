@@ -125,15 +125,24 @@ impl<'a> Visitor<'a> for CompletableObjectFinderVisitor {
                 if let Some(ident) = &obj.with {
                     if name == ident.name {
                         for prop in obj.properties.clone() {
+                            let name = prop.key.name;
                             if let Some(var_type) =
                                 get_var_type(&prop.value)
                             {
                                 (*state).completables.push(Arc::new(
                                     VarResult {
                                         var_type,
-                                        name: prop.key.name,
+                                        name: name.clone(),
                                     },
                                 ));
+                            }
+                            if let Some(fun) = create_function_result(
+                                name,
+                                &prop.value,
+                            ) {
+                                (*state)
+                                    .completables
+                                    .push(Arc::new(fun));
                             }
                         }
                     }
@@ -144,15 +153,26 @@ impl<'a> Visitor<'a> for CompletableObjectFinderVisitor {
                 if assign.id.name == name {
                     if let Expression::Object(obj) = &assign.init {
                         for prop in obj.properties.clone() {
+                            let name = prop.key.name;
+
                             if let Some(var_type) =
                                 get_var_type(&prop.value)
                             {
                                 (*state).completables.push(Arc::new(
                                     VarResult {
                                         var_type,
-                                        name: prop.key.name,
+                                        name: name.clone(),
                                     },
                                 ));
+                            }
+
+                            if let Some(fun) = create_function_result(
+                                name,
+                                &prop.value,
+                            ) {
+                                (*state)
+                                    .completables
+                                    .push(Arc::new(fun));
                             }
                         }
 
@@ -169,18 +189,28 @@ impl<'a> Visitor<'a> for CompletableObjectFinderVisitor {
                     if assign.id.name == name {
                         if let Expression::Object(obj) = assign.init {
                             for prop in obj.properties.clone() {
+                                let name = prop.key.name;
                                 if let Some(var_type) =
                                     get_var_type(&prop.value)
                                 {
                                     (*state).completables.push(
                                         Arc::new(VarResult {
                                             var_type,
-                                            name: prop.key.name,
+                                            name: name.clone(),
                                         }),
                                     );
                                 }
+                                if let Some(fun) =
+                                    create_function_result(
+                                        name,
+                                        &prop.value,
+                                    )
+                                {
+                                    (*state)
+                                        .completables
+                                        .push(Arc::new(fun));
+                                }
                             }
-
                             return false;
                         }
                     }
