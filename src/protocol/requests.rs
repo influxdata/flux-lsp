@@ -162,7 +162,10 @@ pub enum SignatureHelpTriggerKind {
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct SignatureHelpContext {
+    #[serde(rename = "isRetrigger")]
     pub is_retrigger: bool,
+    #[serde(rename = "triggerCharacter")]
     pub trigger_character: Option<String>,
+    #[serde(rename = "triggerKind")]
     pub trigger_kind: SignatureHelpTriggerKind,
 }
