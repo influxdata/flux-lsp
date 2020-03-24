@@ -1,4 +1,3 @@
-use crate::cache;
 use crate::handlers::RequestHandler;
 use crate::protocol::requests::PolymorphicRequest;
 use crate::shared;
@@ -11,13 +10,12 @@ impl RequestHandler for DocumentSaveHandler {
     async fn handle(
         &self,
         prequest: PolymorphicRequest,
-        _: crate::shared::RequestContext,
+        ctx: crate::shared::RequestContext,
     ) -> Result<Option<String>, String> {
         let request = shared::parse_save_request(prequest.data)?;
         if let Some(params) = request.params {
             let uri = params.text_document.uri;
-            let cv = cache::get(uri.clone())?;
-            let msg = shared::create_diagnoistics(uri, cv.contents)?;
+            let msg = shared::create_diagnoistics(uri, ctx)?;
             let json = msg.to_json()?;
 
             return Ok(Some(json));

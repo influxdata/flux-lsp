@@ -75,8 +75,8 @@ pub fn map_errors_to_diagnostics(
 pub fn create_file_node_from_text(
     uri: String,
     text: String,
-) -> ast::File {
-    parse_string(uri.as_str(), text.as_str())
+) -> ast::Package {
+    parse_string(uri.as_str(), text.as_str()).into()
 }
 
 // TODO: figure out if all clients are zero based or if its

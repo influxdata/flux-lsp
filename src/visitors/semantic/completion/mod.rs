@@ -7,6 +7,7 @@ use crate::protocol::responses::{
     CompletionItem, CompletionItemKind, InsertTextFormat,
 };
 use crate::shared::signatures::get_argument_names;
+use crate::shared::RequestContext;
 use crate::stdlib::{create_function_signature, Completable};
 use crate::visitors::semantic::utils;
 
@@ -24,6 +25,65 @@ pub struct CompletableFinderVisitor {
     pub state: Arc<Mutex<CompletableFinderState>>,
 }
 
+impl<'a> Visitor<'a> for CompletableFinderVisitor {
+    fn visit(&mut self, node: Rc<Node<'a>>) -> bool {
+        if let Ok(mut state) = self.state.lock() {
+            let loc = node.loc();
+            let pos = self.pos.clone();
+
+            if loc.start.line > pos.line + 1
+                || (loc.start.line == pos.line + 1
+                    && loc.start.column > pos.character + 1)
+            {
+                return true;
+            }
+
+            if let Node::VariableAssgn(assgn) = node.as_ref() {
+                let name = assgn.id.name.clone();
+                if let Some(var_type) = get_var_type(&assgn.init) {
+                    (*state).completables.push(Arc::new(VarResult {
+                        var_type,
+                        name: name.clone(),
+                    }));
+                }
+
+                if let Some(fun) =
+                    create_function_result(name, &assgn.init)
+                {
+                    (*state).completables.push(Arc::new(fun));
+                }
+            }
+
+            if let Node::OptionStmt(opt) = node.as_ref() {
+                if let flux::semantic::nodes::Assignment::Variable(
+                    var_assign,
+                ) = &opt.assignment
+                {
+                    let name = var_assign.id.name.clone();
+                    if let Some(var_type) =
+                        get_var_type(&var_assign.init)
+                    {
+                        (*state).completables.push(Arc::new(
+                            VarResult { var_type, name },
+                        ));
+
+                        return false;
+                    }
+
+                    if let Some(fun) =
+                        create_function_result(name, &var_assign.init)
+                    {
+                        (*state).completables.push(Arc::new(fun));
+                        return false;
+                    }
+                }
+            }
+        }
+
+        true
+    }
+}
+
 impl CompletableFinderVisitor {
     pub fn new(pos: Position) -> Self {
         CompletableFinderVisitor {
@@ -35,15 +95,147 @@ impl CompletableFinderVisitor {
     }
 }
 
+#[derive(Default)]
+pub struct CompletableObjectFinderState {
+    pub completables: Vec<Arc<dyn Completable + Send + Sync>>,
+}
+
+pub struct CompletableObjectFinderVisitor {
+    pub name: String,
+    pub state: Arc<Mutex<CompletableObjectFinderState>>,
+}
+
+impl CompletableObjectFinderVisitor {
+    pub fn new(name: String) -> Self {
+        CompletableObjectFinderVisitor {
+            state: Arc::new(Mutex::new(
+                CompletableObjectFinderState::default(),
+            )),
+            name,
+        }
+    }
+}
+
+impl<'a> Visitor<'a> for CompletableObjectFinderVisitor {
+    fn visit(&mut self, node: Rc<Node<'a>>) -> bool {
+        if let Ok(mut state) = self.state.lock() {
+            let name = self.name.clone();
+
+            if let Node::ObjectExpr(obj) = node.as_ref() {
+                if let Some(ident) = &obj.with {
+                    if name == ident.name {
+                        for prop in obj.properties.clone() {
+                            let name = prop.key.name;
+                            if let Some(var_type) =
+                                get_var_type(&prop.value)
+                            {
+                                (*state).completables.push(Arc::new(
+                                    VarResult {
+                                        var_type,
+                                        name: name.clone(),
+                                    },
+                                ));
+                            }
+                            if let Some(fun) = create_function_result(
+                                name,
+                                &prop.value,
+                            ) {
+                                (*state)
+                                    .completables
+                                    .push(Arc::new(fun));
+                            }
+                        }
+                    }
+                }
+            }
+
+            if let Node::VariableAssgn(assign) = node.as_ref() {
+                if assign.id.name == name {
+                    if let Expression::Object(obj) = &assign.init {
+                        for prop in obj.properties.clone() {
+                            let name = prop.key.name;
+
+                            if let Some(var_type) =
+                                get_var_type(&prop.value)
+                            {
+                                (*state).completables.push(Arc::new(
+                                    VarResult {
+                                        var_type,
+                                        name: name.clone(),
+                                    },
+                                ));
+                            }
+
+                            if let Some(fun) = create_function_result(
+                                name,
+                                &prop.value,
+                            ) {
+                                (*state)
+                                    .completables
+                                    .push(Arc::new(fun));
+                            }
+                        }
+
+                        return false;
+                    }
+                }
+            }
+
+            if let Node::OptionStmt(opt) = node.as_ref() {
+                if let flux::semantic::nodes::Assignment::Variable(
+                    assign,
+                ) = opt.assignment.clone()
+                {
+                    if assign.id.name == name {
+                        if let Expression::Object(obj) = assign.init {
+                            for prop in obj.properties.clone() {
+                                let name = prop.key.name;
+                                if let Some(var_type) =
+                                    get_var_type(&prop.value)
+                                {
+                                    (*state).completables.push(
+                                        Arc::new(VarResult {
+                                            var_type,
+                                            name: name.clone(),
+                                        }),
+                                    );
+                                }
+                                if let Some(fun) =
+                                    create_function_result(
+                                        name,
+                                        &prop.value,
+                                    )
+                                {
+                                    (*state)
+                                        .completables
+                                        .push(Arc::new(fun));
+                                }
+                            }
+                            return false;
+                        }
+                    }
+                }
+            }
+        }
+
+        true
+    }
+}
+
 fn get_var_type(expr: &Expression) -> Option<VarType> {
+    match expr.type_of() {
+        MonoType::Duration => return Some(VarType::Duration),
+        MonoType::Int => return Some(VarType::Int),
+        MonoType::Bool => return Some(VarType::Bool),
+        MonoType::Float => return Some(VarType::Float),
+        MonoType::String => return Some(VarType::String),
+        MonoType::Arr(_) => return Some(VarType::Array),
+        MonoType::Regexp => return Some(VarType::Regexp),
+        _ => {}
+    }
+
     match expr {
-        Expression::Integer(_) => Some(VarType::Int),
-        Expression::Boolean(_) => Some(VarType::Bool),
-        Expression::Float(_) => Some(VarType::Float),
-        Expression::StringLit(_) => Some(VarType::String),
-        Expression::Array(_) => Some(VarType::Array),
-        Expression::Regexp(_) => Some(VarType::Regexp),
-        Expression::Duration(_) => Some(VarType::Duration),
+        Expression::Object(_) => Some(VarType::Object),
         Expression::Call(c) => {
             let result_type = utils::follow_function_pipes(c);
 
@@ -84,40 +276,6 @@ fn create_function_result(
     None
 }
 
-impl<'a> Visitor<'a> for CompletableFinderVisitor {
-    fn visit(&mut self, node: Rc<Node<'a>>) -> bool {
-        if let Ok(mut state) = self.state.lock() {
-            let loc = node.loc();
-            let pos = self.pos.clone();
-
-            if loc.start.line > pos.line + 1
-                || (loc.start.line == pos.line + 1
-                    && loc.start.column > pos.character + 1)
-            {
-                return true;
-            }
-
-            if let Node::VariableAssgn(assgn) = node.as_ref() {
-                let name = assgn.id.name.clone();
-                if let Some(var_type) = get_var_type(&assgn.init) {
-                    (*state).completables.push(Arc::new(VarResult {
-                        var_type,
-                        name: name.clone(),
-                    }));
-                }
-
-                if let Some(fun) =
-                    create_function_result(name, &assgn.init)
-                {
-                    (*state).completables.push(Arc::new(fun));
-                }
-            }
-        }
-
-        true
-    }
-}
-
 #[derive(Clone)]
 enum VarType {
     Int,
@@ -126,6 +284,7 @@ enum VarType {
     Float,
     Bool,
     Duration,
+    Object,
     Regexp,
     Row,
     Uint,
@@ -146,6 +305,7 @@ impl VarResult {
             VarType::Duration => "Duration".to_string(),
             VarType::Float => "Float".to_string(),
             VarType::Int => "Integer".to_string(),
+            VarType::Object => "Object".to_string(),
             VarType::Regexp => "Regular Expression".to_string(),
             VarType::String => "String".to_string(),
             VarType::Row => "Row".to_string(),
@@ -159,7 +319,7 @@ impl VarResult {
 impl Completable for VarResult {
     async fn completion_item(
         &self,
-        _ctx: crate::shared::RequestContext,
+        _ctx: RequestContext,
     ) -> CompletionItem {
         CompletionItem {
             label: format!("{} ({})", self.name, "self".to_string()),
@@ -222,7 +382,7 @@ impl FunctionResult {
 impl Completable for FunctionResult {
     async fn completion_item(
         &self,
-        _ctx: crate::shared::RequestContext,
+        _ctx: RequestContext,
     ) -> CompletionItem {
         CompletionItem {
             label: format!("{} ({})", self.name, "self".to_string()),

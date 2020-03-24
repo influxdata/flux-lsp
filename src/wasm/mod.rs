@@ -16,6 +16,7 @@ use wasm_bindgen_futures::future_to_promise;
 pub struct Server {
     handler: Rc<RefCell<Handler>>,
     callbacks: Callbacks,
+    support_multiple_files: bool,
 }
 
 #[wasm_bindgen]
@@ -36,21 +37,19 @@ impl ServerResponse {
     }
 }
 
-impl Default for Server {
-    fn default() -> Server {
-        Server::new(false)
-    }
-}
-
 #[wasm_bindgen]
 impl Server {
     #[wasm_bindgen(constructor)]
-    pub fn new(disable_folding: bool) -> Server {
+    pub fn new(
+        disable_folding: bool,
+        support_multiple_files: bool,
+    ) -> Server {
         Server {
             handler: Rc::new(RefCell::new(Handler::new(
                 disable_folding,
             ))),
             callbacks: Callbacks::default(),
+            support_multiple_files,
         }
     }
 
@@ -58,22 +57,10 @@ impl Server {
         self.callbacks.register_buckets_callback(f);
     }
 
-    pub fn get_buckets(&mut self) -> Promise {
-        let callbacks = self.callbacks.clone();
-
-        future_to_promise(async move {
-            let result = callbacks.get_buckets().await;
-
-            match result {
-                Ok(v) => Ok(JsValue::from(v.join(","))),
-                Err(e) => Err(JsValue::from(e)),
-            }
-        })
-    }
-
     pub fn process(&mut self, msg: String) -> Promise {
         let handler = self.handler.clone();
         let callbacks = self.callbacks.clone();
+        let support_multiple_files = self.support_multiple_files;
 
         future_to_promise(async move {
             let lines = msg.lines();
@@ -87,7 +74,10 @@ impl Server {
                 if let Ok(req) =
                     utils::create_polymorphic_request(content)
                 {
-                    let ctx = RequestContext::new(callbacks.clone());
+                    let ctx = RequestContext::new(
+                        callbacks.clone(),
+                        support_multiple_files,
+                    );
                     let mut h = handler.borrow_mut();
                     match (*h).handle(req, ctx).await {
                         Ok(response) => {

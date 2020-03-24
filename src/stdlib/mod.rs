@@ -152,18 +152,23 @@ impl Completable for PackageResult {
     }
 }
 
-#[derive(Clone)]
-pub struct FunctionResult {
-    pub name: String,
-    pub package: String,
-    pub package_name: Option<String>,
-    pub required_args: Vec<String>,
-    pub optional_args: Vec<String>,
-    pub signature: String,
-}
-
 fn default_arg_insert_text(arg: &str, index: usize) -> String {
     (format!("{}: ${}", arg, index + 1))
+}
+
+fn bucket_list_to_snippet(
+    buckets: Vec<String>,
+    index: usize,
+    arg: &str,
+) -> String {
+    let list = buckets
+        .iter()
+        .map(|x| format!("\"{}\"", x))
+        .collect::<Vec<String>>()
+        .join(",");
+    let text = format!("${{{}|{}|}}", index + 1, list);
+
+    return format!("{}: {}", arg, text);
 }
 
 async fn get_bucket_insert_text(
@@ -173,10 +178,7 @@ async fn get_bucket_insert_text(
 ) -> String {
     if let Ok(buckets) = ctx.callbacks.get_buckets().await {
         if !buckets.is_empty() {
-            let list = buckets.join(",");
-            let i = format!("${{{}|{}|}}", index + 1, list);
-
-            return format!("{}: ${}", arg, i);
+            bucket_list_to_snippet(buckets, index, arg)
         } else {
             default_arg_insert_text(arg, index)
         }
@@ -194,6 +196,16 @@ async fn arg_insert_text(
         "bucket" => get_bucket_insert_text(arg, index, ctx).await,
         _ => default_arg_insert_text(arg, index),
     }
+}
+
+#[derive(Clone)]
+pub struct FunctionResult {
+    pub name: String,
+    pub package: String,
+    pub package_name: Option<String>,
+    pub required_args: Vec<String>,
+    pub optional_args: Vec<String>,
+    pub signature: String,
 }
 
 impl FunctionResult {
@@ -516,12 +528,28 @@ pub fn add_package_result(
     }
 }
 
-fn get_imports(list: &mut Vec<Box<dyn Completable + Send + Sync>>) {
+pub fn get_packages(
+    list: &mut Vec<Box<dyn Completable + Send + Sync>>,
+) {
+    let env = imports().unwrap();
+
+    for (key, _val) in env.values {
+        add_package_result(key, list);
+    }
+}
+
+pub fn get_specific_package_functions(
+    list: &mut Vec<Box<dyn Completable + Send + Sync>>,
+    name: String,
+) {
     let env = imports().unwrap();
 
     for (key, val) in env.values {
-        add_package_result(key.clone(), list);
-        walk(key, list, val.expr);
+        if let Some(package_name) = get_package_name(key.clone()) {
+            if package_name == name {
+                walk(key, list, val.expr);
+            }
+        }
     }
 }
 
@@ -655,8 +683,28 @@ pub fn get_builtins(
 pub fn get_stdlib() -> Vec<Box<dyn Completable + Sync + Send>> {
     let mut list = vec![];
 
-    get_imports(&mut list);
+    get_packages(&mut list);
     get_builtins(&mut list);
 
     list
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    #[test]
+    fn test_bucket_list_insert_text() {
+        let names = vec![
+            "one".to_string(),
+            "two".to_string(),
+            "three".to_string(),
+        ];
+        let arg = "bucket";
+        let index = 1;
+
+        assert_eq!(
+            bucket_list_to_snippet(names, index, &arg),
+            "bucket: ${2|\"one\",\"two\",\"three\"|}"
+        );
+    }
 }
