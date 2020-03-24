@@ -89,18 +89,8 @@ import('@influxdata/flux-lsp-browser')
 
 ```
 
-You might also have to add this snippet to your webpack configuration's 'module.rules' array to enable wasm file parsing:
+Also ensure that the wasm file is not being parsed by any file loader plugins, as this will interfere with it's proper instantiation.
 
-```javascript
-rules: [
-    {
-        test: /\.wasm$/,
-        loader: 'file-loader',
-        type: 'javascript/auto'
-    },
-    // ... all the rest of your loaders
-]
-```
 
 # Supported LSP features
 
