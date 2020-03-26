@@ -14,6 +14,7 @@ pub mod utils;
 
 pub use completion::{
     CompletableFinderVisitor, CompletableObjectFinderVisitor,
+    FunctionFinderVisitor,
 };
 pub use symbols::SymbolsVisitor;
 

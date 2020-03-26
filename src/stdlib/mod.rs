@@ -2,7 +2,7 @@ use crate::protocol::responses::{
     CompletionItem, CompletionItemKind, InsertTextFormat,
 };
 use crate::shared::signatures::{get_argument_names, FunctionInfo};
-use crate::shared::RequestContext;
+use crate::shared::{Function, RequestContext};
 
 use flux::semantic::types::{MonoType, Row};
 use libstd::{imports, prelude};
@@ -598,6 +598,28 @@ pub fn get_stdlib_functions() -> Vec<FunctionInfo> {
     }
 
     results
+}
+
+pub fn get_builtin_functions() -> Vec<Function> {
+    let env = prelude().unwrap();
+
+    let mut list = vec![];
+
+    for (key, val) in env.values {
+        if let MonoType::Fun(f) = val.expr {
+            let mut params = get_argument_names(f.req);
+            for opt in get_argument_names(f.opt) {
+                params.push(opt);
+            }
+
+            list.push(Function {
+                name: key.clone(),
+                params,
+            })
+        }
+    }
+
+    list
 }
 
 pub fn get_builtins(

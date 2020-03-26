@@ -63,6 +63,44 @@ impl<'a> Visitor<'a> for DefinitionFinderVisitor<'a> {
     }
 }
 
+pub struct CallFinderState<'a> {
+    pub node: Option<Rc<walk::Node<'a>>>,
+}
+
+#[derive(Clone)]
+pub struct CallFinderVisitor<'a> {
+    pub state: Rc<RefCell<CallFinderState<'a>>>,
+    pub position: Position,
+}
+
+impl<'a> CallFinderVisitor<'a> {
+    pub fn new(position: Position) -> Self {
+        CallFinderVisitor {
+            state: Rc::new(RefCell::new(CallFinderState {
+                node: None,
+            })),
+            position,
+        }
+    }
+}
+
+impl<'a> Visitor<'a> for CallFinderVisitor<'a> {
+    fn visit(&self, node: Rc<walk::Node<'a>>) -> Option<Self> {
+        let mut state = self.state.borrow_mut();
+
+        let contains =
+            contains_position(node.clone(), self.position.clone());
+
+        if contains {
+            if let walk::Node::CallExpr(_) = node.as_ref() {
+                (*state).node = Some(node.clone())
+            }
+        }
+
+        Some(self.clone())
+    }
+}
+
 pub struct NodeFinderState<'a> {
     pub node: Option<Rc<walk::Node<'a>>>,
     pub position: Position,

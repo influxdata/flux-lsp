@@ -7,13 +7,90 @@ use crate::protocol::responses::{
     CompletionItem, CompletionItemKind, InsertTextFormat,
 };
 use crate::shared::signatures::get_argument_names;
-use crate::shared::RequestContext;
+use crate::shared::{Function, RequestContext};
 use crate::stdlib::{create_function_signature, Completable};
 use crate::visitors::semantic::utils;
 
 use flux::semantic::nodes::*;
 use flux::semantic::types::MonoType;
 use flux::semantic::walk::{Node, Visitor};
+
+pub struct FunctionFinderState {
+    pub functions: Vec<Function>,
+}
+
+pub struct FunctionFinderVisitor {
+    pub pos: Position,
+    pub state: Arc<Mutex<FunctionFinderState>>,
+}
+
+impl FunctionFinderVisitor {
+    pub fn new(pos: Position) -> Self {
+        FunctionFinderVisitor {
+            pos,
+            state: Arc::new(Mutex::new(FunctionFinderState {
+                functions: vec![],
+            })),
+        }
+    }
+}
+
+impl<'a> Visitor<'a> for FunctionFinderVisitor {
+    fn visit(&mut self, node: Rc<Node<'a>>) -> bool {
+        if let Ok(mut state) = self.state.lock() {
+            let loc = node.loc();
+            let pos = self.pos.clone();
+
+            if loc.start.line > pos.line + 1
+                || (loc.start.line == pos.line + 1
+                    && loc.start.column > pos.character + 1)
+            {
+                return true;
+            }
+
+            if let Node::VariableAssgn(assgn) = node.as_ref() {
+                let name = assgn.id.name.clone();
+
+                if let Expression::Function(f) = assgn.init.clone() {
+                    if let MonoType::Fun(fun) = f.typ.clone() {
+                        let mut params = get_argument_names(fun.req);
+                        for opt in get_argument_names(fun.opt) {
+                            params.push(opt);
+                        }
+
+                        state
+                            .functions
+                            .push(Function { name, params })
+                    }
+                }
+            } else if let Node::OptionStmt(opt) = node.as_ref() {
+                if let flux::semantic::nodes::Assignment::Variable(
+                    assgn,
+                ) = &opt.assignment
+                {
+                    let name = assgn.id.name.clone();
+                    if let Expression::Function(f) =
+                        assgn.init.clone()
+                    {
+                        if let MonoType::Fun(fun) = f.typ.clone() {
+                            let mut params =
+                                get_argument_names(fun.req);
+                            for opt in get_argument_names(fun.opt) {
+                                params.push(opt);
+                            }
+
+                            state
+                                .functions
+                                .push(Function { name, params })
+                        }
+                    }
+                }
+            }
+        }
+
+        true
+    }
+}
 
 #[derive(Default)]
 pub struct CompletableFinderState {

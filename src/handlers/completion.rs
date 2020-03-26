@@ -11,14 +11,15 @@ use crate::protocol::responses::{
     CompletionItem, CompletionItemKind, CompletionList,
     InsertTextFormat, Response,
 };
-use crate::shared::RequestContext;
+use crate::shared::{Function, RequestContext};
 use crate::stdlib::{
-    get_specific_package_functions, get_stdlib, Completable,
+    get_builtin_functions, get_specific_package_functions,
+    get_stdlib, Completable,
 };
 use crate::visitors::ast;
 use crate::visitors::semantic::{
     utils, CompletableFinderVisitor, CompletableObjectFinderVisitor,
-    ImportFinderVisitor,
+    FunctionFinderVisitor, ImportFinderVisitor,
 };
 
 use flux::ast::walk::walk_rc;
@@ -197,6 +198,145 @@ fn new_string_arg_completion(value: String) -> CompletionItem {
     }
 }
 
+fn new_param_completion(
+    name: String,
+    insert_text: String,
+) -> CompletionItem {
+    CompletionItem {
+        deprecated: false,
+        commit_characters: None,
+        detail: None,
+        label: name,
+        additional_text_edits: None,
+        filter_text: None,
+        insert_text: Some(insert_text),
+        documentation: None,
+        sort_text: None,
+        preselect: None,
+        insert_text_format: InsertTextFormat::Snippet,
+        text_edit: None,
+        kind: Some(CompletionItemKind::Field),
+    }
+}
+
+fn get_user_params(
+    uri: String,
+    pos: Position,
+    ctx: RequestContext,
+) -> Result<Vec<Function>, String> {
+    let pkg =
+        utils::create_completion_package(uri, pos.clone(), ctx)?;
+    let walker = Rc::new(walk::Node::Package(&pkg));
+    let mut visitor = FunctionFinderVisitor::new(pos);
+
+    walk::walk(&mut visitor, walker);
+
+    if let Ok(state) = visitor.state.lock() {
+        return Ok((*state).functions.clone());
+    }
+
+    Err("failed to get completables".to_string())
+}
+
+async fn find_param_completions(
+    trigger: String,
+    params: CompletionParams,
+    ctx: RequestContext,
+) -> Result<CompletionList, String> {
+    let uri = params.text_document.uri;
+    let position = params.position;
+
+    let source = cache::get(uri.clone())?;
+    let pkg = crate::utils::create_file_node_from_text(
+        uri.clone(),
+        source.contents,
+    );
+    let walker = Rc::new(flux::ast::walk::Node::File(&pkg.files[0]));
+    let visitor = ast::CallFinderVisitor::new(Position {
+        line: position.line,
+        character: position.character - 1,
+    });
+
+    walk_rc(&visitor, walker);
+
+    let state = visitor.state.borrow();
+    let node = (*state).node.clone();
+
+    if let Some(node) = node {
+        if let flux::ast::walk::Node::CallExpr(call) = node.as_ref() {
+            let mut provided = vec![];
+            if let Some(flux::ast::Expression::Object(obj)) =
+                call.arguments.first()
+            {
+                for prop in obj.properties.clone() {
+                    match prop.key {
+                        flux::ast::PropertyKey::Identifier(ident) => {
+                            provided.push(ident.name)
+                        }
+                        flux::ast::PropertyKey::StringLit(lit) => {
+                            provided.push(lit.value)
+                        }
+                    };
+                }
+            }
+
+            if let flux::ast::Expression::Identifier(ident) =
+                call.callee.clone()
+            {
+                let mut items: Vec<String> = vec![];
+                let builtins = get_builtin_functions();
+                for b in builtins {
+                    if b.name == ident.name {
+                        for param in b.params {
+                            if !provided.contains(&param) {
+                                items.push(param);
+                            }
+                        }
+                    }
+                }
+
+                if let Ok(user) = get_user_params(uri, position, ctx)
+                {
+                    for u in user {
+                        if u.name == ident.name {
+                            for param in u.params {
+                                if !provided.contains(&param) {
+                                    items.push(param);
+                                }
+                            }
+                        }
+                    }
+                }
+
+                return Ok(CompletionList {
+                    is_incomplete: false,
+                    items: items
+                        .into_iter()
+                        .map(|x| {
+                            if trigger == "(" {
+                                new_param_completion(
+                                    x.clone(),
+                                    format!("{}: ", x),
+                                )
+                            } else {
+                                new_param_completion(
+                                    x.clone(),
+                                    format!(" {}: ", x),
+                                )
+                            }
+                        })
+                        .collect(),
+                });
+            }
+        }
+    }
+
+    Ok(CompletionList {
+        is_incomplete: false,
+        items: vec![],
+    })
+}
+
 async fn find_arg_completions(
     params: CompletionParams,
     ctx: RequestContext,
@@ -295,6 +435,8 @@ async fn triggered_completion(
         return find_dot_completions(params, ctx).await;
     } else if trigger == ":" {
         return find_arg_completions(params, ctx).await;
+    } else if trigger == "(" || trigger == "," {
+        return find_param_completions(trigger, params, ctx).await;
     }
 
     find_completions(params, ctx).await
