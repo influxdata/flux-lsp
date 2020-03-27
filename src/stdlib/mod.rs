@@ -1,7 +1,10 @@
 use crate::protocol::responses::{
     CompletionItem, CompletionItemKind, InsertTextFormat,
 };
-use crate::shared::signatures::{get_argument_names, FunctionInfo};
+use crate::shared::{
+    get_bucket,
+    signatures::{get_argument_names, FunctionInfo},
+};
 use crate::shared::{Function, RequestContext};
 
 use flux::semantic::types::{MonoType, Row};
@@ -22,6 +25,7 @@ pub trait Completable {
     async fn completion_item(
         &self,
         ctx: RequestContext,
+        src: &str,
     ) -> CompletionItem;
     fn matches(&self, text: String, imports: Vec<String>) -> bool;
 }
@@ -70,6 +74,7 @@ impl Completable for VarResult {
     async fn completion_item(
         &self,
         _ctx: RequestContext,
+        _: &str,
     ) -> CompletionItem {
         CompletionItem {
             label: format!("{} ({})", self.name, self.package),
@@ -120,6 +125,7 @@ impl Completable for PackageResult {
     async fn completion_item(
         &self,
         _ctx: RequestContext,
+        _: &str,
     ) -> CompletionItem {
         CompletionItem {
             label: self.name.clone(),
@@ -153,17 +159,17 @@ impl Completable for PackageResult {
 }
 
 fn default_arg_insert_text(arg: &str, index: usize) -> String {
-    (format!("{}: ${}", arg, index + 1))
+    format!("{}: ${}", arg, index + 1)
 }
 
-fn bucket_list_to_snippet(
+fn list_to_snippet(
     buckets: Vec<String>,
     index: usize,
     arg: &str,
 ) -> String {
     let list = buckets
         .iter()
-        .map(|x| format!("\"{}\"", x))
+        .map(|x| format!("\"{}\"", x.trim_end()))
         .collect::<Vec<String>>()
         .join(",");
     let text = format!("${{{}|{}|}}", index + 1, list);
@@ -171,14 +177,33 @@ fn bucket_list_to_snippet(
     return format!("{}: {}", arg, text);
 }
 
+async fn get_measurement_insert_text(
+    arg: &str,
+    index: usize,
+    ctx: RequestContext,
+    src: &str,
+) -> String {
+    if let Ok(buckets) =
+        ctx.callbacks.get_measurement(get_bucket(src)).await
+    {
+        if !buckets.is_empty() {
+            list_to_snippet(buckets, index, arg)
+        } else {
+            default_arg_insert_text(arg, index)
+        }
+    } else {
+        default_arg_insert_text(arg, index)
+    }
+}
+
 async fn get_bucket_insert_text(
     arg: &str,
     index: usize,
     ctx: RequestContext,
 ) -> String {
-    if let Ok(buckets) = ctx.callbacks.get_buckets().await {
+    if let Ok(buckets) = ctx.callbacks.get_bucket().await {
         if !buckets.is_empty() {
-            bucket_list_to_snippet(buckets, index, arg)
+            list_to_snippet(buckets, index, arg)
         } else {
             default_arg_insert_text(arg, index)
         }
@@ -191,9 +216,13 @@ async fn arg_insert_text(
     arg: &str,
     index: usize,
     ctx: RequestContext,
+    src: &str,
 ) -> String {
     match arg {
         "bucket" => get_bucket_insert_text(arg, index, ctx).await,
+        "measurement" => {
+            get_measurement_insert_text(arg, index, ctx, src).await
+        }
         _ => default_arg_insert_text(arg, index),
     }
 }
@@ -209,13 +238,18 @@ pub struct FunctionResult {
 }
 
 impl FunctionResult {
-    async fn insert_text(&self, ctx: RequestContext) -> String {
+    async fn insert_text(
+        &self,
+        ctx: RequestContext,
+        src: &str,
+    ) -> String {
         let mut insert_text = format!("{}(", self.name);
 
         for (index, arg) in self.required_args.iter().enumerate() {
-            insert_text += arg_insert_text(arg, index, ctx.clone())
-                .await
-                .as_str();
+            insert_text +=
+                arg_insert_text(arg, index, ctx.clone(), src)
+                    .await
+                    .as_str();
 
             if index != self.required_args.len() - 1 {
                 insert_text += ", ";
@@ -243,6 +277,7 @@ impl Completable for FunctionResult {
     async fn completion_item(
         &self,
         ctx: RequestContext,
+        src: &str,
     ) -> CompletionItem {
         CompletionItem {
             label: self.name.clone(),
@@ -254,7 +289,7 @@ impl Completable for FunctionResult {
                 self.package.clone(),
             )),
             filter_text: Some(self.name.clone()),
-            insert_text: Some(self.insert_text(ctx).await),
+            insert_text: Some(self.insert_text(ctx, src).await),
             insert_text_format: InsertTextFormat::Snippet,
             kind: Some(CompletionItemKind::Function),
             preselect: None,
@@ -763,14 +798,14 @@ mod test {
     fn test_bucket_list_insert_text() {
         let names = vec![
             "one".to_string(),
-            "two".to_string(),
+            "two\n".to_string(),
             "three".to_string(),
         ];
         let arg = "bucket";
         let index = 1;
 
         assert_eq!(
-            bucket_list_to_snippet(names, index, &arg),
+            list_to_snippet(names, index, &arg),
             "bucket: ${2|\"one\",\"two\",\"three\"|}"
         );
     }

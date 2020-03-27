@@ -11,7 +11,9 @@ use crate::protocol::responses::{
     CompletionItem, CompletionItemKind, CompletionList,
     InsertTextFormat, Response,
 };
-use crate::shared::{Function, RequestContext};
+use crate::shared::{
+    find_ident_from_closest, get_bucket, Function, RequestContext,
+};
 use crate::stdlib::{
     get_builtin_functions, get_package_functions,
     get_specific_package_functions, get_stdlib, Completable,
@@ -46,66 +48,18 @@ fn get_imports(
     Ok((*state).imports.clone())
 }
 
-fn get_ident_name(
-    uri: String,
-    position: Position,
-) -> Result<Option<String>, String> {
-    let source = cache::get(uri.clone())?;
-    let pkg = crate::utils::create_file_node_from_text(
-        uri,
-        source.contents,
-    );
-    let walker = Rc::new(AstNode::File(&pkg.files[0]));
-    let visitor = ast::NodeFinderVisitor::new(Position {
-        line: position.line,
-        character: position.character - 1,
-    });
-
-    walk_rc(&visitor, walker);
-
-    let state = visitor.state.borrow();
-    let node = (*state).node.clone();
-
-    if let Some(node) = node {
-        match node.as_ref() {
-            AstNode::Identifier(ident) => {
-                let name = ident.name.clone();
-                return Ok(Some(name));
-            }
-            AstNode::BadExpr(expr) => {
-                let name = expr.text.clone();
-                return Ok(Some(name));
-            }
-            AstNode::MemberExpr(mbr) => {
-                if let Expression::Identifier(ident) = &mbr.object {
-                    return Ok(Some(ident.name.clone()));
-                }
-            }
-            AstNode::CallExpr(c) => {
-                if let Some(arg) = c.arguments.last() {
-                    if let Expression::Identifier(ident) = arg {
-                        return Ok(Some(ident.name.clone()));
-                    }
-                }
-            }
-            _ => {}
-        }
-    }
-
-    Ok(None)
-}
-
 async fn get_stdlib_completions(
     name: String,
     imports: Vec<String>,
     ctx: RequestContext,
+    src: &str,
 ) -> Vec<CompletionItem> {
     let mut matches = vec![];
     let completes = get_stdlib();
 
     for c in completes.into_iter() {
         if c.matches(name.clone(), imports.clone()) {
-            matches.push(c.completion_item(ctx.clone()).await);
+            matches.push(c.completion_item(ctx.clone(), src).await);
         }
     }
 
@@ -135,13 +89,14 @@ async fn get_user_matches(
     uri: String,
     pos: Position,
     ctx: RequestContext,
+    src: &str,
 ) -> Result<Vec<CompletionItem>, String> {
     let completables =
         get_user_completables(uri.clone(), pos.clone(), ctx.clone())?;
 
     let mut result: Vec<CompletionItem> = vec![];
     for x in completables {
-        result.push(x.completion_item(ctx.clone()).await)
+        result.push(x.completion_item(ctx.clone(), src).await)
     }
 
     Ok(result)
@@ -153,25 +108,26 @@ async fn find_completions(
 ) -> Result<CompletionList, String> {
     let uri = params.text_document.uri;
     let pos = params.position.clone();
-    let name = get_ident_name(uri.clone(), params.position)?;
+    let cv = cache::get(uri.clone())?;
+    let name =
+        find_ident_from_closest(&cv.contents, &params.position);
 
     let mut items: Vec<CompletionItem> = vec![];
     let imports = get_imports(uri.clone(), pos.clone(), ctx.clone())?;
 
-    if let Some(name) = name {
-        let mut stdlib_matches = get_stdlib_completions(
-            name.clone(),
-            imports.clone(),
-            ctx.clone(),
-        )
-        .await;
-        items.append(&mut stdlib_matches);
+    let mut stdlib_matches = get_stdlib_completions(
+        name.clone(),
+        imports.clone(),
+        ctx.clone(),
+        &cv.contents,
+    )
+    .await;
+    items.append(&mut stdlib_matches);
 
-        let mut user_matches =
-            get_user_matches(uri, pos, ctx).await?;
+    let mut user_matches =
+        get_user_matches(uri, pos, ctx, &cv.contents).await?;
 
-        items.append(&mut user_matches);
-    }
+    items.append(&mut user_matches);
 
     Ok(CompletionList {
         is_incomplete: false,
@@ -179,29 +135,37 @@ async fn find_completions(
     })
 }
 
-fn new_string_arg_completion(value: String) -> CompletionItem {
-    CompletionItem {
-        deprecated: false,
-        commit_characters: None,
-        detail: None,
-        label: format!("\"{}\"", value),
-        additional_text_edits: None,
-        filter_text: None,
-        insert_text: None,
-        documentation: None,
-        sort_text: None,
-        preselect: None,
-        insert_text_format: InsertTextFormat::PlainText,
-        text_edit: None,
-        kind: Some(CompletionItemKind::Text),
+fn vec_to_completion_list(v: &[String]) -> CompletionList {
+    let items: Vec<CompletionItem> = v
+        .iter()
+        .map(|value| CompletionItem {
+            deprecated: false,
+            commit_characters: None,
+            detail: None,
+            label: format!("\"{}\"", value.trim_end()),
+            additional_text_edits: None,
+            filter_text: None,
+            insert_text: None,
+            documentation: None,
+            sort_text: None,
+            preselect: None,
+            insert_text_format: InsertTextFormat::PlainText,
+            text_edit: None,
+            kind: Some(CompletionItemKind::Text),
+        })
+        .collect();
+
+    CompletionList {
+        is_incomplete: false,
+        items,
     }
 }
 
 fn new_param_completion(
     name: String,
-    trigger: String,
+    trigger: char,
 ) -> CompletionItem {
-    let insert_text = if trigger == "(" {
+    let insert_text = if trigger == '(' {
         format!("{}: ", name)
     } else {
         format!(" {}: ", name)
@@ -305,7 +269,7 @@ fn get_function_params(
 }
 
 async fn find_param_completions(
-    trigger: String,
+    trigger: char,
     params: CompletionParams,
     ctx: RequestContext,
 ) -> Result<CompletionList, String> {
@@ -394,22 +358,18 @@ async fn find_arg_completions(
     ctx: RequestContext,
 ) -> Result<CompletionList, String> {
     let uri = params.text_document.uri;
-    let name = get_ident_name(uri, params.position)?;
-
-    if let Some(name) = name {
-        if name == "bucket" {
-            let buckets = ctx.callbacks.get_buckets().await?;
-
-            let items: Vec<CompletionItem> = buckets
-                .into_iter()
-                .map(new_string_arg_completion)
-                .collect();
-
-            return Ok(CompletionList {
-                is_incomplete: false,
-                items,
-            });
-        }
+    let cv = cache::get(uri)?;
+    let name =
+        &find_ident_from_closest(&cv.contents, &params.position);
+    if name == "bucket" {
+        let buckets = ctx.callbacks.get_bucket().await?;
+        return Ok(vec_to_completion_list(&buckets));
+    } else if name == "measurement" || name == "_measurement" {
+        let measurements = ctx
+            .callbacks
+            .get_measurement(get_bucket(&cv.contents))
+            .await?;
+        return Ok(vec_to_completion_list(&measurements));
     }
 
     Ok(CompletionList {
@@ -424,35 +384,34 @@ async fn find_dot_completions(
 ) -> Result<CompletionList, String> {
     let uri = params.text_document.uri;
     let pos = params.position;
-    let name = get_ident_name(uri.clone(), pos.clone())?;
+    let cv = cache::get(uri.clone())?;
+    let name = find_ident_from_closest(&cv.contents, &pos);
 
-    if let Some(name) = name {
-        let mut list = vec![];
-        get_specific_package_functions(&mut list, name.clone());
+    let mut list = vec![];
+    get_specific_package_functions(&mut list, name.clone());
 
-        let mut items = vec![];
-        let obj_results =
-            get_specific_object(name, pos, uri.clone(), ctx.clone())?;
+    let mut items = vec![];
+    let obj_results =
+        get_specific_object(name, pos, uri.clone(), ctx.clone())?;
 
-        for completable in obj_results.into_iter() {
-            items
-                .push(completable.completion_item(ctx.clone()).await);
-        }
-
-        for item in list.into_iter() {
-            items.push(item.completion_item(ctx.clone()).await);
-        }
-
-        return Ok(CompletionList {
-            is_incomplete: false,
-            items,
-        });
+    for completable in obj_results.into_iter() {
+        items.push(
+            completable
+                .completion_item(ctx.clone(), &cv.contents)
+                .await,
+        );
     }
 
-    Ok(CompletionList {
+    for item in list.into_iter() {
+        items.push(
+            item.completion_item(ctx.clone(), &cv.contents).await,
+        );
+    }
+
+    return Ok(CompletionList {
         is_incomplete: false,
-        items: vec![],
-    })
+        items,
+    });
 }
 
 pub fn get_specific_object(
@@ -479,15 +438,15 @@ pub fn get_specific_object(
 pub struct CompletionHandler {}
 
 async fn triggered_completion(
-    trigger: String,
+    trigger: char,
     params: CompletionParams,
     ctx: RequestContext,
 ) -> Result<CompletionList, String> {
-    if trigger == "." {
+    if trigger == '.' {
         return find_dot_completions(params, ctx).await;
-    } else if trigger == ":" {
+    } else if (vec![':', '=', '<', '>']).contains(&trigger) {
         return find_arg_completions(params, ctx).await;
-    } else if trigger == "(" || trigger == "," {
+    } else if trigger == '(' || trigger == ',' {
         return find_param_completions(trigger, params, ctx).await;
     }
 

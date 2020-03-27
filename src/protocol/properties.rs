@@ -231,10 +231,13 @@ impl Default for CompletionOptions {
         CompletionOptions {
             resolve_provider: Some(true),
             trigger_characters: Some(vec![
-                ".".to_string(),
-                ":".to_string(),
-                "(".to_string(),
-                ",".to_string(),
+                ".".to_owned(),
+                ":".to_owned(),
+                "(".to_owned(),
+                ",".to_owned(),
+                ">".to_owned(),
+                "<".to_owned(),
+                "=".to_owned(),
             ]),
         }
     }

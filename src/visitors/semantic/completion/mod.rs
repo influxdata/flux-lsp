@@ -501,6 +501,7 @@ impl Completable for VarResult {
     async fn completion_item(
         &self,
         _ctx: RequestContext,
+        _: &str,
     ) -> CompletionItem {
         CompletionItem {
             label: format!("{} ({})", self.name, "self".to_string()),
@@ -564,6 +565,7 @@ impl Completable for FunctionResult {
     async fn completion_item(
         &self,
         _ctx: RequestContext,
+        _: &str,
     ) -> CompletionItem {
         CompletionItem {
             label: format!("{} ({})", self.name, "self".to_string()),

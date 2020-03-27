@@ -57,6 +57,10 @@ impl Server {
         self.callbacks.register_buckets_callback(f);
     }
 
+    pub fn register_measurements_callback(&mut self, f: Function) {
+        self.callbacks.register_measurements_callback(f)
+    }
+
     pub fn process(&mut self, msg: String) -> Promise {
         let handler = self.handler.clone();
         let callbacks = self.callbacks.clone();

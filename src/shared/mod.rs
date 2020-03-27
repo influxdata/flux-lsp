@@ -4,11 +4,18 @@ use crate::protocol::notifications::{
     PublishDiagnosticsParams,
 };
 use crate::protocol::properties::ContentChange;
+use crate::protocol::properties::Position;
 use crate::protocol::requests::{
     Request, TextDocumentChangeParams, TextDocumentParams,
     TextDocumentSaveParams,
 };
 use crate::utils;
+use crate::visitors::ast::contains_line_ref;
+use flux::ast::{
+    walk::{create_visitor, walk, Node},
+    CallExpr, Expression, PropertyKey,
+};
+use flux::parser::Parser;
 
 pub mod callbacks;
 pub mod signatures;
@@ -243,3 +250,97 @@ pub fn handle_save(
 
     Err("invalid textDocument/didSave request".to_string())
 }
+
+pub fn find_ident_from_closest(src: &str, pos: &Position) -> String {
+    let file = Parser::new(src).parse_file("".to_string());
+    let mut result: String = "".to_owned();
+    let mut min: Option<u32> = None;
+    walk(
+        &create_visitor(&mut |n| {
+            if !contains_line_ref(n.as_ref(), &pos) {
+                return; //skip
+            }
+            match n.as_ref() {
+                Node::Identifier(ident) => {
+                    if pos.character
+                        < ident.base.location.end.column - 1
+                        || ident.name.is_empty()
+                    {
+                        return; // pos is before the ident or empty ident
+                    }
+                    let distance = pos.character + 1
+                        - ident.base.location.end.column;
+                    match min {
+                        Some(mm) => {
+                            if mm > distance {
+                                min = Some(distance);
+                                result = ident.name.clone();
+                            }
+                        }
+                        None => {
+                            min = Some(distance);
+                            result = ident.name.clone();
+                        }
+                    }
+                }
+                &_ => {}
+            }
+        }),
+        Node::File(&file),
+    );
+
+    result
+}
+
+pub fn get_bucket(src: &str) -> String {
+    let file = Parser::new(src).parse_file("".to_string());
+    let mut result: Option<String> = None;
+    walk(
+        &create_visitor(&mut |n| {
+            if result.is_some() {
+                return;
+            }
+
+            match n.as_ref() {
+                Node::CallExpr(exp) => {
+                    result = Some(
+                        get_bucket_from_call_expr(exp).to_owned(),
+                    );
+                }
+                &_ => {}
+            }
+        }),
+        Node::File(&file),
+    );
+    result.unwrap_or_default()
+}
+
+fn get_bucket_from_call_expr<'a>(exp: &&'a CallExpr) -> &'a str {
+    // from(bucket:"bucket_name")
+    // v1.measurementTagKeys(bucket:"buck3", measurement:)
+    if exp.arguments.is_empty() {
+        return "";
+    }
+    let args = exp.arguments.get(0);
+    if args.is_none() {
+        return "";
+    }
+    let good_args = Node::from_expr(args.unwrap());
+    if let Node::ObjectExpr(ob) = good_args {
+        for prop in &ob.properties {
+            if let PropertyKey::Identifier(k) = &prop.key {
+                if k.name == "bucket" {
+                    if let Some(pv) = &prop.value {
+                        if let Expression::StringLit(pp) = pv {
+                            return &pp.value;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    ""
+}
+
+#[cfg(test)]
+pub mod tests;

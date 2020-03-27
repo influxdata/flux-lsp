@@ -5,6 +5,22 @@ use std::rc::Rc;
 
 use flux::ast::walk::{self, Visitor};
 
+pub fn contains_line_ref(
+    node: &walk::Node<'_>,
+    pos: &Position,
+) -> bool {
+    let start_line = node.base().location.start.line - 1;
+    let end_line = node.base().location.end.line - 1;
+    if pos.line < start_line {
+        return false;
+    }
+
+    if pos.line > end_line {
+        return false;
+    }
+    true
+}
+
 // TODO: figure out if this offset is common among lsp clients
 fn contains_position(
     node: Rc<walk::Node<'_>>,
@@ -110,18 +126,6 @@ pub struct NodeFinderState<'a> {
 #[derive(Clone)]
 pub struct NodeFinderVisitor<'a> {
     pub state: Rc<RefCell<NodeFinderState<'a>>>,
-}
-
-impl<'a> NodeFinderVisitor<'a> {
-    pub fn new(position: Position) -> Self {
-        NodeFinderVisitor {
-            state: Rc::new(RefCell::new(NodeFinderState {
-                node: None,
-                position,
-                path: vec![],
-            })),
-        }
-    }
 }
 
 impl<'a> Visitor<'a> for NodeFinderVisitor<'a> {

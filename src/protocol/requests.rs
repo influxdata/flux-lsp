@@ -141,7 +141,7 @@ pub struct CompletionContext {
     #[serde(rename = "triggerKind")]
     pub trigger_kind: i32,
     #[serde(rename = "triggerCharacter")]
-    pub trigger_character: Option<String>,
+    pub trigger_character: Option<char>,
 }
 
 #[derive(Serialize, Deserialize, Clone)]

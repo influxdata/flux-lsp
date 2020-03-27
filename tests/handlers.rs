@@ -373,7 +373,7 @@ speculate! {
                     params: Some(CompletionParams {
                         context: Some(CompletionContext {
                             trigger_kind: 2,
-                            trigger_character: Some("(".to_string()),
+                            trigger_character: Some('('),
                         }),
                         position: Position {
                             character: 8,
@@ -437,7 +437,7 @@ speculate! {
                     params: Some(CompletionParams {
                         context: Some(CompletionContext {
                             trigger_kind: 2,
-                            trigger_character: Some("(".to_string()),
+                            trigger_character: Some('('),
                         }),
                         position: Position {
                             character: 8,
@@ -504,7 +504,7 @@ speculate! {
                     params: Some(CompletionParams {
                         context: Some(CompletionContext {
                             trigger_kind: 2,
-                            trigger_character: Some(".".to_string()),
+                            trigger_character: Some('.'),
                         }),
                         position: Position {
                             character: 2,
@@ -554,7 +554,7 @@ speculate! {
                     params: Some(CompletionParams {
                         context: Some(CompletionContext {
                             trigger_kind: 2,
-                            trigger_character: Some(".".to_string()),
+                            trigger_character: Some('.'),
                         }),
                         position: Position {
                             character: 4,
@@ -628,14 +628,14 @@ speculate! {
                     block_on(PackageResult {
                         full_name: "csv".to_string(),
                         name: "csv".to_string(),
-                    }.completion_item(create_request_context()))
+                    }.completion_item(create_request_context(), ""))
                 ];
 
                 let mut builtins = vec![];
                 get_builtins(&mut builtins);
 
                 for b in builtins {
-                    let item = block_on(b.completion_item(create_request_context()));
+                    let item = block_on(b.completion_item(create_request_context(), ""));
                     items.push(item);
                 }
 
@@ -734,7 +734,7 @@ speculate! {
                     params: Some(CompletionParams {
                         context: Some(CompletionContext{
                             trigger_kind: 0,
-                            trigger_character: Some(".".to_string()),
+                            trigger_character: Some('.'),
                         }),
                         position: Position {
                             character: 5,

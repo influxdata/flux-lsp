@@ -96,14 +96,27 @@ impl Callback {
             Err(_e) => Err("Callback failed".to_string()),
         }
     }
+
+    pub fn call1(&self, ss: String) -> Result<Promise, String> {
+        match self.f.call1(&JsValue::NULL, &JsValue::from_str(&ss)) {
+            Ok(result) => Ok(Promise::from(result)),
+            Err(_e) => Err("Callback failed".to_string()),
+        }
+    }
 }
 
 unsafe impl<'a> Send for Callback {}
 unsafe impl<'a> Sync for Callback {}
 
+enum CallbackType {
+    Buckets,
+    Measurements { bucket: String },
+}
+
 #[derive(Default, Clone)]
 pub struct Callbacks {
     pub buckets: Option<Callback>,
+    pub measurements: Option<Callback>,
 }
 
 impl Callbacks {
@@ -111,16 +124,49 @@ impl Callbacks {
         self.buckets = Some(Callback::new(f));
     }
 
-    fn call_buckets(&self) -> Result<JsFuture, String> {
-        if let Some(cb) = self.buckets.clone() {
-            let promise = cb.call0()?;
-            Ok(JsFuture::from(promise))
-        } else {
-            Err("No buckets function set".to_string())
-        }
+    pub fn register_measurements_callback(&mut self, f: Function) {
+        self.measurements = Some(Callback::new(f));
     }
 
-    pub async fn get_buckets(&self) -> Result<Vec<String>, String> {
+    pub async fn get_bucket(&self) -> Result<Vec<String>, String> {
+        self.get(CallbackType::Buckets).await
+    }
+
+    pub async fn get_measurement(
+        &self,
+        bucket: String,
+    ) -> Result<Vec<String>, String> {
+        self.get(CallbackType::Measurements { bucket: bucket })
+            .await
+    }
+
+    fn call_js(&self, typ: CallbackType) -> Result<JsFuture, String> {
+        let promise: Promise;
+        match typ {
+            CallbackType::Buckets => {
+                if let Some(cb) = &self.buckets {
+                    promise = cb.call0()?
+                } else {
+                    return Err("No buckets function set".to_string());
+                }
+            }
+            CallbackType::Measurements { bucket: b } => {
+                if let Some(cb) = &self.measurements {
+                    promise = cb.call1(b)?
+                } else {
+                    return Err(
+                        "No measurements function set".to_string()
+                    );
+                }
+            }
+        }
+        Ok(JsFuture::from(promise))
+    }
+
+    async fn get(
+        &self,
+        typ: CallbackType,
+    ) -> Result<Vec<String>, String> {
         let mut finished = Resolvable::default();
 
         let mut cloned = finished.clone();
@@ -128,7 +174,7 @@ impl Callbacks {
         let cln = self.clone();
 
         spawn_local(async move {
-            let future = cln.call_buckets().unwrap();
+            let future = cln.call_js(typ).unwrap();
             if let Ok(returned) = future.await {
                 if let Ok(v) = returned.into_serde() {
                     cloned.resolve(v);
