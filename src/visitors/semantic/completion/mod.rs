@@ -11,9 +11,21 @@ use crate::shared::{Function, RequestContext};
 use crate::stdlib::{create_function_signature, Completable};
 use crate::visitors::semantic::utils;
 
+use flux::ast::SourceLocation;
 use flux::semantic::nodes::*;
 use flux::semantic::types::MonoType;
 use flux::semantic::walk::{Node, Visitor};
+
+fn defined_after(loc: &SourceLocation, pos: Position) -> bool {
+    if loc.start.line > pos.line + 1
+        || (loc.start.line == pos.line + 1
+            && loc.start.column > pos.character + 1)
+    {
+        return true;
+    }
+
+    false
+}
 
 pub struct FunctionFinderState {
     pub functions: Vec<Function>,
@@ -41,10 +53,7 @@ impl<'a> Visitor<'a> for FunctionFinderVisitor {
             let loc = node.loc();
             let pos = self.pos.clone();
 
-            if loc.start.line > pos.line + 1
-                || (loc.start.line == pos.line + 1
-                    && loc.start.column > pos.character + 1)
-            {
+            if defined_after(loc, pos) {
                 return true;
             }
 
@@ -63,7 +72,9 @@ impl<'a> Visitor<'a> for FunctionFinderVisitor {
                             .push(Function { name, params })
                     }
                 }
-            } else if let Node::OptionStmt(opt) = node.as_ref() {
+            }
+
+            if let Node::OptionStmt(opt) = node.as_ref() {
                 if let flux::semantic::nodes::Assignment::Variable(
                     assgn,
                 ) = &opt.assignment
@@ -108,10 +119,7 @@ impl<'a> Visitor<'a> for CompletableFinderVisitor {
             let loc = node.loc();
             let pos = self.pos.clone();
 
-            if loc.start.line > pos.line + 1
-                || (loc.start.line == pos.line + 1
-                    && loc.start.column > pos.character + 1)
-            {
+            if defined_after(loc, pos) {
                 return true;
             }
 
@@ -169,6 +177,102 @@ impl CompletableFinderVisitor {
             )),
             pos,
         }
+    }
+}
+
+#[derive(Clone)]
+pub struct ObjectFunction {
+    pub object: String,
+    pub function: Function,
+}
+
+#[derive(Default)]
+pub struct ObjectFunctionFinderState {
+    pub results: Vec<ObjectFunction>,
+}
+
+#[derive(Default)]
+pub struct ObjectFunctionFinderVisitor {
+    pub state: Arc<Mutex<ObjectFunctionFinderState>>,
+}
+
+impl<'a> Visitor<'a> for ObjectFunctionFinderVisitor {
+    fn visit(&mut self, node: Rc<Node<'a>>) -> bool {
+        match node.as_ref() {
+            Node::VariableAssgn(assignment) => {
+                let object_name = assignment.id.name.clone();
+
+                if let Expression::Object(obj) =
+                    assignment.init.clone()
+                {
+                    for prop in obj.properties.clone() {
+                        let func_name = prop.key.name;
+
+                        if let Expression::Function(fun) = prop.value
+                        {
+                            let params = fun
+                                .params
+                                .into_iter()
+                                .map(|p| p.key.name)
+                                .collect::<Vec<String>>();
+
+                            if let Ok(mut state) = self.state.lock() {
+                                state.results.push(ObjectFunction {
+                                    object: object_name,
+                                    function: Function {
+                                        name: func_name,
+                                        params,
+                                    },
+                                });
+
+                                return false;
+                            }
+                        }
+                    }
+                }
+            }
+            Node::OptionStmt(opt) => {
+                if let flux::semantic::nodes::Assignment::Variable(
+                    assignment,
+                ) = opt.assignment.clone()
+                {
+                    let object_name = assignment.id.name;
+                    if let Expression::Object(obj) = assignment.init {
+                        for prop in obj.properties.clone() {
+                            let func_name = prop.key.name;
+
+                            if let Expression::Function(fun) =
+                                prop.value
+                            {
+                                let params = fun
+                                    .params
+                                    .into_iter()
+                                    .map(|p| p.key.name)
+                                    .collect::<Vec<String>>();
+
+                                if let Ok(mut state) =
+                                    self.state.lock()
+                                {
+                                    state.results.push(
+                                        ObjectFunction {
+                                            object: object_name,
+                                            function: Function {
+                                                name: func_name,
+                                                params,
+                                            },
+                                        },
+                                    );
+
+                                    return false;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            _ => {}
+        }
+        true
     }
 }
 
