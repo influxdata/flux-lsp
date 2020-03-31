@@ -353,6 +353,134 @@ speculate! {
     }
 
     describe "Completion request" {
+        describe "when object completing params" {
+            before {
+                flux_lsp::cache::clear().unwrap();
+
+                let uri = flux_fixture_uri("object_param_completion");
+
+                open_file(uri.clone(), &mut handler);
+            }
+
+            after {
+                close_file(uri, &mut handler);
+            }
+
+            it "returns the correct response" {
+                let completion_request = Request {
+                    id: 1,
+                    method: "textDocument/completion".to_string(),
+                    params: Some(CompletionParams {
+                        context: Some(CompletionContext {
+                            trigger_kind: 2,
+                            trigger_character: Some("(".to_string()),
+                        }),
+                        position: Position {
+                            character: 8,
+                            line: 4,
+                        },
+                        text_document: TextDocumentIdentifier {
+                            uri: uri.clone(),
+                        }
+                    }),
+                };
+
+                let completion_request_json =
+                    serde_json::to_string(&completion_request).unwrap();
+                let request = PolymorphicRequest {
+                    base_request: BaseRequest {
+                        id: 1,
+                        method: "textDocument/completion".to_string(),
+                    },
+                    data: completion_request_json,
+                };
+
+                let response = block_on(handler.handle(request, create_request_context())).unwrap();
+                let returned = from_str::<Response<CompletionList>>(response.unwrap().as_str()).unwrap();
+                let returned_items = returned.result.unwrap().items;
+
+                let mut labels = returned_items
+                    .clone()
+                    .into_iter()
+                    .map(|x| x.label)
+                    .collect::<Vec<String>>();
+
+                labels.sort_by(|a, b| a.to_lowercase().cmp(&b.to_lowercase()));
+
+                assert_eq!(labels, vec!["age", "name"], "returns correct items");
+
+                assert_eq!(
+                    returned_items.len(),
+                    2,
+                    "returns correct number of results"
+                );
+            }
+        }
+
+        describe "when completing params" {
+            before {
+                flux_lsp::cache::clear().unwrap();
+
+                let uri = flux_fixture_uri("param_completion");
+
+                open_file(uri.clone(), &mut handler);
+            }
+
+            after {
+                close_file(uri, &mut handler);
+            }
+
+            it "returns the correct response" {
+                let completion_request = Request {
+                    id: 1,
+                    method: "textDocument/completion".to_string(),
+                    params: Some(CompletionParams {
+                        context: Some(CompletionContext {
+                            trigger_kind: 2,
+                            trigger_character: Some("(".to_string()),
+                        }),
+                        position: Position {
+                            character: 8,
+                            line: 2,
+                        },
+                        text_document: TextDocumentIdentifier {
+                            uri: uri.clone(),
+                        }
+                    }),
+                };
+
+                let completion_request_json =
+                    serde_json::to_string(&completion_request).unwrap();
+                let request = PolymorphicRequest {
+                    base_request: BaseRequest {
+                        id: 1,
+                        method: "textDocument/completion".to_string(),
+                    },
+                    data: completion_request_json,
+                };
+
+                let response = block_on(handler.handle(request, create_request_context())).unwrap();
+                let returned = from_str::<Response<CompletionList>>(response.unwrap().as_str()).unwrap();
+                let returned_items = returned.result.unwrap().items;
+
+                let mut labels = returned_items
+                    .clone()
+                    .into_iter()
+                    .map(|x| x.label)
+                    .collect::<Vec<String>>();
+
+                labels.sort_by(|a, b| a.to_lowercase().cmp(&b.to_lowercase()));
+
+                assert_eq!(labels, vec!["csv", "file"], "returns correct items");
+
+                assert_eq!(
+                    returned_items.len(),
+                    2,
+                    "returns correct number of results"
+                );
+            }
+        }
+
         describe "when there are multiple files" {
             before {
                 flux_lsp::cache::clear().unwrap();

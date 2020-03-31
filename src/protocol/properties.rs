@@ -128,6 +128,15 @@ pub struct Position {
     pub character: u32,
 }
 
+impl Position {
+    pub fn move_back(&self, count: u32) -> Self {
+        Position {
+            line: self.line,
+            character: self.character - count,
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Clone)]
 pub struct TextDocument {
     pub uri: String,

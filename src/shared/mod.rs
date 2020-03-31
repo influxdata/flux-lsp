@@ -16,6 +16,12 @@ pub mod signatures;
 use combinations::Combinations;
 
 #[derive(Clone)]
+pub struct Function {
+    pub name: String,
+    pub params: Vec<String>,
+}
+
+#[derive(Clone)]
 pub struct RequestContext {
     pub support_multiple_files: bool,
     pub callbacks: callbacks::Callbacks,

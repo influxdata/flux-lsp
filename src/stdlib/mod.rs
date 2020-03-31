@@ -2,7 +2,7 @@ use crate::protocol::responses::{
     CompletionItem, CompletionItemKind, InsertTextFormat,
 };
 use crate::shared::signatures::{get_argument_names, FunctionInfo};
-use crate::shared::RequestContext;
+use crate::shared::{Function, RequestContext};
 
 use flux::semantic::types::{MonoType, Row};
 use libstd::{imports, prelude};
@@ -538,6 +538,51 @@ pub fn get_packages(
     }
 }
 
+fn walk_package_functions(
+    package: String,
+    list: &mut Vec<Function>,
+    t: MonoType,
+) {
+    if let MonoType::Row(row) = t {
+        if let Row::Extension { head, tail } = *row {
+            if let MonoType::Fun(f) = head.v {
+                let mut params = vec![];
+
+                for arg in get_argument_names(f.req) {
+                    params.push(arg);
+                }
+
+                for arg in get_argument_names(f.opt) {
+                    params.push(arg);
+                }
+
+                list.push(Function {
+                    params,
+                    name: head.k,
+                });
+            }
+
+            walk_package_functions(package, list, tail);
+        }
+    }
+}
+
+pub fn get_package_functions(name: String) -> Vec<Function> {
+    let env = imports().unwrap();
+
+    let mut list = vec![];
+
+    for (key, val) in env.values {
+        if let Some(package_name) = get_package_name(key.clone()) {
+            if package_name == name {
+                walk_package_functions(key, &mut list, val.expr);
+            }
+        }
+    }
+
+    list
+}
+
 pub fn get_specific_package_functions(
     list: &mut Vec<Box<dyn Completable + Send + Sync>>,
     name: String,
@@ -598,6 +643,28 @@ pub fn get_stdlib_functions() -> Vec<FunctionInfo> {
     }
 
     results
+}
+
+pub fn get_builtin_functions() -> Vec<Function> {
+    let env = prelude().unwrap();
+
+    let mut list = vec![];
+
+    for (key, val) in env.values {
+        if let MonoType::Fun(f) = val.expr {
+            let mut params = get_argument_names(f.req);
+            for opt in get_argument_names(f.opt) {
+                params.push(opt);
+            }
+
+            list.push(Function {
+                name: key.clone(),
+                params,
+            })
+        }
+    }
+
+    list
 }
 
 pub fn get_builtins(
