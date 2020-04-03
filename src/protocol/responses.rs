@@ -58,6 +58,7 @@ impl InitializeResult {
                 signature_help_provider:
                     SignatureHelpOptions::default(),
                 text_document_sync: TextDocumentSyncKind::Full,
+                document_formatting_provider: true,
             },
         }
     }

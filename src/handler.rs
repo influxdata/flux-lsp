@@ -2,6 +2,7 @@ use crate::handlers::completion::CompletionHandler;
 use crate::handlers::completion_resolve::CompletionResolveHandler;
 use crate::handlers::document_change::DocumentChangeHandler;
 use crate::handlers::document_close::DocumentCloseHandler;
+use crate::handlers::document_formatting::DocumentFormattingHandler;
 use crate::handlers::document_open::DocumentOpenHandler;
 use crate::handlers::document_save::DocumentSaveHandler;
 use crate::handlers::document_symbol::DocumentSymbolHandler;
@@ -47,6 +48,10 @@ impl Handler {
         let mut mapping: HashMap<String, Box<dyn RequestHandler>> =
             HashMap::new();
 
+        mapping.insert(
+            "textDocument/formatting".to_string(),
+            Box::new(DocumentFormattingHandler::default()),
+        );
         mapping.insert(
             "textDocument/references".to_string(),
             Box::new(FindReferencesHandler::default()),

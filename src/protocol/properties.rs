@@ -122,7 +122,7 @@ fn default_text() -> String {
     "".to_string()
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Eq, Debug, Default)]
 pub struct Position {
     pub line: u32,
     pub character: u32,
@@ -134,6 +134,16 @@ impl Position {
             line: self.line,
             character: self.character - count,
         }
+    }
+
+    pub fn new(line: u32, character: u32) -> Position {
+        Position { line, character }
+    }
+}
+
+impl PartialEq for Position {
+    fn eq(&self, other: &Self) -> bool {
+        self.character == other.character && self.line == other.line
     }
 }
 
@@ -160,17 +170,29 @@ pub struct VersionedTextDocumentIdentifier {
     pub version: u32,
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct TextEdit {
     #[serde(rename = "newText")]
     pub new_text: String,
     pub range: Range,
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+impl PartialEq for TextEdit {
+    fn eq(&self, other: &Self) -> bool {
+        self.new_text == other.new_text && self.range == other.range
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Eq, Debug)]
 pub struct Range {
     pub start: Position,
     pub end: Position,
+}
+
+impl PartialEq for Range {
+    fn eq(&self, other: &Self) -> bool {
+        self.start == other.start && self.end == other.end
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -265,6 +287,8 @@ pub struct ServerCapabilities {
 
     #[serde(rename = "signatureHelpProvider")]
     pub signature_help_provider: SignatureHelpOptions,
+    #[serde(rename = "documentFormattingProvider")]
+    pub document_formatting_provider: bool,
 }
 
 #[derive(Serialize, Deserialize, Clone)]

@@ -2,6 +2,7 @@
 extern crate lazy_static;
 
 pub mod cache;
+pub mod format;
 pub mod handler;
 pub mod handlers;
 pub mod protocol;

@@ -471,14 +471,14 @@ speculate! {
 
                 labels.sort_by(|a, b| a.to_lowercase().cmp(&b.to_lowercase()));
 
-                assert_eq!(labels, vec!["csv", "file"], "returns correct items");
+                assert_eq!(labels, vec!["csv", "file", "url"], "returns correct items");
 
                 assert_eq!(
                     returned_items.len(),
-                    2,
+                    3,
                     "returns correct number of results"
                 );
-            }
+           }
         }
 
         describe "when there are multiple files" {
@@ -1377,6 +1377,56 @@ speculate! {
                 expected.to_json().unwrap(),
                 response.unwrap(),
                 "expects to find all symbols"
+            );
+        }
+    }
+
+    describe "Formatting" {
+        before {
+            let uri = flux_fixture_uri("unformatted");
+            open_file(uri.clone(), &mut handler);
+        }
+
+        after {
+            close_file(uri, &mut handler);
+        }
+
+        it "returns the correct response" {
+            let base_request = Request {
+                id: 1,
+                method: "textDocument/formatting".to_string(),
+                params: Some(DocumentFormattingParams {
+                    text_document: TextDocumentIdentifier {
+                        uri: uri.clone(),
+                    },
+                    options:FormattingOptions{
+                        tab_size:4,
+                        insert_spaces:false,
+                    }
+                }),
+            };
+            let request = PolymorphicRequest{
+                base_request: BaseRequest {
+                    id: 1,
+                    method: "textDocument/formatting".to_string(),
+                },
+                data: serde_json::to_string(&base_request).unwrap(),
+            };
+
+            let response = block_on(handler.handle(request, create_request_context())).unwrap();
+            let expected=
+                Response::new(1, Some([TextEdit{
+                    new_text:"\t|> filter(fn: (r) =>\n\t\t(r._measurement == \"cpu\"))\n".to_owned(),
+                    range: Range{
+                        start:Position::new(1,0),
+                        end:Position::new(4,0),
+                    },
+                }]));
+
+            assert_eq!(
+                expected.to_json().unwrap(),
+                response.unwrap(),
+                "expects to format correctly"
             );
         }
     }

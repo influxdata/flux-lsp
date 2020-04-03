@@ -153,7 +153,7 @@ impl Completable for PackageResult {
 }
 
 fn default_arg_insert_text(arg: &str, index: usize) -> String {
-    (format!("{}: ${}", arg, index + 1))
+    format!("{}: ${}", arg, index + 1)
 }
 
 fn bucket_list_to_snippet(

@@ -169,3 +169,35 @@ pub struct SignatureHelpContext {
     #[serde(rename = "triggerKind")]
     pub trigger_kind: SignatureHelpTriggerKind,
 }
+
+/**
+ * Value-object describing what options formatting should use.
+ */
+#[derive(Serialize, Deserialize, Clone)]
+pub struct FormattingOptions {
+    /**
+     * Size of a tab in spaces.
+     */
+    #[serde(rename = "tabSize")]
+    pub tab_size: u32,
+
+    /**
+     * Prefer spaces over tabs.
+     */
+    #[serde(rename = "insertSpaces")]
+    pub insert_spaces: bool,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct DocumentFormattingParams {
+    /**
+     * The document to format.
+     */
+    #[serde(rename = "textDocument")]
+    pub text_document: TextDocumentIdentifier,
+
+    /**
+     * The format options.
+     */
+    pub options: FormattingOptions,
+}
