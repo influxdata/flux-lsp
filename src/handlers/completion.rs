@@ -51,7 +51,7 @@ fn get_ident_name(
     position: Position,
 ) -> Result<Option<String>, String> {
     let source = cache::get(uri.clone())?;
-    let pkg = crate::utils::create_file_node_from_text(
+    let pkg = crate::shared::conversion::create_file_node_from_text(
         uri,
         source.contents,
     );
@@ -313,7 +313,7 @@ async fn find_param_completions(
     let position = params.position;
 
     let source = cache::get(uri.clone())?;
-    let pkg = crate::utils::create_file_node_from_text(
+    let pkg = crate::shared::conversion::create_file_node_from_text(
         uri.clone(),
         source.contents,
     );

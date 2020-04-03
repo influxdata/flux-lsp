@@ -5,9 +5,8 @@ use crate::protocol::requests::{
     PolymorphicRequest, ReferenceParams, Request,
 };
 use crate::protocol::responses::Response;
-use crate::visitors::semantic::utils::{
-    create_semantic_package, map_node_to_location,
-};
+use crate::shared::conversion::map_node_to_location;
+use crate::visitors::semantic::utils::create_semantic_package;
 use crate::visitors::semantic::{
     DefinitionFinderVisitor, IdentFinderVisitor,
 };

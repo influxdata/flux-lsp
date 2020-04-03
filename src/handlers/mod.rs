@@ -10,8 +10,11 @@ pub mod goto_definition;
 pub mod initialize;
 pub mod references;
 pub mod rename;
+pub mod router;
 pub mod shutdown;
 pub mod signature_help;
+
+pub use router::Router;
 
 use crate::protocol::notifications::{
     create_diagnostics_notification, Notification,
@@ -19,8 +22,8 @@ use crate::protocol::notifications::{
 };
 use crate::protocol::properties::Position;
 use crate::protocol::requests::PolymorphicRequest;
+use crate::shared::conversion::map_errors_to_diagnostics;
 use crate::shared::RequestContext;
-use crate::utils;
 use crate::visitors::semantic::NodeFinderVisitor;
 
 use std::rc::Rc;
@@ -44,7 +47,7 @@ pub fn create_diagnostics(
     let walker = walk::Node::File(&file);
 
     let errors = check::check(walker);
-    let diagnostics = utils::map_errors_to_diagnostics(errors);
+    let diagnostics = map_errors_to_diagnostics(errors);
 
     match create_diagnostics_notification(uri, diagnostics) {
         Ok(msg) => Ok(msg),

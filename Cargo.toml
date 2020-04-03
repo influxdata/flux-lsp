@@ -27,7 +27,7 @@ combinations = "0.1.0"
 js-sys = "0.3.37"
 wasm-bindgen-futures = "0.4.10"
 futures = "0.3.4"
-async-trait = "0.1.27"
+async-trait = "0.1.29"
 
 [dev-dependencies]
 speculate = "0.1.2"

@@ -6,6 +6,7 @@ use crate::protocol::requests::{
     PolymorphicRequest, Request, TextDocumentPositionParams,
 };
 use crate::protocol::responses::Response;
+use crate::shared::conversion::map_node_to_location;
 use crate::visitors::semantic::utils;
 use crate::visitors::semantic::{
     DefinitionFinderVisitor, NodeFinderVisitor,
@@ -60,7 +61,7 @@ fn find_scoped_definition<'a>(
                 let state = dvisitor.state.borrow();
 
                 if let Some(node) = state.node.clone() {
-                    let loc = utils::map_node_to_location(uri, node);
+                    let loc = map_node_to_location(uri, node);
                     return Some(loc);
                 }
             }

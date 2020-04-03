@@ -9,12 +9,21 @@ use crate::protocol::responses::{
 use crate::shared::signatures::get_argument_names;
 use crate::shared::{Function, RequestContext};
 use crate::stdlib::{create_function_signature, Completable};
-use crate::visitors::semantic::utils;
 
 use flux::ast::SourceLocation;
 use flux::semantic::nodes::*;
 use flux::semantic::types::MonoType;
 use flux::semantic::walk::{Node, Visitor};
+
+fn follow_function_pipes(c: &CallExpr) -> &MonoType {
+    if let Some(p) = &c.pipe {
+        if let Expression::Call(call) = p {
+            return follow_function_pipes(&call);
+        }
+    }
+
+    &c.typ
+}
 
 fn defined_after(loc: &SourceLocation, pos: Position) -> bool {
     if loc.start.line > pos.line + 1
@@ -418,7 +427,7 @@ fn get_var_type(expr: &Expression) -> Option<VarType> {
     match expr {
         Expression::Object(_) => Some(VarType::Object),
         Expression::Call(c) => {
-            let result_type = utils::follow_function_pipes(c);
+            let result_type = follow_function_pipes(c);
 
             match result_type {
                 MonoType::Int => Some(VarType::Int),

@@ -23,7 +23,7 @@ use wasm_bindgen::prelude::*;
 use async_trait::async_trait;
 
 #[wasm_bindgen]
-pub struct Handler {
+pub struct Router {
     mapping: HashMap<String, Box<dyn RequestHandler>>,
     default_handler: Box<dyn RequestHandler>,
 }
@@ -42,8 +42,8 @@ impl RequestHandler for NoOpHandler {
     }
 }
 
-impl Handler {
-    pub fn new(disable_folding: bool) -> Handler {
+impl Router {
+    pub fn new(disable_folding: bool) -> Router {
         let mut mapping: HashMap<String, Box<dyn RequestHandler>> =
             HashMap::new();
 
@@ -104,13 +104,13 @@ impl Handler {
             Box::new(SignatureHelpHandler::default()),
         );
 
-        Handler {
+        Router {
             mapping,
             default_handler: Box::new(NoOpHandler::default()),
         }
     }
 
-    pub async fn handle(
+    pub async fn route(
         &mut self,
         request: PolymorphicRequest,
         ctx: RequestContext,
