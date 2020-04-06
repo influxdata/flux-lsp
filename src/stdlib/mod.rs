@@ -13,10 +13,6 @@ use std::iter::Iterator;
 
 use async_trait::async_trait;
 
-fn contains(l: Vec<String>, m: String) -> bool {
-    l.into_iter().find(|x| x.as_str() == m.as_str()) != None
-}
-
 #[async_trait]
 pub trait Completable {
     async fn completion_item(
@@ -96,7 +92,7 @@ impl Completable for VarResult {
             return true;
         }
 
-        if !contains(imports, self.package.clone()) {
+        if !imports.contains(&self.package.clone()) {
             return false;
         }
 
@@ -139,7 +135,7 @@ impl Completable for PackageResult {
     }
 
     fn matches(&self, text: String, imports: Vec<String>) -> bool {
-        if !contains(imports, self.full_name.clone()) {
+        if !imports.contains(&self.full_name.clone()) {
             return false;
         }
         if !text.ends_with('.') {
@@ -268,7 +264,7 @@ impl Completable for FunctionResult {
             return true;
         }
 
-        if !contains(imports, self.package.clone()) {
+        if !imports.contains(&self.package.clone()) {
             return false;
         }
 

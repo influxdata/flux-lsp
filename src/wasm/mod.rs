@@ -1,7 +1,9 @@
+use crate::handlers::Router;
 use crate::shared::callbacks::Callbacks;
+use crate::shared::messages::{
+    create_polymorphic_request, wrap_message,
+};
 use crate::shared::RequestContext;
-use crate::utils;
-use crate::Handler;
 
 use std::cell::RefCell;
 use std::ops::Add;
@@ -14,7 +16,7 @@ use wasm_bindgen_futures::future_to_promise;
 
 #[wasm_bindgen]
 pub struct Server {
-    handler: Rc<RefCell<Handler>>,
+    handler: Rc<RefCell<Router>>,
     callbacks: Callbacks,
     support_multiple_files: bool,
 }
@@ -45,7 +47,7 @@ impl Server {
         support_multiple_files: bool,
     ) -> Server {
         Server {
-            handler: Rc::new(RefCell::new(Handler::new(
+            handler: Rc::new(RefCell::new(Router::new(
                 disable_folding,
             ))),
             callbacks: Callbacks::default(),
@@ -58,7 +60,7 @@ impl Server {
     }
 
     pub fn process(&mut self, msg: String) -> Promise {
-        let handler = self.handler.clone();
+        let router = self.handler.clone();
         let callbacks = self.callbacks.clone();
         let support_multiple_files = self.support_multiple_files;
 
@@ -71,24 +73,20 @@ impl Server {
                     .skip(2)
                     .fold(String::new(), |c, l| c.add(l));
 
-                if let Ok(req) =
-                    utils::create_polymorphic_request(content)
-                {
+                if let Ok(req) = create_polymorphic_request(content) {
                     let ctx = RequestContext::new(
                         callbacks.clone(),
                         support_multiple_files,
                     );
-                    let mut h = handler.borrow_mut();
-                    match (*h).handle(req, ctx).await {
+                    let mut h = router.borrow_mut();
+                    match (*h).route(req, ctx).await {
                         Ok(response) => {
                             if let Some(response) = response {
                                 return Ok(JsValue::from(
                                     ServerResponse {
-                                        message: Some(
-                                            utils::wrap_message(
-                                                response,
-                                            ),
-                                        ),
+                                        message: Some(wrap_message(
+                                            response,
+                                        )),
                                         error: None,
                                     },
                                 ));

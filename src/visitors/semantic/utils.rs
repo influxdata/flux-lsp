@@ -1,17 +1,14 @@
 use crate::cache;
-use crate::protocol::properties::{Location, Position, Range};
+use crate::protocol::properties::Position;
+use crate::shared::ast::is_in_node;
 use crate::shared::RequestContext;
-use crate::utils::is_in_node;
 
 use std::convert::TryFrom;
-use std::rc::Rc;
 
 use flux::parser::parse_string;
 use flux::semantic::convert::convert_with;
 use flux::semantic::fresh::Fresher;
-use flux::semantic::nodes::{CallExpr, Expression, Package};
-use flux::semantic::types::MonoType;
-use flux::semantic::walk::Node;
+use flux::semantic::nodes::Package;
 
 use libstd::analyze;
 
@@ -136,35 +133,4 @@ pub fn create_semantic_package(
     let pkg = analyze_source(cv.contents.as_str())?;
 
     Ok(pkg)
-}
-
-pub fn map_node_to_location(uri: String, node: Rc<Node>) -> Location {
-    let start_line = node.loc().start.line - 1;
-    let start_col = node.loc().start.column - 1;
-    let end_line = node.loc().end.line - 1;
-    let end_col = node.loc().end.column - 1;
-
-    Location {
-        uri,
-        range: Range {
-            start: Position {
-                line: start_line,
-                character: start_col,
-            },
-            end: Position {
-                line: end_line,
-                character: end_col,
-            },
-        },
-    }
-}
-
-pub fn follow_function_pipes(c: &CallExpr) -> &MonoType {
-    if let Some(p) = &c.pipe {
-        if let Expression::Call(call) = p {
-            return follow_function_pipes(&call);
-        }
-    }
-
-    &c.typ
 }

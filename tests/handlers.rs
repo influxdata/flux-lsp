@@ -4,7 +4,6 @@ extern crate speculate;
 use serde_json::from_str;
 use speculate::speculate;
 
-use flux_lsp::handler::Handler;
 use flux_lsp::protocol::notifications::*;
 use flux_lsp::protocol::properties::*;
 use flux_lsp::protocol::requests::*;
@@ -12,6 +11,7 @@ use flux_lsp::protocol::responses::*;
 use flux_lsp::shared::callbacks::Callbacks;
 use flux_lsp::shared::RequestContext;
 use flux_lsp::stdlib::{get_builtins, Completable, PackageResult};
+use flux_lsp::Router;
 
 use futures::executor::block_on;
 
@@ -28,7 +28,7 @@ fn create_request_context() -> RequestContext {
 
 speculate! {
     before {
-        let mut handler = create_handler();
+        let mut router = create_router();
     }
 
     describe "multiple packages" {
@@ -36,13 +36,13 @@ speculate! {
             flux_lsp::cache::clear().unwrap();
             let uri1 = flux_fixture_uri("incomplete_option");
             let uri2 = flux_fixture_uri("options_function");
-            open_file(uri1.clone(), &mut handler);
-            open_file(uri2.clone(), &mut handler);
+            open_file(uri1.clone(), &mut router);
+            open_file(uri2.clone(), &mut router);
         }
 
         after {
-            close_file(uri1, &mut handler);
-            close_file(uri2, &mut handler);
+            close_file(uri1, &mut router);
+            close_file(uri2, &mut router);
         }
 
         it "returns packages in directory" {
@@ -61,7 +61,7 @@ speculate! {
                 data: "".to_string(),
             };
 
-            let response = block_on(handler.handle(request, create_request_context())).unwrap();
+            let response = block_on(router.route(request, create_request_context())).unwrap();
             let expected = None;
 
             assert_eq!(expected, response, "expects show message response");
@@ -87,7 +87,7 @@ speculate! {
                 data: initialize_request_json,
             };
 
-            let response = block_on(handler.handle(request, create_request_context())).unwrap().unwrap();
+            let response = block_on(router.route(request, create_request_context())).unwrap().unwrap();
             let expected = Response {
                 id: 1,
                 result: Some(InitializeResult::new(true)),
@@ -112,7 +112,7 @@ speculate! {
                 data: "".to_string(),
             };
 
-            let response = block_on(handler.handle(request, create_request_context())).unwrap();
+            let response = block_on(router.route(request, create_request_context())).unwrap();
             let expected = None;
 
             assert_eq!(expected, response, "expects empty response");
@@ -127,7 +127,7 @@ speculate! {
             }
 
             after {
-                close_file(uri, &mut handler);
+                close_file(uri, &mut router);
             }
 
             it "returns correct response" {
@@ -154,7 +154,7 @@ speculate! {
                     data: did_open_request_json,
                 };
 
-                let response = block_on(handler.handle(request, create_request_context())).unwrap().unwrap();
+                let response = block_on(router.route(request, create_request_context())).unwrap().unwrap();
                 let expected_json =
                     create_diagnostics_notification(uri.clone(), vec![])
                     .unwrap()
@@ -175,7 +175,7 @@ speculate! {
             }
 
             after {
-                close_file(uri, &mut handler);
+                close_file(uri, &mut router);
             }
 
             it "returns an error" {
@@ -203,7 +203,7 @@ speculate! {
                     data: did_open_request_json,
                 };
 
-                let response = block_on(handler.handle(request, create_request_context())).unwrap();
+                let response = block_on(router.route(request, create_request_context())).unwrap();
                 let diagnostics = vec![Diagnostic {
                     range: Range {
                         start: Position {
@@ -242,7 +242,7 @@ speculate! {
             }
 
             after {
-                close_file(uri, &mut handler);
+                close_file(uri, &mut router);
             }
 
             it "returns an error" {
@@ -270,7 +270,7 @@ speculate! {
                     data: did_open_request_json,
                 };
 
-                let response = block_on(handler.handle(request, create_request_context())).unwrap();
+                let response = block_on(router.route(request, create_request_context())).unwrap();
                 let diagnostics = vec![Diagnostic {
                     range: Range {
                         start: Position {
@@ -308,11 +308,11 @@ speculate! {
             before {
                 flux_lsp::cache::clear().unwrap();
                 let uri = flux_fixture_uri("signatures");
-                open_file(uri.clone(), &mut handler);
+                open_file(uri.clone(), &mut router);
             }
 
             after {
-                close_file(uri, &mut handler);
+                close_file(uri, &mut router);
             }
 
             it "returns the correct response" {
@@ -339,7 +339,7 @@ speculate! {
                     data: request_json,
                 };
 
-                let response = block_on(handler.handle(request, create_request_context())).unwrap();
+                let response = block_on(router.route(request, create_request_context())).unwrap();
                 let returned = from_str::<Response<SignatureHelp>>(response.unwrap().as_str()).unwrap();
 
                 let signatures = returned.result.unwrap().signatures;
@@ -359,11 +359,11 @@ speculate! {
 
                 let uri = flux_fixture_uri("object_param_completion");
 
-                open_file(uri.clone(), &mut handler);
+                open_file(uri.clone(), &mut router);
             }
 
             after {
-                close_file(uri, &mut handler);
+                close_file(uri, &mut router);
             }
 
             it "returns the correct response" {
@@ -395,7 +395,7 @@ speculate! {
                     data: completion_request_json,
                 };
 
-                let response = block_on(handler.handle(request, create_request_context())).unwrap();
+                let response = block_on(router.route(request, create_request_context())).unwrap();
                 let returned = from_str::<Response<CompletionList>>(response.unwrap().as_str()).unwrap();
                 let returned_items = returned.result.unwrap().items;
 
@@ -423,11 +423,11 @@ speculate! {
 
                 let uri = flux_fixture_uri("param_completion");
 
-                open_file(uri.clone(), &mut handler);
+                open_file(uri.clone(), &mut router);
             }
 
             after {
-                close_file(uri, &mut handler);
+                close_file(uri, &mut router);
             }
 
             it "returns the correct response" {
@@ -459,7 +459,7 @@ speculate! {
                     data: completion_request_json,
                 };
 
-                let response = block_on(handler.handle(request, create_request_context())).unwrap();
+                let response = block_on(router.route(request, create_request_context())).unwrap();
                 let returned = from_str::<Response<CompletionList>>(response.unwrap().as_str()).unwrap();
                 let returned_items = returned.result.unwrap().items;
 
@@ -488,13 +488,13 @@ speculate! {
                 let uri1 = flux_fixture_uri("multiple_1");
                 let uri2 = flux_fixture_uri("multiple_2");
 
-                open_file(uri1.clone(), &mut handler);
-                open_file(uri2.clone(), &mut handler);
+                open_file(uri1.clone(), &mut router);
+                open_file(uri2.clone(), &mut router);
             }
 
             after {
-                close_file(uri1, &mut handler);
-                close_file(uri2, &mut handler);
+                close_file(uri1, &mut router);
+                close_file(uri2, &mut router);
             }
 
             it "returns the correct response" {
@@ -525,7 +525,7 @@ speculate! {
                     },
                     data: completion_request_json,
                 };
-                let response = block_on(handler.handle(request, create_request_context())).unwrap();
+                let response = block_on(router.route(request, create_request_context())).unwrap();
                 let returned = from_str::<Response<CompletionList>>(response.unwrap().as_str()).unwrap();
                 let returned_items = returned.result.unwrap().items;
 
@@ -540,11 +540,11 @@ speculate! {
             before {
                 flux_lsp::cache::clear().unwrap();
                 let uri = flux_fixture_uri("package_completion");
-                open_file(uri.clone(), &mut handler);
+                open_file(uri.clone(), &mut router);
             }
 
             after {
-                close_file(uri, &mut handler);
+                close_file(uri, &mut router);
             }
 
             it "returns the correct response" {
@@ -575,7 +575,7 @@ speculate! {
                     },
                     data: completion_request_json,
                 };
-                let response = block_on(handler.handle(request, create_request_context())).unwrap();
+                let response = block_on(router.route(request, create_request_context())).unwrap();
                 let returned = from_str::<Response<CompletionList>>(response.unwrap().as_str()).unwrap();
                 let returned_items = returned.result.unwrap().items;
 
@@ -591,11 +591,11 @@ speculate! {
             before {
                 flux_lsp::cache::clear().unwrap();
                 let uri = flux_fixture_uri("completion");
-                open_file(uri.clone(), &mut handler);
+                open_file(uri.clone(), &mut router);
             }
 
             after {
-                close_file(uri, &mut handler);
+                close_file(uri, &mut router);
             }
 
             it "returns the correct response" {
@@ -623,7 +623,7 @@ speculate! {
                     },
                     data: completion_request_json,
                 };
-                let response = block_on(handler.handle(request, create_request_context())).unwrap();
+                let response = block_on(router.route(request, create_request_context())).unwrap();
                 let mut items = vec![
                     block_on(PackageResult {
                         full_name: "csv".to_string(),
@@ -666,11 +666,11 @@ speculate! {
             before {
                 flux_lsp::cache::clear().unwrap();
                 let uri = flux_fixture_uri("options");
-                open_file(uri.clone(), &mut handler);
+                open_file(uri.clone(), &mut router);
             }
 
             after {
-                close_file(uri, &mut handler);
+                close_file(uri, &mut router);
             }
 
             it "returns the correct response" {
@@ -698,7 +698,7 @@ speculate! {
                     },
                     data: completion_request_json,
                 };
-                let response = block_on(handler.handle(request, create_request_context())).unwrap();
+                let response = block_on(router.route(request, create_request_context())).unwrap();
 
                 let returned = from_str::<Response<CompletionList>>(response.unwrap().as_str()).unwrap();
                 let returned_items = returned.result.unwrap().items;
@@ -720,11 +720,11 @@ speculate! {
         describe "when an option members can be completed" {
             before {
                 let uri = flux_fixture_uri("options_object_members");
-                open_file(uri.clone(), &mut handler);
+                open_file(uri.clone(), &mut router);
             }
 
             after {
-                close_file(uri, &mut handler);
+                close_file(uri, &mut router);
             }
 
             it "returns the correct response" {
@@ -755,7 +755,7 @@ speculate! {
                     },
                     data: completion_request_json,
                 };
-                let response = block_on(handler.handle(request, create_request_context())).unwrap();
+                let response = block_on(router.route(request, create_request_context())).unwrap();
 
                 let returned = from_str::<Response<CompletionList>>(response.unwrap().as_str()).unwrap();
                 let returned_items = returned.result.unwrap().items;
@@ -771,11 +771,11 @@ speculate! {
         describe "when an option functions can be completed" {
             before {
                 let uri = flux_fixture_uri("options_function");
-                open_file(uri.clone(), &mut handler);
+                open_file(uri.clone(), &mut router);
             }
 
             after {
-                close_file(uri, &mut handler);
+                close_file(uri, &mut router);
             }
 
             it "returns the correct response" {
@@ -803,7 +803,7 @@ speculate! {
                     },
                     data: completion_request_json,
                 };
-                let response = block_on(handler.handle(request, create_request_context())).unwrap();
+                let response = block_on(router.route(request, create_request_context())).unwrap();
 
                 let returned = from_str::<Response<CompletionList>>(response.unwrap().as_str()).unwrap();
                 let returned_items = returned.result.unwrap().items;
@@ -821,11 +821,11 @@ speculate! {
         describe "when ok" {
             before {
                 let uri = flux_fixture_uri("ok");
-                open_file(uri.clone(), &mut handler);
+                open_file(uri.clone(), &mut router);
             }
 
             after {
-                close_file(uri, &mut handler);
+                close_file(uri, &mut router);
             }
 
             it "returns the correct response" {
@@ -856,7 +856,7 @@ speculate! {
                     },
                     data: did_change_request_json,
                 };
-                let response = block_on(handler.handle(request, create_request_context())).unwrap();
+                let response = block_on(router.route(request, create_request_context())).unwrap();
                 let expected_json =
                     create_diagnostics_notification(uri.clone(), vec![])
                     .unwrap()
@@ -874,11 +874,11 @@ speculate! {
         describe "when there is an error" {
             before {
                 let uri = flux_fixture_uri("error");
-                open_file(uri.clone(), &mut handler);
+                open_file(uri.clone(), &mut router);
             }
 
             after {
-                close_file(uri, &mut handler);
+                close_file(uri, &mut router);
             }
 
             it "returns the correct response" {
@@ -909,7 +909,7 @@ speculate! {
                     },
                     data: did_change_request_json,
                 };
-                let response = block_on(handler.handle(request, create_request_context())).unwrap();
+                let response = block_on(router.route(request, create_request_context())).unwrap();
                 let diagnostics = vec![Diagnostic {
                     range: Range {
                         start: Position {
@@ -960,7 +960,7 @@ speculate! {
                 data: shutdown_request_json,
             };
 
-            let response = block_on(handler.handle(request, create_request_context())).unwrap();
+            let response = block_on(router.route(request, create_request_context())).unwrap();
 
             let expected: Response<ShutdownResult> = Response {
                 id: 1,
@@ -979,11 +979,11 @@ speculate! {
     describe "Rename" {
         before {
             let uri = flux_fixture_uri("ok");
-            open_file(uri.clone(), &mut handler);
+            open_file(uri.clone(), &mut router);
         }
 
         after {
-            close_file(uri, &mut handler);
+            close_file(uri, &mut router);
         }
 
         it "returns the correct response" {
@@ -1015,7 +1015,7 @@ speculate! {
                 },
                 data: rename_request_json,
             };
-            let response = block_on(handler.handle(request, create_request_context())).unwrap();
+            let response = block_on(router.route(request, create_request_context())).unwrap();
 
             let mut expected_changes: HashMap<String, Vec<TextEdit>> =
                 HashMap::new();
@@ -1072,11 +1072,11 @@ speculate! {
     describe "Folding" {
         before {
             let uri = flux_fixture_uri("ok");
-            open_file(uri.clone(), &mut handler);
+            open_file(uri.clone(), &mut router);
         }
 
         after {
-            close_file(uri, &mut handler);
+            close_file(uri, &mut router);
         }
 
         it "returns the correct response" {
@@ -1102,7 +1102,7 @@ speculate! {
                 },
                 data: folding_request_json,
             };
-            let response = block_on(handler.handle(request, create_request_context())).unwrap();
+            let response = block_on(router.route(request, create_request_context())).unwrap();
 
             let areas = vec![
                 FoldingRange {
@@ -1135,11 +1135,11 @@ speculate! {
     describe "Goto definition" {
         before {
             let uri = flux_fixture_uri("ok");
-            open_file(uri.clone(), &mut handler);
+            open_file(uri.clone(), &mut router);
         }
 
         after {
-            close_file(uri, &mut handler);
+            close_file(uri, &mut router);
         }
 
         it "returns correct response" {
@@ -1169,7 +1169,7 @@ speculate! {
                 },
                 data: find_references_request_json,
             };
-            let response = block_on(handler.handle(request, create_request_context())).unwrap();
+            let response = block_on(router.route(request, create_request_context())).unwrap();
 
             let expected: Response<Location> = Response {
                 id: 1,
@@ -1200,11 +1200,11 @@ speculate! {
     describe "Find references" {
         before {
             let uri = flux_fixture_uri("ok");
-            open_file(uri.clone(), &mut handler);
+            open_file(uri.clone(), &mut router);
         }
 
         after {
-            close_file(uri, &mut handler);
+            close_file(uri, &mut router);
         }
 
         it "returns correct response" {
@@ -1235,7 +1235,7 @@ speculate! {
                 },
                 data: find_references_request_json,
             };
-            let response = block_on(handler.handle(request, create_request_context())).unwrap();
+            let response = block_on(router.route(request, create_request_context())).unwrap();
 
             let expected: Response<Vec<Location>> = Response {
                 id: 1,
@@ -1281,11 +1281,11 @@ speculate! {
     describe "Document symbols" {
         before {
             let uri = flux_fixture_uri("simple");
-            open_file(uri.clone(), &mut handler);
+            open_file(uri.clone(), &mut router);
         }
 
         after {
-            close_file(uri, &mut handler);
+            close_file(uri, &mut router);
         }
 
         it "returns the correct response" {
@@ -1308,7 +1308,7 @@ speculate! {
                 },
                 data: symbols_request_json,
             };
-            let response = block_on(handler.handle(request, create_request_context())).unwrap();
+            let response = block_on(router.route(request, create_request_context())).unwrap();
 
             let areas = vec![
                 SymbolInformation {
@@ -1417,11 +1417,11 @@ pub fn get_file_contents_from_uri(
     Ok(contents)
 }
 
-fn create_handler() -> Handler {
-    Handler::new(false)
+fn create_router() -> Router {
+    Router::new(false)
 }
 
-fn open_file(uri: String, handler: &mut Handler) {
+fn open_file(uri: String, router: &mut Router) {
     let text = get_file_contents_from_uri(uri.clone()).unwrap();
     let did_open_request = Request {
         id: 1,
@@ -1446,11 +1446,11 @@ fn open_file(uri: String, handler: &mut Handler) {
         data: did_open_request_json,
     };
 
-    block_on(handler.handle(request, create_request_context()))
+    block_on(router.route(request, create_request_context()))
         .unwrap();
 }
 
-fn close_file(uri: String, handler: &mut Handler) {
+fn close_file(uri: String, router: &mut Router) {
     let text = get_file_contents_from_uri(uri.clone()).unwrap();
     let did_close_request = Request {
         id: 1,
@@ -1475,6 +1475,6 @@ fn close_file(uri: String, handler: &mut Handler) {
         data: did_open_request_json,
     };
 
-    block_on(handler.handle(request, create_request_context()))
+    block_on(router.route(request, create_request_context()))
         .unwrap();
 }
