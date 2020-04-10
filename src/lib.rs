@@ -8,6 +8,8 @@ pub mod shared;
 pub mod stdlib;
 pub mod wasm;
 
+#[macro_use]
+mod macros;
 mod visitors;
 
 pub use handlers::Router;

@@ -101,11 +101,18 @@ impl<'a> Visitor<'a> for CallFinderVisitor<'a> {
     }
 }
 
-pub struct NodeFinderState<'a> {
-    pub node: Option<Rc<walk::Node<'a>>>,
-    pub position: Position,
-    pub path: Vec<Rc<walk::Node<'a>>>,
+#[derive(Clone)]
+pub struct NodeFinderNode<'a> {
+    pub node: Rc<walk::Node<'a>>,
+    pub parent: Option<Box<NodeFinderNode<'a>>>,
 }
+
+pub struct NodeFinderState<'a> {
+    pub node: Option<NodeFinderNode<'a>>,
+    pub position: Position,
+}
+
+impl<'a> NodeFinderState<'a> {}
 
 #[derive(Clone)]
 pub struct NodeFinderVisitor<'a> {
@@ -118,7 +125,6 @@ impl<'a> NodeFinderVisitor<'a> {
             state: Rc::new(RefCell::new(NodeFinderState {
                 node: None,
                 position,
-                path: vec![],
             })),
         }
     }
@@ -134,8 +140,18 @@ impl<'a> Visitor<'a> for NodeFinderVisitor<'a> {
         );
 
         if contains {
-            (*state).path.push(node.clone());
-            (*state).node = Some(node.clone());
+            let parent = (*state).node.clone();
+            if let Some(parent) = parent {
+                (*state).node = Some(NodeFinderNode {
+                    node: node.clone(),
+                    parent: Some(Box::new(parent)),
+                });
+            } else {
+                (*state).node = Some(NodeFinderNode {
+                    node: node.clone(),
+                    parent: None,
+                });
+            }
         }
 
         Some(self.clone())
