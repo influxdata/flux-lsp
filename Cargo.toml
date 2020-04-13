@@ -29,5 +29,11 @@ wasm-bindgen-futures = "0.4.10"
 futures = "0.3.4"
 async-trait = "0.1.29"
 
+[dependencies.web-sys]
+version = "0.3"
+features = [
+  "console",
+]
+
 [dev-dependencies]
 speculate = "0.1.2"

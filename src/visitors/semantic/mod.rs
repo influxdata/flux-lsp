@@ -1,5 +1,6 @@
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 
 use crate::protocol::properties::Position;
 
@@ -41,6 +42,53 @@ fn contains_position(node: Rc<Node<'_>>, pos: Position) -> bool {
     }
 
     true
+}
+
+pub struct CallFinderState<'a> {
+    pub node: Option<Rc<Node<'a>>>,
+    pub position: Position,
+    pub path: Vec<Rc<Node<'a>>>,
+}
+
+#[derive(Clone)]
+pub struct CallFinderVisitor<'a> {
+    pub state: Arc<Mutex<CallFinderState<'a>>>,
+}
+
+impl<'a> Visitor<'a> for CallFinderVisitor<'a> {
+    fn visit(&mut self, node: Rc<Node<'a>>) -> bool {
+        if let Ok(mut state) = self.state.lock() {
+            let contains = contains_position(
+                node.clone(),
+                (*state).position.clone(),
+            );
+
+            if contains {
+                if let Node::ExprStmt(exp) = node.as_ref() {
+                    if let Expression::Call(_call) =
+                        exp.expression.clone()
+                    {
+                        state.node = Some(node.clone());
+                        state.path.push(node.clone());
+                    }
+                }
+            }
+        }
+
+        true
+    }
+}
+
+impl<'a> CallFinderVisitor<'a> {
+    pub fn new(pos: Position) -> CallFinderVisitor<'a> {
+        CallFinderVisitor {
+            state: Arc::new(Mutex::new(CallFinderState {
+                node: None,
+                position: pos,
+                path: vec![],
+            })),
+        }
+    }
 }
 
 pub struct NodeFinderState<'a> {

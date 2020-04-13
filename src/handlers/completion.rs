@@ -18,17 +18,30 @@ use crate::stdlib::{
 };
 use crate::visitors::ast;
 use crate::visitors::semantic::{
-    utils, CompletableFinderVisitor, CompletableObjectFinderVisitor,
-    FunctionFinderVisitor, ImportFinderVisitor,
-    ObjectFunctionFinderVisitor,
+    utils, CallFinderVisitor, CompletableFinderVisitor,
+    CompletableObjectFinderVisitor, FunctionFinderVisitor,
+    ImportFinderVisitor, ObjectFunctionFinderVisitor,
 };
 
 use flux::ast::walk::walk_rc;
 use flux::ast::walk::Node as AstNode;
 use flux::ast::{Expression, PropertyKey};
+use flux::semantic::nodes::CallExpr;
 use flux::semantic::walk;
 
 use async_trait::async_trait;
+
+enum CompletionType {
+    Generic,
+    Logical,
+    Bad,
+}
+
+struct CompletionInfo {
+    completion_type: CompletionType,
+    ident: String,
+    bucket: Option<String>,
+}
 
 fn get_imports(
     uri: String,
@@ -46,45 +59,77 @@ fn get_imports(
     Ok((*state).imports.clone())
 }
 
-fn get_ident_name(
-    uri: String,
-    position: Position,
-) -> Result<Option<String>, String> {
+fn get_completion_info(
+    params: CompletionParams,
+) -> Result<Option<CompletionInfo>, String> {
+    let uri = params.clone().text_document.uri;
+    let position = params.clone().position;
+
     let source = cache::get(uri.clone())?;
     let pkg = crate::shared::conversion::create_file_node_from_text(
         uri,
         source.contents,
     );
     let walker = Rc::new(AstNode::File(&pkg.files[0]));
-    let visitor = ast::NodeFinderVisitor::new(Position {
-        line: position.line,
-        character: position.character - 1,
-    });
+    let visitor = ast::NodeFinderVisitor::new(position.move_back(1));
 
     walk_rc(&visitor, walker);
 
     let state = visitor.state.borrow();
-    let node = (*state).node.clone();
+    let finder_node = (*state).node.clone();
 
-    if let Some(node) = node {
-        match node.as_ref() {
+    if let Some(finder_node) = finder_node {
+        let bucket = find_bucket(params).unwrap_or(None);
+
+        if let Some(parent) = finder_node.parent {
+            if let AstNode::BinaryExpr(be) = parent.node.as_ref() {
+                if let Expression::Identifier(left) = be.left.clone()
+                {
+                    let name = left.name.clone();
+
+                    return Ok(Some(CompletionInfo {
+                        completion_type: CompletionType::Logical,
+                        ident: name,
+                        bucket,
+                    }));
+                }
+            }
+        }
+
+        match finder_node.node.as_ref() {
             AstNode::Identifier(ident) => {
                 let name = ident.name.clone();
-                return Ok(Some(name));
+                return Ok(Some(CompletionInfo {
+                    completion_type: CompletionType::Generic,
+                    ident: name,
+                    bucket,
+                }));
             }
             AstNode::BadExpr(expr) => {
                 let name = expr.text.clone();
-                return Ok(Some(name));
+                return Ok(Some(CompletionInfo {
+                    completion_type: CompletionType::Bad,
+                    ident: name,
+                    bucket,
+                }));
             }
             AstNode::MemberExpr(mbr) => {
                 if let Expression::Identifier(ident) = &mbr.object {
-                    return Ok(Some(ident.name.clone()));
+                    return Ok(Some(CompletionInfo {
+                        completion_type: CompletionType::Generic,
+                        ident: ident.name.clone(),
+                        bucket,
+                    }));
                 }
             }
             AstNode::CallExpr(c) => {
                 if let Some(arg) = c.arguments.last() {
                     if let Expression::Identifier(ident) = arg {
-                        return Ok(Some(ident.name.clone()));
+                        return Ok(Some(CompletionInfo {
+                            completion_type: CompletionType::Generic,
+                            ident: ident.name.clone(),
+                            bucket,
+                        }));
                     }
                 }
             }
@@ -147,30 +192,90 @@ async fn get_user_matches(
     Ok(result)
 }
 
+fn follow_pipes_for_bucket(call: Box<CallExpr>) -> Option<String> {
+    for arg in call.arguments {
+        if arg.key.name == "bucket" {
+            if let flux::semantic::nodes::Expression::StringLit(
+                value,
+            ) = arg.value
+            {
+                return Some(value.value);
+            } else {
+                return None;
+            }
+        }
+    }
+
+    if let Some(flux::semantic::nodes::Expression::Call(next)) =
+        call.pipe.clone()
+    {
+        return follow_pipes_for_bucket(next);
+    }
+
+    None
+}
+
+fn find_bucket(
+    params: CompletionParams,
+) -> Result<Option<String>, String> {
+    let uri = params.text_document.uri;
+    let pkg = utils::create_semantic_package(uri)?;
+    let walker = Rc::new(walk::Node::Package(&pkg));
+    let mut visitor = CallFinderVisitor::new(params.position);
+
+    walk::walk(&mut visitor, walker);
+
+    if let Ok(state) = visitor.state.lock() {
+        if let Some(node) = (*state).node.clone() {
+            if let walk::Node::ExprStmt(stmt) = node.as_ref() {
+                if let flux::semantic::nodes::Expression::Call(call) =
+                    stmt.expression.clone()
+                {
+                    return Ok(follow_pipes_for_bucket(call));
+                }
+            }
+        }
+    }
+
+    Ok(None)
+}
+
 async fn find_completions(
     params: CompletionParams,
     ctx: RequestContext,
 ) -> Result<CompletionList, String> {
-    let uri = params.text_document.uri;
-    let pos = params.position.clone();
-    let name = get_ident_name(uri.clone(), params.position)?;
+    let uri = params.clone().text_document.uri;
+    let pos = params.clone().position.clone();
+    let info = get_completion_info(params)?;
 
     let mut items: Vec<CompletionItem> = vec![];
     let imports = get_imports(uri.clone(), pos.clone(), ctx.clone())?;
 
-    if let Some(name) = name {
-        let mut stdlib_matches = get_stdlib_completions(
-            name.clone(),
-            imports.clone(),
-            ctx.clone(),
-        )
-        .await;
-        items.append(&mut stdlib_matches);
+    if let Some(info) = info {
+        match info.completion_type {
+            CompletionType::Generic => {
+                let mut stdlib_matches = get_stdlib_completions(
+                    info.ident.clone(),
+                    imports.clone(),
+                    ctx.clone(),
+                )
+                .await;
+                items.append(&mut stdlib_matches);
 
-        let mut user_matches =
-            get_user_matches(uri, pos, ctx).await?;
+                let mut user_matches =
+                    get_user_matches(uri, pos, ctx).await?;
 
-        items.append(&mut user_matches);
+                items.append(&mut user_matches);
+            }
+            CompletionType::Logical => {
+                if info.ident == "measurement" {
+                    if let Some(_bucket) = info.bucket {
+                        // TODO: Get measurements from callback
+                    }
+                }
+            }
+            CompletionType::Bad => {}
+        }
     }
 
     Ok(CompletionList {
@@ -393,11 +498,10 @@ async fn find_arg_completions(
     params: CompletionParams,
     ctx: RequestContext,
 ) -> Result<CompletionList, String> {
-    let uri = params.text_document.uri;
-    let name = get_ident_name(uri, params.position)?;
+    let info = get_completion_info(params.clone())?;
 
-    if let Some(name) = name {
-        if name == "bucket" {
+    if let Some(info) = info {
+        if info.ident == "bucket" {
             let buckets = ctx.callbacks.get_buckets().await?;
 
             let items: Vec<CompletionItem> = buckets
@@ -422,17 +526,21 @@ async fn find_dot_completions(
     params: CompletionParams,
     ctx: RequestContext,
 ) -> Result<CompletionList, String> {
-    let uri = params.text_document.uri;
-    let pos = params.position;
-    let name = get_ident_name(uri.clone(), pos.clone())?;
+    let uri = params.clone().text_document.uri;
+    let pos = params.clone().position;
+    let info = get_completion_info(params.clone())?;
 
-    if let Some(name) = name {
+    if let Some(info) = info {
         let mut list = vec![];
-        get_specific_package_functions(&mut list, name.clone());
+        get_specific_package_functions(&mut list, info.ident.clone());
 
         let mut items = vec![];
-        let obj_results =
-            get_specific_object(name, pos, uri.clone(), ctx.clone())?;
+        let obj_results = get_specific_object(
+            info.ident,
+            pos,
+            uri.clone(),
+            ctx.clone(),
+        )?;
 
         for completable in obj_results.into_iter() {
             items
