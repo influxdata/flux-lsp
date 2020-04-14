@@ -235,6 +235,7 @@ impl Default for CompletionOptions {
                 ":".to_string(),
                 "(".to_string(),
                 ",".to_string(),
+                "\"".to_string(), // NOTE: trigger at the beginning of a string argument
             ]),
         }
     }

@@ -33,7 +33,8 @@ use async_trait::async_trait;
 
 enum CompletionType {
     Generic,
-    Logical,
+    Logical(flux::ast::Operator),
+    CallProperty(String),
     Bad,
 }
 
@@ -82,21 +83,99 @@ fn get_completion_info(
         let bucket = find_bucket(params).unwrap_or(None);
 
         if let Some(parent) = finder_node.parent {
-            if let AstNode::BinaryExpr(be) = parent.node.as_ref() {
-                if let Expression::Identifier(left) = be.left.clone()
-                {
-                    let name = left.name.clone();
+            if let Some(grandparent) = parent.parent {
+                if let Some(greatgrandparent) = grandparent.parent {
+                    if let AstNode::Property(prop) =
+                        parent.node.as_ref()
+                    {
+                        if let AstNode::ObjectExpr(_) =
+                            grandparent.node.as_ref()
+                        {
+                            if let AstNode::CallExpr(call) =
+                                greatgrandparent.node.as_ref()
+                            {
+                                let name = match prop.key.clone() {
+                                    PropertyKey::Identifier(
+                                        ident,
+                                    ) => ident.name,
+                                    PropertyKey::StringLit(lit) => {
+                                        lit.value
+                                    }
+                                };
 
-                    return Ok(Some(CompletionInfo {
-                        completion_type: CompletionType::Logical,
-                        ident: name,
-                        bucket,
-                    }));
+                                if let Expression::Identifier(func) =
+                                    call.callee.clone()
+                                {
+                                    return Ok(Some(CompletionInfo {
+                                    completion_type: CompletionType::CallProperty(func.name), ident: name,
+                                    bucket,
+                                }));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            if let AstNode::BinaryExpr(be) = parent.node.as_ref() {
+                match be.left.clone() {
+                    Expression::Identifier(left) => {
+                        let name = left.name.clone();
+
+                        return Ok(Some(CompletionInfo {
+                            completion_type: CompletionType::Logical(
+                                be.operator.clone(),
+                            ),
+                            ident: name,
+                            bucket,
+                        }));
+                    }
+                    Expression::Member(left) => {
+                        if let Expression::Identifier(ident) =
+                            left.object
+                        {
+                            let key = match left.property {
+                                PropertyKey::Identifier(ident) => {
+                                    ident.name
+                                }
+                                PropertyKey::StringLit(lit) => {
+                                    lit.value
+                                }
+                            };
+
+                            let name =
+                                format!("{}.{}", ident.name, key);
+
+                            return Ok(Some(CompletionInfo {
+                                completion_type:
+                                    CompletionType::Logical(
+                                        be.operator.clone(),
+                                    ),
+                                ident: name,
+                                bucket,
+                            }));
+                        }
+                    }
+                    _ => {}
                 }
             }
         }
 
         match finder_node.node.as_ref() {
+            AstNode::BinaryExpr(be) => {
+                if let Expression::Identifier(left) = be.left.clone()
+                {
+                    let name = left.name.clone();
+
+                    return Ok(Some(CompletionInfo {
+                        completion_type: CompletionType::Logical(
+                            be.operator.clone(),
+                        ),
+                        ident: name,
+                        bucket,
+                    }));
+                }
+            }
             AstNode::Identifier(ident) => {
                 let name = ident.name.clone();
                 return Ok(Some(CompletionInfo {
@@ -240,13 +319,41 @@ fn find_bucket(
     Ok(None)
 }
 
+async fn get_measurement_completions(
+    params: CompletionParams,
+    ctx: RequestContext,
+    bucket: Option<String>,
+) -> Result<Option<CompletionList>, String> {
+    if let Some(bucket) = bucket {
+        let measurements =
+            ctx.callbacks.get_measurements(bucket).await?;
+
+        let items: Vec<CompletionItem> = measurements
+            .into_iter()
+            .map(|value| {
+                new_string_arg_completion(
+                    value,
+                    get_trigger(params.clone()),
+                )
+            })
+            .collect();
+
+        return Ok(Some(CompletionList {
+            is_incomplete: false,
+            items,
+        }));
+    }
+
+    Ok(None)
+}
+
 async fn find_completions(
     params: CompletionParams,
     ctx: RequestContext,
 ) -> Result<CompletionList, String> {
     let uri = params.clone().text_document.uri;
     let pos = params.clone().position.clone();
-    let info = get_completion_info(params)?;
+    let info = get_completion_info(params.clone())?;
 
     let mut items: Vec<CompletionItem> = vec![];
     let imports = get_imports(uri.clone(), pos.clone(), ctx.clone())?;
@@ -267,14 +374,44 @@ async fn find_completions(
 
                 items.append(&mut user_matches);
             }
-            CompletionType::Logical => {
-                if info.ident == "measurement" {
-                    if let Some(_bucket) = info.bucket {
-                        // TODO: Get measurements from callback
+            CompletionType::Logical(operator) => {
+                if info.ident.clone() == "r._measurement"
+                    && operator == flux::ast::Operator::EqualOperator
+                {
+                    let list = get_measurement_completions(
+                        params,
+                        ctx,
+                        info.bucket,
+                    )
+                    .await?;
+                    if let Some(list) = list {
+                        return Ok(list);
                     }
                 }
             }
             CompletionType::Bad => {}
+            CompletionType::CallProperty(_func) => {
+                if info.ident == "bucket" {
+                    return get_bucket_completions(
+                        ctx,
+                        get_trigger(params),
+                    )
+                    .await;
+                } else if info.ident == "measurement" {
+                    if let Some(list) = get_measurement_completions(
+                        params,
+                        ctx,
+                        info.bucket,
+                    )
+                    .await?
+                    {
+                        return Ok(list);
+                    }
+                } else {
+                    return find_param_completions(None, params, ctx)
+                        .await;
+                }
+            }
         }
     }
 
@@ -284,7 +421,17 @@ async fn find_completions(
     })
 }
 
-fn new_string_arg_completion(value: String) -> CompletionItem {
+fn new_string_arg_completion(
+    value: String,
+    trigger: Option<String>,
+) -> CompletionItem {
+    let trigger = trigger.unwrap_or_else(|| "".to_string());
+    let insert_text = if trigger == "\"" {
+        format!("{}\"", value)
+    } else {
+        format!("\"{}\"", value)
+    };
+
     CompletionItem {
         deprecated: false,
         commit_characters: None,
@@ -292,24 +439,28 @@ fn new_string_arg_completion(value: String) -> CompletionItem {
         label: format!("\"{}\"", value),
         additional_text_edits: None,
         filter_text: None,
-        insert_text: None,
+        insert_text: Some(insert_text),
         documentation: None,
         sort_text: None,
         preselect: None,
-        insert_text_format: InsertTextFormat::PlainText,
+        insert_text_format: InsertTextFormat::Snippet,
         text_edit: None,
-        kind: Some(CompletionItemKind::Text),
+        kind: Some(CompletionItemKind::Value),
     }
 }
 
 fn new_param_completion(
     name: String,
-    trigger: String,
+    trigger: Option<String>,
 ) -> CompletionItem {
-    let insert_text = if trigger == "(" {
-        format!("{}: ", name)
+    let insert_text = if let Some(trigger) = trigger {
+        if trigger == "(" {
+            format!("{}: ", name)
+        } else {
+            format!(" {}: ", name)
+        }
     } else {
-        format!(" {}: ", name)
+        format!("{}: ", name)
     };
 
     CompletionItem {
@@ -410,7 +561,7 @@ fn get_function_params(
 }
 
 async fn find_param_completions(
-    trigger: String,
+    trigger: Option<String>,
     params: CompletionParams,
     ctx: RequestContext,
 ) -> Result<CompletionList, String> {
@@ -494,6 +645,33 @@ async fn find_param_completions(
     })
 }
 
+fn get_trigger(params: CompletionParams) -> Option<String> {
+    if let Some(context) = params.context {
+        context.trigger_character
+    } else {
+        None
+    }
+}
+
+async fn get_bucket_completions(
+    ctx: RequestContext,
+    trigger: Option<String>,
+) -> Result<CompletionList, String> {
+    let buckets = ctx.callbacks.get_buckets().await?;
+
+    let items: Vec<CompletionItem> = buckets
+        .into_iter()
+        .map(|value| {
+            new_string_arg_completion(value, trigger.clone())
+        })
+        .collect();
+
+    Ok(CompletionList {
+        is_incomplete: false,
+        items,
+    })
+}
+
 async fn find_arg_completions(
     params: CompletionParams,
     ctx: RequestContext,
@@ -502,17 +680,8 @@ async fn find_arg_completions(
 
     if let Some(info) = info {
         if info.ident == "bucket" {
-            let buckets = ctx.callbacks.get_buckets().await?;
-
-            let items: Vec<CompletionItem> = buckets
-                .into_iter()
-                .map(new_string_arg_completion)
-                .collect();
-
-            return Ok(CompletionList {
-                is_incomplete: false,
-                items,
-            });
+            return get_bucket_completions(ctx, get_trigger(params))
+                .await;
         }
     }
 
@@ -587,16 +756,19 @@ pub fn get_specific_object(
 pub struct CompletionHandler {}
 
 async fn triggered_completion(
-    trigger: String,
+    trigger: Option<String>,
     params: CompletionParams,
     ctx: RequestContext,
 ) -> Result<CompletionList, String> {
-    if trigger == "." {
-        return find_dot_completions(params, ctx).await;
-    } else if trigger == ":" {
-        return find_arg_completions(params, ctx).await;
-    } else if trigger == "(" || trigger == "," {
-        return find_param_completions(trigger, params, ctx).await;
+    if let Some(ch) = trigger.clone() {
+        if ch == "." {
+            return find_dot_completions(params, ctx).await;
+        } else if ch == ":" {
+            return find_arg_completions(params, ctx).await;
+        } else if ch == "(" || ch == "," {
+            let trgr = trigger;
+            return find_param_completions(trgr, params, ctx).await;
+        }
     }
 
     find_completions(params, ctx).await
@@ -613,20 +785,21 @@ impl RequestHandler for CompletionHandler {
             Request::from_json(prequest.data.as_str())?;
         if let Some(params) = req.params {
             if let Some(context) = params.clone().context {
-                if let Some(trigger) = context.trigger_character {
-                    let completions =
-                        triggered_completion(trigger, params, ctx)
-                            .await?;
+                let completions = triggered_completion(
+                    context.trigger_character,
+                    params,
+                    ctx,
+                )
+                .await?;
 
-                    let response = Response::new(
-                        prequest.base_request.id,
-                        Some(completions),
-                    );
+                let response = Response::new(
+                    prequest.base_request.id,
+                    Some(completions),
+                );
 
-                    let result = response.to_json()?;
+                let result = response.to_json()?;
 
-                    return Ok(Some(result));
-                }
+                return Ok(Some(result));
             }
 
             let completions = find_completions(params, ctx).await?;
