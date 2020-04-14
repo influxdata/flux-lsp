@@ -96,6 +96,13 @@ impl Callback {
             Err(_e) => Err("Callback failed".to_string()),
         }
     }
+
+    pub fn call1(&self, arg1: JsValue) -> Result<Promise, String> {
+        match self.f.call1(&JsValue::NULL, &arg1) {
+            Ok(result) => Ok(Promise::from(result)),
+            Err(_e) => Err("Callback failed".to_string()),
+        }
+    }
 }
 
 unsafe impl<'a> Send for Callback {}
@@ -104,6 +111,7 @@ unsafe impl<'a> Sync for Callback {}
 #[derive(Default, Clone)]
 pub struct Callbacks {
     pub buckets: Option<Callback>,
+    pub measurements: Option<Callback>,
 }
 
 impl Callbacks {
@@ -111,9 +119,25 @@ impl Callbacks {
         self.buckets = Some(Callback::new(f));
     }
 
+    pub fn register_measurements_callback(&mut self, f: Function) {
+        self.measurements = Some(Callback::new(f));
+    }
+
     fn call_buckets(&self) -> Result<JsFuture, String> {
         if let Some(cb) = self.buckets.clone() {
             let promise = cb.call0()?;
+            Ok(JsFuture::from(promise))
+        } else {
+            Err("No buckets function set".to_string())
+        }
+    }
+
+    fn call_measurements(
+        &self,
+        bucket: String,
+    ) -> Result<JsFuture, String> {
+        if let Some(cb) = self.measurements.clone() {
+            let promise = cb.call1(bucket.into())?;
             Ok(JsFuture::from(promise))
         } else {
             Err("No buckets function set".to_string())
@@ -129,6 +153,34 @@ impl Callbacks {
 
         spawn_local(async move {
             let future = cln.call_buckets().unwrap();
+            if let Ok(returned) = future.await {
+                if let Ok(v) = returned.into_serde() {
+                    cloned.resolve(v);
+                } else {
+                    cloned.resolve(vec![]);
+                }
+            } else {
+                cloned.resolve(vec![]);
+            }
+        });
+
+        finished.clone().await;
+
+        Ok(finished.result())
+    }
+
+    pub async fn get_measurements(
+        &self,
+        bucket: String,
+    ) -> Result<Vec<String>, String> {
+        let mut finished = Resolvable::default();
+
+        let mut cloned = finished.clone();
+
+        let cln = self.clone();
+
+        spawn_local(async move {
+            let future = cln.call_measurements(bucket).unwrap();
             if let Ok(returned) = future.await {
                 if let Ok(v) = returned.into_serde() {
                     cloned.resolve(v);

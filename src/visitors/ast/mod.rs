@@ -5,7 +5,6 @@ use std::rc::Rc;
 
 use flux::ast::walk::{self, Visitor};
 
-// TODO: figure out if this offset is common among lsp clients
 fn contains_position(
     node: Rc<walk::Node<'_>>,
     pos: Position,

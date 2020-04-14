@@ -4,6 +4,10 @@ build:
 install:
 	cargo install --path . --force
 
+lint:
+	cargo fmt --all -- --check
+	cargo clippy --all -- -D warnings
+
 test:
 	@echo "------------------------------------------------------------------"
 	@echo "tests arg can be used to run specific tests"
@@ -27,6 +31,9 @@ clean-wasm:
 
 wasm: clean-wasm build
 	./build.sh
+
+wasm-local: clean-wasm
+	AR=llvm-ar ./wasm-build.sh
 
 publish: build
 	./publish.sh
