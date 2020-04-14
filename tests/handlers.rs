@@ -471,11 +471,11 @@ speculate! {
 
                 labels.sort_by(|a, b| a.to_lowercase().cmp(&b.to_lowercase()));
 
-                assert_eq!(labels, vec!["csv", "file"], "returns correct items");
+                assert_eq!(labels, vec!["csv", "file", "url"], "returns correct items");
 
                 assert_eq!(
                     returned_items.len(),
-                    2,
+                    3,
                     "returns correct number of results"
                 );
             }
