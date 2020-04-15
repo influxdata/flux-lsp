@@ -2,6 +2,7 @@ use crate::handlers::completion::CompletionHandler;
 use crate::handlers::completion_resolve::CompletionResolveHandler;
 use crate::handlers::document_change::DocumentChangeHandler;
 use crate::handlers::document_close::DocumentCloseHandler;
+use crate::handlers::document_formatting::DocumentFormattingHandler;
 use crate::handlers::document_open::DocumentOpenHandler;
 use crate::handlers::document_save::DocumentSaveHandler;
 use crate::handlers::document_symbol::DocumentSymbolHandler;
@@ -90,6 +91,10 @@ impl Router {
         mapping.insert(
             "textDocument/documentSymbol".to_string(),
             Box::new(DocumentSymbolHandler::default()),
+        );
+        mapping.insert(
+            "textDocument/formatting".to_string(),
+            Box::new(DocumentFormattingHandler::default()),
         );
         mapping.insert(
             "textDocument/completion".to_string(),

@@ -303,6 +303,52 @@ speculate! {
         }
     }
 
+    describe "Formatting request" {
+        describe "when ok" {
+            before {
+                flux_lsp::cache::clear().unwrap();
+                let uri = flux_fixture_uri("formatting");
+                open_file(uri.clone(), &mut router);
+            }
+
+            after {
+                close_file(uri, &mut router);
+            }
+            it "returns the correct result" {
+                let formatting_request = Request {
+                    id: 1,
+                    method: "textDocument/formatting".to_string(),
+                    params: Some(DocumentFormattingParams {
+                        text_document: TextDocumentIdentifier {
+                            uri: uri.clone(),
+                        }
+                    }),
+                };
+                let request_json = serde_json::to_string(&formatting_request).unwrap();
+                let request = PolymorphicRequest {
+                    base_request: BaseRequest {
+                        id: 1,
+                        method: "textDocument/formatting".to_string(),
+                    },
+                    data: request_json,
+                };
+
+                let response = block_on(router.route(request, create_request_context())).unwrap();
+                let returned = from_str::<Response<Vec<TextEdit>>>(response.unwrap().as_str()).unwrap();
+
+                let result = returned.result.unwrap();
+                let edit = result.first().unwrap();
+                let text = edit.new_text.clone();
+
+
+                let file_text = get_file_contents_from_uri(uri.clone()).unwrap();
+                let formatted_text = flux::formatter::format(file_text).unwrap();
+
+                assert_eq!(text, formatted_text, "returns formatted text");
+            }
+        }
+    }
+
     describe "Signature help request" {
         describe "when ok" {
             before {

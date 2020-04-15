@@ -70,6 +70,12 @@ pub struct ShutdownParams {}
 pub struct ReferenceContext {}
 
 #[derive(Serialize, Deserialize, Clone)]
+pub struct DocumentFormattingParams {
+    #[serde(rename = "textDocument")]
+    pub text_document: TextDocumentIdentifier,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
 pub struct ReferenceParams {
     pub context: ReferenceContext,
     #[serde(rename = "textDocument")]
