@@ -261,6 +261,9 @@ pub struct ServerCapabilities {
     #[serde(rename = "documentSymbolProvider")]
     pub document_symbol_provider: bool,
 
+    #[serde(rename = "documentFormattingProvider")]
+    pub document_formatting_provider: bool,
+
     #[serde(rename = "completionProvider")]
     pub completion_provider: CompletionOptions,
 

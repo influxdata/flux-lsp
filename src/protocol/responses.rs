@@ -54,6 +54,7 @@ impl InitializeResult {
                 rename_provider: true,
                 folding_range_provider,
                 document_symbol_provider: true,
+                document_formatting_provider: true,
                 completion_provider: CompletionOptions::default(),
                 signature_help_provider:
                     SignatureHelpOptions::default(),

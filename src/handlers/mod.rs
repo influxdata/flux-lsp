@@ -2,6 +2,7 @@ pub mod completion;
 pub mod completion_resolve;
 pub mod document_change;
 pub mod document_close;
+pub mod document_formatting;
 pub mod document_open;
 pub mod document_save;
 pub mod document_symbol;
