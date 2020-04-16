@@ -427,7 +427,7 @@ fn new_string_arg_completion(
 ) -> CompletionItem {
     let trigger = trigger.unwrap_or_else(|| "".to_string());
     let insert_text = if trigger == "\"" {
-        format!("{}\"", value)
+        value
     } else {
         format!("\"{}\"", value)
     };
@@ -436,7 +436,7 @@ fn new_string_arg_completion(
         deprecated: false,
         commit_characters: None,
         detail: None,
-        label: format!("\"{}\"", value),
+        label: insert_text.clone(),
         additional_text_edits: None,
         filter_text: None,
         insert_text: Some(insert_text),
