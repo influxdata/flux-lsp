@@ -101,6 +101,29 @@ pub fn create_completion_package(
     pos: Position,
     ctx: RequestContext,
 ) -> Result<Package, String> {
+    create_filtered_package(uri, ctx, |x| valid_node(x, pos.clone()))
+}
+
+pub fn create_clean_package(
+    uri: String,
+    ctx: RequestContext,
+) -> Result<Package, String> {
+    create_filtered_package(uri, ctx, |x| {
+        if let flux::ast::Statement::Bad(_) = x {
+            return false;
+        }
+        true
+    })
+}
+
+fn create_filtered_package<F>(
+    uri: String,
+    ctx: RequestContext,
+    mut filter: F,
+) -> Result<Package, String>
+where
+    F: FnMut(&flux::ast::Statement) -> bool,
+{
     let mut ast_pkg =
         crate::shared::create_ast_package(uri.clone(), ctx)?;
 
@@ -112,7 +135,7 @@ pub fn create_completion_package(
                 file.body = file
                     .body
                     .into_iter()
-                    .filter(|x| valid_node(x, pos.clone()))
+                    .filter(|x| filter(x))
                     .collect();
             }
 

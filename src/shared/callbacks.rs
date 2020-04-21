@@ -112,6 +112,7 @@ unsafe impl<'a> Sync for Callback {}
 pub struct Callbacks {
     pub buckets: Option<Callback>,
     pub measurements: Option<Callback>,
+    pub tag_keys: Option<Callback>,
 }
 
 impl Callbacks {
@@ -121,6 +122,10 @@ impl Callbacks {
 
     pub fn register_measurements_callback(&mut self, f: Function) {
         self.measurements = Some(Callback::new(f));
+    }
+
+    pub fn register_tag_keys_callback(&mut self, f: Function) {
+        self.tag_keys = Some(Callback::new(f));
     }
 
     fn call_buckets(&self) -> Result<JsFuture, String> {
@@ -140,7 +145,19 @@ impl Callbacks {
             let promise = cb.call1(bucket.into())?;
             Ok(JsFuture::from(promise))
         } else {
-            Err("No buckets function set".to_string())
+            Err("No measurements function set".to_string())
+        }
+    }
+
+    fn call_tag_keys(
+        &self,
+        bucket: String,
+    ) -> Result<JsFuture, String> {
+        if let Some(cb) = self.tag_keys.clone() {
+            let promise = cb.call1(bucket.into())?;
+            Ok(JsFuture::from(promise))
+        } else {
+            Err("No tag keys function set".to_string())
         }
     }
 
@@ -181,6 +198,34 @@ impl Callbacks {
 
         spawn_local(async move {
             let future = cln.call_measurements(bucket).unwrap();
+            if let Ok(returned) = future.await {
+                if let Ok(v) = returned.into_serde() {
+                    cloned.resolve(v);
+                } else {
+                    cloned.resolve(vec![]);
+                }
+            } else {
+                cloned.resolve(vec![]);
+            }
+        });
+
+        finished.clone().await;
+
+        Ok(finished.result())
+    }
+
+    pub async fn get_tag_keys(
+        &self,
+        bucket: String,
+    ) -> Result<Vec<String>, String> {
+        let mut finished = Resolvable::default();
+
+        let mut cloned = finished.clone();
+
+        let cln = self.clone();
+
+        spawn_local(async move {
+            let future = cln.call_tag_keys(bucket).unwrap();
             if let Ok(returned) = future.await {
                 if let Ok(v) = returned.into_serde() {
                     cloned.resolve(v);

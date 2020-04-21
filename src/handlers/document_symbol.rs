@@ -4,6 +4,7 @@ use crate::protocol::requests::{
     DocumentSymbolParams, PolymorphicRequest, Request,
 };
 use crate::protocol::responses::Response;
+use crate::shared::structs::RequestContext;
 use crate::visitors::semantic::utils;
 use crate::visitors::semantic::SymbolsVisitor;
 
@@ -26,8 +27,9 @@ fn sort_symbols(
 
 fn find_symbols(
     uri: String,
+    ctx: RequestContext,
 ) -> Result<Vec<SymbolInformation>, String> {
-    let smp = utils::create_semantic_package(uri.clone())?;
+    let smp = utils::create_clean_package(uri.clone(), ctx)?;
     let pkg = Node::Package(&smp);
 
     let mut visitor = SymbolsVisitor::new(uri);
@@ -49,12 +51,13 @@ impl RequestHandler for DocumentSymbolHandler {
     async fn handle(
         &self,
         prequest: PolymorphicRequest,
-        _: crate::shared::RequestContext,
+        ctx: crate::shared::RequestContext,
     ) -> Result<Option<String>, String> {
         let request: Request<DocumentSymbolParams> =
             Request::from_json(prequest.data.as_str())?;
         if let Some(params) = request.params {
-            let symbols = find_symbols(params.text_document.uri)?;
+            let symbols =
+                find_symbols(params.text_document.uri, ctx)?;
             let response: Response<Vec<SymbolInformation>> =
                 Response::new(request.id, Some(symbols));
             let json = response.to_json()?;

@@ -35,6 +35,7 @@ enum CompletionType {
     Generic,
     Logical(flux::ast::Operator),
     CallProperty(String),
+    ObjectMember(String),
     Bad,
 }
 
@@ -62,6 +63,7 @@ fn get_imports(
 
 fn get_completion_info(
     params: CompletionParams,
+    ctx: RequestContext,
 ) -> Result<Option<CompletionInfo>, String> {
     let uri = params.clone().text_document.uri;
     let position = params.clone().position;
@@ -80,9 +82,22 @@ fn get_completion_info(
     let finder_node = (*state).node.clone();
 
     if let Some(finder_node) = finder_node {
-        let bucket = find_bucket(params).unwrap_or(None);
+        let bucket = find_bucket(params.clone(), ctx).unwrap_or(None);
 
         if let Some(parent) = finder_node.parent {
+            if let AstNode::MemberExpr(me) = parent.node.as_ref() {
+                if let Expression::Identifier(obj) = me.object.clone()
+                {
+                    return Ok(Some(CompletionInfo {
+                        completion_type: CompletionType::ObjectMember(
+                            obj.name.clone(),
+                        ),
+                        ident: obj.name,
+                        bucket,
+                    }));
+                }
+            }
+
             if let Some(grandparent) = parent.parent {
                 if let Some(greatgrandparent) = grandparent.parent {
                     if let AstNode::Property(prop) =
@@ -296,11 +311,13 @@ fn follow_pipes_for_bucket(call: Box<CallExpr>) -> Option<String> {
 
 fn find_bucket(
     params: CompletionParams,
+    ctx: RequestContext,
 ) -> Result<Option<String>, String> {
     let uri = params.text_document.uri;
-    let pkg = utils::create_semantic_package(uri)?;
+    let pos = params.position;
+    let pkg = utils::create_clean_package(uri, ctx)?;
     let walker = Rc::new(walk::Node::Package(&pkg));
-    let mut visitor = CallFinderVisitor::new(params.position);
+    let mut visitor = CallFinderVisitor::new(pos);
 
     walk::walk(&mut visitor, walker);
 
@@ -347,13 +364,48 @@ async fn get_measurement_completions(
     Ok(None)
 }
 
+async fn get_tag_keys_completions(
+    ctx: RequestContext,
+    bucket: Option<String>,
+) -> Result<Option<CompletionList>, String> {
+    if let Some(bucket) = bucket {
+        let tag_keys = ctx.callbacks.get_tag_keys(bucket).await?;
+
+        let items: Vec<CompletionItem> = tag_keys
+            .into_iter()
+            .map(|value| CompletionItem {
+                additional_text_edits: None,
+                commit_characters: None,
+                deprecated: false,
+                detail: None,
+                documentation: None,
+                filter_text: None,
+                insert_text: Some(value.clone()),
+                label: value,
+                insert_text_format: InsertTextFormat::Snippet,
+                kind: Some(CompletionItemKind::Property),
+                preselect: None,
+                sort_text: None,
+                text_edit: None,
+            })
+            .collect();
+
+        return Ok(Some(CompletionList {
+            is_incomplete: false,
+            items,
+        }));
+    }
+
+    Ok(None)
+}
+
 async fn find_completions(
     params: CompletionParams,
     ctx: RequestContext,
 ) -> Result<CompletionList, String> {
     let uri = params.clone().text_document.uri;
     let pos = params.clone().position.clone();
-    let info = get_completion_info(params.clone())?;
+    let info = get_completion_info(params.clone(), ctx.clone())?;
 
     let mut items: Vec<CompletionItem> = vec![];
     let imports = get_imports(uri.clone(), pos.clone(), ctx.clone())?;
@@ -412,6 +464,7 @@ async fn find_completions(
                         .await;
                 }
             }
+            _ => {}
         }
     }
 
@@ -427,7 +480,7 @@ fn new_string_arg_completion(
 ) -> CompletionItem {
     let trigger = trigger.unwrap_or_else(|| "".to_string());
     let insert_text = if trigger == "\"" {
-        format!("{}\"", value)
+        value
     } else {
         format!("\"{}\"", value)
     };
@@ -436,7 +489,7 @@ fn new_string_arg_completion(
         deprecated: false,
         commit_characters: None,
         detail: None,
-        label: format!("\"{}\"", value),
+        label: insert_text.clone(),
         additional_text_edits: None,
         filter_text: None,
         insert_text: Some(insert_text),
@@ -676,7 +729,7 @@ async fn find_arg_completions(
     params: CompletionParams,
     ctx: RequestContext,
 ) -> Result<CompletionList, String> {
-    let info = get_completion_info(params.clone())?;
+    let info = get_completion_info(params.clone(), ctx.clone())?;
 
     if let Some(info) = info {
         if info.ident == "bucket" {
@@ -697,9 +750,25 @@ async fn find_dot_completions(
 ) -> Result<CompletionList, String> {
     let uri = params.clone().text_document.uri;
     let pos = params.clone().position;
-    let info = get_completion_info(params.clone())?;
+    let info = get_completion_info(params.clone(), ctx.clone())?;
 
     if let Some(info) = info {
+        if let CompletionType::ObjectMember(om) = info.completion_type
+        {
+            if om == "r" {
+                if let Some(bucket) = info.bucket {
+                    if let Some(list) = get_tag_keys_completions(
+                        ctx.clone(),
+                        Some(bucket),
+                    )
+                    .await?
+                    {
+                        return Ok(list);
+                    }
+                }
+            }
+        }
+
         let mut list = vec![];
         get_specific_package_functions(&mut list, info.ident.clone());
 
