@@ -63,6 +63,10 @@ impl Server {
         self.callbacks.register_measurements_callback(f);
     }
 
+    pub fn register_tag_keys_callback(&mut self, f: Function) {
+        self.callbacks.register_tag_keys_callback(f);
+    }
+
     pub fn process(&mut self, msg: String) -> Promise {
         let router = self.handler.clone();
         let callbacks = self.callbacks.clone();
