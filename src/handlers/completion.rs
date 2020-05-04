@@ -11,9 +11,10 @@ use crate::protocol::responses::{
     CompletionItem, CompletionItemKind, CompletionList,
     InsertTextFormat, Response,
 };
+use crate::shared::conversion::flux_position_to_position;
 use crate::shared::{Function, RequestContext};
 use crate::stdlib::{
-    get_builtin_functions, get_package_functions,
+    get_builtin_functions, get_package_functions, get_package_infos,
     get_specific_package_functions, get_stdlib, Completable,
 };
 use crate::visitors::ast;
@@ -36,6 +37,7 @@ enum CompletionType {
     Logical(flux::ast::Operator),
     CallProperty(String),
     ObjectMember(String),
+    Import,
     Bad,
 }
 
@@ -43,6 +45,7 @@ struct CompletionInfo {
     completion_type: CompletionType,
     ident: String,
     bucket: Option<String>,
+    position: Position,
 }
 
 fn get_imports(
@@ -51,6 +54,23 @@ fn get_imports(
     ctx: RequestContext,
 ) -> Result<Vec<String>, String> {
     let pkg = utils::create_completion_package(uri, pos, ctx)?;
+    let walker = Rc::new(walk::Node::Package(&pkg));
+    let mut visitor = ImportFinderVisitor::default();
+
+    walk::walk(&mut visitor, walker);
+
+    let state = visitor.state.borrow();
+
+    Ok((*state).imports.clone())
+}
+
+fn get_imports_removed(
+    uri: String,
+    pos: Position,
+    ctx: RequestContext,
+) -> Result<Vec<String>, String> {
+    let pkg =
+        utils::create_completion_package_removed(uri, pos, ctx)?;
     let walker = Rc::new(walk::Node::Package(&pkg));
     let mut visitor = ImportFinderVisitor::default();
 
@@ -94,8 +114,22 @@ fn get_completion_info(
                         ),
                         ident: obj.name,
                         bucket,
+                        position,
                     }));
                 }
+            }
+
+            if let AstNode::ImportDeclaration(id) =
+                parent.node.as_ref()
+            {
+                return Ok(Some(CompletionInfo {
+                    completion_type: CompletionType::Import,
+                    ident: "".to_string(),
+                    bucket,
+                    position: flux_position_to_position(
+                        id.base.location.start.clone(),
+                    ),
+                }));
             }
 
             if let Some(grandparent) = parent.parent {
@@ -124,6 +158,7 @@ fn get_completion_info(
                                     return Ok(Some(CompletionInfo {
                                     completion_type: CompletionType::CallProperty(func.name), ident: name,
                                     bucket,
+                                    position
                                 }));
                                 }
                             }
@@ -143,6 +178,7 @@ fn get_completion_info(
                             ),
                             ident: name,
                             bucket,
+                            position,
                         }));
                     }
                     Expression::Member(left) => {
@@ -168,6 +204,7 @@ fn get_completion_info(
                                     ),
                                 ident: name,
                                 bucket,
+                                position,
                             }));
                         }
                     }
@@ -188,6 +225,7 @@ fn get_completion_info(
                         ),
                         ident: name,
                         bucket,
+                        position,
                     }));
                 }
             }
@@ -197,6 +235,7 @@ fn get_completion_info(
                     completion_type: CompletionType::Generic,
                     ident: name,
                     bucket,
+                    position,
                 }));
             }
             AstNode::BadExpr(expr) => {
@@ -205,6 +244,7 @@ fn get_completion_info(
                     completion_type: CompletionType::Bad,
                     ident: name,
                     bucket,
+                    position,
                 }));
             }
             AstNode::MemberExpr(mbr) => {
@@ -213,6 +253,7 @@ fn get_completion_info(
                         completion_type: CompletionType::Generic,
                         ident: ident.name.clone(),
                         bucket,
+                        position,
                     }));
                 }
             }
@@ -223,6 +264,7 @@ fn get_completion_info(
                             completion_type: CompletionType::Generic,
                             ident: ident.name.clone(),
                             bucket,
+                            position,
                         }));
                     }
                 }
@@ -244,7 +286,9 @@ async fn get_stdlib_completions(
 
     for c in completes.into_iter() {
         if c.matches(name.clone(), imports.clone()) {
-            matches.push(c.completion_item(ctx.clone()).await);
+            matches.push(
+                c.completion_item(ctx.clone(), imports.clone()).await,
+            );
         }
     }
 
@@ -278,9 +322,13 @@ async fn get_user_matches(
     let completables =
         get_user_completables(uri.clone(), pos.clone(), ctx.clone())?;
 
+    let imports = get_imports(uri, pos, ctx.clone())?;
+
     let mut result: Vec<CompletionItem> = vec![];
     for x in completables {
-        result.push(x.completion_item(ctx.clone()).await)
+        result.push(
+            x.completion_item(ctx.clone(), imports.clone()).await,
+        )
     }
 
     Ok(result)
@@ -408,11 +456,15 @@ async fn find_completions(
     let info = get_completion_info(params.clone(), ctx.clone())?;
 
     let mut items: Vec<CompletionItem> = vec![];
-    let imports = get_imports(uri.clone(), pos.clone(), ctx.clone())?;
 
     if let Some(info) = info {
         match info.completion_type {
             CompletionType::Generic => {
+                let imports = get_imports(
+                    uri.clone(),
+                    pos.clone(),
+                    ctx.clone(),
+                )?;
                 let mut stdlib_matches = get_stdlib_completions(
                     info.ident.clone(),
                     imports.clone(),
@@ -464,7 +516,30 @@ async fn find_completions(
                         .await;
                 }
             }
-            _ => {}
+            CompletionType::Import => {
+                let infos = get_package_infos();
+
+                let current =
+                    get_imports_removed(uri, info.position, ctx)?;
+
+                let mut items = vec![];
+                for info in infos {
+                    if !current.contains(&info.name) {
+                        items.push(new_string_arg_completion(
+                            info.path,
+                            get_trigger(params.clone()),
+                        ));
+                    }
+                }
+
+                return Ok(CompletionList {
+                    is_incomplete: false,
+                    items,
+                });
+            }
+            CompletionType::ObjectMember(_obj) => {
+                return find_dot_completions(params, ctx).await;
+            }
         }
     }
 
@@ -752,6 +827,9 @@ async fn find_dot_completions(
     let pos = params.clone().position;
     let info = get_completion_info(params.clone(), ctx.clone())?;
 
+    let imports =
+        get_imports_removed(uri.clone(), pos.clone(), ctx.clone())?;
+
     if let Some(info) = info {
         if let CompletionType::ObjectMember(om) = info.completion_type
         {
@@ -781,12 +859,18 @@ async fn find_dot_completions(
         )?;
 
         for completable in obj_results.into_iter() {
-            items
-                .push(completable.completion_item(ctx.clone()).await);
+            items.push(
+                completable
+                    .completion_item(ctx.clone(), imports.clone())
+                    .await,
+            );
         }
 
         for item in list.into_iter() {
-            items.push(item.completion_item(ctx.clone()).await);
+            items.push(
+                item.completion_item(ctx.clone(), imports.clone())
+                    .await,
+            );
         }
 
         return Ok(CompletionList {

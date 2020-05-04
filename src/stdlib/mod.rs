@@ -1,3 +1,4 @@
+use crate::protocol::properties::{Position, Range, TextEdit};
 use crate::protocol::responses::{
     CompletionItem, CompletionItemKind, InsertTextFormat,
 };
@@ -13,11 +14,14 @@ use std::iter::Iterator;
 
 use async_trait::async_trait;
 
+pub const BUILTIN_PACKAGE: &str = "builtin";
+
 #[async_trait]
 pub trait Completable {
     async fn completion_item(
         &self,
         ctx: RequestContext,
+        imports: Vec<String>,
     ) -> CompletionItem;
     fn matches(&self, text: String, imports: Vec<String>) -> bool;
 }
@@ -66,6 +70,7 @@ impl Completable for VarResult {
     async fn completion_item(
         &self,
         _ctx: RequestContext,
+        _imports: Vec<String>,
     ) -> CompletionItem {
         CompletionItem {
             label: format!("{} ({})", self.name, self.package),
@@ -88,7 +93,7 @@ impl Completable for VarResult {
     }
 
     fn matches(&self, text: String, imports: Vec<String>) -> bool {
-        if self.package == "builtin" && !text.ends_with('.') {
+        if self.package == BUILTIN_PACKAGE && !text.ends_with('.') {
             return true;
         }
 
@@ -116,10 +121,29 @@ impl Completable for PackageResult {
     async fn completion_item(
         &self,
         _ctx: RequestContext,
+        imports: Vec<String>,
     ) -> CompletionItem {
+        let mut additional_text_edits = vec![];
+
+        if !imports.contains(&self.full_name) {
+            additional_text_edits.push(TextEdit {
+                new_text: format!("import \"{}\"\n", self.full_name),
+                range: Range {
+                    start: Position {
+                        character: 0,
+                        line: 0,
+                    },
+                    end: Position {
+                        character: 0,
+                        line: 0,
+                    },
+                },
+            })
+        }
+
         CompletionItem {
             label: self.name.clone(),
-            additional_text_edits: None,
+            additional_text_edits: Some(additional_text_edits),
             commit_characters: None,
             deprecated: false,
             detail: Some("Package".to_string()),
@@ -134,10 +158,7 @@ impl Completable for PackageResult {
         }
     }
 
-    fn matches(&self, text: String, imports: Vec<String>) -> bool {
-        if !imports.contains(&self.full_name.clone()) {
-            return false;
-        }
+    fn matches(&self, text: String, _imports: Vec<String>) -> bool {
         if !text.ends_with('.') {
             let name = self.name.to_lowercase();
             let mtext = text.to_lowercase();
@@ -239,10 +260,31 @@ impl Completable for FunctionResult {
     async fn completion_item(
         &self,
         ctx: RequestContext,
+        imports: Vec<String>,
     ) -> CompletionItem {
+        let mut additional_text_edits = vec![];
+
+        if !imports.contains(&self.package)
+            && self.package != BUILTIN_PACKAGE
+        {
+            additional_text_edits.push(TextEdit {
+                new_text: format!("import \"{}\"\n", self.package),
+                range: Range {
+                    start: Position {
+                        line: 0,
+                        character: 0,
+                    },
+                    end: Position {
+                        line: 0,
+                        character: 0,
+                    },
+                },
+            })
+        }
+
         CompletionItem {
             label: self.name.clone(),
-            additional_text_edits: None,
+            additional_text_edits: Some(additional_text_edits),
             commit_characters: None,
             deprecated: false,
             detail: Some(self.signature.clone()),
@@ -260,7 +302,7 @@ impl Completable for FunctionResult {
     }
 
     fn matches(&self, text: String, imports: Vec<String>) -> bool {
-        if self.package == "builtin" && !text.ends_with('.') {
+        if self.package == BUILTIN_PACKAGE && !text.ends_with('.') {
             return true;
         }
 
@@ -501,6 +543,25 @@ fn walk(
     }
 }
 
+pub struct PackageInfo {
+    pub name: String,
+    pub path: String,
+}
+
+pub fn get_package_infos() -> Vec<PackageInfo> {
+    let mut result: Vec<PackageInfo> = vec![];
+    let env = imports().unwrap();
+
+    for (path, _val) in env.values {
+        let name = get_package_name(path.clone());
+        if let Some(name) = name {
+            result.push(PackageInfo { name, path })
+        }
+    }
+
+    result
+}
+
 pub fn get_package_name(name: String) -> Option<String> {
     let items = name.split('/');
 
@@ -627,7 +688,7 @@ pub fn get_stdlib_functions() -> Vec<FunctionInfo> {
             results.push(FunctionInfo::new(
                 name,
                 f.as_ref(),
-                "builtin".to_string(),
+                BUILTIN_PACKAGE.to_string(),
             ));
         }
     }
@@ -671,7 +732,7 @@ pub fn get_builtins(
     for (key, val) in env.values {
         match val.expr {
             MonoType::Fun(f) => list.push(Box::new(FunctionResult {
-                package: "builtin".to_string(),
+                package: BUILTIN_PACKAGE.to_string(),
                 package_name: None,
                 name: key.clone(),
                 signature: create_function_signature((*f).clone()),
@@ -680,61 +741,61 @@ pub fn get_builtins(
             })),
             MonoType::String => list.push(Box::new(VarResult {
                 name: key.clone(),
-                package: "builtin".to_string(),
+                package: BUILTIN_PACKAGE.to_string(),
                 package_name: None,
                 var_type: VarType::String,
             })),
             MonoType::Int => list.push(Box::new(VarResult {
                 name: key.clone(),
-                package: "builtin".to_string(),
+                package: BUILTIN_PACKAGE.to_string(),
                 package_name: None,
                 var_type: VarType::Int,
             })),
             MonoType::Float => list.push(Box::new(VarResult {
                 name: key.clone(),
-                package: "builtin".to_string(),
+                package: BUILTIN_PACKAGE.to_string(),
                 package_name: None,
                 var_type: VarType::Float,
             })),
             MonoType::Arr(_) => list.push(Box::new(VarResult {
                 name: key.clone(),
-                package: "builtin".to_string(),
+                package: BUILTIN_PACKAGE.to_string(),
                 package_name: None,
                 var_type: VarType::Array,
             })),
             MonoType::Bool => list.push(Box::new(VarResult {
                 name: key.clone(),
-                package: "builtin".to_string(),
+                package: BUILTIN_PACKAGE.to_string(),
                 package_name: None,
                 var_type: VarType::Bool,
             })),
             MonoType::Bytes => list.push(Box::new(VarResult {
                 name: key.clone(),
-                package: "builtin".to_string(),
+                package: BUILTIN_PACKAGE.to_string(),
                 package_name: None,
                 var_type: VarType::Bytes,
             })),
             MonoType::Duration => list.push(Box::new(VarResult {
                 name: key.clone(),
-                package: "builtin".to_string(),
+                package: BUILTIN_PACKAGE.to_string(),
                 package_name: None,
                 var_type: VarType::Duration,
             })),
             MonoType::Uint => list.push(Box::new(VarResult {
                 name: key.clone(),
-                package: "builtin".to_string(),
+                package: BUILTIN_PACKAGE.to_string(),
                 package_name: None,
                 var_type: VarType::Uint,
             })),
             MonoType::Regexp => list.push(Box::new(VarResult {
                 name: key.clone(),
-                package: "builtin".to_string(),
+                package: BUILTIN_PACKAGE.to_string(),
                 package_name: None,
                 var_type: VarType::Regexp,
             })),
             MonoType::Time => list.push(Box::new(VarResult {
                 name: key.clone(),
-                package: "builtin".to_string(),
+                package: BUILTIN_PACKAGE.to_string(),
                 package_name: None,
                 var_type: VarType::Time,
             })),
