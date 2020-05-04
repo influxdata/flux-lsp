@@ -8,7 +8,7 @@ use crate::protocol::responses::{
 };
 use crate::shared::signatures::FunctionSignature;
 use crate::shared::RequestContext;
-use crate::stdlib::get_stdlib_functions;
+use crate::stdlib::{get_stdlib_functions, BUILTIN_PACKAGE};
 use crate::visitors::semantic::functions::FunctionFinderVisitor;
 use crate::visitors::semantic::utils::{
     create_completion_package, create_semantic_package,
@@ -106,7 +106,7 @@ fn find_signatures(
                 } else if let Expression::Identifier(ident) = callee {
                     result.extend(find_stdlib_signatures(
                         ident.name.clone(),
-                        "builtin".to_string(),
+                        BUILTIN_PACKAGE.to_string(),
                     ));
                     result.extend(find_user_defined_signatures(
                         pos, uri, ident.name, ctx,

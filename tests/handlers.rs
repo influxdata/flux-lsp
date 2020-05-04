@@ -674,14 +674,14 @@ speculate! {
                     block_on(PackageResult {
                         full_name: "csv".to_string(),
                         name: "csv".to_string(),
-                    }.completion_item(create_request_context()))
+                    }.completion_item(create_request_context(), vec![]))
                 ];
 
                 let mut builtins = vec![];
                 get_builtins(&mut builtins);
 
                 for b in builtins {
-                    let item = block_on(b.completion_item(create_request_context()));
+                    let item = block_on(b.completion_item(create_request_context(), vec![]));
                     items.push(item);
                 }
 
@@ -689,7 +689,7 @@ speculate! {
                 let returned_items = returned.result.unwrap().items;
 
                 assert_eq!(
-                    110,
+                    111,
                     returned_items.len(),
                     "expects completion items"
                 );
@@ -750,7 +750,7 @@ speculate! {
                 let returned_items = returned.result.unwrap().items;
 
                 assert_eq!(
-                    110,
+                    111,
                     returned_items.len(),
                     "expects completion items"
                 );

@@ -34,10 +34,10 @@ pub fn analyze_source(
 }
 
 fn valid_node(
-    node: &flux::ast::Statement,
+    node: &flux::ast::BaseNode,
     position: Position,
 ) -> bool {
-    !is_in_node(position, node.base())
+    !is_in_node(position, node)
 }
 
 fn remove_character(source: String, pos: Position) -> String {
@@ -74,14 +74,21 @@ pub fn create_completion_package_removed(
     let contents = remove_character(cv.contents, pos.clone());
     let mut file = parse_string("", contents.as_str());
 
+    file.imports = file
+        .imports
+        .into_iter()
+        .filter(|x| valid_node(&x.base, pos.clone()))
+        .collect();
+
     file.body = file
         .body
         .into_iter()
-        .filter(|x| valid_node(x, pos.clone()))
+        .filter(|x| valid_node(x.base(), pos.clone()))
         .collect();
 
     let mut pkg =
         crate::shared::create_ast_package(uri.clone(), ctx)?;
+
     pkg.files = pkg
         .files
         .into_iter()
@@ -101,7 +108,9 @@ pub fn create_completion_package(
     pos: Position,
     ctx: RequestContext,
 ) -> Result<Package, String> {
-    create_filtered_package(uri, ctx, |x| valid_node(x, pos.clone()))
+    create_filtered_package(uri, ctx, |x| {
+        valid_node(x.base(), pos.clone())
+    })
 }
 
 pub fn create_clean_package(

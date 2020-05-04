@@ -510,6 +510,7 @@ impl Completable for VarResult {
     async fn completion_item(
         &self,
         _ctx: RequestContext,
+        _imports: Vec<String>,
     ) -> CompletionItem {
         CompletionItem {
             label: format!("{} ({})", self.name, "self".to_string()),
@@ -573,6 +574,7 @@ impl Completable for FunctionResult {
     async fn completion_item(
         &self,
         _ctx: RequestContext,
+        _imports: Vec<String>,
     ) -> CompletionItem {
         CompletionItem {
             label: format!("{} ({})", self.name, "self".to_string()),
