@@ -9,6 +9,7 @@ use crate::protocol::responses::{
 use crate::shared::signatures::get_argument_names;
 use crate::shared::{Function, RequestContext};
 use crate::stdlib::{create_function_signature, Completable};
+use crate::visitors::semantic::Import;
 
 use flux::ast::SourceLocation;
 use flux::semantic::nodes::*;
@@ -510,7 +511,7 @@ impl Completable for VarResult {
     async fn completion_item(
         &self,
         _ctx: RequestContext,
-        _imports: Vec<String>,
+        _imports: Vec<Import>,
     ) -> CompletionItem {
         CompletionItem {
             label: format!("{} ({})", self.name, "self".to_string()),
@@ -529,7 +530,7 @@ impl Completable for VarResult {
         }
     }
 
-    fn matches(&self, _text: String, _imports: Vec<String>) -> bool {
+    fn matches(&self, _text: String, _imports: Vec<Import>) -> bool {
         true
     }
 }
@@ -574,7 +575,7 @@ impl Completable for FunctionResult {
     async fn completion_item(
         &self,
         _ctx: RequestContext,
-        _imports: Vec<String>,
+        _imports: Vec<Import>,
     ) -> CompletionItem {
         CompletionItem {
             label: format!("{} ({})", self.name, "self".to_string()),
@@ -593,7 +594,7 @@ impl Completable for FunctionResult {
         }
     }
 
-    fn matches(&self, _text: String, _imports: Vec<String>) -> bool {
+    fn matches(&self, _text: String, _imports: Vec<Import>) -> bool {
         true
     }
 }

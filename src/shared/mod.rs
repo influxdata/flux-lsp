@@ -48,3 +48,13 @@ pub fn create_diagnoistics(
         Err(e) => Err(format!("Failed to create diagnostic: {}", e)),
     }
 }
+
+pub fn get_package_name(name: String) -> Option<String> {
+    let items = name.split('/');
+
+    if let Some(n) = items.last() {
+        Some(n.to_string())
+    } else {
+        None
+    }
+}

@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 use flux::semantic::types::{Function, MonoType};
 
@@ -7,7 +7,7 @@ use crate::shared::all_combos;
 
 #[allow(clippy::implicit_hasher)]
 pub fn get_argument_names(
-    args: HashMap<String, MonoType>,
+    args: BTreeMap<String, MonoType>,
 ) -> Vec<String> {
     args.keys().map(String::from).collect()
 }

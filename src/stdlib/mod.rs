@@ -2,11 +2,15 @@ use crate::protocol::properties::{Position, Range, TextEdit};
 use crate::protocol::responses::{
     CompletionItem, CompletionItemKind, InsertTextFormat,
 };
+use crate::shared::get_package_name;
 use crate::shared::signatures::{get_argument_names, FunctionInfo};
 use crate::shared::{Function, RequestContext};
+use crate::visitors::semantic::Import;
 
+// use core::{imports, prelude};
+use flux::imports;
+use flux::prelude;
 use flux::semantic::types::{MonoType, Row};
-use libstd::{imports, prelude};
 
 use std::collections::{BTreeMap, HashMap};
 use std::fmt;
@@ -21,9 +25,9 @@ pub trait Completable {
     async fn completion_item(
         &self,
         ctx: RequestContext,
-        imports: Vec<String>,
+        imports: Vec<Import>,
     ) -> CompletionItem;
-    fn matches(&self, text: String, imports: Vec<String>) -> bool;
+    fn matches(&self, text: String, imports: Vec<Import>) -> bool;
 }
 
 #[derive(Clone)]
@@ -70,7 +74,7 @@ impl Completable for VarResult {
     async fn completion_item(
         &self,
         _ctx: RequestContext,
-        _imports: Vec<String>,
+        _imports: Vec<Import>,
     ) -> CompletionItem {
         CompletionItem {
             label: format!("{} ({})", self.name, self.package),
@@ -92,12 +96,17 @@ impl Completable for VarResult {
         }
     }
 
-    fn matches(&self, text: String, imports: Vec<String>) -> bool {
+    fn matches(&self, text: String, imports: Vec<Import>) -> bool {
         if self.package == BUILTIN_PACKAGE && !text.ends_with('.') {
             return true;
         }
 
-        if !imports.contains(&self.package.clone()) {
+        let current_imports = imports
+            .into_iter()
+            .map(|x| x.path)
+            .collect::<Vec<String>>();
+
+        if !current_imports.contains(&self.package.clone()) {
             return false;
         }
 
@@ -116,18 +125,74 @@ pub struct PackageResult {
     pub full_name: String,
 }
 
+fn create_import_paths(imports: Vec<Import>) -> Vec<String> {
+    imports.into_iter().map(|x| x.path).collect::<Vec<String>>()
+}
+
+fn find_alias_name(
+    imports: Vec<Import>,
+    name: String,
+    iteration: i32,
+) -> Option<String> {
+    let first_iteration = iteration == 1;
+    let pkg_name = if first_iteration {
+        name.clone()
+    } else {
+        format!("{}{}", name, iteration)
+    };
+
+    for import in imports.clone() {
+        if import.alias == pkg_name {
+            return find_alias_name(
+                imports.clone(),
+                name.clone(),
+                iteration + 1,
+            );
+        }
+
+        if let Some(initial_name) = import.initial_name {
+            if initial_name == pkg_name && first_iteration {
+                return find_alias_name(
+                    imports.clone(),
+                    name.clone(),
+                    iteration + 1,
+                );
+            }
+        }
+    }
+
+    if first_iteration {
+        return None;
+    }
+
+    Some(format!("{}{}", name, iteration))
+}
+
 #[async_trait]
 impl Completable for PackageResult {
     async fn completion_item(
         &self,
         _ctx: RequestContext,
-        imports: Vec<String>,
+        imports: Vec<Import>,
     ) -> CompletionItem {
         let mut additional_text_edits = vec![];
+        let mut insert_text = self.name.clone();
 
-        if !imports.contains(&self.full_name) {
+        let current_imports = create_import_paths(imports.clone());
+
+        if !current_imports.contains(&self.full_name) {
+            let alias =
+                find_alias_name(imports, self.name.clone(), 1);
+
+            let new_text = if let Some(alias) = alias {
+                insert_text = alias.clone();
+                format!("import {} \"{}\"\n", alias, self.full_name)
+            } else {
+                format!("import \"{}\"\n", self.full_name)
+            };
+            // Find import
             additional_text_edits.push(TextEdit {
-                new_text: format!("import \"{}\"\n", self.full_name),
+                new_text,
                 range: Range {
                     start: Position {
                         character: 0,
@@ -142,14 +207,14 @@ impl Completable for PackageResult {
         }
 
         CompletionItem {
-            label: self.name.clone(),
+            label: self.full_name.clone(),
             additional_text_edits: Some(additional_text_edits),
             commit_characters: None,
             deprecated: false,
             detail: Some("Package".to_string()),
             documentation: Some(self.full_name.clone()),
             filter_text: Some(self.name.clone()),
-            insert_text: Some(self.name.clone()),
+            insert_text: Some(insert_text),
             insert_text_format: InsertTextFormat::PlainText,
             kind: Some(CompletionItemKind::Module),
             preselect: None,
@@ -158,7 +223,7 @@ impl Completable for PackageResult {
         }
     }
 
-    fn matches(&self, text: String, _imports: Vec<String>) -> bool {
+    fn matches(&self, text: String, _imports: Vec<Import>) -> bool {
         if !text.ends_with('.') {
             let name = self.name.to_lowercase();
             let mtext = text.to_lowercase();
@@ -260,11 +325,16 @@ impl Completable for FunctionResult {
     async fn completion_item(
         &self,
         ctx: RequestContext,
-        imports: Vec<String>,
+        imports: Vec<Import>,
     ) -> CompletionItem {
         let mut additional_text_edits = vec![];
 
-        if !imports.contains(&self.package)
+        let current_imports = imports
+            .into_iter()
+            .map(|x| x.path)
+            .collect::<Vec<String>>();
+
+        if !current_imports.contains(&self.package)
             && self.package != BUILTIN_PACKAGE
         {
             additional_text_edits.push(TextEdit {
@@ -301,18 +371,26 @@ impl Completable for FunctionResult {
         }
     }
 
-    fn matches(&self, text: String, imports: Vec<String>) -> bool {
+    fn matches(&self, text: String, imports: Vec<Import>) -> bool {
         if self.package == BUILTIN_PACKAGE && !text.ends_with('.') {
             return true;
         }
 
-        if !imports.contains(&self.package.clone()) {
+        let current_imports = imports
+            .clone()
+            .into_iter()
+            .map(|x| x.path)
+            .collect::<Vec<String>>();
+
+        if !current_imports.contains(&self.package.clone()) {
             return false;
         }
 
         if text.ends_with('.') {
             let mtext = text[..text.len() - 1].to_string();
-            return Some(mtext) == self.package_name;
+            return imports
+                .into_iter()
+                .any(|import| import.alias == mtext);
         }
 
         false
@@ -562,16 +640,6 @@ pub fn get_package_infos() -> Vec<PackageInfo> {
     result
 }
 
-pub fn get_package_name(name: String) -> Option<String> {
-    let items = name.split('/');
-
-    if let Some(n) = items.last() {
-        Some(n.to_string())
-    } else {
-        None
-    }
-}
-
 pub fn add_package_result(
     name: String,
     list: &mut Vec<Box<dyn Completable + Send + Sync>>,
@@ -643,13 +711,25 @@ pub fn get_package_functions(name: String) -> Vec<Function> {
 pub fn get_specific_package_functions(
     list: &mut Vec<Box<dyn Completable + Send + Sync>>,
     name: String,
+    current_imports: Vec<Import>,
 ) {
     let env = imports().unwrap();
 
-    for (key, val) in env.values {
-        if let Some(package_name) = get_package_name(key.clone()) {
-            if package_name == name {
+    if let Some(import) =
+        current_imports.into_iter().find(|x| x.alias == name)
+    {
+        for (key, val) in env.values {
+            if key == import.path {
                 walk(key, list, val.expr);
+            }
+        }
+    } else {
+        for (key, val) in env.values {
+            if let Some(package_name) = get_package_name(key.clone())
+            {
+                if package_name == name {
+                    walk(key, list, val.expr);
+                }
             }
         }
     }

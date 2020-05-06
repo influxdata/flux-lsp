@@ -20,7 +20,7 @@ use crate::stdlib::{
 use crate::visitors::ast;
 use crate::visitors::semantic::{
     utils, CallFinderVisitor, CompletableFinderVisitor,
-    CompletableObjectFinderVisitor, FunctionFinderVisitor,
+    CompletableObjectFinderVisitor, FunctionFinderVisitor, Import,
     ImportFinderVisitor, ObjectFunctionFinderVisitor,
 };
 
@@ -52,7 +52,7 @@ fn get_imports(
     uri: String,
     pos: Position,
     ctx: RequestContext,
-) -> Result<Vec<String>, String> {
+) -> Result<Vec<Import>, String> {
     let pkg = utils::create_completion_package(uri, pos, ctx)?;
     let walker = Rc::new(walk::Node::Package(&pkg));
     let mut visitor = ImportFinderVisitor::default();
@@ -68,7 +68,7 @@ fn get_imports_removed(
     uri: String,
     pos: Position,
     ctx: RequestContext,
-) -> Result<Vec<String>, String> {
+) -> Result<Vec<Import>, String> {
     let pkg =
         utils::create_completion_package_removed(uri, pos, ctx)?;
     let walker = Rc::new(walk::Node::Package(&pkg));
@@ -278,7 +278,7 @@ fn get_completion_info(
 
 async fn get_stdlib_completions(
     name: String,
-    imports: Vec<String>,
+    imports: Vec<Import>,
     ctx: RequestContext,
 ) -> Vec<CompletionItem> {
     let mut matches = vec![];
@@ -520,7 +520,10 @@ async fn find_completions(
                 let infos = get_package_infos();
 
                 let current =
-                    get_imports_removed(uri, info.position, ctx)?;
+                    get_imports_removed(uri, info.position, ctx)?
+                        .into_iter()
+                        .map(|x| x.path)
+                        .collect::<Vec<String>>();
 
                 let mut items = vec![];
                 for info in infos {
@@ -848,7 +851,11 @@ async fn find_dot_completions(
         }
 
         let mut list = vec![];
-        get_specific_package_functions(&mut list, info.ident.clone());
+        get_specific_package_functions(
+            &mut list,
+            info.ident.clone(),
+            imports.clone(),
+        );
 
         let mut items = vec![];
         let obj_results = get_specific_object(
