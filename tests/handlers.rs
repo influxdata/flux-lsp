@@ -392,7 +392,7 @@ speculate! {
 
                 assert_eq!(
                     signatures.len(),
-                    4,
+                    64,
                     "returns the correct signatures");
             }
         }
@@ -689,7 +689,7 @@ speculate! {
                 let returned_items = returned.result.unwrap().items;
 
                 assert_eq!(
-                    111,
+                    113,
                     returned_items.len(),
                     "expects completion items"
                 );
@@ -750,7 +750,7 @@ speculate! {
                 let returned_items = returned.result.unwrap().items;
 
                 assert_eq!(
-                    111,
+                    114,
                     returned_items.len(),
                     "expects completion items"
                 );
@@ -765,6 +765,7 @@ speculate! {
 
         describe "when an option members can be completed" {
             before {
+                flux_lsp::cache::clear().unwrap();
                 let uri = flux_fixture_uri("options_object_members");
                 open_file(uri.clone(), &mut router);
             }
@@ -816,6 +817,7 @@ speculate! {
 
         describe "when an option functions can be completed" {
             before {
+                flux_lsp::cache::clear().unwrap();
                 let uri = flux_fixture_uri("options_function");
                 open_file(uri.clone(), &mut router);
             }
@@ -855,7 +857,7 @@ speculate! {
                 let returned_items = returned.result.unwrap().items;
 
                 assert_eq!(
-                    110,
+                    112,
                     returned_items.len(),
                     "expects completion items"
                 );
@@ -866,6 +868,7 @@ speculate! {
     describe "Document change" {
         describe "when ok" {
             before {
+                flux_lsp::cache::clear().unwrap();
                 let uri = flux_fixture_uri("ok");
                 open_file(uri.clone(), &mut router);
             }
@@ -919,6 +922,7 @@ speculate! {
 
         describe "when there is an error" {
             before {
+                flux_lsp::cache::clear().unwrap();
                 let uri = flux_fixture_uri("error");
                 open_file(uri.clone(), &mut router);
             }
@@ -1024,6 +1028,7 @@ speculate! {
 
     describe "Rename" {
         before {
+            flux_lsp::cache::clear().unwrap();
             let uri = flux_fixture_uri("ok");
             open_file(uri.clone(), &mut router);
         }
@@ -1117,6 +1122,7 @@ speculate! {
 
     describe "Folding" {
         before {
+            flux_lsp::cache::clear().unwrap();
             let uri = flux_fixture_uri("ok");
             open_file(uri.clone(), &mut router);
         }
@@ -1180,6 +1186,7 @@ speculate! {
 
     describe "Goto definition" {
         before {
+            flux_lsp::cache::clear().unwrap();
             let uri = flux_fixture_uri("ok");
             open_file(uri.clone(), &mut router);
         }
@@ -1245,6 +1252,7 @@ speculate! {
 
     describe "Find references" {
         before {
+            flux_lsp::cache::clear().unwrap();
             let uri = flux_fixture_uri("ok");
             open_file(uri.clone(), &mut router);
         }
@@ -1326,6 +1334,7 @@ speculate! {
 
     describe "Document symbols" {
         before {
+            flux_lsp::cache::clear().unwrap();
             let uri = flux_fixture_uri("simple");
             open_file(uri.clone(), &mut router);
         }

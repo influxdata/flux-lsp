@@ -3,6 +3,7 @@ use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
 use crate::protocol::properties::Position;
+use crate::shared::get_package_name;
 
 use flux::semantic::nodes::*;
 use flux::semantic::walk::{self, Node, Visitor};
@@ -243,9 +244,16 @@ impl<'a> Visitor<'a> for FoldFinderVisitor<'a> {
     }
 }
 
+#[derive(Clone)]
+pub struct Import {
+    pub path: String,
+    pub initial_name: Option<String>,
+    pub alias: String,
+}
+
 #[derive(Default)]
 pub struct ImportFinderState {
-    pub imports: Vec<String>,
+    pub imports: Vec<Import>,
 }
 
 #[derive(Default)]
@@ -258,7 +266,19 @@ impl<'a> Visitor<'a> for ImportFinderVisitor {
         let mut state = self.state.borrow_mut();
 
         if let Node::ImportDeclaration(import) = node.as_ref() {
-            (*state).imports.push(import.path.value.clone());
+            let alias = match import.alias.clone() {
+                Some(alias) => alias.name.clone(),
+                None => get_package_name(import.path.value.clone())
+                    .unwrap_or_else(|| "".to_string()),
+            };
+
+            (*state).imports.push(Import {
+                path: import.path.value.clone(),
+                alias,
+                initial_name: get_package_name(
+                    import.path.value.clone(),
+                ),
+            });
         }
 
         true

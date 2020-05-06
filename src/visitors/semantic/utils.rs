@@ -10,7 +10,7 @@ use flux::semantic::convert::convert_with;
 use flux::semantic::fresh::Fresher;
 use flux::semantic::nodes::Package;
 
-use libstd::analyze;
+use flux::analyze;
 
 fn local_analyze(
     pkg: flux::ast::Package,
