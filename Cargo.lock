@@ -177,7 +177,7 @@ checksum = "728b7ab3119b5167cc60a4aad16b6086b762278f5571cc650e7eed2e89a23a15"
 [[package]]
 name = "core"
 version = "0.4.0"
-source = "git+https://github.com/influxdata/flux?rev=7432bbd#7432bbda91d7cd4e7c1c112bf42f12dc70dcfce9"
+source = "git+https://github.com/influxdata/flux?rev=840a526#840a5268405af2f90357fc2ed8c76f06e3aa7915"
 dependencies = [
  "bindgen",
  "cc",
@@ -239,7 +239,7 @@ dependencies = [
 [[package]]
 name = "flux"
 version = "0.1.0"
-source = "git+https://github.com/influxdata/flux?rev=7432bbd#7432bbda91d7cd4e7c1c112bf42f12dc70dcfce9"
+source = "git+https://github.com/influxdata/flux?rev=840a526#840a5268405af2f90357fc2ed8c76f06e3aa7915"
 dependencies = [
  "core",
  "flatbuffers",
