@@ -59,6 +59,7 @@ impl InitializeResult {
                 signature_help_provider:
                     SignatureHelpOptions::default(),
                 text_document_sync: TextDocumentSyncKind::Full,
+                hover_provider: true,
             },
         }
     }
@@ -176,4 +177,24 @@ pub struct SignatureInformation {
 pub struct ParameterInformation {
     pub label: String,
     pub documentation: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct HoverResult {
+    pub contents: MarkupContent,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct MarkupContent {
+    pub kind: String,
+    pub value: String,
+}
+
+impl MarkupContent {
+    pub fn new(content: String) -> Self {
+        MarkupContent {
+            kind: "markdown".to_string(),
+            value: content,
+        }
+    }
 }
