@@ -181,7 +181,11 @@ impl Cache {
         if let Some(cv) = store.get(uri) {
             Ok((*cv).clone())
         } else {
-            Err(format!("unknown uri: {}", uri))
+            Ok(CacheValue {
+                uri: uri.to_string(),
+                version: 1,
+                contents: "".to_string(),
+            })
         }
     }
 }

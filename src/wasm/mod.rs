@@ -10,7 +10,7 @@ use std::ops::Add;
 use std::rc::Rc;
 
 use js_sys::{Function, Promise};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::future_to_promise;
 
@@ -26,6 +26,40 @@ pub struct Server {
 pub struct ServerResponse {
     message: Option<String>,
     error: Option<String>,
+}
+
+#[derive(Serialize)]
+pub struct ServerError {
+    pub id: u32,
+    pub error: ResponseError,
+    pub jsonrpc: String,
+}
+
+impl ServerError {
+    pub fn from_error(
+        id: u32,
+        err: String,
+    ) -> Result<String, String> {
+        let se = ServerError {
+            id,
+            error: ResponseError {
+                code: 100,
+                message: err,
+            },
+            jsonrpc: "2.0".to_string(),
+        };
+
+        match serde_json::to_string(&se) {
+            Ok(val) => Ok(val),
+            Err(_) => Err("failed to serialize error".to_string()),
+        }
+    }
+}
+
+#[derive(Serialize)]
+pub struct ResponseError {
+    code: u32,
+    message: String,
 }
 
 #[wasm_bindgen]
@@ -74,14 +108,12 @@ impl Server {
 
         future_to_promise(async move {
             let lines = msg.lines();
+            let content: String =
+                lines.skip(2).fold(String::new(), |c, l| c.add(l));
 
-            if lines.clone().count() > 2 {
-                // Skip content length and spacer
-                let content = lines
-                    .skip(2)
-                    .fold(String::new(), |c, l| c.add(l));
-
-                if let Ok(req) = create_polymorphic_request(content) {
+            match create_polymorphic_request(content.clone()) {
+                Ok(req) => {
+                    let id = req.base_request.id;
                     let ctx = RequestContext::new(
                         callbacks.clone(),
                         support_multiple_files,
@@ -110,25 +142,23 @@ impl Server {
                         Err(error) => {
                             return Ok(JsValue::from(
                                 ServerResponse {
-                                    message: None,
-                                    error: Some(error),
+                                    message: Some(wrap_message(
+                                        ServerError::from_error(
+                                            id, error,
+                                        )
+                                        .unwrap(),
+                                    )),
+                                    error: None,
                                 },
                             ))
                         }
                     }
-                } else {
-                    return Ok(JsValue::from(ServerResponse {
-                        message: None,
-                        error: Some(
-                            "Failed to parse message".to_string(),
-                        ),
-                    }));
                 }
+                Err(e) => Ok(JsValue::from(ServerResponse {
+                    message: None,
+                    error: Some(format!("{} -> {}", e, content)),
+                })),
             }
-            Ok(JsValue::from(ServerResponse {
-                message: None,
-                error: Some("Failed to process message".to_string()),
-            }))
         })
     }
 }
