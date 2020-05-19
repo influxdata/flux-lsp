@@ -158,6 +158,13 @@ pub struct SignatureHelpParams {
     pub context: Option<SignatureHelpContext>,
 }
 
+#[derive(Serialize, Deserialize, Clone)]
+pub struct HoverParams {
+    #[serde(rename = "textDocument")]
+    pub text_document: TextDocumentIdentifier,
+    pub position: Position,
+}
+
 #[derive(Serialize_repr, Deserialize_repr, Clone)]
 #[repr(u32)]
 pub enum SignatureHelpTriggerKind {

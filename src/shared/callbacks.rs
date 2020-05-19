@@ -103,6 +103,17 @@ impl Callback {
             Err(_e) => Err("Callback failed".to_string()),
         }
     }
+
+    pub fn call2(
+        &self,
+        arg1: JsValue,
+        arg2: JsValue,
+    ) -> Result<Promise, String> {
+        match self.f.call2(&JsValue::NULL, &arg1, &arg2) {
+            Ok(result) => Ok(Promise::from(result)),
+            Err(_e) => Err("Callback failed".to_string()),
+        }
+    }
 }
 
 unsafe impl<'a> Send for Callback {}
@@ -113,6 +124,7 @@ pub struct Callbacks {
     pub buckets: Option<Callback>,
     pub measurements: Option<Callback>,
     pub tag_keys: Option<Callback>,
+    pub tag_values: Option<Callback>,
 }
 
 impl Callbacks {
@@ -126,6 +138,10 @@ impl Callbacks {
 
     pub fn register_tag_keys_callback(&mut self, f: Function) {
         self.tag_keys = Some(Callback::new(f));
+    }
+
+    pub fn register_tag_values_callback(&mut self, f: Function) {
+        self.tag_values = Some(Callback::new(f));
     }
 
     fn call_buckets(&self) -> Result<JsFuture, String> {
@@ -161,11 +177,22 @@ impl Callbacks {
         }
     }
 
+    fn call_tag_values(
+        &self,
+        bucket: String,
+        field: String,
+    ) -> Result<JsFuture, String> {
+        if let Some(cb) = self.tag_values.clone() {
+            let promise = cb.call2(bucket.into(), field.into())?;
+            Ok(JsFuture::from(promise))
+        } else {
+            Err("No tag keys function set".to_string())
+        }
+    }
+
     pub async fn get_buckets(&self) -> Result<Vec<String>, String> {
         let mut finished = Resolvable::default();
-
         let mut cloned = finished.clone();
-
         let cln = self.clone();
 
         spawn_local(async move {
@@ -182,7 +209,6 @@ impl Callbacks {
         });
 
         finished.clone().await;
-
         Ok(finished.result())
     }
 
@@ -191,9 +217,7 @@ impl Callbacks {
         bucket: String,
     ) -> Result<Vec<String>, String> {
         let mut finished = Resolvable::default();
-
         let mut cloned = finished.clone();
-
         let cln = self.clone();
 
         spawn_local(async move {
@@ -210,7 +234,6 @@ impl Callbacks {
         });
 
         finished.clone().await;
-
         Ok(finished.result())
     }
 
@@ -219,9 +242,7 @@ impl Callbacks {
         bucket: String,
     ) -> Result<Vec<String>, String> {
         let mut finished = Resolvable::default();
-
         let mut cloned = finished.clone();
-
         let cln = self.clone();
 
         spawn_local(async move {
@@ -238,7 +259,32 @@ impl Callbacks {
         });
 
         finished.clone().await;
+        Ok(finished.result())
+    }
 
+    pub async fn get_tag_values(
+        &self,
+        bucket: String,
+        field: String,
+    ) -> Result<Vec<String>, String> {
+        let mut finished = Resolvable::default();
+        let mut cloned = finished.clone();
+        let cln = self.clone();
+
+        spawn_local(async move {
+            let future = cln.call_tag_values(bucket, field).unwrap();
+            if let Ok(returned) = future.await {
+                if let Ok(v) = returned.into_serde() {
+                    cloned.resolve(v);
+                } else {
+                    cloned.resolve(vec![]);
+                }
+            } else {
+                cloned.resolve(vec![]);
+            }
+        });
+
+        finished.clone().await;
         Ok(finished.result())
     }
 }

@@ -269,6 +269,9 @@ pub struct ServerCapabilities {
 
     #[serde(rename = "signatureHelpProvider")]
     pub signature_help_provider: SignatureHelpOptions,
+
+    #[serde(rename = "hoverProvider")]
+    pub hover_provider: bool,
 }
 
 #[derive(Serialize, Deserialize, Clone)]

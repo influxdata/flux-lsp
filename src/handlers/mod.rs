@@ -8,6 +8,7 @@ pub mod document_save;
 pub mod document_symbol;
 pub mod folding;
 pub mod goto_definition;
+pub mod hover;
 pub mod initialize;
 pub mod references;
 pub mod rename;

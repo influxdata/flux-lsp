@@ -32,6 +32,30 @@ use flux::semantic::walk;
 
 use async_trait::async_trait;
 
+struct ObjectMember {
+    pub object: String,
+    pub member: String,
+}
+
+impl ObjectMember {
+    pub fn from_string(v: String) -> Option<Self> {
+        let parts = v.split('.').collect::<Vec<&str>>();
+        let object: Option<&&str> = parts.get(0);
+        let member: Option<&&str> = parts.get(1);
+
+        if let Some(&object) = object {
+            if let Some(&member) = member {
+                return Some(ObjectMember {
+                    object: object.to_string(),
+                    member: member.to_string(),
+                });
+            }
+        }
+
+        None
+    }
+}
+
 enum CompletionType {
     Generic,
     Logical(flux::ast::Operator),
@@ -447,6 +471,45 @@ async fn get_tag_keys_completions(
     Ok(None)
 }
 
+async fn get_tag_values_completions(
+    ctx: RequestContext,
+    bucket: Option<String>,
+    field: Option<String>,
+) -> Result<Option<CompletionList>, String> {
+    if let Some(bucket) = bucket {
+        if let Some(field) = field {
+            let tag_values =
+                ctx.callbacks.get_tag_values(bucket, field).await?;
+
+            let items: Vec<CompletionItem> = tag_values
+                .into_iter()
+                .map(|value| CompletionItem {
+                    additional_text_edits: None,
+                    commit_characters: None,
+                    deprecated: false,
+                    detail: None,
+                    documentation: None,
+                    filter_text: None,
+                    insert_text: Some(value.clone()),
+                    label: value,
+                    insert_text_format: InsertTextFormat::Snippet,
+                    kind: Some(CompletionItemKind::Property),
+                    preselect: None,
+                    sort_text: None,
+                    text_edit: None,
+                })
+                .collect();
+
+            return Ok(Some(CompletionList {
+                is_incomplete: false,
+                items,
+            }));
+        }
+    }
+
+    Ok(None)
+}
+
 async fn find_completions(
     params: CompletionParams,
     ctx: RequestContext,
@@ -478,18 +541,20 @@ async fn find_completions(
 
                 items.append(&mut user_matches);
             }
-            CompletionType::Logical(operator) => {
-                if info.ident.clone() == "r._measurement"
-                    && operator == flux::ast::Operator::EqualOperator
-                {
-                    let list = get_measurement_completions(
-                        params,
-                        ctx,
-                        info.bucket,
-                    )
-                    .await?;
-                    if let Some(list) = list {
-                        return Ok(list);
+            CompletionType::Logical(_operator) => {
+                let om =
+                    ObjectMember::from_string(info.ident.clone());
+                if let Some(om) = om {
+                    if om.object == "r" {
+                        let list = get_tag_values_completions(
+                            ctx,
+                            info.bucket,
+                            Some(om.member),
+                        )
+                        .await?;
+                        if let Some(list) = list {
+                            return Ok(list);
+                        }
                     }
                 }
             }
