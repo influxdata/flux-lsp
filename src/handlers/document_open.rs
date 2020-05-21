@@ -29,7 +29,7 @@ fn handle_open(
         let version = params.text_document.version;
         let text = params.text_document.text;
 
-        cache::set(uri.clone(), version, text)?;
+        cache::force(uri.clone(), version, text)?;
         let msg = create_diagnoistics(uri, ctx)?;
 
         let json = msg.to_json()?;
