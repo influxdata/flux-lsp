@@ -4,6 +4,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use flux::ast::walk::{self, Visitor};
+pub mod package_finder;
 
 fn contains_position(
     node: Rc<walk::Node<'_>>,

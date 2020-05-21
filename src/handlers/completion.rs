@@ -11,23 +11,25 @@ use crate::protocol::responses::{
     CompletionItem, CompletionItemKind, CompletionList,
     InsertTextFormat, Response,
 };
-use crate::shared::conversion::flux_position_to_position;
-use crate::shared::{Function, RequestContext};
+use crate::shared::{
+    get_imports_removed, CompletionInfo, CompletionType, Function,
+    RequestContext,
+};
+
 use crate::stdlib::{
     get_builtin_functions, get_package_functions, get_package_infos,
     get_specific_package_functions, get_stdlib, Completable,
 };
 use crate::visitors::ast;
 use crate::visitors::semantic::{
-    utils, CallFinderVisitor, CompletableFinderVisitor,
-    CompletableObjectFinderVisitor, FunctionFinderVisitor, Import,
-    ImportFinderVisitor, ObjectFunctionFinderVisitor,
+    utils, CompletableFinderVisitor, CompletableObjectFinderVisitor,
+    FunctionFinderVisitor, ObjectFunctionFinderVisitor,
 };
 
 use flux::ast::walk::walk_rc;
 use flux::ast::walk::Node as AstNode;
+use flux::ast::CallExpr;
 use flux::ast::{Expression, PropertyKey};
-use flux::semantic::nodes::CallExpr;
 use flux::semantic::walk;
 
 use async_trait::async_trait;
@@ -56,262 +58,18 @@ impl ObjectMember {
     }
 }
 
-enum CompletionType {
-    Generic,
-    Logical(flux::ast::Operator),
-    CallProperty(String),
-    ObjectMember(String),
-    Import,
-    Bad,
-}
-
-struct CompletionInfo {
-    completion_type: CompletionType,
-    ident: String,
-    bucket: Option<String>,
-    position: Position,
-}
-
-fn get_imports(
-    uri: String,
-    pos: Position,
-    ctx: RequestContext,
-) -> Result<Vec<Import>, String> {
-    let pkg = utils::create_completion_package(uri, pos, ctx)?;
-    let walker = Rc::new(walk::Node::Package(&pkg));
-    let mut visitor = ImportFinderVisitor::default();
-
-    walk::walk(&mut visitor, walker);
-
-    let state = visitor.state.borrow();
-
-    Ok((*state).imports.clone())
-}
-
-fn get_imports_removed(
-    uri: String,
-    pos: Position,
-    ctx: RequestContext,
-) -> Result<Vec<Import>, String> {
-    let pkg =
-        utils::create_completion_package_removed(uri, pos, ctx)?;
-    let walker = Rc::new(walk::Node::Package(&pkg));
-    let mut visitor = ImportFinderVisitor::default();
-
-    walk::walk(&mut visitor, walker);
-
-    let state = visitor.state.borrow();
-
-    Ok((*state).imports.clone())
-}
-
-fn get_completion_info(
-    params: CompletionParams,
-    ctx: RequestContext,
-) -> Result<Option<CompletionInfo>, String> {
-    let uri = params.clone().text_document.uri;
-    let position = params.clone().position;
-
-    let source = cache::get(uri.clone())?;
-    let pkg = crate::shared::conversion::create_file_node_from_text(
-        uri,
-        source.contents,
-    );
-    let walker = Rc::new(AstNode::File(&pkg.files[0]));
-    let visitor = ast::NodeFinderVisitor::new(position.move_back(1));
-
-    walk_rc(&visitor, walker);
-
-    let state = visitor.state.borrow();
-    let finder_node = (*state).node.clone();
-
-    if let Some(finder_node) = finder_node {
-        let bucket = find_bucket(params.clone(), ctx).unwrap_or(None);
-
-        if let Some(parent) = finder_node.parent {
-            if let AstNode::MemberExpr(me) = parent.node.as_ref() {
-                if let Expression::Identifier(obj) = me.object.clone()
-                {
-                    return Ok(Some(CompletionInfo {
-                        completion_type: CompletionType::ObjectMember(
-                            obj.name.clone(),
-                        ),
-                        ident: obj.name,
-                        bucket,
-                        position,
-                    }));
-                }
-            }
-
-            if let AstNode::ImportDeclaration(id) =
-                parent.node.as_ref()
-            {
-                return Ok(Some(CompletionInfo {
-                    completion_type: CompletionType::Import,
-                    ident: "".to_string(),
-                    bucket,
-                    position: flux_position_to_position(
-                        id.base.location.start.clone(),
-                    ),
-                }));
-            }
-
-            if let Some(grandparent) = parent.parent {
-                if let Some(greatgrandparent) = grandparent.parent {
-                    if let AstNode::Property(prop) =
-                        parent.node.as_ref()
-                    {
-                        if let AstNode::ObjectExpr(_) =
-                            grandparent.node.as_ref()
-                        {
-                            if let AstNode::CallExpr(call) =
-                                greatgrandparent.node.as_ref()
-                            {
-                                let name = match prop.key.clone() {
-                                    PropertyKey::Identifier(
-                                        ident,
-                                    ) => ident.name,
-                                    PropertyKey::StringLit(lit) => {
-                                        lit.value
-                                    }
-                                };
-
-                                if let Expression::Identifier(func) =
-                                    call.callee.clone()
-                                {
-                                    return Ok(Some(CompletionInfo {
-                                    completion_type: CompletionType::CallProperty(func.name), ident: name,
-                                    bucket,
-                                    position
-                                }));
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            if let AstNode::BinaryExpr(be) = parent.node.as_ref() {
-                match be.left.clone() {
-                    Expression::Identifier(left) => {
-                        let name = left.name.clone();
-
-                        return Ok(Some(CompletionInfo {
-                            completion_type: CompletionType::Logical(
-                                be.operator.clone(),
-                            ),
-                            ident: name,
-                            bucket,
-                            position,
-                        }));
-                    }
-                    Expression::Member(left) => {
-                        if let Expression::Identifier(ident) =
-                            left.object
-                        {
-                            let key = match left.property {
-                                PropertyKey::Identifier(ident) => {
-                                    ident.name
-                                }
-                                PropertyKey::StringLit(lit) => {
-                                    lit.value
-                                }
-                            };
-
-                            let name =
-                                format!("{}.{}", ident.name, key);
-
-                            return Ok(Some(CompletionInfo {
-                                completion_type:
-                                    CompletionType::Logical(
-                                        be.operator.clone(),
-                                    ),
-                                ident: name,
-                                bucket,
-                                position,
-                            }));
-                        }
-                    }
-                    _ => {}
-                }
-            }
-        }
-
-        match finder_node.node.as_ref() {
-            AstNode::BinaryExpr(be) => {
-                if let Expression::Identifier(left) = be.left.clone()
-                {
-                    let name = left.name.clone();
-
-                    return Ok(Some(CompletionInfo {
-                        completion_type: CompletionType::Logical(
-                            be.operator.clone(),
-                        ),
-                        ident: name,
-                        bucket,
-                        position,
-                    }));
-                }
-            }
-            AstNode::Identifier(ident) => {
-                let name = ident.name.clone();
-                return Ok(Some(CompletionInfo {
-                    completion_type: CompletionType::Generic,
-                    ident: name,
-                    bucket,
-                    position,
-                }));
-            }
-            AstNode::BadExpr(expr) => {
-                let name = expr.text.clone();
-                return Ok(Some(CompletionInfo {
-                    completion_type: CompletionType::Bad,
-                    ident: name,
-                    bucket,
-                    position,
-                }));
-            }
-            AstNode::MemberExpr(mbr) => {
-                if let Expression::Identifier(ident) = &mbr.object {
-                    return Ok(Some(CompletionInfo {
-                        completion_type: CompletionType::Generic,
-                        ident: ident.name.clone(),
-                        bucket,
-                        position,
-                    }));
-                }
-            }
-            AstNode::CallExpr(c) => {
-                if let Some(arg) = c.arguments.last() {
-                    if let Expression::Identifier(ident) = arg {
-                        return Ok(Some(CompletionInfo {
-                            completion_type: CompletionType::Generic,
-                            ident: ident.name.clone(),
-                            bucket,
-                            position,
-                        }));
-                    }
-                }
-            }
-            _ => {}
-        }
-    }
-
-    Ok(None)
-}
-
 async fn get_stdlib_completions(
     name: String,
-    imports: Vec<Import>,
+    info: CompletionInfo,
     ctx: RequestContext,
 ) -> Vec<CompletionItem> {
     let mut matches = vec![];
     let completes = get_stdlib();
 
     for c in completes.into_iter() {
-        if c.matches(name.clone(), imports.clone()) {
+        if c.matches(name.clone(), info.clone()) {
             matches.push(
-                c.completion_item(ctx.clone(), imports.clone()).await,
+                c.completion_item(ctx.clone(), info.clone()).await,
             );
         }
     }
@@ -339,73 +97,22 @@ fn get_user_completables(
 }
 
 async fn get_user_matches(
-    uri: String,
-    pos: Position,
+    info: CompletionInfo,
     ctx: RequestContext,
 ) -> Result<Vec<CompletionItem>, String> {
-    let completables =
-        get_user_completables(uri.clone(), pos.clone(), ctx.clone())?;
-
-    let imports = get_imports(uri, pos, ctx.clone())?;
+    let completables = get_user_completables(
+        info.uri.clone(),
+        info.position.clone(),
+        ctx.clone(),
+    )?;
 
     let mut result: Vec<CompletionItem> = vec![];
     for x in completables {
-        result.push(
-            x.completion_item(ctx.clone(), imports.clone()).await,
-        )
+        result
+            .push(x.completion_item(ctx.clone(), info.clone()).await)
     }
 
     Ok(result)
-}
-
-fn follow_pipes_for_bucket(call: Box<CallExpr>) -> Option<String> {
-    for arg in call.arguments {
-        if arg.key.name == "bucket" {
-            if let flux::semantic::nodes::Expression::StringLit(
-                value,
-            ) = arg.value
-            {
-                return Some(value.value);
-            } else {
-                return None;
-            }
-        }
-    }
-
-    if let Some(flux::semantic::nodes::Expression::Call(next)) =
-        call.pipe.clone()
-    {
-        return follow_pipes_for_bucket(next);
-    }
-
-    None
-}
-
-fn find_bucket(
-    params: CompletionParams,
-    ctx: RequestContext,
-) -> Result<Option<String>, String> {
-    let uri = params.text_document.uri;
-    let pos = params.position;
-    let pkg = utils::create_clean_package(uri, ctx)?;
-    let walker = Rc::new(walk::Node::Package(&pkg));
-    let mut visitor = CallFinderVisitor::new(pos);
-
-    walk::walk(&mut visitor, walker);
-
-    if let Ok(state) = visitor.state.lock() {
-        if let Some(node) = (*state).node.clone() {
-            if let walk::Node::ExprStmt(stmt) = node.as_ref() {
-                if let flux::semantic::nodes::Expression::Call(call) =
-                    stmt.expression.clone()
-                {
-                    return Ok(follow_pipes_for_bucket(call));
-                }
-            }
-        }
-    }
-
-    Ok(None)
 }
 
 async fn get_measurement_completions(
@@ -515,29 +222,23 @@ async fn find_completions(
     ctx: RequestContext,
 ) -> Result<CompletionList, String> {
     let uri = params.clone().text_document.uri;
-    let pos = params.clone().position.clone();
-    let info = get_completion_info(params.clone(), ctx.clone())?;
+    let info = CompletionInfo::create(params.clone(), ctx.clone())?;
 
     let mut items: Vec<CompletionItem> = vec![];
 
     if let Some(info) = info {
         match info.completion_type {
             CompletionType::Generic => {
-                let imports = get_imports(
-                    uri.clone(),
-                    pos.clone(),
-                    ctx.clone(),
-                )?;
                 let mut stdlib_matches = get_stdlib_completions(
                     info.ident.clone(),
-                    imports.clone(),
+                    info.clone(),
                     ctx.clone(),
                 )
                 .await;
                 items.append(&mut stdlib_matches);
 
                 let mut user_matches =
-                    get_user_matches(uri, pos, ctx).await?;
+                    get_user_matches(info, ctx).await?;
 
                 items.append(&mut user_matches);
             }
@@ -695,7 +396,7 @@ fn get_user_functions(
     Err("failed to get completables".to_string())
 }
 
-fn get_provided_arguments(call: &flux::ast::CallExpr) -> Vec<String> {
+fn get_provided_arguments(call: &CallExpr) -> Vec<String> {
     let mut provided = vec![];
     if let Some(Expression::Object(obj)) = call.arguments.first() {
         for prop in obj.properties.clone() {
@@ -872,7 +573,7 @@ async fn find_arg_completions(
     params: CompletionParams,
     ctx: RequestContext,
 ) -> Result<CompletionList, String> {
-    let info = get_completion_info(params.clone(), ctx.clone())?;
+    let info = CompletionInfo::create(params.clone(), ctx.clone())?;
 
     if let Some(info) = info {
         if info.ident == "bucket" {
@@ -893,16 +594,15 @@ async fn find_dot_completions(
 ) -> Result<CompletionList, String> {
     let uri = params.clone().text_document.uri;
     let pos = params.clone().position;
-    let info = get_completion_info(params.clone(), ctx.clone())?;
+    let info = CompletionInfo::create(params.clone(), ctx.clone())?;
 
-    let imports =
-        get_imports_removed(uri.clone(), pos.clone(), ctx.clone())?;
-
-    if let Some(info) = info {
-        if let CompletionType::ObjectMember(om) = info.completion_type
+    if let Some(info) = info.clone() {
+        let imports = info.imports.clone();
+        if let CompletionType::ObjectMember(om) =
+            info.completion_type.clone()
         {
             if om == "r" {
-                if let Some(bucket) = info.bucket {
+                if let Some(bucket) = info.bucket.clone() {
                     if let Some(list) = get_tag_keys_completions(
                         ctx.clone(),
                         Some(bucket),
@@ -916,15 +616,16 @@ async fn find_dot_completions(
         }
 
         let mut list = vec![];
+        let name = info.ident.clone();
         get_specific_package_functions(
             &mut list,
-            info.ident.clone(),
+            name,
             imports.clone(),
         );
 
         let mut items = vec![];
         let obj_results = get_specific_object(
-            info.ident,
+            info.ident.clone(),
             pos,
             uri.clone(),
             ctx.clone(),
@@ -933,15 +634,14 @@ async fn find_dot_completions(
         for completable in obj_results.into_iter() {
             items.push(
                 completable
-                    .completion_item(ctx.clone(), imports.clone())
+                    .completion_item(ctx.clone(), info.clone())
                     .await,
             );
         }
 
         for item in list.into_iter() {
             items.push(
-                item.completion_item(ctx.clone(), imports.clone())
-                    .await,
+                item.completion_item(ctx.clone(), info.clone()).await,
             );
         }
 
