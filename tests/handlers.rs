@@ -10,6 +10,7 @@ use flux_lsp::protocol::requests::*;
 use flux_lsp::protocol::responses::*;
 use flux_lsp::shared::callbacks::Callbacks;
 use flux_lsp::shared::RequestContext;
+use flux_lsp::shared::{CompletionInfo, CompletionType};
 use flux_lsp::stdlib::{get_builtins, Completable, PackageResult};
 use flux_lsp::Router;
 
@@ -670,18 +671,33 @@ speculate! {
                     data: completion_request_json,
                 };
                 let response = block_on(router.route(request, create_request_context())).unwrap();
+
+                let info = CompletionInfo {
+                    bucket: None,
+                    completion_type: CompletionType::Generic,
+                    ident: "".to_string(),
+                    imports: vec![],
+                    package: None,
+                    position: Position {
+                            character: 1,
+                            line: 8,
+                        },
+                        uri: uri.clone(),
+                };
+
+
                 let mut items = vec![
                     block_on(PackageResult {
                         full_name: "csv".to_string(),
                         name: "csv".to_string(),
-                    }.completion_item(create_request_context(), vec![]))
+                    }.completion_item(create_request_context(), info.clone()))
                 ];
 
                 let mut builtins = vec![];
                 get_builtins(&mut builtins);
 
                 for b in builtins {
-                    let item = block_on(b.completion_item(create_request_context(), vec![]));
+                    let item = block_on(b.completion_item(create_request_context(), info.clone()));
                     items.push(item);
                 }
 
@@ -802,7 +818,12 @@ speculate! {
                     },
                     data: completion_request_json,
                 };
-                let response = block_on(router.route(request, create_request_context())).unwrap();
+                let response = match block_on(router.route(request, create_request_context())) {
+                    Ok(response) => response,
+                    Err(e) => {
+                        panic!(e);
+                    }
+                };
 
                 let returned = from_str::<Response<CompletionList>>(response.unwrap().as_str()).unwrap();
                 let returned_items = returned.result.unwrap().items;

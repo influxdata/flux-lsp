@@ -4,6 +4,7 @@ use crate::protocol::responses::{
 };
 use crate::shared::get_package_name;
 use crate::shared::signatures::{get_argument_names, FunctionInfo};
+use crate::shared::CompletionInfo;
 use crate::shared::{Function, RequestContext};
 use crate::visitors::semantic::Import;
 
@@ -25,9 +26,9 @@ pub trait Completable {
     async fn completion_item(
         &self,
         ctx: RequestContext,
-        imports: Vec<Import>,
+        info: CompletionInfo,
     ) -> CompletionItem;
-    fn matches(&self, text: String, imports: Vec<Import>) -> bool;
+    fn matches(&self, text: String, info: CompletionInfo) -> bool;
 }
 
 #[derive(Clone)]
@@ -74,7 +75,7 @@ impl Completable for VarResult {
     async fn completion_item(
         &self,
         _ctx: RequestContext,
-        _imports: Vec<Import>,
+        _info: CompletionInfo,
     ) -> CompletionItem {
         CompletionItem {
             label: format!("{} ({})", self.name, self.package),
@@ -96,7 +97,8 @@ impl Completable for VarResult {
         }
     }
 
-    fn matches(&self, text: String, imports: Vec<Import>) -> bool {
+    fn matches(&self, text: String, info: CompletionInfo) -> bool {
+        let imports = info.imports;
         if self.package == BUILTIN_PACKAGE && !text.ends_with('.') {
             return true;
         }
@@ -173,8 +175,9 @@ impl Completable for PackageResult {
     async fn completion_item(
         &self,
         _ctx: RequestContext,
-        imports: Vec<Import>,
+        info: CompletionInfo,
     ) -> CompletionItem {
+        let imports = info.imports;
         let mut additional_text_edits = vec![];
         let mut insert_text = self.name.clone();
 
@@ -190,18 +193,18 @@ impl Completable for PackageResult {
             } else {
                 format!("import \"{}\"\n", self.full_name)
             };
+
+            let line = match info.package {
+                Some(pi) => pi.position.line + 1,
+                None => 0,
+            };
+
             // Find import
             additional_text_edits.push(TextEdit {
                 new_text,
                 range: Range {
-                    start: Position {
-                        character: 0,
-                        line: 0,
-                    },
-                    end: Position {
-                        character: 0,
-                        line: 0,
-                    },
+                    start: Position { character: 0, line },
+                    end: Position { character: 0, line },
                 },
             })
         }
@@ -223,7 +226,7 @@ impl Completable for PackageResult {
         }
     }
 
-    fn matches(&self, text: String, _imports: Vec<Import>) -> bool {
+    fn matches(&self, text: String, _info: CompletionInfo) -> bool {
         if !text.ends_with('.') {
             let name = self.name.to_lowercase();
             let mtext = text.to_lowercase();
@@ -325,8 +328,9 @@ impl Completable for FunctionResult {
     async fn completion_item(
         &self,
         ctx: RequestContext,
-        imports: Vec<Import>,
+        info: CompletionInfo,
     ) -> CompletionItem {
+        let imports = info.imports;
         let mut additional_text_edits = vec![];
 
         let current_imports = imports
@@ -371,7 +375,8 @@ impl Completable for FunctionResult {
         }
     }
 
-    fn matches(&self, text: String, imports: Vec<Import>) -> bool {
+    fn matches(&self, text: String, info: CompletionInfo) -> bool {
+        let imports = info.imports;
         if self.package == BUILTIN_PACKAGE && !text.ends_with('.') {
             return true;
         }
