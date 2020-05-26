@@ -31,14 +31,19 @@ impl PackageFinderVisitor {
         ctx: RequestContext,
     ) -> Result<Option<PackageInfo>, String> {
         let package = create_ast_package(uri.clone(), ctx)?;
-        let walker =
-            Rc::new(flux::ast::walk::Node::File(&package.files[0]));
-        let visitor = PackageFinderVisitor::default();
+        for file in package.files {
+            let walker = Rc::new(flux::ast::walk::Node::File(&file));
+            let visitor = PackageFinderVisitor::default();
 
-        walk_rc(&visitor, walker);
+            walk_rc(&visitor, walker);
 
-        let state = visitor.state.borrow();
-        Ok(state.info.clone())
+            let state = visitor.state.borrow();
+            if let Some(info) = state.info.clone() {
+                return Ok(Some(info.clone()));
+            }
+        }
+
+        Ok(None)
     }
 }
 
