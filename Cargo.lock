@@ -177,7 +177,7 @@ checksum = "728b7ab3119b5167cc60a4aad16b6086b762278f5571cc650e7eed2e89a23a15"
 [[package]]
 name = "core"
 version = "0.4.0"
-source = "git+https://github.com/influxdata/flux?rev=840a526#840a5268405af2f90357fc2ed8c76f06e3aa7915"
+source = "git+https://github.com/influxdata/flux?rev=85bd204#85bd20484b1698dbb10863fe6a2d2d7ab2c0424c"
 dependencies = [
  "bindgen",
  "cc",
@@ -196,13 +196,13 @@ dependencies = [
 
 [[package]]
 name = "derivative"
-version = "1.0.4"
+version = "2.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3c6d883546668a3e2011b6a716a7330b82eabb0151b138217f632c8243e17135"
+checksum = "cb582b60359da160a9477ee80f15c8d784c477e69c217ef2cdd4169c24ea380f"
 dependencies = [
- "proc-macro2 0.4.30",
- "quote 0.6.13",
- "syn 0.15.44",
+ "proc-macro2 1.0.12",
+ "quote 1.0.4",
+ "syn 1.0.18",
 ]
 
 [[package]]
@@ -238,8 +238,8 @@ dependencies = [
 
 [[package]]
 name = "flux"
-version = "0.1.0"
-source = "git+https://github.com/influxdata/flux?rev=840a526#840a5268405af2f90357fc2ed8c76f06e3aa7915"
+version = "0.5.1"
+source = "git+https://github.com/influxdata/flux?rev=85bd204#85bd20484b1698dbb10863fe6a2d2d7ab2c0424c"
 dependencies = [
  "core",
  "flatbuffers",
@@ -703,17 +703,6 @@ name = "syn"
 version = "0.14.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "261ae9ecaa397c42b960649561949d69311f08eeaea86a65696e6e46517cf741"
-dependencies = [
- "proc-macro2 0.4.30",
- "quote 0.6.13",
- "unicode-xid 0.1.0",
-]
-
-[[package]]
-name = "syn"
-version = "0.15.44"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9ca4b3b69a77cbe1ffc9e198781b7acb0c7365a883670e8f1c1bc66fba79a5c5"
 dependencies = [
  "proc-macro2 0.4.30",
  "quote 0.6.13",

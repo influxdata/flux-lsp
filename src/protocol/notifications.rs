@@ -38,10 +38,8 @@ where
 pub fn create_diagnostics_notification(
     uri: String,
     diagnostics: Vec<Diagnostic>,
-) -> Result<Notification<PublishDiagnosticsParams>, &'static str> {
+) -> Notification<PublishDiagnosticsParams> {
     let method = String::from("textDocument/publishDiagnostics");
     let params = PublishDiagnosticsParams { uri, diagnostics };
-    let request = Notification { method, params };
-
-    Ok(request)
+    Notification { method, params }
 }
