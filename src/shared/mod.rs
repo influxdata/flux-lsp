@@ -62,10 +62,7 @@ pub fn create_diagnoistics(
     let errors = flux::ast::check::check(walker);
     let diagnostics = map_errors_to_diagnostics(errors);
 
-    match create_diagnostics_notification(uri, diagnostics) {
-        Ok(msg) => Ok(msg),
-        Err(e) => Err(format!("Failed to create diagnostic: {}", e)),
-    }
+    Ok(create_diagnostics_notification(uri, diagnostics))
 }
 
 pub fn get_package_name(name: String) -> Option<String> {

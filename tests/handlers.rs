@@ -158,7 +158,6 @@ speculate! {
                 let response = block_on(router.route(request, create_request_context())).unwrap().unwrap();
                 let expected_json =
                     create_diagnostics_notification(uri.clone(), vec![])
-                    .unwrap()
                     .to_json()
                     .unwrap();
 
@@ -224,7 +223,6 @@ speculate! {
 
                 let expected_json =
                     create_diagnostics_notification(uri.clone(), diagnostics)
-                    .unwrap()
                     .to_json()
                     .unwrap();
 
@@ -291,7 +289,6 @@ speculate! {
 
                 let expected_json =
                     create_diagnostics_notification(uri.clone(), diagnostics)
-                    .unwrap()
                     .to_json()
                     .unwrap();
 
@@ -929,7 +926,6 @@ speculate! {
                 let response = block_on(router.route(request, create_request_context())).unwrap();
                 let expected_json =
                     create_diagnostics_notification(uri.clone(), vec![])
-                    .unwrap()
                     .to_json()
                     .unwrap();
 
@@ -1000,7 +996,6 @@ speculate! {
 
                 let expected_json =
                     create_diagnostics_notification(uri.clone(), diagnostics)
-                    .unwrap()
                     .to_json()
                     .unwrap();
 

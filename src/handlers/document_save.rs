@@ -7,10 +7,7 @@ use crate::shared::create_diagnoistics;
 fn parse_save_request(
     data: String,
 ) -> Result<Request<TextDocumentSaveParams>, String> {
-    let request: Request<TextDocumentSaveParams> =
-        Request::from_json(data.as_str())?;
-
-    Ok(request)
+    Ok(Request::from_json(data.as_str())?)
 }
 
 #[derive(Default)]

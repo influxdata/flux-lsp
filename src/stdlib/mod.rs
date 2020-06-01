@@ -8,7 +8,6 @@ use crate::shared::CompletionInfo;
 use crate::shared::{Function, RequestContext};
 use crate::visitors::semantic::Import;
 
-// use core::{imports, prelude};
 use flux::imports;
 use flux::prelude;
 use flux::semantic::types::{MonoType, Row};
@@ -199,7 +198,6 @@ impl Completable for PackageResult {
                 None => 0,
             };
 
-            // Find import
             additional_text_edits.push(TextEdit {
                 new_text,
                 range: Range {
@@ -207,6 +205,12 @@ impl Completable for PackageResult {
                     end: Position { character: 0, line },
                 },
             })
+        } else {
+            for import in imports {
+                if self.full_name == import.path {
+                    insert_text = import.alias;
+                }
+            }
         }
 
         CompletionItem {

@@ -89,7 +89,6 @@ impl Cache {
         Ok(())
     }
 
-    #[allow(dead_code)]
     fn clear(&self) -> Result<(), String> {
         let keys = self.keys()?;
 
