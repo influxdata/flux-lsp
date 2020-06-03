@@ -36,7 +36,7 @@ jobs:
       - install-linux-deps
       - run:
           name: "run tests"
-          command: cargo test -- --test-threads=1
+          command: make test
 
   build:
     docker:
@@ -50,6 +50,7 @@ jobs:
     docker:
       - image: circleci/rust:1.39-stretch
     steps:
+      - run: make wasm-local
       - run: echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN" > pkg-node/.npmrc
       - run: echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN" > pkg-browser/.npmrc
       - run: make publish
