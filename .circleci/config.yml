@@ -10,7 +10,7 @@ commands:
 jobs:
   lint:
     docker:
-      - image: circleci/rust:1.39-stretch
+      - image: circleci/rust
     steps:
       - checkout
       - install-linux-deps
@@ -29,7 +29,7 @@ jobs:
 
   test:
     docker:
-      - image: circleci/rust:1.39-stretch
+      - image: circleci/rust
     steps:
       - checkout
       - install-linux-deps
@@ -39,7 +39,7 @@ jobs:
 
   build:
     docker:
-      - image: circleci/rust:1.39-stretch
+      - image: circleci/rust
     steps:
       - checkout
       - install-linux-deps
@@ -49,7 +49,7 @@ jobs:
 
   deploy:
     docker:
-      - image: circleci/rust:1.39-stretch
+      - image: circleci/rust
     steps:
       - checkout
       - install-linux-deps

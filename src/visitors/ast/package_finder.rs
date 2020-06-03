@@ -30,7 +30,7 @@ impl PackageFinderVisitor {
         uri: String,
         ctx: RequestContext,
     ) -> Result<Option<PackageInfo>, String> {
-        let package = create_ast_package(uri.clone(), ctx)?;
+        let package = create_ast_package(uri, ctx)?;
         for file in package.files {
             let walker = Rc::new(flux::ast::walk::Node::File(&file));
             let visitor = PackageFinderVisitor::default();
@@ -39,7 +39,7 @@ impl PackageFinderVisitor {
 
             let state = visitor.state.borrow();
             if let Some(info) = state.info.clone() {
-                return Ok(Some(info.clone()));
+                return Ok(Some(info));
             }
         }
 

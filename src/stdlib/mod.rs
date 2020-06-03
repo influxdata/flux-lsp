@@ -144,20 +144,12 @@ fn find_alias_name(
 
     for import in imports.clone() {
         if import.alias == pkg_name {
-            return find_alias_name(
-                imports.clone(),
-                name.clone(),
-                iteration + 1,
-            );
+            return find_alias_name(imports, name, iteration + 1);
         }
 
         if let Some(initial_name) = import.initial_name {
             if initial_name == pkg_name && first_iteration {
-                return find_alias_name(
-                    imports.clone(),
-                    name.clone(),
-                    iteration + 1,
-                );
+                return find_alias_name(imports, name, iteration + 1);
             }
         }
     }
@@ -242,7 +234,7 @@ impl Completable for PackageResult {
 }
 
 fn default_arg_insert_text(arg: &str, index: usize) -> String {
-    (format!("{}: ${}", arg, index + 1))
+    format!("{}: ${}", arg, index + 1)
 }
 
 fn bucket_list_to_snippet(

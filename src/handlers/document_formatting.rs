@@ -12,7 +12,10 @@ use flux::formatter;
 
 fn create_range(contents: String) -> Range {
     let lines = contents.split('\n').collect::<Vec<&str>>();
-    let last = lines.last().unwrap_or_else(|| &"").to_string();
+    let last = match lines.last() {
+        Some(l) => (*l).to_string(),
+        None => String::from(""),
+    };
     let line_count: u32 = u32::try_from(lines.len()).unwrap();
     let char_count: u32 = u32::try_from(last.len()).unwrap();
 

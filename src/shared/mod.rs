@@ -121,8 +121,8 @@ impl CompletionInfo {
         let finder_node = (*state).node.clone();
 
         if let Some(finder_node) = finder_node {
-            let bucket = find_bucket(params.clone(), ctx.clone())
-                .unwrap_or(None);
+            let bucket =
+                find_bucket(params, ctx.clone()).unwrap_or(None);
 
             if let Some(parent) = finder_node.parent {
                 if let AstNode::MemberExpr(me) = parent.node.as_ref()
@@ -208,7 +208,7 @@ impl CompletionInfo {
                 {
                     match be.left.clone() {
                         Expression::Identifier(left) => {
-                            let name = left.name.clone();
+                            let name = left.name;
 
                             return Ok(Some(CompletionInfo {
                                 completion_type:
@@ -267,7 +267,7 @@ impl CompletionInfo {
                     if let Expression::Identifier(left) =
                         be.left.clone()
                     {
-                        let name = left.name.clone();
+                        let name = left.name;
 
                         return Ok(Some(CompletionInfo {
                             completion_type: CompletionType::Logical(
