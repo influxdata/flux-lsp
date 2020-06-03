@@ -1,6 +1,6 @@
 [package]
 name = "flux-lsp"
-version = "0.5.15"
+version = "0.5.16"
 authors = ["Brandon Farmer <bthesorceror@gmail.com>"]
 edition = "2018"
 license = "MIT"
