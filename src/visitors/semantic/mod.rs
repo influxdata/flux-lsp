@@ -267,7 +267,7 @@ impl<'a> Visitor<'a> for ImportFinderVisitor {
 
         if let Node::ImportDeclaration(import) = node.as_ref() {
             let alias = match import.alias.clone() {
-                Some(alias) => alias.name.clone(),
+                Some(alias) => alias.name,
                 None => get_package_name(import.path.value.clone())
                     .unwrap_or_else(|| "".to_string()),
             };
