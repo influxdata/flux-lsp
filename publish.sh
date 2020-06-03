@@ -1,7 +1,5 @@
 #!/bin/bash
 
-./build.sh
-
 cd pkg-node
 npm publish --access public
 cd ..

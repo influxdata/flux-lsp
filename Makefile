@@ -35,7 +35,7 @@ wasm: clean-wasm build
 wasm-local: clean-wasm
 	AR=llvm-ar ./wasm-build.sh
 
-publish: build
+publish:
 	./publish.sh
 
 install-wasm-pack:
