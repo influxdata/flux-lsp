@@ -37,3 +37,6 @@ wasm-local: clean-wasm
 
 publish: build
 	./publish.sh
+
+install-wasm-pack:
+	curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh

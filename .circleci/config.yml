@@ -43,7 +43,9 @@ jobs:
     steps:
       - checkout
       - install-linux-deps
+      - run: make install-wasm-pack
       - run: cargo build --verbose
+      - run: make wasm-local
 
   deploy:
     docker:
@@ -51,6 +53,7 @@ jobs:
     steps:
       - checkout
       - install-linux-deps
+      - run: make install-wasm-pack
       - run: make wasm-local
       - run: echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN" > pkg-node/.npmrc
       - run: echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN" > pkg-browser/.npmrc
@@ -71,13 +74,7 @@ workflows:
 
   build-and-deploy:
     jobs:
-      - build:
-          filters:
-            tags:
-              only: /^v.*/
       - deploy:
-          requires:
-            - build
           filters:
             tags:
               only: /^v.*/
