@@ -46,6 +46,15 @@ jobs:
       - install-linux-deps
       - run: cargo build --verbose
 
+  deploy:
+    docker:
+      - image: circleci/rust:1.39-stretch
+    steps:
+      - run: echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN" > pkg-node/.npmrc
+      - run: echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN" > pkg-browser/.npmrc
+      - run: make publish
+
+
 workflows:
   version: 2.1
   build-and-test:
@@ -57,3 +66,18 @@ workflows:
       - build:
           requires:
             - lint
+
+  build-and-deploy:
+    jobs:
+      - build:
+          filters:
+            tags:
+              only: /^v.*/
+      - deploy:
+          requires:
+            - build
+          filters:
+            tags:
+              only: /^v.*/
+            branches:
+              ignore: /.*/
