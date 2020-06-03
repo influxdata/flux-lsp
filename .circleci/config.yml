@@ -31,7 +31,6 @@ jobs:
     docker:
       - image: circleci/rust:1.39-stretch
     steps:
-      - install-linux-deps
       - checkout
       - install-linux-deps
       - run:
@@ -50,6 +49,8 @@ jobs:
     docker:
       - image: circleci/rust:1.39-stretch
     steps:
+      - checkout
+      - install-linux-deps
       - run: make wasm-local
       - run: echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN" > pkg-node/.npmrc
       - run: echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN" > pkg-browser/.npmrc
