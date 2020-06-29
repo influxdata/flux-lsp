@@ -196,15 +196,20 @@ impl Callbacks {
         let cln = self.clone();
 
         spawn_local(async move {
-            let future = cln.call_buckets().unwrap();
-            if let Ok(returned) = future.await {
-                if let Ok(v) = returned.into_serde() {
-                    cloned.resolve(v);
-                } else {
-                    cloned.resolve(vec![]);
+            let future = cln.call_buckets();
+            match future {
+                Ok(future) => {
+                    if let Ok(returned) = future.await {
+                        if let Ok(v) = returned.into_serde() {
+                            cloned.resolve(v);
+                        } else {
+                            cloned.resolve(vec![]);
+                        }
+                    } else {
+                        cloned.resolve(vec![]);
+                    }
                 }
-            } else {
-                cloned.resolve(vec![]);
+                Err(_) => cloned.resolve(vec![]),
             }
         });
 
@@ -221,15 +226,20 @@ impl Callbacks {
         let cln = self.clone();
 
         spawn_local(async move {
-            let future = cln.call_measurements(bucket).unwrap();
-            if let Ok(returned) = future.await {
-                if let Ok(v) = returned.into_serde() {
-                    cloned.resolve(v);
-                } else {
-                    cloned.resolve(vec![]);
+            let future = cln.call_measurements(bucket);
+            match future {
+                Ok(future) => {
+                    if let Ok(returned) = future.await {
+                        if let Ok(v) = returned.into_serde() {
+                            cloned.resolve(v);
+                        } else {
+                            cloned.resolve(vec![]);
+                        }
+                    } else {
+                        cloned.resolve(vec![]);
+                    }
                 }
-            } else {
-                cloned.resolve(vec![]);
+                Err(_) => cloned.resolve(vec![]),
             }
         });
 
@@ -246,15 +256,20 @@ impl Callbacks {
         let cln = self.clone();
 
         spawn_local(async move {
-            let future = cln.call_tag_keys(bucket).unwrap();
-            if let Ok(returned) = future.await {
-                if let Ok(v) = returned.into_serde() {
-                    cloned.resolve(v);
-                } else {
-                    cloned.resolve(vec![]);
+            let future = cln.call_tag_keys(bucket);
+            match future {
+                Ok(future) => {
+                    if let Ok(returned) = future.await {
+                        if let Ok(v) = returned.into_serde() {
+                            cloned.resolve(v);
+                        } else {
+                            cloned.resolve(vec![]);
+                        }
+                    } else {
+                        cloned.resolve(vec![]);
+                    }
                 }
-            } else {
-                cloned.resolve(vec![]);
+                Err(_) => cloned.resolve(vec![]),
             }
         });
 
@@ -272,15 +287,20 @@ impl Callbacks {
         let cln = self.clone();
 
         spawn_local(async move {
-            let future = cln.call_tag_values(bucket, field).unwrap();
-            if let Ok(returned) = future.await {
-                if let Ok(v) = returned.into_serde() {
-                    cloned.resolve(v);
-                } else {
-                    cloned.resolve(vec![]);
+            let future = cln.call_tag_values(bucket, field);
+            match future {
+                Ok(future) => {
+                    if let Ok(returned) = future.await {
+                        if let Ok(v) = returned.into_serde() {
+                            cloned.resolve(v);
+                        } else {
+                            cloned.resolve(vec![]);
+                        }
+                    } else {
+                        cloned.resolve(vec![]);
+                    }
                 }
-            } else {
-                cloned.resolve(vec![]);
+                Err(_) => cloned.resolve(vec![]),
             }
         });
 
