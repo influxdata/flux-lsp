@@ -1,8 +1,9 @@
-FROM ubuntu:19.04
+FROM ubuntu:20.04
 
 WORKDIR /src
 
 ENV CC=clang
+ENV PATH="~/.cargo/bin:${PATH}"
 
 # Install common packages
 RUN apt-get update && \
@@ -20,4 +21,12 @@ RUN curl https://sh.rustup.rs -sSf | \
   sh -s -- --default-toolchain stable -y
 
 # Install wasm-pack
-RUN $HOME/.cargo/bin/cargo install wasm-pack
+RUN ~/.cargo/bin/cargo install wasm-pack
+
+# Install Node.js
+RUN curl -sL https://deb.nodesource.com/setup_12.x | bash -
+RUN apt-get install -y nodejs
+
+# Install linting tools
+RUN ~/.cargo/bin/rustup component add rustfmt
+RUN ~/.cargo/bin/rustup component add clippy
