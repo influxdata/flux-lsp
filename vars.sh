@@ -1,7 +1,7 @@
 #!/bin/sh
 
-imagename=flux-lsp-builder
-imagetag=0.0.1
+imagename=bthesorceror/wasm-build
+imagetag=latest
 
 SRC_DIR=/src
 DIR=$(pwd)

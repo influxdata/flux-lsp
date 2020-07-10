@@ -1,25 +1,18 @@
 version: 2.1
 
 commands:
-  install-linux-deps:
-    description: install flux-lsp dependencies
-    steps:
-      - run: sudo apt-get update
-      - run: sudo apt-get install ragel llvm clang libclang-dev
-
   install-node:
     description: install node.js for publishing
     steps:
-      - run: curl -sL https://deb.nodesource.com/setup_12.x | sudo bash -
-      - run: sudo apt-get install -y nodejs
+      - run: curl -sL https://deb.nodesource.com/setup_12.x | bash -
+      - run: apt-get install -y nodejs
 
 jobs:
   lint:
     docker:
-      - image: circleci/rust
+      - image: bthesorceror/wasm-build
     steps:
       - checkout
-      - install-linux-deps
       - run:
           name: "install rustfmt"
           command: rustup component add rustfmt
@@ -35,20 +28,18 @@ jobs:
 
   test:
     docker:
-      - image: circleci/rust
+      - image: bthesorceror/wasm-build
     steps:
       - checkout
-      - install-linux-deps
       - run:
           name: "run tests"
           command: make test
 
   build:
     docker:
-      - image: circleci/rust
+      - image: bthesorceror/wasm-build
     steps:
       - checkout
-      - install-linux-deps
       - install-node
       - run: make install-wasm-pack
       - run: cargo build --verbose
@@ -56,12 +47,10 @@ jobs:
 
   deploy:
     docker:
-      - image: circleci/rust
+      - image: bthesorceror/wasm-build
     steps:
       - checkout
-      - install-linux-deps
       - install-node
-      - run: make install-wasm-pack
       - run: make wasm-local
       - run: echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN" > pkg-node/.npmrc
       - run: echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN" > pkg-browser/.npmrc
