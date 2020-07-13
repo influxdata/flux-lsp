@@ -20,7 +20,7 @@ jobs:
       - checkout
       - run:
           name: "run tests"
-          command: make test
+          command: ./run-tests.sh
 
   build:
     docker:
@@ -46,12 +46,12 @@ workflows:
   build-and-test:
     jobs:
       - lint
-      - test:
-          requires:
-            - lint
       - build:
           requires:
             - lint
+      - test:
+          requires:
+            - build
 
   build-and-deploy:
     jobs:
