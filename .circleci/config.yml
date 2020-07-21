@@ -3,7 +3,7 @@ version: 2.1
 jobs:
   lint:
     docker:
-      - image: bthesorceror/wasm-build
+      - image: quay.io/influxdb/wasm-build
     steps:
       - checkout
       - run:
@@ -15,7 +15,7 @@ jobs:
 
   test:
     docker:
-      - image: bthesorceror/wasm-build
+      - image: quay.io/influxdb/wasm-build
     steps:
       - checkout
       - run:
@@ -24,7 +24,7 @@ jobs:
 
   build:
     docker:
-      - image: bthesorceror/wasm-build
+      - image: quay.io/influxdb/wasm-build
     steps:
       - checkout
       - run: cargo build --verbose
@@ -32,7 +32,7 @@ jobs:
 
   deploy:
     docker:
-      - image: bthesorceror/wasm-build
+      - image: quay.io/influxdb/wasm-build
     steps:
       - checkout
       - run: make wasm-local
