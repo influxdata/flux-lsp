@@ -177,7 +177,7 @@ checksum = "728b7ab3119b5167cc60a4aad16b6086b762278f5571cc650e7eed2e89a23a15"
 [[package]]
 name = "core"
 version = "0.4.0"
-source = "git+https://github.com/influxdata/flux?rev=85bd204#85bd20484b1698dbb10863fe6a2d2d7ab2c0424c"
+source = "git+https://github.com/influxdata/flux?tag=v0.87.0#61aef88194b32c1ead674ac7b9cf44f699c37787"
 dependencies = [
  "bindgen",
  "cc",
@@ -239,7 +239,7 @@ dependencies = [
 [[package]]
 name = "flux"
 version = "0.5.1"
-source = "git+https://github.com/influxdata/flux?rev=85bd204#85bd20484b1698dbb10863fe6a2d2d7ab2c0424c"
+source = "git+https://github.com/influxdata/flux?tag=v0.87.0#61aef88194b32c1ead674ac7b9cf44f699c37787"
 dependencies = [
  "core",
  "flatbuffers",
@@ -247,11 +247,12 @@ dependencies = [
  "serde-aux",
  "serde_derive",
  "serde_json",
+ "wasm-bindgen",
 ]
 
 [[package]]
 name = "flux-lsp"
-version = "0.5.19"
+version = "0.5.2"
 dependencies = [
  "async-trait",
  "combinations",

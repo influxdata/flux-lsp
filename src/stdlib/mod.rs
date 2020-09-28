@@ -10,7 +10,7 @@ use crate::visitors::semantic::Import;
 
 use flux::imports;
 use flux::prelude;
-use flux::semantic::types::{MonoType, Row};
+use flux::semantic::types::{MonoType, Record};
 
 use std::collections::{BTreeMap, HashMap};
 use std::fmt;
@@ -517,8 +517,8 @@ fn walk(
     list: &mut Vec<Box<dyn Completable + Send + Sync>>,
     t: MonoType,
 ) {
-    if let MonoType::Row(row) = t {
-        if let Row::Extension { head, tail } = *row {
+    if let MonoType::Record(record) = t {
+        if let Record::Extension { head, tail } = *record {
             match head.v {
                 MonoType::Fun(f) => {
                     list.push(Box::new(FunctionResult {
@@ -669,8 +669,8 @@ fn walk_package_functions(
     list: &mut Vec<Function>,
     t: MonoType,
 ) {
-    if let MonoType::Row(row) = t {
-        if let Row::Extension { head, tail } = *row {
+    if let MonoType::Record(record) = t {
+        if let Record::Extension { head, tail } = *record {
             if let MonoType::Fun(f) = head.v {
                 let mut params = vec![];
 
@@ -741,8 +741,8 @@ fn walk_functions(
     list: &mut Vec<FunctionInfo>,
     t: MonoType,
 ) {
-    if let MonoType::Row(row) = t {
-        if let Row::Extension { head, tail } = *row {
+    if let MonoType::Record(record) = t {
+        if let Record::Extension { head, tail } = *record {
             if let MonoType::Fun(f) = head.v {
                 if let Some(package_name) =
                     get_package_name(package.clone())
