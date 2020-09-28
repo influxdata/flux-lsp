@@ -1,10 +1,7 @@
 [package]
 name = "flux-lsp"
 version = "0.5.20"
-authors = [
-	"Sean Brickley <sbrickley@influxdata.com",
-	"Brandon Farmer <bthesorceror@gmail.com>",
-]
+authors = ["Flux Developers <flux-developers@influxdata.com>"]
 edition = "2018"
 license = "MIT"
 description = "LSP support for the flux language"
