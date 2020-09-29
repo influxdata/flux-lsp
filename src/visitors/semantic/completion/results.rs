@@ -124,7 +124,7 @@ pub enum VarType {
     Duration,
     Object,
     Regexp,
-    Row,
+    Record,
     Uint,
     Time,
 }
@@ -146,7 +146,7 @@ impl VarResult {
             VarType::Object => "Object".to_string(),
             VarType::Regexp => "Regular Expression".to_string(),
             VarType::String => "String".to_string(),
-            VarType::Row => "Row".to_string(),
+            VarType::Record => "Record".to_string(),
             VarType::Time => "Time".to_string(),
             VarType::Uint => "Unsigned Integer".to_string(),
         }
@@ -205,7 +205,7 @@ pub fn get_var_type(expr: &Expression) -> Option<VarType> {
                 MonoType::Bool => Some(VarType::Bool),
                 MonoType::Arr(_) => Some(VarType::Array),
                 MonoType::Duration => Some(VarType::Duration),
-                MonoType::Row(_) => Some(VarType::Row),
+                MonoType::Record(_) => Some(VarType::Record),
                 MonoType::String => Some(VarType::String),
                 MonoType::Uint => Some(VarType::Uint),
                 MonoType::Time => Some(VarType::Time),

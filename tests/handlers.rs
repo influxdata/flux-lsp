@@ -702,7 +702,7 @@ speculate! {
                 let returned_items = returned.result.unwrap().items;
 
                 assert_eq!(
-                    113,
+                    115,
                     returned_items.len(),
                     "expects completion items"
                 );
@@ -763,7 +763,7 @@ speculate! {
                 let returned_items = returned.result.unwrap().items;
 
                 assert_eq!(
-                    114,
+                    119,
                     returned_items.len(),
                     "expects completion items"
                 );
@@ -875,7 +875,7 @@ speculate! {
                 let returned_items = returned.result.unwrap().items;
 
                 assert_eq!(
-                    112,
+                    115,
                     returned_items.len(),
                     "expects completion items"
                 );
