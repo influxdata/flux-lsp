@@ -13,7 +13,7 @@ RUN apt-get update && \
   build-essential \
   openssl libssl-dev \
   clang pkg-config llvm \
-  autoconf automake autotools-dev libtool xutils-dev \
+  autoconf automake autotools-dev libtool xutils-dev git \
   && rm -rf /var/lib/{apt,dpkg,cache,log}
 
 # Install Rust
