@@ -8,13 +8,13 @@ Make sure you have the following installed:
 - `npm`
 - `wasm-pack`
 
-To install `wasm-pack` you can simply run `make install-wasm-pack` from the project root.
+To install `wasm-pack` you can simply run `make install-wasm-pack` from the project root of `flux-lsp`.
 
 You should also have the most recent versions of the following repos pulled down:
 - [ `flux-lsp` ](https://www.github.com/influxdata/flux-lsp)
 - [ `flux-lsp-cli` ](https://www.github.com/influxdata/flux-lsp-cli)
 - [ `flux-lsp` ](https://www.github.com/influxdata/vsflux)
-- influxdb
+- [ influxdb ](https://www.github.com/influxdata/influxdb)
 
 ## Testing Locally
 
