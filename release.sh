@@ -47,4 +47,4 @@ git tag -a $new_version HEAD -m "Release $new_verion"
 git push origin master --follow-tags
 
 # Requires the hub CLI tool to be installed
-hub release create $new_version -m "Release $new_version" 
+hub release create $new_version -m "Release $new_version" -e
