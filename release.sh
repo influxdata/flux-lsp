@@ -13,6 +13,7 @@ if [[ $git_changes != 0 ]]; then
 fi
 
 git fetch
+git checkout master
 ahead=$(git status -sb | grep ahead -c)
 if [[ $ahead != 0 ]]; then
 	echo "Your local master branch is ahead of the remote master branch. Exiting."
@@ -31,7 +32,6 @@ if [[ $continue != "yes" && $continue != "y" && $continue != "Yes" && $continue 
 	exit
 fi
 
-git checkout master
 git pull origin master
 
 version=v$(cat Cargo.toml | grep -Po -m 1 '\d+\.\d+\.\d+')
