@@ -1,6 +1,6 @@
 #!/bin/sh
 
-imagename=bthesorceror/wasm-build
+imagename=influxdb/wasm-build
 imagetag=latest
 
 SRC_DIR=/src

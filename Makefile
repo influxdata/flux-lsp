@@ -42,7 +42,7 @@ install-wasm-pack:
 	curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
 
 patch-release:
-	cargo install cargo-bump && cargo bump patch
+	./releash.sh patch
 
 minor-release:
-	cargo install cargo-bump && cargo bump minor
+	./releash.sh minor
