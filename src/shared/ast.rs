@@ -37,19 +37,15 @@ pub fn create_ast_package(
     let values =
         cache.get_package(uri, ctx.support_multiple_files)?;
 
-    let pkgs = values
-        .into_iter()
-        .map(|v: cache::CacheValue| {
-            crate::shared::conversion::create_file_node_from_text(
-                v.uri.as_str(),
-                v.contents,
-            )
-        })
-        .collect::<Vec<flux::ast::Package>>();
+    let pkgs = values.into_iter().map(|v: cache::CacheValue| {
+        crate::shared::conversion::create_file_node_from_text(
+            v.uri.as_str(),
+            v.contents,
+        )
+    });
 
-    let pkg = pkgs.into_iter().fold(
-        None,
-        |acc: Option<flux::ast::Package>, pkg| {
+    let pkg =
+        pkgs.fold(None, |acc: Option<flux::ast::Package>, pkg| {
             if let Some(mut p) = acc {
                 let mut files = pkg.files;
                 p.files.append(&mut files);
@@ -57,13 +53,12 @@ pub fn create_ast_package(
             }
 
             Some(pkg)
-        },
-    );
+        });
 
     if let Some(mut pkg) = pkg {
         let mut files = pkg.files;
         files.sort_by(|a, _b| {
-            if a.name == uri.clone() {
+            if a.name == uri {
                 std::cmp::Ordering::Greater
             } else {
                 std::cmp::Ordering::Less

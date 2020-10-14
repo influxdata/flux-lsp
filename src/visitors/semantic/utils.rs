@@ -143,7 +143,7 @@ where
         .files
         .into_iter()
         .map(|mut file| {
-            if file.name == uri.clone() {
+            if file.name == uri {
                 file.body = file
                     .body
                     .into_iter()

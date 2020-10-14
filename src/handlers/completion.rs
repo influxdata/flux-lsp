@@ -297,19 +297,17 @@ async fn find_completions(
             CompletionType::Import => {
                 let infos = get_package_infos();
 
-                let current = get_imports_removed(
+                let imports = get_imports_removed(
                     uri,
                     info.position,
                     ctx,
                     cache,
-                )?
-                .into_iter()
-                .map(|x| x.path)
-                .collect::<Vec<String>>();
+                )?;
 
                 let mut items = vec![];
                 for info in infos {
-                    if !current.contains(&info.name) {
+                    if !(&imports).iter().any(|x| x.path == info.name)
+                    {
                         items.push(new_string_arg_completion(
                             info.path,
                             get_trigger(params.clone()),
