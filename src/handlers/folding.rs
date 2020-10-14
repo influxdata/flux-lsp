@@ -1,4 +1,4 @@
-use crate::cache;
+use crate::cache::Cache;
 use crate::handlers::RequestHandler;
 use crate::protocol::properties::FoldingRange;
 use crate::protocol::requests::{
@@ -22,9 +22,10 @@ fn node_to_folding_range(node: Rc<Node>) -> FoldingRange {
 }
 
 fn find_foldable_areas(
-    uri: String,
+    uri: &'_ str,
+    cache: &Cache,
 ) -> Result<Vec<FoldingRange>, String> {
-    let cv = cache::get(uri)?;
+    let cv = cache.get(uri)?;
     let pkg = utils::analyze_source(cv.contents.as_str())?;
     let walker = walk::Node::Package(&pkg);
     let mut visitor = FoldFinderVisitor::default();
@@ -51,13 +52,16 @@ impl RequestHandler for FoldingHandler {
         &self,
         prequest: PolymorphicRequest,
         _: crate::shared::RequestContext,
+        cache: &Cache,
     ) -> Result<Option<String>, String> {
         let request: Request<FoldingRangeParams> =
             Request::from_json(prequest.data.as_str())?;
         let mut areas: Option<Vec<FoldingRange>> = None;
         if let Some(params) = request.params {
-            let foldable =
-                find_foldable_areas(params.text_document.uri)?;
+            let foldable = find_foldable_areas(
+                params.text_document.uri.as_str(),
+                cache,
+            )?;
             areas = Some(foldable);
         }
 

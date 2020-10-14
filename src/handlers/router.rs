@@ -1,3 +1,4 @@
+use crate::cache::Cache;
 use crate::handlers::completion::CompletionHandler;
 use crate::handlers::completion_resolve::CompletionResolveHandler;
 use crate::handlers::document_change::DocumentChangeHandler;
@@ -28,6 +29,7 @@ use async_trait::async_trait;
 pub struct Router {
     mapping: HashMap<String, Box<dyn RequestHandler>>,
     default_handler: Box<dyn RequestHandler>,
+    cache: Cache,
 }
 
 #[derive(Default)]
@@ -39,6 +41,7 @@ impl RequestHandler for NoOpHandler {
         &self,
         _: PolymorphicRequest,
         _: RequestContext,
+        _: &Cache,
     ) -> Result<Option<String>, String> {
         Ok(None)
     }
@@ -117,6 +120,7 @@ impl Router {
         Router {
             mapping,
             default_handler: Box::new(NoOpHandler::default()),
+            cache: Cache::default(),
         }
     }
 
@@ -131,7 +135,7 @@ impl Router {
             None => &self.default_handler,
         };
 
-        let resp = handler.handle(request, ctx).await?;
+        let resp = handler.handle(request, ctx, &self.cache).await?;
 
         Ok(resp)
     }

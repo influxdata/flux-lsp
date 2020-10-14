@@ -1,4 +1,4 @@
-use crate::cache;
+use crate::cache::Cache;
 use crate::handlers::RequestHandler;
 use crate::protocol::requests::{
     PolymorphicRequest, Request, TextDocumentParams,
@@ -18,13 +18,16 @@ fn parse_close_request(
     Ok(request)
 }
 
-fn handle_close(data: String) -> Result<Option<String>, String> {
+fn handle_close(
+    data: String,
+    cache: &Cache,
+) -> Result<Option<String>, String> {
     let request = parse_close_request(data)?;
 
     if let Some(params) = request.params {
         let uri = params.text_document.uri;
 
-        cache::remove(uri)?;
+        cache.remove(uri.as_str())?;
 
         return Ok(None);
     }
@@ -38,7 +41,8 @@ impl RequestHandler for DocumentCloseHandler {
         &self,
         prequest: PolymorphicRequest,
         _: crate::shared::RequestContext,
+        cache: &Cache,
     ) -> Result<Option<String>, String> {
-        handle_close(prequest.data)
+        handle_close(prequest.data, cache)
     }
 }

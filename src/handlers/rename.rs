@@ -1,3 +1,4 @@
+use crate::cache::Cache;
 use crate::handlers::references::find_references;
 use crate::handlers::RequestHandler;
 use crate::protocol::properties::TextEdit;
@@ -17,6 +18,7 @@ impl RequestHandler for RenameHandler {
         &self,
         prequest: PolymorphicRequest,
         _: crate::shared::RequestContext,
+        cache: &Cache,
     ) -> Result<Option<String>, String> {
         let request: Request<RenameParams> =
             Request::from_json(prequest.data.as_str())?;
@@ -26,9 +28,10 @@ impl RequestHandler for RenameHandler {
         };
 
         if let Some(params) = request.params {
-            let uri = params.text_document.uri;
+            let uri = params.text_document.uri.as_str();
             let new_name = params.new_name;
-            let locations = find_references(uri, params.position)?;
+            let locations =
+                find_references(uri, params.position, cache)?;
 
             for location in locations.iter() {
                 let uri = location.uri.clone();

@@ -32,26 +32,6 @@ speculate! {
         let mut router = create_router();
     }
 
-    describe "multiple packages" {
-        before {
-            flux_lsp::cache::clear().unwrap();
-            let uri1 = flux_fixture_uri("incomplete_option");
-            let uri2 = flux_fixture_uri("options_function");
-            open_file(uri1.clone(), &mut router);
-            open_file(uri2.clone(), &mut router);
-        }
-
-        after {
-            close_file(uri1, &mut router);
-            close_file(uri2, &mut router);
-        }
-
-        it "returns packages in directory" {
-            let files = flux_lsp::cache::get_package(uri1.clone(), true).unwrap();
-            assert_eq!(files.len(), 2, "returns correct number of files");
-        }
-    }
-
     describe "unknown request" {
         it "returns correct response" {
             let request = PolymorphicRequest {
@@ -123,8 +103,8 @@ speculate! {
     describe "Document open" {
         describe "when ok" {
             before {
-                flux_lsp::cache::clear().unwrap();
                 let uri = flux_fixture_uri("ok");
+                let uri = uri.as_str();
             }
 
             after {
@@ -137,7 +117,7 @@ speculate! {
                     method: "textDocument/didOpen".to_string(),
                     params: Some(TextDocumentParams {
                         text_document: TextDocument {
-                            uri: uri.clone(),
+                            uri: uri.to_string(),
                             language_id: "flux".to_string(),
                             version: 1,
                             text: "".to_string(),
@@ -157,7 +137,7 @@ speculate! {
 
                 let response = block_on(router.route(request, create_request_context())).unwrap().unwrap();
                 let expected_json =
-                    create_diagnostics_notification(uri.clone(), vec![])
+                    create_diagnostics_notification(uri.to_string(), vec![])
                     .to_json()
                     .unwrap();
 
@@ -170,8 +150,8 @@ speculate! {
 
         describe "when incomplete option" {
             before {
-                flux_lsp::cache::clear().unwrap();
                 let uri = flux_fixture_uri("incomplete_option");
+                let uri = uri.as_str();
             }
 
             after {
@@ -179,13 +159,13 @@ speculate! {
             }
 
             it "returns an error" {
-                let text = get_file_contents_from_uri(uri.clone()).unwrap();
+                let text = get_file_contents_from_uri(uri).unwrap();
                 let did_open_request = Request {
                     id: 1,
                     method: "textDocument/didOpen".to_string(),
                     params: Some(TextDocumentParams {
                         text_document: TextDocument {
-                            uri: uri.clone(),
+                            uri: uri.to_string(),
                             language_id: "flux".to_string(),
                             version: 1,
                             text,
@@ -222,7 +202,7 @@ speculate! {
                 }];
 
                 let expected_json =
-                    create_diagnostics_notification(uri.clone(), diagnostics)
+                    create_diagnostics_notification(uri.to_string(), diagnostics)
                     .to_json()
                     .unwrap();
 
@@ -236,8 +216,8 @@ speculate! {
 
         describe "when there is an error" {
             before {
-                flux_lsp::cache::clear().unwrap();
                 let uri = flux_fixture_uri("error");
+                let uri = uri.as_str();
             }
 
             after {
@@ -245,13 +225,13 @@ speculate! {
             }
 
             it "returns an error" {
-                let text = get_file_contents_from_uri(uri.clone()).unwrap();
+                let text = get_file_contents_from_uri(uri).unwrap();
                 let did_open_request = Request {
                     id: 1,
                     method: "textDocument/didOpen".to_string(),
                     params: Some(TextDocumentParams {
                         text_document: TextDocument {
-                            uri: uri.clone(),
+                            uri: uri.to_string(),
                             language_id: "flux".to_string(),
                             version: 1,
                             text,
@@ -288,7 +268,7 @@ speculate! {
                 }];
 
                 let expected_json =
-                    create_diagnostics_notification(uri.clone(), diagnostics)
+                    create_diagnostics_notification(uri.to_string(), diagnostics)
                     .to_json()
                     .unwrap();
 
@@ -304,9 +284,9 @@ speculate! {
     describe "Formatting request" {
         describe "when ok" {
             before {
-                flux_lsp::cache::clear().unwrap();
                 let uri = flux_fixture_uri("formatting");
-                open_file(uri.clone(), &mut router);
+                let uri = uri.as_str();
+                open_file(uri, &mut router);
             }
 
             after {
@@ -318,7 +298,7 @@ speculate! {
                     method: "textDocument/formatting".to_string(),
                     params: Some(DocumentFormattingParams {
                         text_document: TextDocumentIdentifier {
-                            uri: uri.clone(),
+                            uri: uri.to_string(),
                         }
                     }),
                 };
@@ -339,7 +319,7 @@ speculate! {
                 let text = edit.new_text.clone();
 
 
-                let file_text = get_file_contents_from_uri(uri.clone()).unwrap();
+                let file_text = get_file_contents_from_uri(uri).unwrap();
                 let formatted_text = flux::formatter::format(file_text).unwrap();
 
                 assert_eq!(text, formatted_text, "returns formatted text");
@@ -350,9 +330,9 @@ speculate! {
     describe "Signature help request" {
         describe "when ok" {
             before {
-                flux_lsp::cache::clear().unwrap();
                 let uri = flux_fixture_uri("signatures");
-                open_file(uri.clone(), &mut router);
+                let uri = uri.as_str();
+                open_file(uri, &mut router);
             }
 
             after {
@@ -370,7 +350,7 @@ speculate! {
                             character: 5,
                         },
                         text_document: TextDocumentIdentifier {
-                            uri: uri.clone(),
+                            uri: uri.to_string(),
                         }
                     }),
                 };
@@ -399,11 +379,10 @@ speculate! {
     describe "Completion request" {
         describe "when object completing params" {
             before {
-                flux_lsp::cache::clear().unwrap();
 
                 let uri = flux_fixture_uri("object_param_completion");
-
-                open_file(uri.clone(), &mut router);
+                let uri = uri.as_str();
+                open_file(uri, &mut router);
             }
 
             after {
@@ -424,7 +403,7 @@ speculate! {
                             line: 4,
                         },
                         text_document: TextDocumentIdentifier {
-                            uri: uri.clone(),
+                            uri: uri.to_string(),
                         }
                     }),
                 };
@@ -463,11 +442,10 @@ speculate! {
 
         describe "when completing params" {
             before {
-                flux_lsp::cache::clear().unwrap();
 
                 let uri = flux_fixture_uri("param_completion");
-
-                open_file(uri.clone(), &mut router);
+                let uri = uri.as_str();
+                open_file(uri, &mut router);
             }
 
             after {
@@ -488,7 +466,7 @@ speculate! {
                             line: 2,
                         },
                         text_document: TextDocumentIdentifier {
-                            uri: uri.clone(),
+                            uri: uri.to_string(),
                         }
                     }),
                 };
@@ -527,13 +505,14 @@ speculate! {
 
         describe "when there are multiple files" {
             before {
-                flux_lsp::cache::clear().unwrap();
 
                 let uri1 = flux_fixture_uri("multiple_1");
+                let uri1 = uri1.as_str();
                 let uri2 = flux_fixture_uri("multiple_2");
+                let uri2 = uri2.as_str();
 
-                open_file(uri1.clone(), &mut router);
-                open_file(uri2.clone(), &mut router);
+                open_file(uri1, &mut router);
+                open_file(uri2, &mut router);
             }
 
             after {
@@ -555,7 +534,7 @@ speculate! {
                             line: 0,
                         },
                         text_document: TextDocumentIdentifier {
-                            uri: uri2.clone(),
+                            uri: uri2.to_string(),
                         }
                     }),
                 };
@@ -582,9 +561,9 @@ speculate! {
         }
         describe "when completion a package" {
             before {
-                flux_lsp::cache::clear().unwrap();
                 let uri = flux_fixture_uri("package_completion");
-                open_file(uri.clone(), &mut router);
+                let uri = uri.as_str();
+                open_file(uri, &mut router);
             }
 
             after {
@@ -605,7 +584,7 @@ speculate! {
                             line: 2,
                         },
                         text_document: TextDocumentIdentifier {
-                            uri: uri.clone(),
+                            uri: uri.to_string(),
                         }
                     }),
                 };
@@ -633,9 +612,9 @@ speculate! {
 
         describe "when ok" {
             before {
-                flux_lsp::cache::clear().unwrap();
                 let uri = flux_fixture_uri("completion");
-                open_file(uri.clone(), &mut router);
+                let uri = uri.as_str();
+                open_file(uri, &mut router);
             }
 
             after {
@@ -653,7 +632,7 @@ speculate! {
                             line: 8,
                         },
                         text_document: TextDocumentIdentifier {
-                            uri: uri.clone(),
+                            uri: uri.to_string(),
                         }
                     }),
                 };
@@ -679,7 +658,7 @@ speculate! {
                             character: 1,
                             line: 8,
                         },
-                        uri: uri.clone(),
+                        uri: uri.to_string(),
                 };
 
 
@@ -723,9 +702,9 @@ speculate! {
 
         describe "when an option can be completed" {
             before {
-                flux_lsp::cache::clear().unwrap();
                 let uri = flux_fixture_uri("options");
-                open_file(uri.clone(), &mut router);
+                let uri = uri.as_str();
+                open_file(uri, &mut router);
             }
 
             after {
@@ -743,7 +722,7 @@ speculate! {
                             line: 16,
                         },
                         text_document: TextDocumentIdentifier {
-                            uri: uri.clone(),
+                            uri: uri.to_string(),
                         }
                     }),
                 };
@@ -778,9 +757,9 @@ speculate! {
 
         describe "when an option members can be completed" {
             before {
-                flux_lsp::cache::clear().unwrap();
                 let uri = flux_fixture_uri("options_object_members");
-                open_file(uri.clone(), &mut router);
+                let uri = uri.as_str();
+                open_file(uri, &mut router);
             }
 
             after {
@@ -801,7 +780,7 @@ speculate! {
                             line: 16,
                         },
                         text_document: TextDocumentIdentifier {
-                            uri: uri.clone(),
+                            uri: uri.to_string(),
                         }
                     }),
                 };
@@ -835,9 +814,9 @@ speculate! {
 
         describe "when an option functions can be completed" {
             before {
-                flux_lsp::cache::clear().unwrap();
                 let uri = flux_fixture_uri("options_function");
-                open_file(uri.clone(), &mut router);
+                let uri = uri.as_str();
+                open_file(uri, &mut router);
             }
 
             after {
@@ -855,7 +834,7 @@ speculate! {
                             line: 10,
                         },
                         text_document: TextDocumentIdentifier {
-                            uri: uri.clone(),
+                            uri: uri.to_string(),
                         }
                     }),
                 };
@@ -886,9 +865,9 @@ speculate! {
     describe "Document change" {
         describe "when ok" {
             before {
-                flux_lsp::cache::clear().unwrap();
                 let uri = flux_fixture_uri("ok");
-                open_file(uri.clone(), &mut router);
+                let uri = uri.as_str();
+                open_file(uri, &mut router);
             }
 
             after {
@@ -896,14 +875,14 @@ speculate! {
             }
 
             it "returns the correct response" {
-                let text = get_file_contents_from_uri(uri.clone()).unwrap();
+                let text = get_file_contents_from_uri(uri).unwrap();
 
                 let did_change_request = Request {
                     id: 1,
                     method: "textDocument/didChange".to_string(),
                     params: Some(TextDocumentChangeParams {
                         text_document: VersionedTextDocumentIdentifier {
-                            uri: uri.clone(),
+                            uri: uri.to_string(),
                             version: 1,
                         },
                         content_changes: vec![ContentChange {
@@ -925,7 +904,7 @@ speculate! {
                 };
                 let response = block_on(router.route(request, create_request_context())).unwrap();
                 let expected_json =
-                    create_diagnostics_notification(uri.clone(), vec![])
+                    create_diagnostics_notification(uri.to_string(), vec![])
                     .to_json()
                     .unwrap();
 
@@ -939,9 +918,9 @@ speculate! {
 
         describe "when there is an error" {
             before {
-                flux_lsp::cache::clear().unwrap();
                 let uri = flux_fixture_uri("error");
-                open_file(uri.clone(), &mut router);
+                let uri = uri.as_str();
+                open_file(uri, &mut router);
             }
 
             after {
@@ -949,14 +928,14 @@ speculate! {
             }
 
             it "returns the correct response" {
-                let text = get_file_contents_from_uri(uri.clone()).unwrap();
+                let text = get_file_contents_from_uri(uri).unwrap();
 
                 let did_change_request = Request {
                     id: 1,
                     method: "textDocument/didChange".to_string(),
                     params: Some(TextDocumentChangeParams {
                         text_document: VersionedTextDocumentIdentifier {
-                            uri: uri.clone(),
+                            uri: uri.to_string(),
                             version: 1,
                         },
                         content_changes: vec![ContentChange {
@@ -995,7 +974,7 @@ speculate! {
                 }];
 
                 let expected_json =
-                    create_diagnostics_notification(uri.clone(), diagnostics)
+                    create_diagnostics_notification(uri.to_string(), diagnostics)
                     .to_json()
                     .unwrap();
 
@@ -1044,9 +1023,9 @@ speculate! {
 
     describe "Rename" {
         before {
-            flux_lsp::cache::clear().unwrap();
             let uri = flux_fixture_uri("ok");
-            open_file(uri.clone(), &mut router);
+            let uri = uri.as_str();
+            open_file(uri, &mut router);
         }
 
         after {
@@ -1060,7 +1039,7 @@ speculate! {
                 method: "textDocument/rename".to_string(),
                 params: Some(RenameParams {
                     text_document: TextDocument {
-                        uri: uri.clone(),
+                        uri: uri.to_string(),
                         language_id: "flux".to_string(),
                         version: 1,
                         text: "".to_string(),
@@ -1116,7 +1095,7 @@ speculate! {
                 },
                 ];
 
-            expected_changes.insert(uri.clone(), edits);
+            expected_changes.insert(uri.to_string(), edits);
 
             let workspace_edit = WorkspaceEditResult {
                 changes: expected_changes,
@@ -1138,9 +1117,9 @@ speculate! {
 
     describe "Folding" {
         before {
-            flux_lsp::cache::clear().unwrap();
             let uri = flux_fixture_uri("ok");
-            open_file(uri.clone(), &mut router);
+            let uri = uri.as_str();
+            open_file(uri, &mut router);
         }
 
         after {
@@ -1153,7 +1132,7 @@ speculate! {
                 method: "textDocument/foldingRange".to_string(),
                 params: Some(FoldingRangeParams {
                     text_document: TextDocument {
-                        uri: uri.clone(),
+                        uri: uri.to_string(),
                         language_id: "flux".to_string(),
                         version: 1,
                         text: "".to_string(),
@@ -1202,9 +1181,9 @@ speculate! {
 
     describe "Goto definition" {
         before {
-            flux_lsp::cache::clear().unwrap();
             let uri = flux_fixture_uri("ok");
-            open_file(uri.clone(), &mut router);
+            let uri = uri.as_str();
+            open_file(uri, &mut router);
         }
 
         after {
@@ -1217,7 +1196,7 @@ speculate! {
                 method: "textDocument/definition".to_string(),
                 params: Some(TextDocumentPositionParams {
                     text_document: TextDocument {
-                        uri: uri.clone(),
+                        uri: uri.to_string(),
                         language_id: "flux".to_string(),
                         version: 1,
                         text: "".to_string(),
@@ -1243,7 +1222,7 @@ speculate! {
             let expected: Response<Location> = Response {
                 id: 1,
                 result: Some(Location {
-                    uri: uri.clone(),
+                    uri: uri.to_string(),
                     range: Range {
                         start: Position {
                             line: 1,
@@ -1268,9 +1247,9 @@ speculate! {
 
     describe "Find references" {
         before {
-            flux_lsp::cache::clear().unwrap();
             let uri = flux_fixture_uri("ok");
-            open_file(uri.clone(), &mut router);
+            let uri = uri.as_str();
+            open_file(uri, &mut router);
         }
 
         after {
@@ -1284,7 +1263,7 @@ speculate! {
                 params: Some(ReferenceParams {
                     context: ReferenceContext {},
                     text_document: TextDocument {
-                        uri: uri.clone(),
+                        uri: uri.to_string(),
                         language_id: "flux".to_string(),
                         version: 1,
                         text: "".to_string(),
@@ -1311,7 +1290,7 @@ speculate! {
                 id: 1,
                 result: Some(vec![
                     Location {
-                        uri: uri.clone(),
+                        uri: uri.to_string(),
                         range: Range {
                             start: Position {
                                 line: 1,
@@ -1324,7 +1303,7 @@ speculate! {
                         },
                     },
                     Location {
-                        uri: uri.clone(),
+                        uri: uri.to_string(),
                         range: Range {
                             start: Position {
                                 line: 8,
@@ -1350,9 +1329,9 @@ speculate! {
 
     describe "Document symbols" {
         before {
-            flux_lsp::cache::clear().unwrap();
             let uri = flux_fixture_uri("simple");
-            open_file(uri.clone(), &mut router);
+            let uri = uri.as_str();
+            open_file(uri, &mut router);
         }
 
         after {
@@ -1365,7 +1344,7 @@ speculate! {
                 method: "textDocument/documentSymbol".to_string(),
                 params: Some(DocumentSymbolParams {
                     text_document: TextDocumentIdentifier {
-                        uri: uri.clone(),
+                        uri: uri.to_string(),
                     },
                 }),
             };
@@ -1387,7 +1366,7 @@ speculate! {
                    kind: SymbolKind::Function,
                    deprecated: Some(false),
                    location: Location {
-                        uri: uri.clone(),
+                        uri: uri.to_string(),
                         range: Range {
                             start: Position {
                                 line: 0,
@@ -1406,7 +1385,7 @@ speculate! {
                    kind: SymbolKind::Variable,
                    deprecated: Some(false),
                    location: Location {
-                        uri: uri.clone(),
+                        uri: uri.to_string(),
                         range: Range {
                             start: Position {
                                 line: 0,
@@ -1425,7 +1404,7 @@ speculate! {
                    kind: SymbolKind::String,
                    deprecated: Some(false),
                    location: Location {
-                        uri: uri.clone(),
+                        uri: uri.to_string(),
                         range: Range {
                             start: Position {
                                 line: 0,
@@ -1466,9 +1445,9 @@ fn flux_fixture_uri(filename: &'static str) -> String {
 }
 
 pub fn get_file_contents_from_uri(
-    uri: String,
+    uri: &'_ str,
 ) -> Result<String, String> {
-    let url = match Url::parse(uri.as_str()) {
+    let url = match Url::parse(uri) {
         Ok(s) => s,
         Err(e) => {
             return Err(format!("Failed to get file path: {}", e))
@@ -1492,14 +1471,14 @@ fn create_router() -> Router {
     Router::new(false)
 }
 
-fn open_file(uri: String, router: &mut Router) {
-    let text = get_file_contents_from_uri(uri.clone()).unwrap();
+fn open_file(uri: &'_ str, router: &mut Router) {
+    let text = get_file_contents_from_uri(uri).unwrap();
     let did_open_request = Request {
         id: 1,
         method: "textDocument/didOpen".to_string(),
         params: Some(TextDocumentParams {
             text_document: TextDocument {
-                uri,
+                uri: uri.to_string(),
                 language_id: "flux".to_string(),
                 version: 1,
                 text,
@@ -1521,14 +1500,14 @@ fn open_file(uri: String, router: &mut Router) {
         .unwrap();
 }
 
-fn close_file(uri: String, router: &mut Router) {
-    let text = get_file_contents_from_uri(uri.clone()).unwrap();
+fn close_file(uri: &'_ str, router: &mut Router) {
+    let text = get_file_contents_from_uri(uri).unwrap();
     let did_close_request = Request {
         id: 1,
         method: "textDocument/didClose".to_string(),
         params: Some(TextDocumentParams {
             text_document: TextDocument {
-                uri,
+                uri: uri.to_string(),
                 language_id: "flux".to_string(),
                 version: 1,
                 text,

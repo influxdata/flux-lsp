@@ -1,4 +1,4 @@
-use crate::cache;
+use crate::cache::Cache;
 use crate::handlers::RequestHandler;
 use crate::protocol::requests::{
     PolymorphicRequest, Request, TextDocumentParams,
@@ -21,16 +21,17 @@ fn parse_open_request(
 fn handle_open(
     data: String,
     ctx: RequestContext,
+    cache: &Cache,
 ) -> Result<Option<String>, String> {
     let request = parse_open_request(data)?;
 
     if let Some(params) = request.params {
-        let uri = params.text_document.uri;
+        let uri = params.text_document.uri.as_str();
         let version = params.text_document.version;
         let text = params.text_document.text;
 
-        cache::force(uri.clone(), version, text)?;
-        let msg = create_diagnoistics(uri, ctx)?;
+        cache.force(uri, version, text)?;
+        let msg = create_diagnoistics(uri, ctx, cache)?;
 
         let json = msg.to_json()?;
 
@@ -46,7 +47,8 @@ impl RequestHandler for DocumentOpenHandler {
         &self,
         prequest: PolymorphicRequest,
         ctx: crate::shared::RequestContext,
+        cache: &Cache,
     ) -> Result<Option<String>, String> {
-        handle_open(prequest.data, ctx)
+        handle_open(prequest.data, ctx, cache)
     }
 }

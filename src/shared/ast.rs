@@ -1,4 +1,5 @@
 use crate::cache;
+use crate::cache::Cache;
 use crate::shared::structs::RequestContext;
 
 use crate::protocol::properties::Position;
@@ -29,17 +30,18 @@ pub fn is_in_node(pos: Position, base: &flux::ast::BaseNode) -> bool {
 }
 
 pub fn create_ast_package(
-    uri: String,
+    uri: &'_ str,
     ctx: RequestContext,
+    cache: &Cache,
 ) -> Result<flux::ast::Package, String> {
     let values =
-        cache::get_package(uri.clone(), ctx.support_multiple_files)?;
+        cache.get_package(uri, ctx.support_multiple_files)?;
 
     let pkgs = values
         .into_iter()
         .map(|v: cache::CacheValue| {
             crate::shared::conversion::create_file_node_from_text(
-                v.uri.clone(),
+                v.uri.as_str(),
                 v.contents,
             )
         })

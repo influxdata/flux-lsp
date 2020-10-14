@@ -1,3 +1,4 @@
+use crate::cache::Cache;
 use crate::handlers::RequestHandler;
 use crate::protocol::requests::{
     InitializeParams, PolymorphicRequest, Request,
@@ -20,6 +21,7 @@ impl RequestHandler for InitializeHandler {
         &self,
         prequest: PolymorphicRequest,
         _: crate::shared::RequestContext,
+        _: &Cache,
     ) -> Result<Option<String>, String> {
         let _: Request<InitializeParams> =
             Request::from_json(prequest.data.as_str())?;

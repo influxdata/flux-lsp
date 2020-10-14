@@ -1,11 +1,7 @@
 use std::collections::hash_map::HashMap;
 use std::sync::{Arc, Mutex};
 
-lazy_static! {
-    static ref GLOBAL_CACHE: Cache = Cache::default();
-}
-
-fn get_dir(uri: String) -> String {
+fn get_dir(uri: &'_ str) -> String {
     let mut parts = uri.split('/').collect::<Vec<&str>>();
     parts.pop();
     parts.join("/")
@@ -16,7 +12,7 @@ mod test {
     use super::*;
     #[test]
     fn test_get_dir() {
-        let uri = String::from("file:///users/test/mine.flux");
+        let uri = "file:///users/test/mine.flux";
         let dir = get_dir(uri);
 
         assert_eq!(
@@ -24,41 +20,6 @@ mod test {
             "returns correct directory"
         )
     }
-}
-
-pub fn set(
-    uri: String,
-    version: u32,
-    contents: String,
-) -> Result<(), String> {
-    GLOBAL_CACHE.set(uri, version, contents)
-}
-
-pub fn force(
-    uri: String,
-    version: u32,
-    contents: String,
-) -> Result<(), String> {
-    GLOBAL_CACHE.force(uri, version, contents)
-}
-
-pub fn get(uri: String) -> Result<CacheValue, String> {
-    GLOBAL_CACHE.get(uri.as_str())
-}
-
-pub fn get_package(
-    uri: String,
-    multiple_files: bool,
-) -> Result<Vec<CacheValue>, String> {
-    GLOBAL_CACHE.get_package(uri, multiple_files)
-}
-
-pub fn remove(uri: String) -> Result<(), String> {
-    GLOBAL_CACHE.remove(uri.as_str())
-}
-
-pub fn clear() -> Result<(), String> {
-    GLOBAL_CACHE.clear()
 }
 
 #[derive(Clone)]
@@ -69,12 +30,12 @@ pub struct CacheValue {
 }
 
 #[derive(Default)]
-struct Cache {
+pub struct Cache {
     store: Arc<Mutex<HashMap<String, CacheValue>>>,
 }
 
 impl Cache {
-    fn remove(&self, uri: &'_ str) -> Result<(), String> {
+    pub fn remove(&self, uri: &'_ str) -> Result<(), String> {
         let mut store = match self.store.lock() {
             Ok(s) => s,
             Err(_) => {
@@ -89,7 +50,7 @@ impl Cache {
         Ok(())
     }
 
-    fn clear(&self) -> Result<(), String> {
+    pub fn clear(&self) -> Result<(), String> {
         let keys = self.keys()?;
 
         for key in keys {
@@ -99,7 +60,7 @@ impl Cache {
         Ok(())
     }
 
-    fn keys(&self) -> Result<Vec<String>, String> {
+    pub fn keys(&self) -> Result<Vec<String>, String> {
         let store = match self.store.lock() {
             Ok(s) => s,
             Err(_) => {
@@ -112,13 +73,13 @@ impl Cache {
         Ok(store.keys().map(|k| (*k).clone()).collect())
     }
 
-    fn get_package(
+    pub fn get_package(
         &self,
-        uri: String,
+        uri: &'_ str,
         multiple_files: bool,
     ) -> Result<Vec<CacheValue>, String> {
         if !multiple_files {
-            let result = self.get(uri.as_str())?;
+            let result = self.get(uri)?;
             return Ok(vec![result]);
         }
 
@@ -137,9 +98,9 @@ impl Cache {
             }))
     }
 
-    fn force(
+    pub fn force(
         &self,
-        uri: String,
+        uri: &'_ str,
         version: u32,
         contents: String,
     ) -> Result<(), String> {
@@ -153,19 +114,19 @@ impl Cache {
         };
 
         let val = CacheValue {
-            uri: uri.clone(),
+            uri: uri.to_string(),
             version,
             contents,
         };
 
-        store.insert(uri, val);
+        store.insert(uri.to_string(), val);
 
         Ok(())
     }
 
-    fn set(
+    pub fn set(
         &self,
-        uri: String,
+        uri: &'_ str,
         version: u32,
         contents: String,
     ) -> Result<(), String> {
@@ -178,30 +139,30 @@ impl Cache {
             }
         };
 
-        if let Some(val) = store.get(uri.as_str()) {
+        if let Some(val) = store.get(uri) {
             if val.version <= version {
                 let val = CacheValue {
-                    uri: uri.clone(),
+                    uri: uri.to_string(),
                     version,
                     contents,
                 };
 
-                store.insert(uri, val);
+                store.insert(uri.to_string(), val);
             }
         } else {
             let val = CacheValue {
-                uri: uri.clone(),
+                uri: uri.to_string(),
                 version,
                 contents,
             };
 
-            store.insert(uri, val);
+            store.insert(uri.to_string(), val);
         }
 
         Ok(())
     }
 
-    fn get(&self, uri: &'_ str) -> Result<CacheValue, String> {
+    pub fn get(&self, uri: &'_ str) -> Result<CacheValue, String> {
         let store = match self.store.lock() {
             Ok(s) => s,
             Err(_) => {

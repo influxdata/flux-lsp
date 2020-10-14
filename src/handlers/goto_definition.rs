@@ -1,5 +1,6 @@
 use std::rc::Rc;
 
+use crate::cache::Cache;
 use crate::handlers::RequestHandler;
 use crate::protocol::properties::{Location, Position, Range};
 use crate::protocol::requests::{
@@ -80,6 +81,7 @@ impl RequestHandler for GotoDefinitionHandler {
         &self,
         prequest: PolymorphicRequest,
         _: crate::shared::RequestContext,
+        cache: &Cache,
     ) -> Result<Option<String>, String> {
         let mut result: Option<Location> = None;
 
@@ -87,8 +89,8 @@ impl RequestHandler for GotoDefinitionHandler {
             Request::from_json(prequest.data.as_str())?;
 
         if let Some(params) = request.params {
-            let uri = params.text_document.uri;
-            let pkg = utils::create_semantic_package(uri.clone())?;
+            let uri = params.text_document.uri.as_str();
+            let pkg = utils::create_semantic_package(uri, cache)?;
             let walker = Rc::new(walk::Node::Package(&pkg));
 
             let mut node_finder =
@@ -112,7 +114,11 @@ impl RequestHandler for GotoDefinitionHandler {
                 };
 
                 if let Some(name) = name {
-                    result = find_scoped_definition(uri, name, path);
+                    result = find_scoped_definition(
+                        uri.to_string(),
+                        name,
+                        path,
+                    );
                 }
             }
 

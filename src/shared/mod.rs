@@ -1,4 +1,4 @@
-use crate::cache;
+use crate::cache::Cache;
 use crate::protocol::notifications::{
     create_diagnostics_notification, Notification,
     PublishDiagnosticsParams,
@@ -54,15 +54,19 @@ where
 }
 
 pub fn create_diagnoistics(
-    uri: String,
+    uri: &'_ str,
     ctx: RequestContext,
+    cache: &Cache,
 ) -> Result<Notification<PublishDiagnosticsParams>, String> {
-    let package = create_ast_package(uri.clone(), ctx)?;
+    let package = create_ast_package(uri, ctx, cache)?;
     let walker = flux::ast::walk::Node::Package(&package);
     let errors = flux::ast::check::check(walker);
     let diagnostics = map_errors_to_diagnostics(errors);
 
-    Ok(create_diagnostics_notification(uri, diagnostics))
+    Ok(create_diagnostics_notification(
+        uri.to_string(),
+        diagnostics,
+    ))
 }
 
 pub fn get_package_name(name: String) -> Option<String> {
@@ -99,14 +103,16 @@ impl CompletionInfo {
     pub fn create(
         params: CompletionParams,
         ctx: RequestContext,
+        cache: &Cache,
     ) -> Result<Option<CompletionInfo>, String> {
-        let uri = params.clone().text_document.uri;
-        let position = params.clone().position;
+        let uri = params.text_document.uri.clone();
+        let uri = uri.as_str();
+        let position = params.position.clone();
 
-        let source = cache::get(uri.clone())?;
+        let source = cache.get(uri)?;
         let pkg =
             crate::shared::conversion::create_file_node_from_text(
-                uri.clone(),
+                uri,
                 source.contents,
             );
         let walker = Rc::new(AstNode::File(&pkg.files[0]));
@@ -115,14 +121,14 @@ impl CompletionInfo {
         walk_rc(&visitor, walker);
 
         let package =
-            PackageFinderVisitor::find(uri.clone(), ctx.clone())?;
+            PackageFinderVisitor::find(uri, ctx.clone(), cache)?;
 
         let state = visitor.state.borrow();
         let finder_node = (*state).node.clone();
 
         if let Some(finder_node) = finder_node {
-            let bucket =
-                find_bucket(params, ctx.clone()).unwrap_or(None);
+            let bucket = find_bucket(params, ctx.clone(), cache)
+                .unwrap_or(None);
 
             if let Some(parent) = finder_node.parent {
                 if let AstNode::MemberExpr(me) = parent.node.as_ref()
@@ -138,9 +144,9 @@ impl CompletionInfo {
                             ident: obj.name,
                             bucket,
                             position: position.clone(),
-                            uri: uri.clone(),
+                            uri: uri.to_string(),
                             imports: get_imports_removed(
-                                uri, position, ctx,
+                                uri, position, ctx, cache,
                             )?,
                             package,
                         }));
@@ -155,9 +161,9 @@ impl CompletionInfo {
                         ident: "".to_string(),
                         bucket,
                         position: position.clone(),
-                        uri: uri.clone(),
+                        uri: uri.to_string(),
                         imports: get_imports_removed(
-                            uri, position, ctx,
+                            uri, position, ctx, cache,
                         )?,
                         package,
                     }));
@@ -193,8 +199,8 @@ impl CompletionInfo {
                                     completion_type: CompletionType::CallProperty(func.name), ident: name,
                                     bucket,
                                     position: position.clone(),
-                                    uri: uri.clone(),
-                                    imports: get_imports(uri, position, ctx)?,
+                                    uri: uri.to_string(),
+                                    imports: get_imports(uri, position, ctx,cache)?,
                                     package,
                                 }));
                                     }
@@ -218,9 +224,9 @@ impl CompletionInfo {
                                 ident: name,
                                 bucket,
                                 position: position.clone(),
-                                uri: uri.clone(),
+                                uri: uri.to_string(),
                                 imports: get_imports(
-                                    uri, position, ctx,
+                                    uri, position, ctx, cache,
                                 )?,
                                 package,
                             }));
@@ -249,9 +255,9 @@ impl CompletionInfo {
                                     ident: name,
                                     bucket,
                                     position: position.clone(),
-                                    uri: uri.clone(),
+                                    uri: uri.to_string(),
                                     imports: get_imports(
-                                        uri, position, ctx,
+                                        uri, position, ctx, cache,
                                     )?,
                                     package,
                                 }));
@@ -276,8 +282,10 @@ impl CompletionInfo {
                             ident: name,
                             bucket,
                             position: position.clone(),
-                            uri: uri.clone(),
-                            imports: get_imports(uri, position, ctx)?,
+                            uri: uri.to_string(),
+                            imports: get_imports(
+                                uri, position, ctx, cache,
+                            )?,
                             package,
                         }));
                     }
@@ -289,8 +297,10 @@ impl CompletionInfo {
                         ident: name,
                         bucket,
                         position: position.clone(),
-                        uri: uri.clone(),
-                        imports: get_imports(uri, position, ctx)?,
+                        uri: uri.to_string(),
+                        imports: get_imports(
+                            uri, position, ctx, cache,
+                        )?,
                         package,
                     }));
                 }
@@ -301,8 +311,10 @@ impl CompletionInfo {
                         ident: name,
                         bucket,
                         position: position.clone(),
-                        uri: uri.clone(),
-                        imports: get_imports(uri, position, ctx)?,
+                        uri: uri.to_string(),
+                        imports: get_imports(
+                            uri, position, ctx, cache,
+                        )?,
                         package,
                     }));
                 }
@@ -314,8 +326,10 @@ impl CompletionInfo {
                             ident: ident.name.clone(),
                             bucket,
                             position: position.clone(),
-                            uri: uri.clone(),
-                            imports: get_imports(uri, position, ctx)?,
+                            uri: uri.to_string(),
+                            imports: get_imports(
+                                uri, position, ctx, cache,
+                            )?,
                             package,
                         }));
                     }
@@ -329,9 +343,9 @@ impl CompletionInfo {
                                 ident: ident.name.clone(),
                                 bucket,
                                 position: position.clone(),
-                                uri: uri.clone(),
+                                uri: uri.to_string(),
                                 imports: get_imports(
-                                    uri, position, ctx,
+                                    uri, position, ctx, cache,
                                 )?,
                                 package,
                             }));
@@ -349,10 +363,11 @@ impl CompletionInfo {
 fn find_bucket(
     params: CompletionParams,
     ctx: RequestContext,
+    cache: &Cache,
 ) -> Result<Option<String>, String> {
-    let uri = params.text_document.uri;
+    let uri = params.text_document.uri.as_str();
     let pos = params.position;
-    let pkg = utils::create_clean_package(uri, ctx)?;
+    let pkg = utils::create_clean_package(uri, ctx, cache)?;
     let walker = Rc::new(walk::Node::Package(&pkg));
     let mut visitor = CallFinderVisitor::new(pos);
 
@@ -374,11 +389,12 @@ fn find_bucket(
 }
 
 pub fn get_imports(
-    uri: String,
+    uri: &'_ str,
     pos: Position,
     ctx: RequestContext,
+    cache: &Cache,
 ) -> Result<Vec<Import>, String> {
-    let pkg = utils::create_completion_package(uri, pos, ctx)?;
+    let pkg = utils::create_completion_package(uri, pos, ctx, cache)?;
     let walker = Rc::new(walk::Node::Package(&pkg));
     let mut visitor = ImportFinderVisitor::default();
 
@@ -390,12 +406,14 @@ pub fn get_imports(
 }
 
 pub fn get_imports_removed(
-    uri: String,
+    uri: &'_ str,
     pos: Position,
     ctx: RequestContext,
+    cache: &Cache,
 ) -> Result<Vec<Import>, String> {
-    let pkg =
-        utils::create_completion_package_removed(uri, pos, ctx)?;
+    let pkg = utils::create_completion_package_removed(
+        uri, pos, ctx, cache,
+    )?;
     let walker = Rc::new(walk::Node::Package(&pkg));
     let mut visitor = ImportFinderVisitor::default();
 
