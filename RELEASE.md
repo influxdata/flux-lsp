@@ -2,29 +2,41 @@
 
 ## Prerequisites
 
-Make sure you have the following installed:
+Install the following
 
-- A recent release of Rust's `stable` branch
+- Any stable release of Rust >= 1.47
 - `npm`
 - `wasm-pack`
 
-To install `wasm-pack` you can simply run `make install-wasm-pack` from the project root of `flux-lsp`.
+To install `wasm-pack`, run `make install-wasm-pack` from the project root of `flux-lsp`.
 
-You should also have the most recent versions of the following repos pulled down:
+Pull down the most recent versions of the following repos:
 - [ `flux-lsp` ](https://www.github.com/influxdata/flux-lsp)
 - [ `flux-lsp-cli` ](https://www.github.com/influxdata/flux-lsp-cli)
 - [ `flux-lsp` ](https://www.github.com/influxdata/vsflux)
-- [ influxdb ](https://www.github.com/influxdata/influxdb)
+- [ `influxdb` ](https://www.github.com/influxdata/influxdb)
 
 ## Testing Locally
 
 `cd` into `flux-lsp`.
 
-If you want to test the LSP with a new Flux release, open `Cargo.toml` and look for the `flux` dependency. Replace the `tag` value with whatever the tag for the current release is.
+If you want to test the LSP with a new Flux release, open `Cargo.toml` and look for the `flux` dependency. Replace the `tag` value with the tag for the current Flux release. Run `cargo test` and confirm that all tests pass.
 
-Then run the tests. This should always be done with `make test`, which will run the tests all on a single thread. If you just run `cargo test` you will see random tests passing and failing. An [issue](https://github.com/influxdata/flux-lsp/issues/173) has been created for this, and is currently being addressed by the Flux team. For the time being, just use `make test`.
+Then, navigate to `ui` directory in `influxdb`, and open `package.json`. Find the `@influxdata/flux-lsp-browser` dependency, and replace the version number with `file:`, followed by the full file path to the `pkg-browser` directory in your local copy of `flux-lsp`.
 
-After confirming that all the tests pass, run `make wasm` to compile with a docker container, or `make wasm-local` to compile locally. This will create two folders: `pkg-node` and `pkg-browser`. Each is a ready-to-publish npm package for different wasm compilation targets.
+Example:
+
+```json
+"dependencies": {
+    "@influxdata/flux-lsp-browser": "file: /home/janedoe/projects/flux-lsp/pkg-browser"
+}
+```
+
+Run `yarn add`, then navigate back to the project root and run `make test-js`. Confirm that the tests pass.
+
+### Running your local LSP changes in VS Code (Optional)
+
+After confirming that all the tests pass, run `make wasm` to compile with a docker container, or `make wasm-local` to compile locally. This will create two directories: `pkg-node` and `pkg-browser`. Each is a ready-to-publish npm package for different wasm compilation targets.
 
 Navigate to the `vsflux` repo, and open `package.json`. Find the `@influxdata/flux-lsp-node` dependency, and replace the version number with `file:`, followed by the full file path to the `pkg-node` directory in your local copy of `flux-lsp`. It should look something like:
 
