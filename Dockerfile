@@ -17,8 +17,9 @@ RUN apt-get update && \
   && rm -rf /var/lib/{apt,dpkg,cache,log}
 
 # Install Rust
+ENV RUST_VERSION 1.47.0
 RUN curl https://sh.rustup.rs -sSf | \
-  sh -s -- --default-toolchain stable -y
+  sh -s -- --default-toolchain $RUST_VERSION -y
 
 # Install wasm-pack
 RUN ~/.cargo/bin/cargo install wasm-pack
