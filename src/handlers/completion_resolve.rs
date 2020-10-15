@@ -1,3 +1,4 @@
+use crate::cache::Cache;
 use crate::handlers::RequestHandler;
 use crate::protocol::requests::{PolymorphicRequest, Request};
 use crate::protocol::responses::{CompletionItem, Response};
@@ -13,6 +14,7 @@ impl RequestHandler for CompletionResolveHandler {
         &self,
         prequest: PolymorphicRequest,
         _: crate::shared::RequestContext,
+        _: &Cache,
     ) -> Result<Option<String>, String> {
         let req: Request<CompletionItem> =
             Request::from_json(prequest.data.as_str())?;

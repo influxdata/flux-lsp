@@ -1,3 +1,4 @@
+use crate::cache::Cache;
 use crate::handlers::RequestHandler;
 use crate::protocol::requests::PolymorphicRequest;
 use crate::protocol::responses::{Response, ShutdownResult};
@@ -10,6 +11,7 @@ impl RequestHandler for ShutdownHandler {
         &self,
         prequest: PolymorphicRequest,
         _: crate::shared::RequestContext,
+        _: &Cache,
     ) -> Result<Option<String>, String> {
         let id = prequest.base_request.id;
         let response: Response<ShutdownResult> =

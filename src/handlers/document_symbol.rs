@@ -1,3 +1,4 @@
+use crate::cache::Cache;
 use crate::handlers::RequestHandler;
 use crate::protocol::properties::SymbolInformation;
 use crate::protocol::requests::{
@@ -26,13 +27,14 @@ fn sort_symbols(
 }
 
 fn find_symbols(
-    uri: String,
+    uri: &'_ str,
     ctx: RequestContext,
+    cache: &Cache,
 ) -> Result<Vec<SymbolInformation>, String> {
-    let smp = utils::create_clean_package(uri.clone(), ctx)?;
+    let smp = utils::create_clean_package(uri, ctx, cache)?;
     let pkg = Node::Package(&smp);
 
-    let mut visitor = SymbolsVisitor::new(uri);
+    let mut visitor = SymbolsVisitor::new(uri.to_string());
     walk::walk(&mut visitor, Rc::new(pkg));
 
     let state = visitor.state.borrow();
@@ -52,12 +54,16 @@ impl RequestHandler for DocumentSymbolHandler {
         &self,
         prequest: PolymorphicRequest,
         ctx: crate::shared::RequestContext,
+        cache: &Cache,
     ) -> Result<Option<String>, String> {
         let request: Request<DocumentSymbolParams> =
             Request::from_json(prequest.data.as_str())?;
         if let Some(params) = request.params {
-            let symbols =
-                find_symbols(params.text_document.uri, ctx)?;
+            let symbols = find_symbols(
+                params.text_document.uri.as_str(),
+                ctx,
+                cache,
+            )?;
             let response: Response<Vec<SymbolInformation>> =
                 Response::new(request.id, Some(symbols));
             let json = response.to_json()?;

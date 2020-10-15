@@ -1,4 +1,4 @@
-use crate::cache;
+use crate::cache::Cache;
 use crate::handlers::RequestHandler;
 use crate::protocol::properties::{Position, Range, TextEdit};
 use crate::protocol::requests::{
@@ -40,13 +40,14 @@ impl RequestHandler for DocumentFormattingHandler {
         &self,
         prequest: PolymorphicRequest,
         _ctx: crate::shared::RequestContext,
+        cache: &Cache,
     ) -> Result<Option<String>, String> {
         let request: Request<DocumentFormattingParams> =
             Request::from_json(prequest.data.as_str())?;
 
         if let Some(params) = request.params {
-            let uri = params.text_document.uri;
-            let cache_value = cache::get(uri)?;
+            let uri = params.text_document.uri.as_str();
+            let cache_value = cache.get(uri)?;
             let file_contents = cache_value.contents;
             let range = create_range(file_contents.clone());
 

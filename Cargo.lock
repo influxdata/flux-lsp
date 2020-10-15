@@ -252,14 +252,13 @@ dependencies = [
 
 [[package]]
 name = "flux-lsp"
-version = "0.5.2"
+version = "0.5.20"
 dependencies = [
  "async-trait",
  "combinations",
  "flux",
  "futures",
  "js-sys",
- "lazy_static",
  "serde",
  "serde_json",
  "serde_repr",

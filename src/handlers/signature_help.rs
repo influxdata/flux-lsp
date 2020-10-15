@@ -1,3 +1,4 @@
+use crate::cache::Cache;
 use crate::handlers::{find_node, RequestHandler};
 use crate::protocol::properties::Position;
 use crate::protocol::requests::{
@@ -52,11 +53,13 @@ fn find_stdlib_signatures(
 
 fn find_user_defined_signatures(
     pos: Position,
-    uri: String,
+    uri: &'_ str,
     name: String,
     ctx: RequestContext,
+    cache: &Cache,
 ) -> Result<Vec<SignatureInformation>, String> {
-    let pkg = create_completion_package(uri, pos.clone(), ctx)?;
+    let pkg =
+        create_completion_package(uri, pos.clone(), ctx, cache)?;
     let mut visitor = FunctionFinderVisitor::new(pos);
 
     walk(&mut visitor, Rc::new(Node::Package(&pkg)));
@@ -81,13 +84,14 @@ fn find_user_defined_signatures(
 fn find_signatures(
     request: Request<SignatureHelpParams>,
     ctx: RequestContext,
+    cache: &Cache,
 ) -> Result<Vec<SignatureInformation>, String> {
     let mut result = vec![];
 
     if let Some(params) = request.params {
         let pos = params.position;
-        let uri = params.text_document.uri;
-        let pkg = create_semantic_package(uri.clone())?;
+        let uri = params.text_document.uri.as_str();
+        let pkg = create_semantic_package(uri, cache)?;
         let node_result = find_node(Node::Package(&pkg), pos.clone());
 
         if let Some(node) = node_result.node {
@@ -109,7 +113,7 @@ fn find_signatures(
                         BUILTIN_PACKAGE.to_string(),
                     ));
                     result.extend(find_user_defined_signatures(
-                        pos, uri, ident.name, ctx,
+                        pos, uri, ident.name, ctx, cache,
                     )?);
                 }
             }
@@ -125,12 +129,13 @@ impl RequestHandler for SignatureHelpHandler {
         &self,
         prequest: PolymorphicRequest,
         ctx: RequestContext,
+        cache: &Cache,
     ) -> Result<Option<String>, String> {
         let req: Request<SignatureHelpParams> =
             Request::from_json(prequest.data.as_str())?;
 
         let sh = SignatureHelp {
-            signatures: find_signatures(req.clone(), ctx)?,
+            signatures: find_signatures(req.clone(), ctx, cache)?,
             active_signature: None,
             active_parameter: None,
         };

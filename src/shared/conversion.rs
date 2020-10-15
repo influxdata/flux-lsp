@@ -31,10 +31,10 @@ pub fn map_node_to_location(uri: String, node: Rc<Node>) -> Location {
 }
 
 pub fn create_file_node_from_text(
-    uri: String,
+    uri: &'_ str,
     text: String,
 ) -> Package {
-    parse_string(uri.as_str(), text.as_str()).into()
+    parse_string(uri, text.as_str()).into()
 }
 
 pub fn flux_position_to_position(

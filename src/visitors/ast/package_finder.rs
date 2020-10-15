@@ -4,6 +4,7 @@ use std::rc::Rc;
 use flux::ast::walk::walk_rc;
 use flux::ast::walk::{Node, Visitor};
 
+use crate::cache::Cache;
 use crate::protocol::properties::Position;
 use crate::shared::ast::create_ast_package;
 use crate::shared::conversion::flux_position_to_position;
@@ -27,10 +28,11 @@ pub struct PackageFinderVisitor {
 
 impl PackageFinderVisitor {
     pub fn find(
-        uri: String,
+        uri: &'_ str,
         ctx: RequestContext,
+        cache: &Cache,
     ) -> Result<Option<PackageInfo>, String> {
-        let package = create_ast_package(uri, ctx)?;
+        let package = create_ast_package(uri, ctx, cache)?;
         for file in package.files {
             let walker = Rc::new(flux::ast::walk::Node::File(&file));
             let visitor = PackageFinderVisitor::default();

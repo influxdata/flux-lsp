@@ -1,4 +1,4 @@
-use crate::cache;
+use crate::cache::Cache;
 use crate::protocol::properties::Position;
 use crate::shared::ast::is_in_node;
 use crate::shared::RequestContext;
@@ -66,11 +66,12 @@ fn remove_character(source: String, pos: Position) -> String {
 }
 
 pub fn create_completion_package_removed(
-    uri: String,
+    uri: &'_ str,
     pos: Position,
     ctx: RequestContext,
+    cache: &Cache,
 ) -> Result<Package, String> {
-    let cv = cache::get(uri.clone())?;
+    let cv = cache.get(uri)?;
     let contents = remove_character(cv.contents, pos.clone());
     let mut file = parse_string("", contents.as_str());
 
@@ -86,8 +87,7 @@ pub fn create_completion_package_removed(
         .filter(|x| valid_node(x.base(), pos.clone()))
         .collect();
 
-    let mut pkg =
-        crate::shared::create_ast_package(uri.clone(), ctx)?;
+    let mut pkg = crate::shared::create_ast_package(uri, ctx, cache)?;
 
     pkg.files = pkg
         .files
@@ -104,20 +104,22 @@ pub fn create_completion_package_removed(
 }
 
 pub fn create_completion_package(
-    uri: String,
+    uri: &'_ str,
     pos: Position,
     ctx: RequestContext,
+    cache: &Cache,
 ) -> Result<Package, String> {
-    create_filtered_package(uri, ctx, |x| {
+    create_filtered_package(uri, ctx, cache, |x| {
         valid_node(x.base(), pos.clone())
     })
 }
 
 pub fn create_clean_package(
-    uri: String,
+    uri: &'_ str,
     ctx: RequestContext,
+    cache: &Cache,
 ) -> Result<Package, String> {
-    create_filtered_package(uri, ctx, |x| {
+    create_filtered_package(uri, ctx, cache, |x| {
         if let flux::ast::Statement::Bad(_) = x {
             return false;
         }
@@ -126,21 +128,22 @@ pub fn create_clean_package(
 }
 
 fn create_filtered_package<F>(
-    uri: String,
+    uri: &'_ str,
     ctx: RequestContext,
+    cache: &Cache,
     mut filter: F,
 ) -> Result<Package, String>
 where
     F: FnMut(&flux::ast::Statement) -> bool,
 {
     let mut ast_pkg =
-        crate::shared::create_ast_package(uri.clone(), ctx)?;
+        crate::shared::create_ast_package(uri, ctx, cache)?;
 
     ast_pkg.files = ast_pkg
         .files
         .into_iter()
         .map(|mut file| {
-            if file.name == uri.clone() {
+            if file.name == uri {
                 file.body = file
                     .body
                     .into_iter()
@@ -159,9 +162,10 @@ where
 }
 
 pub fn create_semantic_package(
-    uri: String,
+    uri: &'_ str,
+    cache: &Cache,
 ) -> Result<Package, String> {
-    let cv = cache::get(uri)?;
+    let cv = cache.get(uri)?;
     let pkg = analyze_source(cv.contents.as_str())?;
 
     Ok(pkg)

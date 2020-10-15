@@ -1,4 +1,4 @@
-use crate::cache;
+use crate::cache::Cache;
 use crate::handlers::RequestHandler;
 use crate::protocol::properties::ContentChange;
 use crate::protocol::requests::PolymorphicRequest;
@@ -36,19 +36,20 @@ fn parse_change_request(
 fn handle_change(
     data: String,
     ctx: RequestContext,
+    cache: &Cache,
 ) -> Result<Option<String>, String> {
     let request = parse_change_request(data)?;
     if let Some(params) = request.params {
-        let uri = params.text_document.uri;
+        let uri = params.text_document.uri.as_str();
         let changes = params.content_changes;
         let version = params.text_document.version;
 
-        let cv = cache::get(uri.clone())?;
+        let cv = cache.get(uri)?;
         let text = apply_changes(cv.contents, changes);
 
-        cache::set(uri.clone(), version, text)?;
+        cache.set(uri, version, text)?;
 
-        let msg = create_diagnoistics(uri, ctx)?;
+        let msg = create_diagnoistics(uri, ctx, cache)?;
         let json = msg.to_json()?;
 
         return Ok(Some(json));
@@ -63,7 +64,8 @@ impl RequestHandler for DocumentChangeHandler {
         &self,
         prequest: PolymorphicRequest,
         ctx: crate::shared::RequestContext,
+        cache: &Cache,
     ) -> Result<Option<String>, String> {
-        handle_change(prequest.data, ctx)
+        handle_change(prequest.data, ctx, cache)
     }
 }

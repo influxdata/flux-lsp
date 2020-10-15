@@ -18,6 +18,7 @@ pub mod signature_help;
 
 pub use router::Router;
 
+use crate::cache::Cache;
 use crate::protocol::notifications::{
     create_diagnostics_notification, Notification,
     PublishDiagnosticsParams,
@@ -39,6 +40,7 @@ pub trait RequestHandler {
         &self,
         prequest: PolymorphicRequest,
         ctx: RequestContext,
+        cache: &Cache,
     ) -> Result<Option<String>, String>;
 }
 

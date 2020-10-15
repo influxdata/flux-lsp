@@ -1,3 +1,4 @@
+use crate::cache::Cache;
 use crate::handlers::find_node;
 use crate::handlers::RequestHandler;
 use crate::protocol::properties::{Location, Position};
@@ -80,11 +81,12 @@ fn find_scope<'a>(
 }
 
 pub fn find_references(
-    uri: String,
+    uri: &'_ str,
     position: Position,
+    cache: &Cache,
 ) -> Result<Vec<Location>, String> {
     let mut locations: Vec<Location> = vec![];
-    let pkg = create_semantic_package(uri.clone())?;
+    let pkg = create_semantic_package(uri, cache)?;
 
     let result = find_node(Node::Package(&pkg), position);
 
@@ -104,7 +106,7 @@ pub fn find_references(
 
                 for node in identifiers {
                     let loc = map_node_to_location(
-                        uri.clone(),
+                        uri.to_string(),
                         node.clone(),
                     );
                     locations.push(loc);
@@ -125,14 +127,16 @@ impl RequestHandler for FindReferencesHandler {
         &self,
         prequest: PolymorphicRequest,
         _: crate::shared::RequestContext,
+        cache: &Cache,
     ) -> Result<Option<String>, String> {
         let mut locations: Vec<Location> = vec![];
         let request: Request<ReferenceParams> =
             Request::from_json(prequest.data.as_str())?;
         if let Some(params) = request.params {
             locations = find_references(
-                params.text_document.uri,
+                params.text_document.uri.as_str(),
                 params.position,
+                cache,
             )?;
         }
 

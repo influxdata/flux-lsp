@@ -20,7 +20,7 @@ test:
 	@echo ""
 	@echo ""
 
-	cargo test $(tests) -- test  --test-threads=1 --nocapture
+	cargo test $(tests) -- test  --nocapture
 
 manual-test: test install
 	vim me.flux

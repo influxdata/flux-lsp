@@ -102,12 +102,7 @@ impl Completable for VarResult {
             return true;
         }
 
-        let current_imports = imports
-            .into_iter()
-            .map(|x| x.path)
-            .collect::<Vec<String>>();
-
-        if !current_imports.contains(&self.package.clone()) {
+        if !imports.into_iter().any(|x| self.package == x.path) {
             return false;
         }
 
@@ -329,14 +324,10 @@ impl Completable for FunctionResult {
         let imports = info.imports;
         let mut additional_text_edits = vec![];
 
-        let current_imports = imports
-            .into_iter()
-            .map(|x| x.path)
-            .collect::<Vec<String>>();
+        let contains_pkg =
+            imports.into_iter().any(|x| self.package == x.path);
 
-        if !current_imports.contains(&self.package)
-            && self.package != BUILTIN_PACKAGE
-        {
+        if !contains_pkg && self.package != BUILTIN_PACKAGE {
             additional_text_edits.push(TextEdit {
                 new_text: format!("import \"{}\"\n", self.package),
                 range: Range {
@@ -377,13 +368,11 @@ impl Completable for FunctionResult {
             return true;
         }
 
-        let current_imports = imports
+        if !imports
             .clone()
             .into_iter()
-            .map(|x| x.path)
-            .collect::<Vec<String>>();
-
-        if !current_imports.contains(&self.package.clone()) {
+            .any(|x| self.package == x.path)
+        {
             return false;
         }
 
