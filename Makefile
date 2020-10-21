@@ -42,7 +42,7 @@ install-wasm-pack:
 	curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
 
 patch-release:
-	./releash.sh patch
+	./release.sh patch
 
 minor-release:
-	./releash.sh minor
+	./release.sh minor
