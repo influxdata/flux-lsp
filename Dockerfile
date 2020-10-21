@@ -9,7 +9,7 @@ ENV PATH="~/.cargo/bin:${PATH}"
 RUN apt-get update && \
   apt-get install --no-install-recommends -y \
   ca-certificates \
-  curl file git openssh \
+  curl file git openssh-client \
   build-essential \
   openssl libssl-dev \
   clang pkg-config llvm \
