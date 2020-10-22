@@ -31,7 +31,7 @@ fi
 git fetch
 ahead=$(git status -sb | grep ahead -c)
 if [[ $ahead != 0 ]]; then
-	echo "Your local master branch is ahead of the remote master branch. Exiting."
+	echo "Your local master branch is ahead of the remote master branch. Aborting."
 	exit 1
 fi
 
@@ -47,12 +47,16 @@ version=v$(cat Cargo.toml | grep -Po -m 1 '\d+\.\d+\.\d+')
 cargo install -q cargo-bump && cargo bump $release_type
 new_version=v$(cat Cargo.toml | grep -Po -m 1 '\d+\.\d+\.\d+')
 
-echo "Cutting $release_type release"
+echo "Incrementing version"
 echo "$version -> $new_version"
 
+git checkout -b bump-version
 git add .
-git commit -m "build(release): Release $new_version"
-git tag -a $new_version HEAD -m "Release $new_verion"
-git push origin master --follow-tags
+git commit -m "build(version): Release $new_version"
 
-hub release create $new_version -m "Release $new_version" -e
+hub pull-request -o
+
+# git tag -a $new_version HEAD -m "Release $new_verion"
+# git push origin master --follow-tags
+
+# hub release create $new_version -m "Release $new_version" -e
