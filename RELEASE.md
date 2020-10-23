@@ -69,19 +69,17 @@ Once installed, use one of the following commands to programatically bump the ve
 
 *Note: most of the time, you will want to do a patch release*
 
-### Commit, tag, and push
+Checkout a new branch and commit the `Cargo.toml` change. Open a pull request to master, and wait for it to merge.
 
-Commit the `Cargo.toml` change to the ***master branch*** of `flux-lsp`. **It is very important that no other changes are included in this commit, as it will be pushed directly to master.**
-
-Add a tag to that commit that consists of the version number prepended with a `'v'` (example: `v0.5.20`). Git will prompt you to include a message with your tag, which should just be `"Release <tag-name>"`.
+Once it has merged, pull down a fresh copy of master. Find the commit hash with the version change, and add a tag that consists of the new version number prepended with a `'v'` (example: `v0.5.20`). Git will prompt you to include a message with your tag, which should just be `"Release <tag-name>"`.
 
 As an example, if the new version was version `0.5.21`, you could accomplish all of this with the following command:
 
 ```
-git tag -a v0.5.21 $(git rev-parse HEAD) -m "Release v0.5.21"
+git tag -a v0.5.21 <commit-hash> -m "Release v0.5.21"
 ```
 
-Push the commit along with its tag by running `git push --follow-tags`
+Push the tag to master by running `git push --tags`
 
 Confirm that the both of the following have occurred:
 
@@ -93,20 +91,48 @@ The last thing to do for the `flux-lsp` repo is to cut a release on GitHub. Go t
 
 ### Update the CLI and the VS Code Extension
 
-In both `flux-lsp-cli` and `vsflux`, update the `flux-lsp-node` dependency to the latest version in `package.json`, then run `npm install`. Commit the changes to a new branch, and open a pull request to `master`
+In both `flux-lsp-cli` and `vsflux`, update the `flux-lsp-node` dependency to the latest version in `package.json`, then run `npm install`. 
 
-The process for cutting a release for these repos should be virtually identical to cutting a release for `flux-lsp`. The only difference is that instead of using `cargo bump` to increment the version number, you should use `npm version`, followed by the type of release (major, minor, or patch), followed by the `--no-git-tag-version` flag. 
+Then, increment the version number using the following command:
 
-Example:
+`npm version <patch|minor|major> --no-git-tag-version`
 
-```
-npm version patch --no-git-tag-version
-```
+From this point on, the process should be virtually identical to cutting a release of the LSP itself:
+
+- Commit the changes to a new branch, and open a pull request to `master`, and wait for it to merge.
+- Pull down a fresh copy of master, and add the version tag to the relevant commit.
+- Push the tag up to GitHub, and mark a release.
 
 Like `flux-lsp`, `flux-lsp-cli` and `vsflux` both have CircleCI jobs that will take care of deploying them once the version tag is detected. Still, you should confirm that the new versions have been deployed to [ NPM ](https://www.npmjs.com/package/@influxdata/flux-lsp-cli) and the [ VS Code Extension Marketplace ](https://marketplace.visualstudio.com/items?itemName=influxdata.flux).
 
-Again, other than those minor details, the release process should be identical to that of `flux-lsp`.
-
 ### Update InfluxDB
 
-The last thing to do is to pull down a fresh copy of [`influxdb`](https://github.com/influxdata/influxdb), open up `ui/package.json`, and update the `flux-lsp-browser` dependency to the latest version. Run `yarn add`, commit the changes, run `make test` to confirm nothing breaks, and open a PR into `master`.
+The last thing to do is to pull down a fresh copy of [`influxdb`](https://github.com/influxdata/influxdb), open up `ui/package.json`, and update the `flux-lsp-browser` dependency to the latest version. Run `yarn add`, commit the changes, run the tests to confirm nothing has broken, and open a PR into `master`.
+
+### Automating the release
+
+Some small scripts have been written to streamline some of the more tedious parts of the release process. As a result, many of the steps described above can be taken care of by running a few commands.
+
+In order for the scripts to work, the [ hub command line tool ](https://github.com/github/hub) must be installed.
+
+When a release of the LSP is ready to be made, checkout the master branch and make sure the working tree is clean (the script will exit early if it's not).
+
+Then, run `make patch-version` or `make minor-version` depending on the type of release you're doing.
+
+This command will do a few things:
+
+- Run some checks before executing the body of the script:
+	- Is `hub` installed?
+	- Is the `master` branch checked out?
+	- Are there any uncommitted changes?
+	- Is the local `master` branch ahead of the `remote`?
+- Pull down a fresh copy of `master`
+- Bump the version number in `Cargo.toml`
+- Checkout a new branch called `bump-version` and push it to GitHub
+- Create a pull request from `bump-version` to `master` and open it in a browser window
+
+Once that PR has been merged into master, run `make tag-release` from the master branch. This will perform the same checks as the last command. Then, it will pull down master, tag the most recent commit, push it to GitHub (which will trigger the CI Job that publishes to NPM), and open a prompt for the user to describe major chages since the last release.
+
+When this is done, follow the steps outlined above for updating the lsp version in `vsflux` and `flux-lspcli`, and then run the same commands in each of those repos to publish a new release.
+
+There is not currently a way to automate upgrading the lsp verion in `influxdb`.
