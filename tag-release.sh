@@ -27,11 +27,9 @@ if [[ $ahead != 0 ]]; then
 	exit 1
 fi
 
-git pull origin master
-
 new_version=v$(cat Cargo.toml | grep -Po -m 1 '\d+\.\d+\.\d+')
 
-git tag -a $new_version HEAD -m "Release $new_verion"
-git push origin master --tags
+git tag -a -s $new_version -m "Release $new_verion"
+git push origin master $new_version
 
 hub release create $new_version -m "Release $new_version" -e

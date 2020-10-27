@@ -1,5 +1,7 @@
 # How to Update the LSP and its Consumers
 
+This document describes all the steps necessary for updating the Flux LSP and its main consumers. There is also a section at the end that describes how to use some automated helper scripts to streamline the process.
+
 ## Prerequisites
 
 Install the following
@@ -15,6 +17,7 @@ Pull down the most recent versions of the following repos:
 - [ `flux-lsp-cli` ](https://www.github.com/influxdata/flux-lsp-cli)
 - [ `flux-lsp` ](https://www.github.com/influxdata/vsflux)
 - [ `influxdb` ](https://www.github.com/influxdata/influxdb)
+- [ `ui` ](https://www.github.com/influxdata/ui)
 
 ## Testing Locally
 
@@ -22,7 +25,7 @@ Pull down the most recent versions of the following repos:
 
 To test the LSP with a new Flux release, open `Cargo.toml` and look for the `flux` dependency. Replace the `tag` value with the tag for the current Flux release. Run `cargo test` and confirm that all tests pass.
 
-Then, navigate to `ui` directory in `influxdb`, and open `package.json`. Find the `@influxdata/flux-lsp-browser` dependency, and replace the version number with `file:`, followed by the full file path to the `pkg-browser` directory in the local copy of `flux-lsp`.
+Then, navigate to the `ui` directory in `influxdb`, and open `package.json`. Find the `@influxdata/flux-lsp-browser` dependency, and replace the version number with `file:`, followed by the full file path to the `pkg-browser` directory in the local copy of `flux-lsp`.
 
 Example:
 
@@ -74,10 +77,10 @@ Once it has merged, pull down a fresh copy of master. Find the commit hash with 
 As an example, if the new version was version `0.5.21`, all of this could be done with the following command:
 
 ```
-git tag -a v0.5.21 <commit-hash> -m "Release v0.5.21"
+git tag -a -s v0.5.21 <commit hash> -m "Release v0.5.21"
 ```
 
-Push the tag to master by running `git push --tags`
+Push the tag to `master` by running `git push origin master <tag-name>`
 
 Confirm that the both of the following have occurred:
 
@@ -103,9 +106,13 @@ From this point on, the process should be virtually identical to cutting a relea
 
 Like `flux-lsp`, `flux-lsp-cli` and `vsflux` both have CircleCI jobs that will take care of deploying them once the version tag is detected. Still, it is good practice to confirm that the new versions have been deployed to [ NPM ](https://www.npmjs.com/package/@influxdata/flux-lsp-cli) and the [ VS Code Extension Marketplace ](https://marketplace.visualstudio.com/items?itemName=influxdata.flux).
 
-### Update InfluxDB
+### Update InfluxDB & UI
 
-The last thing to do is to pull down a fresh copy of [`influxdb`](https://github.com/influxdata/influxdb), open up `ui/package.json`, and update the `flux-lsp-browser` dependency to the latest version. Run `yarn add`, commit the changes, run the tests to confirm nothing has broken, and open a PR into `master`.
+The last thing to do is to pull down a fresh copy of both [`influxdb`](https://github.com/influxdata/influxdb) and [ `ui` ](https://github.com/influxdata/ui).
+
+Open up `package.json` in `ui` and update the `flux-lsp-browser` dependency to the latest version for both files. Run `yarn add`, commit the changes, run the tests with `yarn test` to confirm nothing has broken, and open a PR into `master`.
+
+The process for `influxdb` should be the same, with the exception that all these steps should be done within the `ui` directory.
 
 ### Automating the release
 
@@ -129,8 +136,10 @@ This command will do a few things:
 - Checkout a new branch called `bump-version` and push it to GitHub
 - Create a pull request from `bump-version` to `master` and open it in a browser window
 
-Once that PR has been merged into master, run `make tag-release` from the master branch. This will perform the same checks as the last command. Then, it will pull down master, tag the most recent commit, push it to GitHub (which will trigger the CI Job that publishes to NPM), and open a prompt for the user to describe major chages since the last release.
+Once that PR has been merged, pull down a fresh copy of `master` and run `make tag-release` from the master branch. This will perform the same checks as the last command. Then, it will tag the current commit, push it to GitHub (which will trigger the CI Job that publishes to NPM), and open a prompt for the user to describe major chages since the last release.
 
-When this is done, follow the steps outlined above for updating the lsp version in `vsflux` and `flux-lspcli`, and then run the same commands in each of those repos to publish a new release.
+When this is done, run `make [patch|minor]-version` in both `vsflux` and `flux-lsp-cli`. This will create a PR for the `bump-version` branch into master, just like in `flux-lsp`. Then, follow the steps outlined above to update the `flux-lsp-node` version inside `package.json` for both repos. Push that change up to both `bump-version` PRs.
 
-There is not currently a way to automate upgrading the lsp verion in `influxdb`.
+Once they've merged, checkout master, pull down the changes, and run `make tag-release`.
+
+There is not currently a way to automate upgrading the lsp verion in `influxdb` or `ui`
