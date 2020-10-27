@@ -33,13 +33,12 @@ if [[ $release_type != "patch" && $release_type != "minor" ]]; then
 	exit 1
 fi
 
-git pull origin master
-git checkout -B bump-version
-echo "Checking out branch \`bump-version\`"
-
 version=v$(cat Cargo.toml | grep -Po -m 1 '\d+\.\d+\.\d+')
 cargo install -q cargo-bump && cargo bump $release_type
 new_version=v$(cat Cargo.toml | grep -Po -m 1 '\d+\.\d+\.\d+')
+
+git checkout -B bump-$new_version
+echo "Checking out branch \`bump-$new_version\`"
 
 echo "Incrementing version"
 echo "$version -> $new_version"
