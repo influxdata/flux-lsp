@@ -1,5 +1,5 @@
 use crate::cache::Cache;
-use crate::handlers::RequestHandler;
+use crate::handlers::{Error, RequestHandler};
 use crate::protocol::requests::{
     PolymorphicRequest, Request, TextDocumentParams,
 };
@@ -22,7 +22,7 @@ fn handle_open(
     data: String,
     ctx: RequestContext,
     cache: &Cache,
-) -> Result<Option<String>, String> {
+) -> Result<Option<String>, Error> {
     let request = parse_open_request(data)?;
 
     if let Some(params) = request.params {
@@ -38,7 +38,7 @@ fn handle_open(
         return Ok(Some(json));
     }
 
-    Err("invalid textDocument/didOpen request".to_string())
+    Err(Error{msg: "invalid textDocument/didOpen request".to_string()})
 }
 
 #[async_trait::async_trait]
@@ -48,7 +48,7 @@ impl RequestHandler for DocumentOpenHandler {
         prequest: PolymorphicRequest,
         ctx: crate::shared::RequestContext,
         cache: &Cache,
-    ) -> Result<Option<String>, String> {
+    ) -> Result<Option<String>, Error> {
         handle_open(prequest.data, ctx, cache)
     }
 }

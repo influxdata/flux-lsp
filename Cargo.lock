@@ -177,7 +177,7 @@ checksum = "728b7ab3119b5167cc60a4aad16b6086b762278f5571cc650e7eed2e89a23a15"
 [[package]]
 name = "core"
 version = "0.4.0"
-source = "git+https://github.com/influxdata/flux?tag=v0.94.0#7e1ea554877ceb5b424293508aa63c0d644aaf39"
+source = "git+https://github.com/influxdata/flux?branch=master#2e0f9dd8dbf9417d7f83010a3912ded9a61e7237"
 dependencies = [
  "bindgen",
  "cc",
@@ -190,6 +190,7 @@ dependencies = [
  "serde-aux",
  "serde_derive",
  "serde_json",
+ "tabwriter",
  "walkdir",
  "wasm-bindgen",
 ]
@@ -239,7 +240,7 @@ dependencies = [
 [[package]]
 name = "flux"
 version = "0.5.1"
-source = "git+https://github.com/influxdata/flux?tag=v0.94.0#7e1ea554877ceb5b424293508aa63c0d644aaf39"
+source = "git+https://github.com/influxdata/flux?branch=master#2e0f9dd8dbf9417d7f83010a3912ded9a61e7237"
 dependencies = [
  "core",
  "flatbuffers",
@@ -252,7 +253,7 @@ dependencies = [
 
 [[package]]
 name = "flux-lsp"
-version = "0.5.21"
+version = "0.5.22"
 dependencies = [
  "async-trait",
  "combinations",
@@ -718,6 +719,15 @@ dependencies = [
  "proc-macro2 1.0.12",
  "quote 1.0.4",
  "unicode-xid 0.2.0",
+]
+
+[[package]]
+name = "tabwriter"
+version = "1.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "36205cfc997faadcc4b0b87aaef3fbedafe20d38d4959a7ca6ff803564051111"
+dependencies = [
+ "unicode-width",
 ]
 
 [[package]]

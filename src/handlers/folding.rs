@@ -1,5 +1,5 @@
 use crate::cache::Cache;
-use crate::handlers::RequestHandler;
+use crate::handlers::{Error, RequestHandler};
 use crate::protocol::properties::FoldingRange;
 use crate::protocol::requests::{
     FoldingRangeParams, PolymorphicRequest, Request,
@@ -53,7 +53,7 @@ impl RequestHandler for FoldingHandler {
         prequest: PolymorphicRequest,
         _: crate::shared::RequestContext,
         cache: &Cache,
-    ) -> Result<Option<String>, String> {
+    ) -> Result<Option<String>, Error> {
         let request: Request<FoldingRangeParams> =
             Request::from_json(prequest.data.as_str())?;
         let mut areas: Option<Vec<FoldingRange>> = None;

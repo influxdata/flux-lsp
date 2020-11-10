@@ -1,5 +1,5 @@
 use crate::cache::Cache;
-use crate::handlers::RequestHandler;
+use crate::handlers::{Error, RequestHandler};
 use crate::protocol::properties::ContentChange;
 use crate::protocol::requests::PolymorphicRequest;
 use crate::protocol::requests::{Request, TextDocumentChangeParams};
@@ -37,7 +37,7 @@ fn handle_change(
     data: String,
     ctx: RequestContext,
     cache: &Cache,
-) -> Result<Option<String>, String> {
+) -> Result<Option<String>, Error> {
     let request = parse_change_request(data)?;
     if let Some(params) = request.params {
         let uri = params.text_document.uri.as_str();
@@ -55,7 +55,7 @@ fn handle_change(
         return Ok(Some(json));
     }
 
-    Err("invalid textDocument/didChange request".to_string())
+    Err(Error{msg: "invalid textDocument/didChange request".to_string()})
 }
 
 #[async_trait]
@@ -65,7 +65,7 @@ impl RequestHandler for DocumentChangeHandler {
         prequest: PolymorphicRequest,
         ctx: crate::shared::RequestContext,
         cache: &Cache,
-    ) -> Result<Option<String>, String> {
+    ) -> Result<Option<String>, Error> {
         handle_change(prequest.data, ctx, cache)
     }
 }

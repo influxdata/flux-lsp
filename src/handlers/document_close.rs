@@ -1,5 +1,5 @@
 use crate::cache::Cache;
-use crate::handlers::RequestHandler;
+use crate::handlers::{Error, RequestHandler};
 use crate::protocol::requests::{
     PolymorphicRequest, Request, TextDocumentParams,
 };
@@ -21,7 +21,7 @@ fn parse_close_request(
 fn handle_close(
     data: String,
     cache: &Cache,
-) -> Result<Option<String>, String> {
+) -> Result<Option<String>, Error> {
     let request = parse_close_request(data)?;
 
     if let Some(params) = request.params {
@@ -32,7 +32,7 @@ fn handle_close(
         return Ok(None);
     }
 
-    Err("invalid textDocument/didClose request".to_string())
+    Err(Error{msg: "invalid textDocument/didClose request".to_string()})
 }
 
 #[async_trait]
@@ -42,7 +42,7 @@ impl RequestHandler for DocumentCloseHandler {
         prequest: PolymorphicRequest,
         _: crate::shared::RequestContext,
         cache: &Cache,
-    ) -> Result<Option<String>, String> {
+    ) -> Result<Option<String>, Error> {
         handle_close(prequest.data, cache)
     }
 }

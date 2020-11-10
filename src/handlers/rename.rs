@@ -1,6 +1,6 @@
 use crate::cache::Cache;
 use crate::handlers::references::find_references;
-use crate::handlers::RequestHandler;
+use crate::handlers::{Error, RequestHandler};
 use crate::protocol::properties::TextEdit;
 use crate::protocol::requests::{
     PolymorphicRequest, RenameParams, Request,
@@ -19,7 +19,7 @@ impl RequestHandler for RenameHandler {
         prequest: PolymorphicRequest,
         _: crate::shared::RequestContext,
         cache: &Cache,
-    ) -> Result<Option<String>, String> {
+    ) -> Result<Option<String>, Error> {
         let request: Request<RenameParams> =
             Request::from_json(prequest.data.as_str())?;
 

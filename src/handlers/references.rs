@@ -1,6 +1,6 @@
 use crate::cache::Cache;
 use crate::handlers::find_node;
-use crate::handlers::RequestHandler;
+use crate::handlers::{Error, RequestHandler};
 use crate::protocol::properties::{Location, Position};
 use crate::protocol::requests::{
     PolymorphicRequest, ReferenceParams, Request,
@@ -128,7 +128,7 @@ impl RequestHandler for FindReferencesHandler {
         prequest: PolymorphicRequest,
         _: crate::shared::RequestContext,
         cache: &Cache,
-    ) -> Result<Option<String>, String> {
+    ) -> Result<Option<String>, Error> {
         let mut locations: Vec<Location> = vec![];
         let request: Request<ReferenceParams> =
             Request::from_json(prequest.data.as_str())?;

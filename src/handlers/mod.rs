@@ -20,8 +20,7 @@ pub use router::Router;
 
 use crate::cache::Cache;
 use crate::protocol::notifications::{
-    create_diagnostics_notification, Notification,
-    PublishDiagnosticsParams,
+    create_diagnostics_notification, Notification, PublishDiagnosticsParams,
 };
 use crate::protocol::properties::Position;
 use crate::protocol::requests::PolymorphicRequest;
@@ -34,6 +33,16 @@ use std::rc::Rc;
 use async_trait::async_trait;
 use flux::ast::{check, walk};
 
+#[derive(Debug)]
+pub struct Error {
+    pub msg: String,
+}
+impl From<String> for Error {
+    fn from(s: String) -> Error {
+        Error { msg: s }
+    }
+}
+
 #[async_trait]
 pub trait RequestHandler {
     async fn handle(
@@ -41,7 +50,7 @@ pub trait RequestHandler {
         prequest: PolymorphicRequest,
         ctx: RequestContext,
         cache: &Cache,
-    ) -> Result<Option<String>, String>;
+    ) -> Result<Option<String>, Error>;
 }
 
 pub fn create_diagnostics(
@@ -62,10 +71,7 @@ pub struct NodeFinderResult<'a> {
     path: Vec<Rc<flux::semantic::walk::Node<'a>>>,
 }
 
-pub fn find_node(
-    node: flux::semantic::walk::Node<'_>,
-    position: Position,
-) -> NodeFinderResult<'_> {
+pub fn find_node(node: flux::semantic::walk::Node<'_>, position: Position) -> NodeFinderResult<'_> {
     let mut result = NodeFinderResult::default();
     let mut visitor = NodeFinderVisitor::new(position);
 

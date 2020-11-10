@@ -1,5 +1,5 @@
 use crate::cache::Cache;
-use crate::handlers::RequestHandler;
+use crate::handlers::{Error, RequestHandler};
 use crate::protocol::requests::{
     PolymorphicRequest, Request, TextDocumentSaveParams,
 };
@@ -21,7 +21,7 @@ impl RequestHandler for DocumentSaveHandler {
         prequest: PolymorphicRequest,
         ctx: crate::shared::RequestContext,
         cache: &Cache,
-    ) -> Result<Option<String>, String> {
+    ) -> Result<Option<String>, Error> {
         let request = parse_save_request(prequest.data)?;
         if let Some(params) = request.params {
             let uri = params.text_document.uri.as_str();
@@ -31,6 +31,6 @@ impl RequestHandler for DocumentSaveHandler {
             return Ok(Some(json));
         }
 
-        Err("invalid textDocument/didSave request".to_string())
+        Err(Error{msg: "invalid textDocument/didSave request".to_string()})
     }
 }

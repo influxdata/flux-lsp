@@ -2,18 +2,14 @@ use std::rc::Rc;
 use std::sync::Arc;
 
 use crate::cache::Cache;
-use crate::handlers::RequestHandler;
+use crate::handlers::{Error, RequestHandler};
 use crate::protocol::properties::Position;
-use crate::protocol::requests::{
-    CompletionParams, PolymorphicRequest, Request,
-};
+use crate::protocol::requests::{CompletionParams, PolymorphicRequest, Request};
 use crate::protocol::responses::{
-    CompletionItem, CompletionItemKind, CompletionList,
-    InsertTextFormat, Response,
+    CompletionItem, CompletionItemKind, CompletionList, InsertTextFormat, Response,
 };
 use crate::shared::{
-    get_imports_removed, CompletionInfo, CompletionType, Function,
-    RequestContext,
+    get_imports_removed, CompletionInfo, CompletionType, Function, RequestContext,
 };
 
 use crate::stdlib::{
@@ -22,8 +18,8 @@ use crate::stdlib::{
 };
 use crate::visitors::ast;
 use crate::visitors::semantic::{
-    utils, CompletableFinderVisitor, CompletableObjectFinderVisitor,
-    FunctionFinderVisitor, ObjectFunctionFinderVisitor,
+    utils, CompletableFinderVisitor, CompletableObjectFinderVisitor, FunctionFinderVisitor,
+    ObjectFunctionFinderVisitor,
 };
 
 use flux::ast::walk::walk_rc;
@@ -68,9 +64,7 @@ async fn get_stdlib_completions(
 
     for c in completes.into_iter() {
         if c.matches(name.clone(), info.clone()) {
-            matches.push(
-                c.completion_item(ctx.clone(), info.clone()).await,
-            );
+            matches.push(c.completion_item(ctx.clone(), info.clone()).await);
         }
     }
 
@@ -82,13 +76,8 @@ fn get_user_completables(
     pos: Position,
     ctx: RequestContext,
     cache: &Cache,
-) -> Result<Vec<Arc<dyn Completable + Send + Sync>>, String> {
-    let pkg = utils::create_completion_package(
-        uri,
-        pos.clone(),
-        ctx,
-        cache,
-    )?;
+) -> Result<Vec<Arc<dyn Completable + Send + Sync>>, Error> {
+    let pkg = utils::create_completion_package(uri, pos.clone(), ctx, cache)?;
     let walker = Rc::new(walk::Node::Package(&pkg));
     let mut visitor = CompletableFinderVisitor::new(pos);
 
@@ -98,25 +87,22 @@ fn get_user_completables(
         return Ok((*state).completables.clone());
     }
 
-    Err("failed to get completables".to_string())
+    Err(Error {
+        msg: "failed to get completables".to_string(),
+    })
 }
 
 async fn get_user_matches(
     info: CompletionInfo,
     ctx: RequestContext,
     cache: &Cache,
-) -> Result<Vec<CompletionItem>, String> {
-    let completables = get_user_completables(
-        info.uri.as_str(),
-        info.position.clone(),
-        ctx.clone(),
-        cache,
-    )?;
+) -> Result<Vec<CompletionItem>, Error> {
+    let completables =
+        get_user_completables(info.uri.as_str(), info.position.clone(), ctx.clone(), cache)?;
 
     let mut result: Vec<CompletionItem> = vec![];
     for x in completables {
-        result
-            .push(x.completion_item(ctx.clone(), info.clone()).await)
+        result.push(x.completion_item(ctx.clone(), info.clone()).await)
     }
 
     Ok(result)
@@ -126,19 +112,13 @@ async fn get_measurement_completions(
     params: CompletionParams,
     ctx: RequestContext,
     bucket: Option<String>,
-) -> Result<Option<CompletionList>, String> {
+) -> Result<Option<CompletionList>, Error> {
     if let Some(bucket) = bucket {
-        let measurements =
-            ctx.callbacks.get_measurements(bucket).await?;
+        let measurements = ctx.callbacks.get_measurements(bucket).await?;
 
         let items: Vec<CompletionItem> = measurements
             .into_iter()
-            .map(|value| {
-                new_string_arg_completion(
-                    value,
-                    get_trigger(params.clone()),
-                )
-            })
+            .map(|value| new_string_arg_completion(value, get_trigger(params.clone())))
             .collect();
 
         return Ok(Some(CompletionList {
@@ -153,7 +133,7 @@ async fn get_measurement_completions(
 async fn get_tag_keys_completions(
     ctx: RequestContext,
     bucket: Option<String>,
-) -> Result<Option<CompletionList>, String> {
+) -> Result<Option<CompletionList>, Error> {
     if let Some(bucket) = bucket {
         let tag_keys = ctx.callbacks.get_tag_keys(bucket).await?;
 
@@ -189,11 +169,10 @@ async fn get_tag_values_completions(
     ctx: RequestContext,
     bucket: Option<String>,
     field: Option<String>,
-) -> Result<Option<CompletionList>, String> {
+) -> Result<Option<CompletionList>, Error> {
     if let Some(bucket) = bucket {
         if let Some(field) = field {
-            let tag_values =
-                ctx.callbacks.get_tag_values(bucket, field).await?;
+            let tag_values = ctx.callbacks.get_tag_values(bucket, field).await?;
 
             let items: Vec<CompletionItem> = tag_values
                 .into_iter()
@@ -228,41 +207,30 @@ async fn find_completions(
     params: CompletionParams,
     ctx: RequestContext,
     cache: &Cache,
-) -> Result<CompletionList, String> {
+) -> Result<CompletionList, Error> {
     let uri = params.text_document.uri.clone();
     let uri = uri.as_str();
-    let info =
-        CompletionInfo::create(params.clone(), ctx.clone(), cache)?;
+    let info = CompletionInfo::create(params.clone(), ctx.clone(), cache)?;
 
     let mut items: Vec<CompletionItem> = vec![];
 
     if let Some(info) = info {
         match info.completion_type {
             CompletionType::Generic => {
-                let mut stdlib_matches = get_stdlib_completions(
-                    info.ident.clone(),
-                    info.clone(),
-                    ctx.clone(),
-                )
-                .await;
+                let mut stdlib_matches =
+                    get_stdlib_completions(info.ident.clone(), info.clone(), ctx.clone()).await;
                 items.append(&mut stdlib_matches);
 
-                let mut user_matches =
-                    get_user_matches(info, ctx, cache).await?;
+                let mut user_matches = get_user_matches(info, ctx, cache).await?;
 
                 items.append(&mut user_matches);
             }
             CompletionType::Logical(_operator) => {
-                let om =
-                    ObjectMember::from_string(info.ident.clone());
+                let om = ObjectMember::from_string(info.ident.clone());
                 if let Some(om) = om {
                     if om.object == "r" {
-                        let list = get_tag_values_completions(
-                            ctx,
-                            info.bucket,
-                            Some(om.member),
-                        )
-                        .await?;
+                        let list =
+                            get_tag_values_completions(ctx, info.bucket, Some(om.member)).await?;
                         if let Some(list) = list {
                             return Ok(list);
                         }
@@ -272,42 +240,25 @@ async fn find_completions(
             CompletionType::Bad => {}
             CompletionType::CallProperty(_func) => {
                 if info.ident == "bucket" {
-                    return get_bucket_completions(
-                        ctx,
-                        get_trigger(params),
-                    )
-                    .await;
+                    return get_bucket_completions(ctx, get_trigger(params)).await;
                 } else if info.ident == "measurement" {
-                    if let Some(list) = get_measurement_completions(
-                        params,
-                        ctx,
-                        info.bucket,
-                    )
-                    .await?
+                    if let Some(list) =
+                        get_measurement_completions(params, ctx, info.bucket).await?
                     {
                         return Ok(list);
                     }
                 } else {
-                    return find_param_completions(
-                        None, params, ctx, cache,
-                    )
-                    .await;
+                    return find_param_completions(None, params, ctx, cache).await;
                 }
             }
             CompletionType::Import => {
                 let infos = get_package_infos();
 
-                let imports = get_imports_removed(
-                    uri,
-                    info.position,
-                    ctx,
-                    cache,
-                )?;
+                let imports = get_imports_removed(uri, info.position, ctx, cache)?;
 
                 let mut items = vec![];
                 for info in infos {
-                    if !(&imports).iter().any(|x| x.path == info.name)
-                    {
+                    if !(&imports).iter().any(|x| x.path == info.name) {
                         items.push(new_string_arg_completion(
                             info.path,
                             get_trigger(params.clone()),
@@ -321,8 +272,7 @@ async fn find_completions(
                 });
             }
             CompletionType::ObjectMember(_obj) => {
-                return find_dot_completions(params, ctx, cache)
-                    .await;
+                return find_dot_completions(params, ctx, cache).await;
             }
         }
     }
@@ -333,10 +283,7 @@ async fn find_completions(
     })
 }
 
-fn new_string_arg_completion(
-    value: String,
-    trigger: Option<String>,
-) -> CompletionItem {
+fn new_string_arg_completion(value: String, trigger: Option<String>) -> CompletionItem {
     let trigger = trigger.unwrap_or_else(|| "".to_string());
     let insert_text = if trigger == "\"" {
         value
@@ -361,10 +308,7 @@ fn new_string_arg_completion(
     }
 }
 
-fn new_param_completion(
-    name: String,
-    trigger: Option<String>,
-) -> CompletionItem {
+fn new_param_completion(name: String, trigger: Option<String>) -> CompletionItem {
     let insert_text = if let Some(trigger) = trigger {
         if trigger == "(" {
             format!("{}: ", name)
@@ -397,13 +341,8 @@ fn get_user_functions(
     pos: Position,
     ctx: RequestContext,
     cache: &Cache,
-) -> Result<Vec<Function>, String> {
-    let pkg = utils::create_completion_package(
-        uri,
-        pos.clone(),
-        ctx,
-        cache,
-    )?;
+) -> Result<Vec<Function>, Error> {
+    let pkg = utils::create_completion_package(uri, pos.clone(), ctx, cache)?;
     let walker = Rc::new(walk::Node::Package(&pkg));
     let mut visitor = FunctionFinderVisitor::new(pos);
 
@@ -413,7 +352,9 @@ fn get_user_functions(
         return Ok((*state).functions.clone());
     }
 
-    Err("failed to get completables".to_string())
+    Err(Error {
+        msg: "failed to get completables".to_string(),
+    })
 }
 
 fn get_provided_arguments(call: &CallExpr) -> Vec<String> {
@@ -421,12 +362,8 @@ fn get_provided_arguments(call: &CallExpr) -> Vec<String> {
     if let Some(Expression::Object(obj)) = call.arguments.first() {
         for prop in obj.properties.clone() {
             match prop.key {
-                flux::ast::PropertyKey::Identifier(ident) => {
-                    provided.push(ident.name)
-                }
-                flux::ast::PropertyKey::StringLit(lit) => {
-                    provided.push(lit.value)
-                }
+                flux::ast::PropertyKey::Identifier(ident) => provided.push(ident.name),
+                flux::ast::PropertyKey::StringLit(lit) => provided.push(lit.value),
             };
         }
     }
@@ -440,7 +377,7 @@ fn get_object_functions(
     ctx: RequestContext,
     object: String,
     cache: &Cache,
-) -> Result<Vec<Function>, String> {
+) -> Result<Vec<Function>, Error> {
     let pkg = utils::create_completion_package(uri, pos, ctx, cache)?;
     let walker = Rc::new(walk::Node::Package(&pkg));
     let mut visitor = ObjectFunctionFinderVisitor::default();
@@ -465,17 +402,13 @@ fn get_function_params(
     functions: Vec<Function>,
     provided: Vec<String>,
 ) -> Vec<String> {
-    functions.into_iter().filter(|f| f.name == name).fold(
-        vec![],
-        |mut acc, f| {
-            acc.extend(
-                f.params
-                    .into_iter()
-                    .filter(|p| !provided.contains(p)),
-            );
+    functions
+        .into_iter()
+        .filter(|f| f.name == name)
+        .fold(vec![], |mut acc, f| {
+            acc.extend(f.params.into_iter().filter(|p| !provided.contains(p)));
             acc
-        },
-    )
+        })
 }
 
 async fn find_param_completions(
@@ -483,15 +416,12 @@ async fn find_param_completions(
     params: CompletionParams,
     ctx: RequestContext,
     cache: &Cache,
-) -> Result<CompletionList, String> {
+) -> Result<CompletionList, Error> {
     let uri = params.text_document.uri.as_str();
     let position = params.position;
 
     let source = cache.get(uri)?;
-    let pkg = crate::shared::conversion::create_file_node_from_text(
-        uri,
-        source.contents,
-    );
+    let pkg = crate::shared::conversion::create_file_node_from_text(uri, source.contents);
     let walker = Rc::new(AstNode::File(&pkg.files[0]));
     let visitor = ast::CallFinderVisitor::new(position.move_back(1));
 
@@ -505,20 +435,16 @@ async fn find_param_completions(
         if let AstNode::CallExpr(call) = node.as_ref() {
             let provided = get_provided_arguments(call);
 
-            if let Expression::Identifier(ident) = call.callee.clone()
-            {
+            if let Expression::Identifier(ident) = call.callee.clone() {
                 items.extend(get_function_params(
                     ident.name.clone(),
                     get_builtin_functions(),
                     provided.clone(),
                 ));
 
-                if let Ok(user_functions) = get_user_functions(
-                    uri,
-                    position.clone(),
-                    ctx.clone(),
-                    cache,
-                ) {
+                if let Ok(user_functions) =
+                    get_user_functions(uri, position.clone(), ctx.clone(), cache)
+                {
                     items.extend(get_function_params(
                         ident.name,
                         user_functions,
@@ -528,12 +454,10 @@ async fn find_param_completions(
             }
             if let Expression::Member(me) = call.callee.clone() {
                 if let Expression::Identifier(ident) = me.object {
-                    let package_functions =
-                        get_package_functions(ident.name.clone());
+                    let package_functions = get_package_functions(ident.name.clone());
 
-                    let object_functions = get_object_functions(
-                        uri, position, ctx, ident.name, cache,
-                    )?;
+                    let object_functions =
+                        get_object_functions(uri, position, ctx, ident.name, cache)?;
 
                     let key = match me.property {
                         PropertyKey::Identifier(i) => i.name,
@@ -546,11 +470,7 @@ async fn find_param_completions(
                         provided.clone(),
                     ));
 
-                    items.extend(get_function_params(
-                        key,
-                        object_functions,
-                        provided,
-                    ));
+                    items.extend(get_function_params(key, object_functions, provided));
                 }
             }
         }
@@ -576,14 +496,12 @@ fn get_trigger(params: CompletionParams) -> Option<String> {
 async fn get_bucket_completions(
     ctx: RequestContext,
     trigger: Option<String>,
-) -> Result<CompletionList, String> {
+) -> Result<CompletionList, Error> {
     let buckets = ctx.callbacks.get_buckets().await?;
 
     let items: Vec<CompletionItem> = buckets
         .into_iter()
-        .map(|value| {
-            new_string_arg_completion(value, trigger.clone())
-        })
+        .map(|value| new_string_arg_completion(value, trigger.clone()))
         .collect();
 
     Ok(CompletionList {
@@ -596,14 +514,12 @@ async fn find_arg_completions(
     params: CompletionParams,
     ctx: RequestContext,
     cache: &Cache,
-) -> Result<CompletionList, String> {
-    let info =
-        CompletionInfo::create(params.clone(), ctx.clone(), cache)?;
+) -> Result<CompletionList, Error> {
+    let info = CompletionInfo::create(params.clone(), ctx.clone(), cache)?;
 
     if let Some(info) = info {
         if info.ident == "bucket" {
-            return get_bucket_completions(ctx, get_trigger(params))
-                .await;
+            return get_bucket_completions(ctx, get_trigger(params)).await;
         }
     }
 
@@ -617,7 +533,7 @@ async fn find_dot_completions(
     params: CompletionParams,
     ctx: RequestContext,
     cache: &Cache,
-) -> Result<CompletionList, String> {
+) -> Result<CompletionList, Error> {
     let uri = params.text_document.uri.clone();
     let uri = uri.as_str();
     let pos = params.position.clone();
@@ -625,17 +541,10 @@ async fn find_dot_completions(
 
     if let Some(info) = info.clone() {
         let imports = info.imports.clone();
-        if let CompletionType::ObjectMember(om) =
-            info.completion_type.clone()
-        {
+        if let CompletionType::ObjectMember(om) = info.completion_type.clone() {
             if om == "r" {
                 if let Some(bucket) = info.bucket.clone() {
-                    if let Some(list) = get_tag_keys_completions(
-                        ctx.clone(),
-                        Some(bucket),
-                    )
-                    .await?
-                    {
+                    if let Some(list) = get_tag_keys_completions(ctx.clone(), Some(bucket)).await? {
                         return Ok(list);
                     }
                 }
@@ -644,33 +553,17 @@ async fn find_dot_completions(
 
         let mut list = vec![];
         let name = info.ident.clone();
-        get_specific_package_functions(
-            &mut list,
-            name,
-            imports.clone(),
-        );
+        get_specific_package_functions(&mut list, name, imports.clone());
 
         let mut items = vec![];
-        let obj_results = get_specific_object(
-            info.ident.clone(),
-            pos,
-            uri,
-            ctx.clone(),
-            cache,
-        )?;
+        let obj_results = get_specific_object(info.ident.clone(), pos, uri, ctx.clone(), cache)?;
 
         for completable in obj_results.into_iter() {
-            items.push(
-                completable
-                    .completion_item(ctx.clone(), info.clone())
-                    .await,
-            );
+            items.push(completable.completion_item(ctx.clone(), info.clone()).await);
         }
 
         for item in list.into_iter() {
-            items.push(
-                item.completion_item(ctx.clone(), info.clone()).await,
-            );
+            items.push(item.completion_item(ctx.clone(), info.clone()).await);
         }
 
         return Ok(CompletionList {
@@ -691,10 +584,8 @@ pub fn get_specific_object(
     uri: &'_ str,
     ctx: RequestContext,
     cache: &Cache,
-) -> Result<Vec<Arc<dyn Completable + Send + Sync>>, String> {
-    let pkg = utils::create_completion_package_removed(
-        uri, pos, ctx, cache,
-    )?;
+) -> Result<Vec<Arc<dyn Completable + Send + Sync>>, Error> {
+    let pkg = utils::create_completion_package_removed(uri, pos, ctx, cache)?;
     let walker = Rc::new(walk::Node::Package(&pkg));
     let mut visitor = CompletableObjectFinderVisitor::new(name);
 
@@ -715,7 +606,7 @@ async fn triggered_completion(
     params: CompletionParams,
     ctx: RequestContext,
     cache: &Cache,
-) -> Result<CompletionList, String> {
+) -> Result<CompletionList, Error> {
     if let Some(ch) = trigger.clone() {
         if ch == "." {
             return find_dot_completions(params, ctx, cache).await;
@@ -723,8 +614,7 @@ async fn triggered_completion(
             return find_arg_completions(params, ctx, cache).await;
         } else if ch == "(" || ch == "," {
             let trgr = trigger;
-            return find_param_completions(trgr, params, ctx, cache)
-                .await;
+            return find_param_completions(trgr, params, ctx, cache).await;
         }
     }
 
@@ -738,42 +628,31 @@ impl RequestHandler for CompletionHandler {
         prequest: PolymorphicRequest,
         ctx: RequestContext,
         cache: &Cache,
-    ) -> Result<Option<String>, String> {
-        let req: Request<CompletionParams> =
-            Request::from_json(prequest.data.as_str())?;
+    ) -> Result<Option<String>, Error> {
+        let req: Request<CompletionParams> = Request::from_json(prequest.data.as_str())?;
         if let Some(params) = req.params {
             if let Some(context) = params.clone().context {
-                let completions = triggered_completion(
-                    context.trigger_character,
-                    params,
-                    ctx,
-                    cache,
-                )
-                .await?;
+                let completions =
+                    triggered_completion(context.trigger_character, params, ctx, cache).await?;
 
-                let response = Response::new(
-                    prequest.base_request.id,
-                    Some(completions),
-                );
+                let response = Response::new(prequest.base_request.id, Some(completions));
 
                 let result = response.to_json()?;
 
                 return Ok(Some(result));
             }
 
-            let completions =
-                find_completions(params, ctx, cache).await?;
+            let completions = find_completions(params, ctx, cache).await?;
 
-            let response = Response::new(
-                prequest.base_request.id,
-                Some(completions),
-            );
+            let response = Response::new(prequest.base_request.id, Some(completions));
 
             let result = response.to_json()?;
 
             return Ok(Some(result));
         }
 
-        Err("invalid completion request".to_string())
+        Err(Error {
+            msg: "invalid completion request".to_string(),
+        })
     }
 }

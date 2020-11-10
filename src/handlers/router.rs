@@ -15,7 +15,7 @@ use crate::handlers::references::FindReferencesHandler;
 use crate::handlers::rename::RenameHandler;
 use crate::handlers::shutdown::ShutdownHandler;
 use crate::handlers::signature_help::SignatureHelpHandler;
-use crate::handlers::RequestHandler;
+use crate::handlers::{Error, RequestHandler};
 use crate::protocol::requests::PolymorphicRequest;
 use crate::shared::RequestContext;
 
@@ -42,7 +42,7 @@ impl RequestHandler for NoOpHandler {
         _: PolymorphicRequest,
         _: RequestContext,
         _: &Cache,
-    ) -> Result<Option<String>, String> {
+    ) -> Result<Option<String>, Error> {
         Ok(None)
     }
 }
@@ -128,7 +128,7 @@ impl Router {
         &mut self,
         request: PolymorphicRequest,
         ctx: RequestContext,
-    ) -> Result<Option<String>, String> {
+    ) -> Result<Option<String>, Error> {
         let method = request.method();
         let handler = match self.mapping.get(&method) {
             Some(h) => h,

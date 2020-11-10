@@ -1,7 +1,7 @@
 use std::rc::Rc;
 
 use crate::cache::Cache;
-use crate::handlers::RequestHandler;
+use crate::handlers::{Error, RequestHandler};
 use crate::protocol::properties::{Location, Position, Range};
 use crate::protocol::requests::{
     PolymorphicRequest, Request, TextDocumentPositionParams,
@@ -82,7 +82,7 @@ impl RequestHandler for GotoDefinitionHandler {
         prequest: PolymorphicRequest,
         _: crate::shared::RequestContext,
         cache: &Cache,
-    ) -> Result<Option<String>, String> {
+    ) -> Result<Option<String>, Error> {
         let mut result: Option<Location> = None;
 
         let request: Request<TextDocumentPositionParams> =
@@ -129,6 +129,6 @@ impl RequestHandler for GotoDefinitionHandler {
             return Ok(Some(json));
         }
 
-        Err("invalid textDocument/definition request".to_string())
+        Err(Error{msg: "invalid textDocument/definition request".to_string()})
     }
 }
