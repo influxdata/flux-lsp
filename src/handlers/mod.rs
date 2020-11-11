@@ -20,7 +20,8 @@ pub use router::Router;
 
 use crate::cache::Cache;
 use crate::protocol::notifications::{
-    create_diagnostics_notification, Notification, PublishDiagnosticsParams,
+    create_diagnostics_notification, Notification,
+    PublishDiagnosticsParams,
 };
 use crate::protocol::properties::Position;
 use crate::protocol::requests::PolymorphicRequest;
@@ -71,7 +72,10 @@ pub struct NodeFinderResult<'a> {
     path: Vec<Rc<flux::semantic::walk::Node<'a>>>,
 }
 
-pub fn find_node(node: flux::semantic::walk::Node<'_>, position: Position) -> NodeFinderResult<'_> {
+pub fn find_node(
+    node: flux::semantic::walk::Node<'_>,
+    position: Position,
+) -> NodeFinderResult<'_> {
     let mut result = NodeFinderResult::default();
     let mut visitor = NodeFinderVisitor::new(position);
 

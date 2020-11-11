@@ -32,7 +32,9 @@ fn handle_close(
         return Ok(None);
     }
 
-    Err(Error{msg: "invalid textDocument/didClose request".to_string()})
+    Err(Error {
+        msg: "invalid textDocument/didClose request".to_string(),
+    })
 }
 
 #[async_trait]

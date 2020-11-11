@@ -1,7 +1,9 @@
 use crate::cache::Cache;
 use crate::handlers::{Error, RequestHandler};
 use crate::protocol::properties::SymbolInformation;
-use crate::protocol::requests::{DocumentSymbolParams, PolymorphicRequest, Request};
+use crate::protocol::requests::{
+    DocumentSymbolParams, PolymorphicRequest, Request,
+};
 use crate::protocol::responses::Response;
 use crate::shared::structs::RequestContext;
 use crate::visitors::semantic::utils;
@@ -10,7 +12,10 @@ use crate::visitors::semantic::SymbolsVisitor;
 use flux::semantic::walk::{self, Node};
 use std::rc::Rc;
 
-fn sort_symbols(a: &SymbolInformation, b: &SymbolInformation) -> std::cmp::Ordering {
+fn sort_symbols(
+    a: &SymbolInformation,
+    b: &SymbolInformation,
+) -> std::cmp::Ordering {
     let a_start = a.location.range.start.clone();
     let b_start = b.location.range.start.clone();
 
@@ -51,9 +56,14 @@ impl RequestHandler for DocumentSymbolHandler {
         ctx: crate::shared::RequestContext,
         cache: &Cache,
     ) -> Result<Option<String>, Error> {
-        let request: Request<DocumentSymbolParams> = Request::from_json(prequest.data.as_str())?;
+        let request: Request<DocumentSymbolParams> =
+            Request::from_json(prequest.data.as_str())?;
         if let Some(params) = request.params {
-            let symbols = find_symbols(params.text_document.uri.as_str(), ctx, cache)?;
+            let symbols = find_symbols(
+                params.text_document.uri.as_str(),
+                ctx,
+                cache,
+            )?;
             let response: Response<Vec<SymbolInformation>> =
                 Response::new(request.id, Some(symbols));
             let json = response.to_json()?;

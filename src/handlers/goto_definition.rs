@@ -129,6 +129,9 @@ impl RequestHandler for GotoDefinitionHandler {
             return Ok(Some(json));
         }
 
-        Err(Error{msg: "invalid textDocument/definition request".to_string()})
+        Err(Error {
+            msg: "invalid textDocument/definition request"
+                .to_string(),
+        })
     }
 }

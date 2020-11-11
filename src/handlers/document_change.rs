@@ -55,7 +55,9 @@ fn handle_change(
         return Ok(Some(json));
     }
 
-    Err(Error{msg: "invalid textDocument/didChange request".to_string()})
+    Err(Error {
+        msg: "invalid textDocument/didChange request".to_string(),
+    })
 }
 
 #[async_trait]

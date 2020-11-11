@@ -38,7 +38,9 @@ fn handle_open(
         return Ok(Some(json));
     }
 
-    Err(Error{msg: "invalid textDocument/didOpen request".to_string()})
+    Err(Error {
+        msg: "invalid textDocument/didOpen request".to_string(),
+    })
 }
 
 #[async_trait::async_trait]

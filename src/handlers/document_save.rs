@@ -31,6 +31,8 @@ impl RequestHandler for DocumentSaveHandler {
             return Ok(Some(json));
         }
 
-        Err(Error{msg: "invalid textDocument/didSave request".to_string()})
+        Err(Error {
+            msg: "invalid textDocument/didSave request".to_string(),
+        })
     }
 }
