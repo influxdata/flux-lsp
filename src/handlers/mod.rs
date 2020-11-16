@@ -34,6 +34,16 @@ use std::rc::Rc;
 use async_trait::async_trait;
 use flux::ast::{check, walk};
 
+#[derive(Debug)]
+pub struct Error {
+    pub msg: String,
+}
+impl From<String> for Error {
+    fn from(s: String) -> Error {
+        Error { msg: s }
+    }
+}
+
 #[async_trait]
 pub trait RequestHandler {
     async fn handle(
@@ -41,7 +51,7 @@ pub trait RequestHandler {
         prequest: PolymorphicRequest,
         ctx: RequestContext,
         cache: &Cache,
-    ) -> Result<Option<String>, String>;
+    ) -> Result<Option<String>, Error>;
 }
 
 pub fn create_diagnostics(

@@ -1,5 +1,5 @@
 use crate::cache::Cache;
-use crate::handlers::RequestHandler;
+use crate::handlers::{Error, RequestHandler};
 use crate::protocol::requests::{
     HoverParams, PolymorphicRequest, Request,
 };
@@ -15,7 +15,7 @@ impl RequestHandler for HoverHandler {
         prequest: PolymorphicRequest,
         _: crate::shared::RequestContext,
         _: &Cache,
-    ) -> Result<Option<String>, String> {
+    ) -> Result<Option<String>, Error> {
         let req: Request<HoverParams> =
             Request::from_json(prequest.data.as_str())?;
 

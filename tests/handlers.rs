@@ -320,7 +320,7 @@ speculate! {
 
 
                 let file_text = get_file_contents_from_uri(uri).unwrap();
-                let formatted_text = flux::formatter::format(file_text).unwrap();
+                let formatted_text = flux::formatter::format(&file_text).unwrap();
 
                 assert_eq!(text, formatted_text, "returns formatted text");
             }

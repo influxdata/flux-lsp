@@ -1,4 +1,4 @@
-use crate::handlers::Router;
+use crate::handlers::{Error, Router};
 use crate::shared::callbacks::Callbacks;
 use crate::shared::messages::{
     create_polymorphic_request, wrap_message,
@@ -36,22 +36,21 @@ pub struct ServerError {
 }
 
 impl ServerError {
-    pub fn from_error(
-        id: u32,
-        err: String,
-    ) -> Result<String, String> {
+    pub fn from_error(id: u32, err: Error) -> Result<String, Error> {
         let se = ServerError {
             id,
             error: ResponseError {
                 code: 100,
-                message: err,
+                message: err.msg,
             },
             jsonrpc: "2.0".to_string(),
         };
 
         match serde_json::to_string(&se) {
             Ok(val) => Ok(val),
-            Err(_) => Err("failed to serialize error".to_string()),
+            Err(_) => Err(Error {
+                msg: "failed to serialize error".to_string(),
+            }),
         }
     }
 }

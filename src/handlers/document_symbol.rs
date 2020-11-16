@@ -1,5 +1,5 @@
 use crate::cache::Cache;
-use crate::handlers::RequestHandler;
+use crate::handlers::{Error, RequestHandler};
 use crate::protocol::properties::SymbolInformation;
 use crate::protocol::requests::{
     DocumentSymbolParams, PolymorphicRequest, Request,
@@ -55,7 +55,7 @@ impl RequestHandler for DocumentSymbolHandler {
         prequest: PolymorphicRequest,
         ctx: crate::shared::RequestContext,
         cache: &Cache,
-    ) -> Result<Option<String>, String> {
+    ) -> Result<Option<String>, Error> {
         let request: Request<DocumentSymbolParams> =
             Request::from_json(prequest.data.as_str())?;
         if let Some(params) = request.params {
@@ -71,7 +71,8 @@ impl RequestHandler for DocumentSymbolHandler {
             return Ok(Some(json));
         }
 
-        Err("missing params for textDocument/documentSymbol request"
-            .to_string())
+        Err(Error {
+            msg: "missing params for textDocument/documentSymbol request".to_string(),
+        })
     }
 }

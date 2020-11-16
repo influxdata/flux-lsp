@@ -1,5 +1,5 @@
 use crate::cache::Cache;
-use crate::handlers::{find_node, RequestHandler};
+use crate::handlers::{find_node, Error, RequestHandler};
 use crate::protocol::properties::Position;
 use crate::protocol::requests::{
     PolymorphicRequest, Request, SignatureHelpParams,
@@ -130,7 +130,7 @@ impl RequestHandler for SignatureHelpHandler {
         prequest: PolymorphicRequest,
         ctx: RequestContext,
         cache: &Cache,
-    ) -> Result<Option<String>, String> {
+    ) -> Result<Option<String>, Error> {
         let req: Request<SignatureHelpParams> =
             Request::from_json(prequest.data.as_str())?;
 

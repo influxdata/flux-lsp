@@ -1,5 +1,5 @@
 use crate::cache::Cache;
-use crate::handlers::RequestHandler;
+use crate::handlers::{Error, RequestHandler};
 use crate::protocol::properties::{Position, Range, TextEdit};
 use crate::protocol::requests::{
     DocumentFormattingParams, PolymorphicRequest, Request,
@@ -34,6 +34,12 @@ fn create_range(contents: String) -> Range {
 #[derive(Default)]
 pub struct DocumentFormattingHandler {}
 
+impl From<flux::Error> for Error {
+    fn from(e: flux::Error) -> Error {
+        Error { msg: e.msg }
+    }
+}
+
 #[async_trait::async_trait]
 impl RequestHandler for DocumentFormattingHandler {
     async fn handle(
@@ -41,7 +47,7 @@ impl RequestHandler for DocumentFormattingHandler {
         prequest: PolymorphicRequest,
         _ctx: crate::shared::RequestContext,
         cache: &Cache,
-    ) -> Result<Option<String>, String> {
+    ) -> Result<Option<String>, Error> {
         let request: Request<DocumentFormattingParams> =
             Request::from_json(prequest.data.as_str())?;
 
@@ -51,7 +57,8 @@ impl RequestHandler for DocumentFormattingHandler {
             let file_contents = cache_value.contents;
             let range = create_range(file_contents.clone());
 
-            let formatted = formatter::format(file_contents)?;
+            let formatted =
+                formatter::format(file_contents.as_str())?;
 
             let response: Response<Vec<TextEdit>> = Response::new(
                 prequest.base_request.id,
@@ -67,6 +74,8 @@ impl RequestHandler for DocumentFormattingHandler {
         }
 
         // Get document contents
-        Err("Invalid request".to_string())
+        Err(Error {
+            msg: "Invalid request".to_string(),
+        })
     }
 }

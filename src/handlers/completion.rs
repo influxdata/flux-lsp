@@ -2,7 +2,7 @@ use std::rc::Rc;
 use std::sync::Arc;
 
 use crate::cache::Cache;
-use crate::handlers::RequestHandler;
+use crate::handlers::{Error, RequestHandler};
 use crate::protocol::properties::Position;
 use crate::protocol::requests::{
     CompletionParams, PolymorphicRequest, Request,
@@ -82,7 +82,7 @@ fn get_user_completables(
     pos: Position,
     ctx: RequestContext,
     cache: &Cache,
-) -> Result<Vec<Arc<dyn Completable + Send + Sync>>, String> {
+) -> Result<Vec<Arc<dyn Completable + Send + Sync>>, Error> {
     let pkg = utils::create_completion_package(
         uri,
         pos.clone(),
@@ -98,14 +98,16 @@ fn get_user_completables(
         return Ok((*state).completables.clone());
     }
 
-    Err("failed to get completables".to_string())
+    Err(Error {
+        msg: "failed to get completables".to_string(),
+    })
 }
 
 async fn get_user_matches(
     info: CompletionInfo,
     ctx: RequestContext,
     cache: &Cache,
-) -> Result<Vec<CompletionItem>, String> {
+) -> Result<Vec<CompletionItem>, Error> {
     let completables = get_user_completables(
         info.uri.as_str(),
         info.position.clone(),
@@ -126,7 +128,7 @@ async fn get_measurement_completions(
     params: CompletionParams,
     ctx: RequestContext,
     bucket: Option<String>,
-) -> Result<Option<CompletionList>, String> {
+) -> Result<Option<CompletionList>, Error> {
     if let Some(bucket) = bucket {
         let measurements =
             ctx.callbacks.get_measurements(bucket).await?;
@@ -153,7 +155,7 @@ async fn get_measurement_completions(
 async fn get_tag_keys_completions(
     ctx: RequestContext,
     bucket: Option<String>,
-) -> Result<Option<CompletionList>, String> {
+) -> Result<Option<CompletionList>, Error> {
     if let Some(bucket) = bucket {
         let tag_keys = ctx.callbacks.get_tag_keys(bucket).await?;
 
@@ -189,7 +191,7 @@ async fn get_tag_values_completions(
     ctx: RequestContext,
     bucket: Option<String>,
     field: Option<String>,
-) -> Result<Option<CompletionList>, String> {
+) -> Result<Option<CompletionList>, Error> {
     if let Some(bucket) = bucket {
         if let Some(field) = field {
             let tag_values =
@@ -228,7 +230,7 @@ async fn find_completions(
     params: CompletionParams,
     ctx: RequestContext,
     cache: &Cache,
-) -> Result<CompletionList, String> {
+) -> Result<CompletionList, Error> {
     let uri = params.text_document.uri.clone();
     let uri = uri.as_str();
     let info =
@@ -397,7 +399,7 @@ fn get_user_functions(
     pos: Position,
     ctx: RequestContext,
     cache: &Cache,
-) -> Result<Vec<Function>, String> {
+) -> Result<Vec<Function>, Error> {
     let pkg = utils::create_completion_package(
         uri,
         pos.clone(),
@@ -413,7 +415,9 @@ fn get_user_functions(
         return Ok((*state).functions.clone());
     }
 
-    Err("failed to get completables".to_string())
+    Err(Error {
+        msg: "failed to get completables".to_string(),
+    })
 }
 
 fn get_provided_arguments(call: &CallExpr) -> Vec<String> {
@@ -440,7 +444,7 @@ fn get_object_functions(
     ctx: RequestContext,
     object: String,
     cache: &Cache,
-) -> Result<Vec<Function>, String> {
+) -> Result<Vec<Function>, Error> {
     let pkg = utils::create_completion_package(uri, pos, ctx, cache)?;
     let walker = Rc::new(walk::Node::Package(&pkg));
     let mut visitor = ObjectFunctionFinderVisitor::default();
@@ -483,7 +487,7 @@ async fn find_param_completions(
     params: CompletionParams,
     ctx: RequestContext,
     cache: &Cache,
-) -> Result<CompletionList, String> {
+) -> Result<CompletionList, Error> {
     let uri = params.text_document.uri.as_str();
     let position = params.position;
 
@@ -576,7 +580,7 @@ fn get_trigger(params: CompletionParams) -> Option<String> {
 async fn get_bucket_completions(
     ctx: RequestContext,
     trigger: Option<String>,
-) -> Result<CompletionList, String> {
+) -> Result<CompletionList, Error> {
     let buckets = ctx.callbacks.get_buckets().await?;
 
     let items: Vec<CompletionItem> = buckets
@@ -596,7 +600,7 @@ async fn find_arg_completions(
     params: CompletionParams,
     ctx: RequestContext,
     cache: &Cache,
-) -> Result<CompletionList, String> {
+) -> Result<CompletionList, Error> {
     let info =
         CompletionInfo::create(params.clone(), ctx.clone(), cache)?;
 
@@ -617,7 +621,7 @@ async fn find_dot_completions(
     params: CompletionParams,
     ctx: RequestContext,
     cache: &Cache,
-) -> Result<CompletionList, String> {
+) -> Result<CompletionList, Error> {
     let uri = params.text_document.uri.clone();
     let uri = uri.as_str();
     let pos = params.position.clone();
@@ -691,7 +695,7 @@ pub fn get_specific_object(
     uri: &'_ str,
     ctx: RequestContext,
     cache: &Cache,
-) -> Result<Vec<Arc<dyn Completable + Send + Sync>>, String> {
+) -> Result<Vec<Arc<dyn Completable + Send + Sync>>, Error> {
     let pkg = utils::create_completion_package_removed(
         uri, pos, ctx, cache,
     )?;
@@ -715,7 +719,7 @@ async fn triggered_completion(
     params: CompletionParams,
     ctx: RequestContext,
     cache: &Cache,
-) -> Result<CompletionList, String> {
+) -> Result<CompletionList, Error> {
     if let Some(ch) = trigger.clone() {
         if ch == "." {
             return find_dot_completions(params, ctx, cache).await;
@@ -738,7 +742,7 @@ impl RequestHandler for CompletionHandler {
         prequest: PolymorphicRequest,
         ctx: RequestContext,
         cache: &Cache,
-    ) -> Result<Option<String>, String> {
+    ) -> Result<Option<String>, Error> {
         let req: Request<CompletionParams> =
             Request::from_json(prequest.data.as_str())?;
         if let Some(params) = req.params {
@@ -774,6 +778,8 @@ impl RequestHandler for CompletionHandler {
             return Ok(Some(result));
         }
 
-        Err("invalid completion request".to_string())
+        Err(Error {
+            msg: "invalid completion request".to_string(),
+        })
     }
 }
