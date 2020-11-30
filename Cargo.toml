@@ -7,6 +7,9 @@ license = "MIT"
 description = "LSP support for the flux language"
 repository = "https://github.com/influxdata/flux-lsp"
 
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = ["-Oz", "--enable-mutable-globals"]
+
 [lib]
 name = "flux_lsp"
 crate-type = ["cdylib", "rlib"]
@@ -20,15 +23,15 @@ serde_repr = "0.1"
 serde = { version = "1.0.106", features = ["derive"] }
 flux = { git = "https://github.com/influxdata/flux", tag="v0.96.0"}
 url = "2.1.1"
-wasm-bindgen = "0.2.62"
+wasm-bindgen = "0.2.69"
 combinations = "0.1.0"
-js-sys = "0.3.39"
-wasm-bindgen-futures = "0.4.12"
-futures = "0.3.4"
+js-sys = "0.3.46"
+wasm-bindgen-futures = "0.4.19"
+futures = "0.3.8"
 async-trait = "0.1.30"
 
 [dependencies.web-sys]
-version = "0.3"
+version = "0.3.46"
 features = [
   "console",
 ]
