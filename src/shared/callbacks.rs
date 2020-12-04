@@ -128,20 +128,20 @@ pub struct Callbacks {
 }
 
 impl Callbacks {
-    pub fn register_buckets_callback(&mut self, f: Function) {
-        self.buckets = Some(Callback::new(f));
+    pub fn register_buckets_callback(&mut self, _f: Function) {
+        self.buckets = None;
     }
 
-    pub fn register_measurements_callback(&mut self, f: Function) {
-        self.measurements = Some(Callback::new(f));
+    pub fn register_measurements_callback(&mut self, _f: Function) {
+        self.measurements = None;
     }
 
-    pub fn register_tag_keys_callback(&mut self, f: Function) {
-        self.tag_keys = Some(Callback::new(f));
+    pub fn register_tag_keys_callback(&mut self, _f: Function) {
+        self.tag_keys = None;
     }
 
-    pub fn register_tag_values_callback(&mut self, f: Function) {
-        self.tag_values = Some(Callback::new(f));
+    pub fn register_tag_values_callback(&mut self, _f: Function) {
+        self.tag_values = None;
     }
 
     fn call_buckets(&self) -> Result<JsFuture, String> {
