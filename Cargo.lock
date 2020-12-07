@@ -183,7 +183,7 @@ checksum = "728b7ab3119b5167cc60a4aad16b6086b762278f5571cc650e7eed2e89a23a15"
 [[package]]
 name = "core"
 version = "0.4.0"
-source = "git+https://github.com/influxdata/flux?tag=v0.96.0#9c3cf772426aef125c979c81d93e0dda37ab95b8"
+source = "git+https://github.com/influxdata/flux?tag=v0.98.0#c40321a5a49949ec65906064251e419fdee4a2ef"
 dependencies = [
  "bindgen",
  "cc",
@@ -246,7 +246,7 @@ dependencies = [
 [[package]]
 name = "flux"
 version = "0.5.1"
-source = "git+https://github.com/influxdata/flux?tag=v0.96.0#9c3cf772426aef125c979c81d93e0dda37ab95b8"
+source = "git+https://github.com/influxdata/flux?tag=v0.98.0#c40321a5a49949ec65906064251e419fdee4a2ef"
 dependencies = [
  "core",
  "flatbuffers",
@@ -259,7 +259,7 @@ dependencies = [
 
 [[package]]
 name = "flux-lsp"
-version = "0.5.24"
+version = "0.5.25"
 dependencies = [
  "async-trait",
  "combinations",
