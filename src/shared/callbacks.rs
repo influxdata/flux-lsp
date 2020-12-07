@@ -128,20 +128,26 @@ pub struct Callbacks {
 }
 
 impl Callbacks {
-    pub fn register_buckets_callback(&mut self, f: Function) {
-        self.buckets = Some(Callback::new(f));
+    // All of the `register_*_callback` methods have been disabled
+    // to prevent the LSP from crashing. Autocomplete for user-specific
+    // data will not be available until these methods are re-enabled
+    // See the following issue for more details:
+    // https://github.com/influxdata/flux-lsp/issues/190
+    pub fn register_buckets_callback(&mut self, _f: Function) {
+        self.buckets = None;
+        // self.buckets = Some(Callback::new(f)) // re-enable buckets callback
     }
 
-    pub fn register_measurements_callback(&mut self, f: Function) {
-        self.measurements = Some(Callback::new(f));
+    pub fn register_measurements_callback(&mut self, _f: Function) {
+        self.measurements = None;
     }
 
-    pub fn register_tag_keys_callback(&mut self, f: Function) {
-        self.tag_keys = Some(Callback::new(f));
+    pub fn register_tag_keys_callback(&mut self, _f: Function) {
+        self.tag_keys = None;
     }
 
-    pub fn register_tag_values_callback(&mut self, f: Function) {
-        self.tag_values = Some(Callback::new(f));
+    pub fn register_tag_values_callback(&mut self, _f: Function) {
+        self.tag_values = None;
     }
 
     fn call_buckets(&self) -> Result<JsFuture, String> {
