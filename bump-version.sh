@@ -50,5 +50,5 @@ git commit -m "build: Release $new_version"
 git push -u origin $branch_name
 
 hub pull-request -o \
-	-m "build: Increment version" \
+	-m "build: Bump to $new_version" \
 	-m "Change version from $version to $new_version" &> /dev/null &
