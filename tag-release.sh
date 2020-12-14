@@ -35,4 +35,5 @@ git push origin master $new_version
 flux_version=$(cat Cargo.toml | grep -P -m 1 'flux = *' | grep -Po 'v\d+\.\d+\.\d+')
 
 hub release create $new_version -m "Release $new_version
+
 - Upgrade to [Flux $flux_version](https://github.com/influxdata/flux/releases/tag/$flux_version)" -e
