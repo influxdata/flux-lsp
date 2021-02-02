@@ -65,10 +65,11 @@ checksum = "728b7ab3119b5167cc60a4aad16b6086b762278f5571cc650e7eed2e89a23a15"
 [[package]]
 name = "core"
 version = "0.4.0"
-source = "git+https://github.com/influxdata/flux?tag=v0.101.0#3843d7f9d428a3d5f8743bffdd56a0f96973b850"
+source = "git+https://github.com/influxdata/flux?tag=v0.103.0#e217e028da1e911fe0f909edf7ede9e24fc555ea"
 dependencies = [
  "chrono",
  "derivative",
+ "derive_more",
  "flatbuffers",
  "maplit",
  "regex",
@@ -93,6 +94,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "derive_more"
+version = "0.99.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "41cb0e6161ad61ed084a36ba71fbba9e3ac5aee3606fb607fe08da6acbcf3d8c"
+dependencies = [
+ "proc-macro2 1.0.24",
+ "quote 1.0.4",
+ "syn 1.0.53",
+]
+
+[[package]]
 name = "flatbuffers"
 version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -104,7 +116,7 @@ dependencies = [
 [[package]]
 name = "flux"
 version = "0.5.1"
-source = "git+https://github.com/influxdata/flux?tag=v0.101.0#3843d7f9d428a3d5f8743bffdd56a0f96973b850"
+source = "git+https://github.com/influxdata/flux?tag=v0.103.0#e217e028da1e911fe0f909edf7ede9e24fc555ea"
 dependencies = [
  "core",
  "flatbuffers",
@@ -117,7 +129,7 @@ dependencies = [
 
 [[package]]
 name = "flux-lsp"
-version = "0.5.28"
+version = "0.5.30"
 dependencies = [
  "async-trait",
  "combinations",
