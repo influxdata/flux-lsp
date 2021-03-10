@@ -50,7 +50,13 @@ flux_version=$(extract_version $(git describe))
 # Tag a release of the LSP
 cd $LSP_DIR
 lsp_version=$(extract_version "$(cat Cargo.toml)")
-echo $lsp_version
+hub release show $lsp_version &> /dev/null
+if [[ $? == 0 ]]; then
+	echo "Release v$lsp_version already exists"
+	exit
+fi
+
+echo "Cutting release for Flux LSP v$lsp_version"
 make tag-release
 
 # Wait for the release to hit NPM registry
