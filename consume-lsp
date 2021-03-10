@@ -91,11 +91,16 @@ ui_pr
 
 # Pause and wait for the vsflux and cli PRs to merge. Continue when user gives the go-ahead.
 echo "Wait for the vsflux and flux-lsp-cli PRs to merge."
-echo "Press any key to continue. Doing so will tag releases for both repos."
+echo "Type 'release' to continue. Doing so will tag releases for both repos."
 while [ true ] ; do
-	read -t 10000 -n 1
-	if [ $? = 0 ] ; then
+	read -t 10000 -n 7 input
+	if [[ $input == "release" ]] ; then
+		echo ""
 		break
+	else
+		echo ""
+		echo "try again"
+		continue
 	fi
 done
 
