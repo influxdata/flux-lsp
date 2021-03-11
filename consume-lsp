@@ -1,26 +1,20 @@
 #!/bin/bash
 
 # This script is meant to be run after the Flux release script has
-# opened a PR in the LSP, and that PR has merged.
+# triggered a version bump in the LSP. It should handle the rest of
+# the release process, with minimal babysitting by an engineer.
 
-# It should handle the rest of the release process, with minimal 
-# babysitting by an engineer.
-
-# If any command fails, exit the script
 set -e
 
-# Check if hub is installed
 if ! command -v hub &> /dev/null
 then
     echo "hub is not installed. exiting"
 fi
 
-# Make a temporary directory where we can clone fresh copies of all the necessary repos
 TEMPDIR=$(mktemp -d -t lsp-release.XXXX)
 echo "Using ${TEMPDIR}"
 cd $TEMPDIR
 
-# Cut down on code duplication
 function tmp_clone() {
 	git clone git@github.com:influxdata/$1.git &> /dev/null
 	echo "$(pwd)/$1"
@@ -36,9 +30,6 @@ LSP_DIR=$(tmp_clone flux-lsp)
 VSFLUX_DIR=$(tmp_clone vsflux)
 CLI_DIR=$(tmp_clone flux-lsp-cli)
 INFLUXDB_DIR=$(tmp_clone influxdb)
-
-# ui is a private repo, so maybe we should treat it like idpe,
-# in the sense that we don't want to expose its existence to the public.
 UI_DIR=$(tmp_clone ui)
 
 cd $FLUX_DIR
@@ -47,7 +38,6 @@ flux_version=$(extract_version $(git describe))
 # TODO:
 # (maybe?) Confirm that the flux version matches what's in flux-lsp's Cargo.toml
 
-# Tag a release of the LSP
 cd $LSP_DIR
 lsp_version=$(extract_version "$(cat Cargo.toml)")
 hub release show $lsp_version &> /dev/null
@@ -59,9 +49,8 @@ fi
 echo "Cutting release for Flux LSP v$lsp_version"
 make tag-release
 
-# Wait for the release to hit NPM registry
+echo "Waiting for LSP release to the NPM registry..."
 while true; do
-	echo "Waiting for LSP release to finish publishing to NPM..."
 	npm_node_version=$(extract_version "$(npm search @influxdata/flux-lsp-node)")
 	npm_browser_version=$(extract_version "$(npm search @influxdata/flux-lsp-browser)")
 	[[ $npm_node_version == $lsp_version ]] && [[ $npm_browser_version == $lsp_version ]] && break
@@ -70,7 +59,7 @@ done
 
 branch_name="build/lsp-$lsp_version"
 
-function ui_pr() {
+function uipr() {
 	git checkout -b $branch_name
 	yarn add @influxdata/flux-lsp-browser
 	git commit -am "build(lsp): Upgrade flux-lsp-browser to v$lsp_version"
@@ -89,12 +78,11 @@ cd $CLI_DIR
 make patch-version
 
 cd $INFLUXDB_DIR/ui
-ui_pr
+uipr
 
 cd $UI_DIR
-ui_pr
+uipr
 
-# Pause and wait for the vsflux and cli PRs to merge. Continue when user gives the go-ahead.
 echo "Wait for the vsflux and flux-lsp-cli PRs to merge."
 echo "Type 'release' to continue. Doing so will tag releases for both repos."
 while [ true ] ; do
@@ -111,12 +99,10 @@ done
 
 echo "Tagging releases..."
 
-# Tag releases for vsflux and cli
 cd $VSFLUX_DIR
 make tag-release
 
 cd $CLI_DIR
 make tag-release
 
-# Clean up
 rm -rf $TEMPDIR
