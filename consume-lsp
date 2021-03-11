@@ -25,31 +25,36 @@ function extract_version() {
 	echo $v
 }
 
-FLUX_DIR=$(tmp_clone flux)
+# FLUX_DIR=$(tmp_clone flux)
 LSP_DIR=$(tmp_clone flux-lsp)
 VSFLUX_DIR=$(tmp_clone vsflux)
 CLI_DIR=$(tmp_clone flux-lsp-cli)
 INFLUXDB_DIR=$(tmp_clone influxdb)
 UI_DIR=$(tmp_clone ui)
 
-cd $FLUX_DIR
-flux_version=$(extract_version $(git describe))
+# cd $FLUX_DIR
+# flux_version=$(extract_version $(git describe))
 
 # TODO:
 # (maybe?) Confirm that the flux version matches what's in flux-lsp's Cargo.toml
 
 cd $LSP_DIR
 lsp_version=$(extract_version "$(cat Cargo.toml)")
+
+# If all is well, we are expecting `hub release show` to fail
+# Hence `set +e`, so the script doesn't exit
+set +e
 hub release show $lsp_version &> /dev/null
 if [[ $? == 0 ]]; then
 	echo "Release v$lsp_version already exists"
 	exit
 fi
+set -e
 
 echo "Cutting release for Flux LSP v$lsp_version"
 make tag-release
 
-echo "Waiting for LSP release to the NPM registry..."
+echo "Waiting for LSP release to hit the NPM registry..."
 while true; do
 	npm_node_version=$(extract_version "$(npm search @influxdata/flux-lsp-node)")
 	npm_browser_version=$(extract_version "$(npm search @influxdata/flux-lsp-browser)")
@@ -83,6 +88,7 @@ uipr
 cd $UI_DIR
 uipr
 
+echo ""
 echo "Wait for the vsflux and flux-lsp-cli PRs to merge."
 echo "Type 'release' to continue. Doing so will tag releases for both repos."
 while [ true ] ; do
@@ -100,9 +106,13 @@ done
 echo "Tagging releases..."
 
 cd $VSFLUX_DIR
+git checkout master
+git pull
 make tag-release
 
 cd $CLI_DIR
+git checkout master
+git pull
 make tag-release
 
 rm -rf $TEMPDIR
