@@ -73,8 +73,7 @@ branch_name="build/lsp-$lsp_version"
 function ui_pr() {
 	git checkout -b $branch_name
 	yarn add @influxdata/flux-lsp-browser
-	git add package.json
-	git commit -m "build(lsp): Upgrade flux-lsp-browser to v$lsp_version"
+	git commit -am "build(lsp): Upgrade flux-lsp-browser to v$lsp_version"
 	git push -u origin $branch_name
 
 	hub pull-request -o \
