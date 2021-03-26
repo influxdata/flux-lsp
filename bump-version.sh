@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -e
+
 hub_installed=$(command -v hub)
 if [[ ! $hub_installed ]]; then
 	echo "Please install the hub command line tool before running this script."
@@ -7,23 +9,10 @@ if [[ ! $hub_installed ]]; then
 	exit 1
 fi
 
-current_branch=$(git branch --show-current)
-if [[ $current_branch != "master" ]]; then
-	echo "This script should only be run from the master branch. Aborting."
-	exit 1
-fi
-
-git_changes=$(git status -s | wc -l)
-if [[ $git_changes != 0 ]]; then
-	echo "The master branch has been modified."
-	echo "Please revert the changes or move them to another branch before running this script."
-	exit 1
-fi
-
-git fetch
-ahead=$(git status -sb | grep ahead -c)
-if [[ $ahead != 0 ]]; then
-	echo "Your local master branch is ahead of the remote master branch. Aborting."
+rg_installed=$(command -v rg)
+if [[ ! $rg_installed ]]; then
+	echo "Please install the hub command line tool before running this script."
+	echo "https://github.com/github/hub"
 	exit 1
 fi
 
@@ -33,9 +22,9 @@ if [[ $release_type != "patch" && $release_type != "minor" ]]; then
 	exit 1
 fi
 
-version=v$(cat Cargo.toml | grep -Po -m 1 '\d+\.\d+\.\d+')
+version=v$(rg -N -m 1 -r='$1' 'version = "(\d+\.\d+\.\d+)"' Cargo.toml)
 cargo install -q cargo-bump && cargo bump $release_type
-new_version=v$(cat Cargo.toml | grep -Po -m 1 '\d+\.\d+\.\d+')
+new_version=v$(rg -N -m 1 -r='$1' 'version = "(\d+\.\d+\.\d+)"' Cargo.toml)
 
 branch_name=bump-$new_version
 
