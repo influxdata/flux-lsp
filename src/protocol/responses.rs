@@ -70,20 +70,20 @@ pub struct WorkspaceEditResult {
     pub changes: HashMap<String, Vec<TextEdit>>,
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct CompletionList {
     #[serde(rename = "isIncomplete")]
     pub is_incomplete: bool,
     pub items: Vec<CompletionItem>,
 }
-#[derive(Serialize_repr, Deserialize_repr, Clone)]
+#[derive(Serialize_repr, Deserialize_repr, Clone, Debug)]
 #[repr(u32)]
 pub enum InsertTextFormat {
     PlainText = 1,
     Snippet = 2,
 }
 
-#[derive(Serialize_repr, Deserialize_repr, Clone)]
+#[derive(Serialize_repr, Deserialize_repr, Clone, Debug)]
 #[repr(u32)]
 pub enum CompletionItemKind {
     Text = 1,
@@ -113,7 +113,7 @@ pub enum CompletionItemKind {
     TypeParameter = 25,
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct CompletionItem {
     pub label: String,
     pub kind: Option<CompletionItemKind>,
