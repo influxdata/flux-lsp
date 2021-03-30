@@ -741,9 +741,15 @@ speculate! {
                 let returned = from_str::<Response<CompletionList>>(response.unwrap().as_str()).unwrap();
                 let returned_items = returned.result.unwrap().items;
 
+                // This test may fail when flux is updated, as the number of
+                // completion items changes. This is not an unstable test, but
+                // it may be required to look at the items returned to manually
+                // see which ones were added or removed when the flux stdlib
+                // changes. Swap the panic line comments to do that.
                 assert_eq!(
-                    120,
+                    121,
                     returned_items.len(),
+                    //"{:#?}", returned_items,
                     "expects completion items"
                 );
 

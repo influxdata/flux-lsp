@@ -122,7 +122,7 @@ fn default_text() -> String {
     "".to_string()
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Position {
     pub line: u32,
     pub character: u32,
@@ -160,14 +160,14 @@ pub struct VersionedTextDocumentIdentifier {
     pub version: u32,
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct TextEdit {
     #[serde(rename = "newText")]
     pub new_text: String,
     pub range: Range,
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Range {
     pub start: Position,
     pub end: Position,
