@@ -31,10 +31,10 @@ fn ident_to_location(uri: String, node: Rc<Node<'_>>) -> Location {
     Location { uri, range }
 }
 
-fn find_scoped_definition<'a>(
+fn find_scoped_definition(
     uri: String,
     ident_name: String,
-    path: Vec<Rc<Node<'a>>>,
+    path: Vec<Rc<Node>>,
 ) -> Option<Location> {
     let path_iter = path.iter().rev();
     for n in path_iter {
