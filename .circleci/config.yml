@@ -11,7 +11,7 @@ jobs:
           command: cargo fmt --all -- --check
       - run:
           name: "run lint"
-          command: cargo clippy --all -- -D warnings
+          command: cargo clippy --all -- -Dclippy::all
 
   test:
     docker:

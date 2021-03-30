@@ -125,35 +125,29 @@ impl Server {
                     match (*h).route(req, ctx).await {
                         Ok(response) => {
                             if let Some(response) = response {
-                                return Ok(JsValue::from(
-                                    ServerResponse {
-                                        message: Some(wrap_message(
-                                            response,
-                                        )),
-                                        error: None,
-                                    },
-                                ));
+                                Ok(JsValue::from(ServerResponse {
+                                    message: Some(wrap_message(
+                                        response,
+                                    )),
+                                    error: None,
+                                }))
                             } else {
-                                return Ok(JsValue::from(
-                                    ServerResponse {
-                                        message: None,
-                                        error: None,
-                                    },
-                                ));
+                                Ok(JsValue::from(ServerResponse {
+                                    message: None,
+                                    error: None,
+                                }))
                             }
                         }
                         Err(error) => {
-                            return Ok(JsValue::from(
-                                ServerResponse {
-                                    message: Some(wrap_message(
-                                        ServerError::from_error(
-                                            id, error,
-                                        )
-                                        .unwrap(),
-                                    )),
-                                    error: None,
-                                },
-                            ))
+                            Ok(JsValue::from(ServerResponse {
+                                message: Some(wrap_message(
+                                    ServerError::from_error(
+                                        id, error,
+                                    )
+                                    .unwrap(),
+                                )),
+                                error: None,
+                            }))
                         }
                     }
                 }

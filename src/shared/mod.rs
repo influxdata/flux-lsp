@@ -335,21 +335,20 @@ impl CompletionInfo {
                     }
                 }
                 AstNode::CallExpr(c) => {
-                    if let Some(arg) = c.arguments.last() {
-                        if let Expression::Identifier(ident) = arg {
-                            return Ok(Some(CompletionInfo {
-                                completion_type:
-                                    CompletionType::Generic,
-                                ident: ident.name.clone(),
-                                bucket,
-                                position: position.clone(),
-                                uri: uri.to_string(),
-                                imports: get_imports(
-                                    uri, position, ctx, cache,
-                                )?,
-                                package,
-                            }));
-                        }
+                    if let Some(Expression::Identifier(ident)) =
+                        c.arguments.last()
+                    {
+                        return Ok(Some(CompletionInfo {
+                            completion_type: CompletionType::Generic,
+                            ident: ident.name.clone(),
+                            bucket,
+                            position: position.clone(),
+                            uri: uri.to_string(),
+                            imports: get_imports(
+                                uri, position, ctx, cache,
+                            )?,
+                            package,
+                        }));
                     }
                 }
                 _ => {}
