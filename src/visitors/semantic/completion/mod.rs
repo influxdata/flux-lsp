@@ -149,7 +149,7 @@ impl<'a> Visitor<'a> for CompletableFinderVisitor {
                         get_var_type(&var_assign.init)
                     {
                         (*state).completables.push(Arc::new(
-                            VarResult { var_type, name },
+                            VarResult { name, var_type },
                         ));
 
                         return false;

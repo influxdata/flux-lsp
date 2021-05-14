@@ -71,12 +71,7 @@ pub fn create_diagnoistics(
 
 pub fn get_package_name(name: String) -> Option<String> {
     let items = name.split('/');
-
-    if let Some(n) = items.last() {
-        Some(n.to_string())
-    } else {
-        None
-    }
+    items.last().map(|n| n.to_string())
 }
 #[derive(Clone)]
 pub enum CompletionType {
