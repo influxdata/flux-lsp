@@ -2,6 +2,7 @@
 pub mod cache;
 pub mod handlers;
 pub mod protocol;
+pub mod refactor;
 pub mod shared;
 pub mod stdlib;
 pub mod wasm;

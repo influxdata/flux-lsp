@@ -35,5 +35,10 @@ wasm-bindgen = "0.2.69"
 wasm-bindgen-futures = "0.4.19"
 web-sys = { version = "0.3.46", features = ["console"] }
 
+[dependencies.lspower]
+version = "1.1.0"
+default-features = false
+features = ["runtime-agnostic"]
+
 [dev-dependencies]
 speculate = "0.1.2"
