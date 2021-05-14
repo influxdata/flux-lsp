@@ -18,8 +18,8 @@ impl RequestContext {
         support_multiple_files: bool,
     ) -> Self {
         RequestContext {
-            callbacks,
             support_multiple_files,
+            callbacks,
         }
     }
 }
