@@ -681,7 +681,7 @@ speculate! {
                 let returned_items = returned.result.unwrap().items;
 
                 assert_eq!(
-                    116,
+                    117,
                     returned_items.len(),
                     "expects completion items"
                 );
@@ -747,7 +747,7 @@ speculate! {
                 // see which ones were added or removed when the flux stdlib
                 // changes. Swap the panic line comments to do that.
                 assert_eq!(
-                    122,
+                    123,
                     returned_items.len(),
                     //"{:#?}", returned_items,
                     "expects completion items"
@@ -860,7 +860,7 @@ speculate! {
                 let returned_items = returned.result.unwrap().items;
 
                 assert_eq!(
-                    116,
+                    117,
                     returned_items.len(),
                     "expects completion items"
                 );
