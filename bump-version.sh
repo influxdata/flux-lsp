@@ -7,35 +7,15 @@ if [[ ! $hub_installed ]]; then
 	exit 1
 fi
 
-current_branch=$(git branch --show-current)
-if [[ $current_branch != "master" ]]; then
-	echo "This script should only be run from the master branch. Aborting."
-	exit 1
-fi
-
-git_changes=$(git status -s | wc -l)
-if [[ $git_changes != 0 ]]; then
-	echo "The master branch has been modified."
-	echo "Please revert the changes or move them to another branch before running this script."
-	exit 1
-fi
-
-git fetch
-ahead=$(git status -sb | grep ahead -c)
-if [[ $ahead != 0 ]]; then
-	echo "Your local master branch is ahead of the remote master branch. Aborting."
-	exit 1
-fi
-
 release_type=$1
 if [[ $release_type != "patch" && $release_type != "minor" ]]; then
 	echo "Invalid argument: $release_type"
 	exit 1
 fi
 
-version=v$(cat Cargo.toml | grep -Po -m 1 '\d+\.\d+\.\d+')
+version=v$(grep -Eom 1 "([0-9]{1,}\.)+[0-9]{1,}" Cargo.toml)
 cargo install -q cargo-bump && cargo bump $release_type
-new_version=v$(cat Cargo.toml | grep -Po -m 1 '\d+\.\d+\.\d+')
+new_version=v$(grep -Eom 1 "([0-9]{1,}\.)+[0-9]{1,}" Cargo.toml)
 
 branch_name=bump-$new_version
 
