@@ -7,7 +7,7 @@ if [[ ! $hub_installed ]]; then
 	exit 1
 fi
 
-new_version=v$(grep -Eom 1 "([0-9]{1,}\.)+[0-9]{1,}" package.json)
+new_version=v$(grep -Eom 1 "([0-9]{1,}\.)+[0-9]{1,}" Cargo.toml)
 
 git tag -a -s $new_version -m "Release $new_version"
 git push origin master $new_version
