@@ -41,9 +41,9 @@ fi
 
 TEMPDIR=$(mktemp -d -t lsp-release.XXXX)
 echo "Using ${TEMPDIR}"
-cd $TEMPDIR
 
 function tmp_clone() {
+	cd $TEMPDIR
 	git clone git@github.com:influxdata/$1.git &> /dev/null
 	echo "$(pwd)/$1"
 }
@@ -95,7 +95,6 @@ wom=`expr $(expr $(date +%-d) - 1) / 7 + 1`
 if [[ $wom == 1 ]]; then
 	echo "It's the first week of the month!"
 	echo "Cutting releases for vsflux and flux-lsp-cli..."
-	cd $TEMPDIR
 	VSFLUX_DIR=$(tmp_clone vsflux)
 	CLI_DIR=$(tmp_clone flux-lsp-cli)
 
