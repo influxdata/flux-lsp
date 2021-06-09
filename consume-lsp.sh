@@ -85,7 +85,7 @@ function uipr() {
 	hub pull-request -o \
 		-m "build(lsp): Upgrade to flux-lsp-browser v$lsp_version" \
 		-m "Upgrade flux-lsp-browser to [v$lsp_version](https://github.com/influxdata/flux-lsp/releases/tag/v$lsp_version)" &> /dev/null &
-	}
+}
 
 cd $UI_DIR
 uipr
