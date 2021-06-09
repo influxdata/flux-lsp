@@ -1,13 +1,13 @@
 #!/bin/bash
 
 # This script should only be run after the Flux release process has successfully
-# triggered a version bump in the LSP. Once the version bump PR has merged this
+# triggered a version bump in the LSP. Once the version bump PR has merged, this
 # script will handle the rest of the release process for the LSP, with minimal
 # babysitting by an engineer.
 
 # Some pre-requisites:
-# - Install the hub cli, and make sure you can use it to interact with github
-#   (this may require generating a personal access token via the github ui)
+# - Install the hub cli, and make sure you can use it to interact with GitHub
+#   (this may require generating a personal access token via the GitHub web ui)
 # - Install npm & yarn package managers
 # - Install jq
 # - Have a personal GPG key set up and imported into your GitHub account
