@@ -1,6 +1,6 @@
 [package]
 name = "flux-lsp"
-version = "0.5.49"
+version = "0.5.50"
 authors = ["Flux Developers <flux-developers@influxdata.com>"]
 edition = "2018"
 license = "MIT"
@@ -24,7 +24,7 @@ path = "src/lib.rs"
 [dependencies]
 async-trait = "0.1.30"
 combinations = "0.1.0"
-flux = { git = "https://github.com/influxdata/flux", tag = "v0.117.3" }
+flux = { git = "https://github.com/influxdata/flux", tag = "v0.119.0" }
 futures = "0.3.8"
 js-sys = "0.3.46"
 serde = { version = "1.0.106", features = ["derive"] }
