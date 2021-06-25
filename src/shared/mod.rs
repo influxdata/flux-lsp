@@ -440,3 +440,16 @@ fn follow_pipes_for_bucket(call: Box<CallExpr>) -> Option<String> {
 
     None
 }
+
+#[cfg(test)]
+mod tests {
+    use super::all_combos;
+
+    #[test]
+    fn test_all_combos() {
+        let array = vec!["1", "2", "3"];
+        let result = all_combos(array);
+
+        assert_eq!(result.len(), 7);
+    }
+}
