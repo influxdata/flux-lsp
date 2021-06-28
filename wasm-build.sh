@@ -1,10 +1,5 @@
 #!/bin/bash
 
-FILE=$HOME/.cargo/env
-if test -f "$FILE"; then
-    source $FILE
-fi
-
 wasm-pack build -t nodejs -d pkg-node --out-name flux-lsp-node --scope influxdata --release
 wasm-pack build -t browser -d pkg-browser --out-name flux-lsp-browser --scope influxdata --release
 

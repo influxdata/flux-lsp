@@ -39,6 +39,56 @@ then
 	exit 1
 fi
 
+# Start helper functions
+function version() {
+	grep -Eom 1 "([0-9]{1,}\.)+[0-9]{1,}" $1
+}
+
+function tag_lsp_release() {
+	v=v`version $LSP_DIR/Cargo.toml`
+	git tag -a -s $v -m "Release $v"
+	git push origin master $version
+	flux_version=$(grep -m 1 'flux = ' $LSP_DIR/Cargo.toml | version)
+	hub release create $v -m "Release $v
+
+- Upgrade to [Flux $flux_version](https://github.com/influxdata/flux/releases/tag/$flux_version)" -e
+}
+
+function bump_npm_version() {
+	release_type=$1
+	if [[ $release_type != "patch" && $release_type != "minor" ]]; then
+		echo "Invalid argument: $release_type"
+		exit 1
+	fi
+	npm version $release_type --no-git-tag-version
+	npm install
+	v=v$(version package.json)
+	
+	branch="bump-$v"
+
+	git checkout -B $branch
+	echo "Using branch \`$branch\`"
+
+	npm add @influxdata/flux-lsp-node
+	git commit -am "build: Release $v"
+	git push -u origin $branch_name
+
+	hub pull-request -o \
+		-m "build: Release $v" \
+		-m "- Bump version to $v
+- Import latest version of flux-lsp-node" &> /dev/null &
+}
+
+function tag_npm_release() {
+	v=v$(version package.json)
+	git tag -a -s $v -m "Release $v"
+	git push origin master $v
+
+	lsp_version=v$(grep -m 1 '"@influxdata/flux-lsp-node":' package.json | version)
+	hub release create $v -m "Release $v
+
+- Upgrade to [Flux LSP $lsp_version](https://github.com/influxdata/flux-lsp/releases/tag/$lsp_version)" -e
+}
 TEMPDIR=$(mktemp -d -t lsp-release.XXXX)
 echo "Using ${TEMPDIR}"
 
@@ -52,7 +102,7 @@ LSP_DIR=$(tmp_clone flux-lsp)
 UI_DIR=$(tmp_clone ui)
 
 cd $LSP_DIR
-lsp_version=$(grep -Eom 1 "([0-9]{1,}\.)+[0-9]{1,}" Cargo.toml)
+lsp_version=$(version Cargo.toml)
 
 if ! hub release show $lsp_version &> /dev/null
 then
@@ -61,7 +111,7 @@ then
 fi
 
 echo "Cutting release for Flux LSP v$lsp_version"
-make tag-release
+tag_lsp_release
 
 echo "Waiting for the new release to hit the NPM registry..."
 echo -e "This may take up to 30 minutes\n"
@@ -99,10 +149,10 @@ if [[ $wom == 1 ]]; then
 	CLI_DIR=$(tmp_clone flux-lsp-cli)
 
 	cd $VSFLUX_DIR
-	make patch-version
+	bump_npm_version patch
 
 	cd $CLI_DIR
-	make patch-version
+	bump_npm_version patch
 
 	echo ""
 	echo "Wait for the vsflux and flux-lsp-cli PRs to merge,"
@@ -125,12 +175,12 @@ if [[ $wom == 1 ]]; then
 	cd $VSFLUX_DIR
 	git checkout master
 	git pull
-	make tag-release
+	tag_npm_release
 
 	cd $CLI_DIR
 	git checkout master
 	git pull
-	make tag-release
+	tag_npm_release
 else
 	echo "Not the first week of the month. Skipping releases for vsflux and flux-lsp-cli."
 fi
