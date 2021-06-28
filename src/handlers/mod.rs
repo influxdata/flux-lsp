@@ -16,6 +16,9 @@ pub mod router;
 pub mod shutdown;
 pub mod signature_help;
 
+#[cfg(test)]
+mod tests;
+
 pub use router::Router;
 
 use crate::cache::Cache;
