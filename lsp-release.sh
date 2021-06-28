@@ -89,6 +89,8 @@ function tag_npm_release() {
 
 - Upgrade to [Flux LSP $lsp_version](https://github.com/influxdata/flux-lsp/releases/tag/$lsp_version)" -e
 }
+
+# Start script
 TEMPDIR=$(mktemp -d -t lsp-release.XXXX)
 echo "Using ${TEMPDIR}"
 
