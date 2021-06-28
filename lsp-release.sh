@@ -47,7 +47,7 @@ function version() {
 function tag_lsp_release() {
 	v=v`version $LSP_DIR/Cargo.toml`
 	git tag -a -s $v -m "Release $v"
-	git push origin master $version
+	git push origin master $v
 	flux_version=$(grep -m 1 'flux = ' $LSP_DIR/Cargo.toml | version)
 	hub release create $v -m "Release $v
 
