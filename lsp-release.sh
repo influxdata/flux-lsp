@@ -39,19 +39,9 @@ then
 	exit 1
 fi
 
-# Start helper functions
+# Some helper functions
 function version() {
 	grep -Eom 1 "([0-9]{1,}\.)+[0-9]{1,}" $1
-}
-
-function tag_lsp_release() {
-	v=v`version $LSP_DIR/Cargo.toml`
-	git tag -a -s $v -m "Release $v"
-	git push origin master $v
-	flux_version=$(grep -m 1 'flux = ' $LSP_DIR/Cargo.toml | version)
-	hub release create $v -m "Release $v
-
-- Upgrade to [Flux $flux_version](https://github.com/influxdata/flux/releases/tag/$flux_version)" -e
 }
 
 function bump_npm_version() {
@@ -102,6 +92,16 @@ function tmp_clone() {
 
 LSP_DIR=$(tmp_clone flux-lsp)
 UI_DIR=$(tmp_clone ui)
+
+function tag_lsp_release() {
+	v=v`version $LSP_DIR/Cargo.toml`
+	git tag -a -s $v -m "Release $v"
+	git push origin master $v
+	flux_version=$(grep -m 1 'flux = ' $LSP_DIR/Cargo.toml | version)
+	hub release create $v -m "Release $v
+
+	- Upgrade to [Flux $flux_version](https://github.com/influxdata/flux/releases/tag/$flux_version)" -e
+}
 
 cd $LSP_DIR
 lsp_version=$(version Cargo.toml)
