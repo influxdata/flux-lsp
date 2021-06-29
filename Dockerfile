@@ -12,4 +12,4 @@ RUN curl -fsSL https://deb.nodesource.com/gpgkey/nodesource.gpg.key | apt-key ad
     apt-get update && apt-get install --no-install-recommends -y nodejs && \
     apt-get clean  && rm -rf /var/lib/apt/lists/*
 
-USER $UNAME
+USER $USER

@@ -20,7 +20,7 @@ jobs:
       - checkout
       - run:
           name: "run tests"
-          command: ./run-tests.sh
+          command: cargo test
 
   build:
     docker:
@@ -28,14 +28,14 @@ jobs:
     steps:
       - checkout
       - run: cargo build --verbose
-      - run: make wasm-local
+      - run: make wasm
 
   deploy:
     docker:
       - image: quay.io/influxdb/wasm-build
     steps:
       - checkout
-      - run: make wasm-local
+      - run: make wasm
       - run: echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN" > pkg-node/.npmrc
       - run: echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN" > pkg-browser/.npmrc
       - run: make publish
