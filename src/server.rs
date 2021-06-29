@@ -5,7 +5,36 @@ use lspower::lsp::{
 };
 use lspower::LanguageServer;
 
-struct LspServer {}
+#[allow(dead_code)]
+struct LspServerOptions {
+    folding: bool,
+    influxdb_url: Option<String>,
+    token: Option<String>,
+    org: Option<String>,
+}
+
+#[allow(dead_code)]
+pub struct LspServer {
+    options: LspServerOptions,
+}
+
+impl LspServer {
+    pub fn new(
+        folding: bool,
+        influxdb_url: Option<String>,
+        token: Option<String>,
+        org: Option<String>,
+    ) -> Self {
+        Self {
+            options: LspServerOptions {
+                folding,
+                influxdb_url,
+                token,
+                org,
+            },
+        }
+    }
+}
 
 #[lspower::async_trait]
 impl LanguageServer for LspServer {
@@ -65,9 +94,13 @@ mod tests {
 
     use super::LspServer;
 
+    fn create_server() -> LspServer {
+        LspServer::new(true, None, None, None)
+    }
+
     #[test]
     fn test_initialized() {
-        let server = LspServer {};
+        let server = create_server();
 
         let params = InitializeParams {
             capabilities: ClientCapabilities {
@@ -96,7 +129,7 @@ mod tests {
 
     #[test]
     fn test_shutdown() {
-        let server = LspServer {};
+        let server = create_server();
 
         let result = block_on(server.shutdown()).unwrap();
 
