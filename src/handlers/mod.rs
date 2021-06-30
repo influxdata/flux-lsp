@@ -71,8 +71,8 @@ pub fn create_diagnostics(
 
 #[derive(Default, Clone)]
 pub struct NodeFinderResult<'a> {
-    node: Option<Rc<flux::semantic::walk::Node<'a>>>,
-    path: Vec<Rc<flux::semantic::walk::Node<'a>>>,
+    pub node: Option<Rc<flux::semantic::walk::Node<'a>>>,
+    pub path: Vec<Rc<flux::semantic::walk::Node<'a>>>,
 }
 
 pub fn find_node(
