@@ -13,7 +13,7 @@ Pull the following repos
   - github.com/influxdata/flux-lsp
 
 2.
-CD into the flux-lsp repo and run `make wasm` (requires docker)
+CD into the flux-lsp repo and run `make wasm`
 
 3.
 CD into the flux-lsp-cli repo and update `package.json` and change the dependency of `@influxdata/flux-lsp-node` to `file: <full path to flux-lsp>/pkg-node`
