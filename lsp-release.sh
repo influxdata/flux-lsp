@@ -61,7 +61,7 @@ function bump_npm_version() {
 
 	npm add @influxdata/flux-lsp-node
 	git commit -am "build: Release $v"
-	git push -u origin $branch_name
+	git push -u origin $branch
 
 	hub pull-request -o \
 		-m "build: Release $v" \
@@ -77,7 +77,7 @@ function tag_npm_release() {
 	lsp_version=v$(grep -m 1 '"@influxdata/flux-lsp-node":' package.json | version)
 	hub release create $v -m "Release $v
 
-- Upgrade to [Flux LSP $lsp_version](https://github.com/influxdata/flux-lsp/releases/tag/$lsp_version)" -e
+- Upgrade to [Flux LSP v$lsp_version](https://github.com/influxdata/flux-lsp/releases/tag/v$lsp_version)" -e
 }
 
 # Start script
