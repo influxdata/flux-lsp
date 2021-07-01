@@ -1,4 +1,7 @@
 #![cfg_attr(feature = "strict", deny(warnings))]
+
+extern crate clap;
+
 pub mod cache;
 pub mod handlers;
 pub mod protocol;
@@ -14,3 +17,4 @@ pub use handlers::Router;
 pub use wasm::Server;
 
 mod server;
+pub use server::LspServer;
