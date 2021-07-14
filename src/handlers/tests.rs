@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::fs;
 
 use futures::executor::block_on;
+use lspower::lsp;
 use serde_json::from_str;
 use url::Url;
 
@@ -390,10 +391,11 @@ fn test_signature_help() {
     let response =
         block_on(router.route(request, create_request_context()))
             .unwrap();
-    let returned = from_str::<
-        responses::Response<responses::SignatureHelp>,
-    >(response.unwrap().as_str())
-    .unwrap();
+    let returned =
+        from_str::<responses::Response<lsp::SignatureHelp>>(
+            response.unwrap().as_str(),
+        )
+        .unwrap();
 
     let signatures = returned.result.unwrap().signatures;
 

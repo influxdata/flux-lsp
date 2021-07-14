@@ -4,9 +4,7 @@ use crate::protocol::properties::Position;
 use crate::protocol::requests::{
     PolymorphicRequest, Request, SignatureHelpParams,
 };
-use crate::protocol::responses::{
-    Response, SignatureHelp, SignatureInformation,
-};
+use crate::protocol::responses::Response;
 use crate::shared::signatures::FunctionSignature;
 use crate::shared::RequestContext;
 use crate::stdlib::{get_stdlib_functions, BUILTIN_PACKAGE};
@@ -20,13 +18,16 @@ use flux::semantic::walk::{walk, Node};
 
 use std::rc::Rc;
 
+use lspower::lsp;
+
 fn create_signature_information(
     fs: FunctionSignature,
-) -> SignatureInformation {
-    SignatureInformation {
+) -> lsp::SignatureInformation {
+    lsp::SignatureInformation {
         label: fs.create_signature(),
         parameters: Some(fs.create_parameters()),
         documentation: None,
+        active_parameter: None,
     }
 }
 
@@ -36,7 +37,7 @@ pub struct SignatureHelpHandler {}
 fn find_stdlib_signatures(
     name: String,
     package: String,
-) -> Vec<SignatureInformation> {
+) -> Vec<lsp::SignatureInformation> {
     get_stdlib_functions()
         .into_iter()
         .filter(|x| x.name == name && x.package_name == package)
@@ -57,7 +58,7 @@ fn find_user_defined_signatures(
     name: String,
     ctx: RequestContext,
     cache: &Cache,
-) -> Result<Vec<SignatureInformation>, String> {
+) -> Result<Vec<lsp::SignatureInformation>, String> {
     let pkg =
         create_completion_package(uri, pos.clone(), ctx, cache)?;
     let mut visitor = FunctionFinderVisitor::new(pos);
@@ -85,7 +86,7 @@ fn find_signatures(
     request: Request<SignatureHelpParams>,
     ctx: RequestContext,
     cache: &Cache,
-) -> Result<Vec<SignatureInformation>, String> {
+) -> Result<Vec<lsp::SignatureInformation>, String> {
     let mut result = vec![];
 
     if let Some(params) = request.params {
@@ -134,7 +135,7 @@ impl RequestHandler for SignatureHelpHandler {
         let req: Request<SignatureHelpParams> =
             Request::from_json(prequest.data.as_str())?;
 
-        let sh = SignatureHelp {
+        let sh = lsp::SignatureHelp {
             signatures: find_signatures(req.clone(), ctx, cache)?,
             active_signature: None,
             active_parameter: None,

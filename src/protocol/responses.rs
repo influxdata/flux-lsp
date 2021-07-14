@@ -158,28 +158,6 @@ impl CompletionItem {
 }
 
 #[derive(Serialize, Deserialize, Clone)]
-pub struct SignatureHelp {
-    pub signatures: Vec<SignatureInformation>,
-    #[serde(rename = "activeSignature")]
-    pub active_signature: Option<i32>,
-    #[serde(rename = "activeParameter")]
-    pub active_parameter: Option<i32>,
-}
-
-#[derive(Serialize, Deserialize, Clone)]
-pub struct SignatureInformation {
-    pub label: String,
-    pub documentation: Option<String>,
-    pub parameters: Option<Vec<ParameterInformation>>,
-}
-
-#[derive(Serialize, Deserialize, Clone)]
-pub struct ParameterInformation {
-    pub label: String,
-    pub documentation: Option<String>,
-}
-
-#[derive(Serialize, Deserialize, Clone)]
 pub struct HoverResult {
     pub contents: MarkupContent,
 }
