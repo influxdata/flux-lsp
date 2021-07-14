@@ -58,8 +58,7 @@ fn find_user_defined_signatures(
     ctx: RequestContext,
     cache: &Cache,
 ) -> Result<Vec<lsp::SignatureInformation>, String> {
-    let pkg =
-        create_completion_package(uri, pos.clone(), ctx, cache)?;
+    let pkg = create_completion_package(uri, pos, ctx, cache)?;
     let mut visitor = FunctionFinderVisitor::new(pos);
 
     walk(&mut visitor, Rc::new(Node::Package(&pkg)));
@@ -93,7 +92,7 @@ fn find_signatures(
         let uri = lsp::Url::parse(params.text_document.uri.as_str())
             .unwrap();
         let pkg = create_semantic_package(uri.clone(), cache)?;
-        let node_result = find_node(Node::Package(&pkg), pos.clone());
+        let node_result = find_node(Node::Package(&pkg), pos);
 
         if let Some(node) = node_result.node {
             if let Node::CallExpr(call) = node.as_ref() {

@@ -63,7 +63,7 @@ fn parse_variable_assignment(
             kind: lsp::SymbolKind::Variable,
             name: va.id.name.clone(),
             location: lsp::Location {
-                uri: uri.clone(),
+                uri,
                 range: lsp::Range {
                     start: lsp::Position {
                         line: node.loc().start.line - 1,
@@ -196,7 +196,7 @@ fn parse_binary_expression(
             kind: lsp::SymbolKind::Variable,
             name: ident.name.clone(),
             location: lsp::Location {
-                uri: uri.clone(),
+                uri,
                 range: lsp::Range {
                     start: lsp::Position {
                         line: ident.loc.start.line - 1,
@@ -283,7 +283,7 @@ impl<'a> Visitor<'a> for SymbolsVisitor<'a> {
                         kind: lsp::SymbolKind::Object,
                         name: source,
                         location: lsp::Location {
-                            uri: uri.clone(),
+                            uri,
                             range: lsp::Range {
                                 start: lsp::Position {
                                     line: me.loc.start.line - 1,
@@ -307,7 +307,7 @@ impl<'a> Visitor<'a> for SymbolsVisitor<'a> {
                     kind: lsp::SymbolKind::Number,
                     name: num.value.to_string(),
                     location: lsp::Location {
-                        uri: uri.clone(),
+                        uri,
                         range: lsp::Range {
                             start: lsp::Position {
                                 line: num.loc.start.line - 1,
@@ -330,7 +330,7 @@ impl<'a> Visitor<'a> for SymbolsVisitor<'a> {
                     kind: lsp::SymbolKind::Number,
                     name: num.value.to_string(),
                     location: lsp::Location {
-                        uri: uri.clone(),
+                        uri,
                         range: lsp::Range {
                             start: lsp::Position {
                                 line: num.loc.start.line - 1,
@@ -353,7 +353,7 @@ impl<'a> Visitor<'a> for SymbolsVisitor<'a> {
                     kind: lsp::SymbolKind::Constant,
                     name: d.value.to_string(),
                     location: lsp::Location {
-                        uri: uri.clone(),
+                        uri,
                         range: lsp::Range {
                             start: lsp::Position {
                                 line: d.loc.start.line - 1,
@@ -376,7 +376,7 @@ impl<'a> Visitor<'a> for SymbolsVisitor<'a> {
                     kind: lsp::SymbolKind::Boolean,
                     name: b.value.to_string(),
                     location: lsp::Location {
-                        uri: uri.clone(),
+                        uri,
                         range: lsp::Range {
                             start: lsp::Position {
                                 line: b.loc.start.line - 1,
@@ -399,7 +399,7 @@ impl<'a> Visitor<'a> for SymbolsVisitor<'a> {
                     kind: lsp::SymbolKind::String,
                     name: s.value.clone(),
                     location: lsp::Location {
-                        uri: uri.clone(),
+                        uri,
                         range: lsp::Range {
                             start: lsp::Position {
                                 line: s.loc.start.line - 1,
@@ -422,7 +422,7 @@ impl<'a> Visitor<'a> for SymbolsVisitor<'a> {
                     kind: lsp::SymbolKind::Array,
                     name: String::from("[]"),
                     location: lsp::Location {
-                        uri: uri.clone(),
+                        uri,
                         range: lsp::Range {
                             start: lsp::Position {
                                 line: a.loc.start.line - 1,

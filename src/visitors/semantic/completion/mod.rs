@@ -41,9 +41,8 @@ impl<'a> Visitor<'a> for FunctionFinderVisitor {
     fn visit(&mut self, node: Rc<Node<'a>>) -> bool {
         if let Ok(mut state) = self.state.lock() {
             let loc = node.loc();
-            let pos = self.pos.clone();
 
-            if defined_after(loc, pos) {
+            if defined_after(loc, self.pos) {
                 return true;
             }
 
@@ -107,9 +106,8 @@ impl<'a> Visitor<'a> for CompletableFinderVisitor {
     fn visit(&mut self, node: Rc<Node<'a>>) -> bool {
         if let Ok(mut state) = self.state.lock() {
             let loc = node.loc();
-            let pos = self.pos.clone();
 
-            if defined_after(loc, pos) {
+            if defined_after(loc, self.pos) {
                 return true;
             }
 

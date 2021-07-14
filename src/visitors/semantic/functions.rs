@@ -65,7 +65,7 @@ fn is_before_position(
 impl<'a> Visitor<'a> for FunctionFinderVisitor {
     fn visit(&mut self, node: Rc<Node<'a>>) -> bool {
         let loc = node.loc();
-        let pos = self.pos.clone();
+        let pos = self.pos;
 
         if !is_before_position(loc, pos) {
             return true;

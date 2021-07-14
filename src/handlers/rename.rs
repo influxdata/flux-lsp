@@ -45,7 +45,7 @@ impl RequestHandler for RenameHandler {
                     changes.get_mut(&location.uri.clone())
                 {
                     let text_edit = lsp::TextEdit {
-                        range: location.range.clone(),
+                        range: location.range,
                         new_text: new_name.clone(),
                     };
 

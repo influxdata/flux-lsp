@@ -91,12 +91,7 @@ fn get_user_completables(
     ctx: RequestContext,
     cache: &Cache,
 ) -> Result<Vec<Arc<dyn Completable + Send + Sync>>, Error> {
-    let pkg = utils::create_completion_package(
-        uri,
-        pos.clone(),
-        ctx,
-        cache,
-    )?;
+    let pkg = utils::create_completion_package(uri, pos, ctx, cache)?;
     let walker = Rc::new(walk::Node::Package(&pkg));
     let mut visitor = CompletableFinderVisitor::new(pos);
 
@@ -118,7 +113,7 @@ async fn get_user_matches(
 ) -> Result<Vec<CompletionItem>, Error> {
     let completables = get_user_completables(
         info.uri.clone(),
-        info.position.clone(),
+        info.position,
         ctx.clone(),
         cache,
     )?;
@@ -407,12 +402,7 @@ fn get_user_functions(
     ctx: RequestContext,
     cache: &Cache,
 ) -> Result<Vec<Function>, Error> {
-    let pkg = utils::create_completion_package(
-        uri,
-        pos.clone(),
-        ctx,
-        cache,
-    )?;
+    let pkg = utils::create_completion_package(uri, pos, ctx, cache)?;
     let walker = Rc::new(walk::Node::Package(&pkg));
     let mut visitor = FunctionFinderVisitor::new(pos);
 
@@ -526,7 +516,7 @@ async fn find_param_completions(
 
                 if let Ok(user_functions) = get_user_functions(
                     uri.clone(),
-                    position.clone(),
+                    position,
                     ctx.clone(),
                     cache,
                 ) {
@@ -543,11 +533,7 @@ async fn find_param_completions(
                         get_package_functions(ident.name.clone());
 
                     let object_functions = get_object_functions(
-                        uri.clone(),
-                        position,
-                        ctx,
-                        ident.name,
-                        cache,
+                        uri, position, ctx, ident.name, cache,
                     )?;
 
                     let key = match me.property {
@@ -634,7 +620,7 @@ async fn find_dot_completions(
     cache: &Cache,
 ) -> Result<CompletionList, Error> {
     let uri = params.text_document.uri.clone();
-    let pos = params.position.clone();
+    let pos = params.position;
     let info = CompletionInfo::create(params, ctx.clone(), cache)?;
 
     if let Some(info) = info.clone() {

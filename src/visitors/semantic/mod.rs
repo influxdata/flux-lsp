@@ -60,10 +60,8 @@ pub struct CallFinderVisitor<'a> {
 impl<'a> Visitor<'a> for CallFinderVisitor<'a> {
     fn visit(&mut self, node: Rc<Node<'a>>) -> bool {
         if let Ok(mut state) = self.state.lock() {
-            let contains = contains_position(
-                node.clone(),
-                (*state).position.clone(),
-            );
+            let contains =
+                contains_position(node.clone(), (*state).position);
 
             if contains {
                 if let Node::ExprStmt(exp) = node.as_ref() {
@@ -108,10 +106,8 @@ impl<'a> Visitor<'a> for NodeFinderVisitor<'a> {
     fn visit(&mut self, node: Rc<Node<'a>>) -> bool {
         let mut state = self.state.borrow_mut();
 
-        let contains = contains_position(
-            node.clone(),
-            (*state).position.clone(),
-        );
+        let contains =
+            contains_position(node.clone(), (*state).position);
 
         if contains {
             (*state).path.push(node.clone());

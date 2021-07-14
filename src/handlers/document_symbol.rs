@@ -17,8 +17,8 @@ fn sort_symbols(
     a: &lsp::SymbolInformation,
     b: &lsp::SymbolInformation,
 ) -> std::cmp::Ordering {
-    let a_start = a.location.range.start.clone();
-    let b_start = b.location.range.start.clone();
+    let a_start = a.location.range.start;
+    let b_start = b.location.range.start;
 
     if a_start.line == b_start.line {
         a_start.character.cmp(&b_start.character)

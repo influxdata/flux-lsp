@@ -73,19 +73,19 @@ pub fn create_completion_package_removed(
     cache: &Cache,
 ) -> Result<Package, String> {
     let cv = cache.get(uri.as_str())?;
-    let contents = remove_character(cv.contents, pos.clone());
+    let contents = remove_character(cv.contents, pos);
     let mut file = parse_string("", contents.as_str());
 
     file.imports = file
         .imports
         .into_iter()
-        .filter(|x| valid_node(&x.base, pos.clone()))
+        .filter(|x| valid_node(&x.base, pos))
         .collect();
 
     file.body = file
         .body
         .into_iter()
-        .filter(|x| valid_node(x.base(), pos.clone()))
+        .filter(|x| valid_node(x.base(), pos))
         .collect();
 
     let mut pkg =
@@ -116,7 +116,7 @@ pub fn create_completion_package(
     cache: &Cache,
 ) -> Result<Package, String> {
     create_filtered_package(uri, ctx, cache, |x| {
-        valid_node(x.base(), pos.clone())
+        valid_node(x.base(), pos)
     })
 }
 

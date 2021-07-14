@@ -88,8 +88,7 @@ impl<'a> Visitor<'a> for CallFinderVisitor<'a> {
     fn visit(&self, node: Rc<walk::Node<'a>>) -> Option<Self> {
         let mut state = self.state.borrow_mut();
 
-        let contains =
-            contains_position(node.clone(), self.position.clone());
+        let contains = contains_position(node.clone(), self.position);
 
         if contains {
             if let walk::Node::CallExpr(_) = node.as_ref() {
@@ -134,10 +133,8 @@ impl<'a> Visitor<'a> for NodeFinderVisitor<'a> {
     fn visit(&self, node: Rc<walk::Node<'a>>) -> Option<Self> {
         let mut state = self.state.borrow_mut();
 
-        let contains = contains_position(
-            node.clone(),
-            (*state).position.clone(),
-        );
+        let contains =
+            contains_position(node.clone(), (*state).position);
 
         if contains {
             let parent = (*state).node.clone();

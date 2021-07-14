@@ -106,7 +106,7 @@ impl CompletionInfo {
         cache: &Cache,
     ) -> Result<Option<CompletionInfo>, String> {
         let uri = params.text_document.uri.clone();
-        let position = params.position.clone();
+        let position = params.position;
 
         let source = cache.get(uri.as_str())?;
         let pkg =
@@ -145,7 +145,7 @@ impl CompletionInfo {
                                 ),
                             ident: obj.name,
                             bucket,
-                            position: position.clone(),
+                            position,
                             uri: uri.clone(),
                             imports: get_imports_removed(
                                 uri, position, ctx, cache,
@@ -162,7 +162,7 @@ impl CompletionInfo {
                         completion_type: CompletionType::Import,
                         ident: "".to_string(),
                         bucket,
-                        position: position.clone(),
+                        position,
                         uri: uri.clone(),
                         imports: get_imports_removed(
                             uri, position, ctx, cache,
@@ -200,7 +200,7 @@ impl CompletionInfo {
                                         return Ok(Some(CompletionInfo {
                                     completion_type: CompletionType::CallProperty(func.name), ident: name,
                                     bucket,
-                                    position: position.clone(),
+                                    position,
                                     uri: uri.clone(),
                                     imports: get_imports(uri, position, ctx,cache)?,
                                     package,
@@ -225,7 +225,7 @@ impl CompletionInfo {
                                     ),
                                 ident: name,
                                 bucket,
-                                position: position.clone(),
+                                position,
                                 uri: uri.clone(),
                                 imports: get_imports(
                                     uri, position, ctx, cache,
@@ -256,7 +256,7 @@ impl CompletionInfo {
                                         ),
                                     ident: name,
                                     bucket,
-                                    position: position.clone(),
+                                    position,
                                     uri: uri.clone(),
                                     imports: get_imports(
                                         uri, position, ctx, cache,
@@ -283,7 +283,7 @@ impl CompletionInfo {
                             ),
                             ident: name,
                             bucket,
-                            position: position.clone(),
+                            position,
                             uri: uri.clone(),
                             imports: get_imports(
                                 uri, position, ctx, cache,
@@ -298,7 +298,7 @@ impl CompletionInfo {
                         completion_type: CompletionType::Generic,
                         ident: name,
                         bucket,
-                        position: position.clone(),
+                        position,
                         uri: uri.clone(),
                         imports: get_imports(
                             uri, position, ctx, cache,
@@ -312,7 +312,7 @@ impl CompletionInfo {
                         completion_type: CompletionType::Bad,
                         ident: name,
                         bucket,
-                        position: position.clone(),
+                        position,
                         uri: uri.clone(),
                         imports: get_imports(
                             uri, position, ctx, cache,
@@ -327,7 +327,7 @@ impl CompletionInfo {
                             completion_type: CompletionType::Generic,
                             ident: ident.name.clone(),
                             bucket,
-                            position: position.clone(),
+                            position,
                             uri: uri.clone(),
                             imports: get_imports(
                                 uri, position, ctx, cache,
@@ -344,7 +344,7 @@ impl CompletionInfo {
                             completion_type: CompletionType::Generic,
                             ident: ident.name.clone(),
                             bucket,
-                            position: position.clone(),
+                            position,
                             uri: uri.clone(),
                             imports: get_imports(
                                 uri, position, ctx, cache,
