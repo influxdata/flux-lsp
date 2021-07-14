@@ -2,10 +2,7 @@ use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use std::collections::HashMap;
 
-use crate::protocol::properties::{
-    CompletionOptions, ServerCapabilities, SignatureHelpOptions,
-    TextDocumentSyncKind, TextEdit,
-};
+use lspower::lsp;
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Response<T> {
@@ -40,34 +37,9 @@ where
 #[derive(Serialize, Deserialize, Clone)]
 pub struct ShutdownResult {}
 
-#[derive(Serialize, Clone)]
-pub struct InitializeResult {
-    pub capabilities: ServerCapabilities,
-}
-
-impl InitializeResult {
-    pub fn new(folding_range_provider: bool) -> Self {
-        InitializeResult {
-            capabilities: ServerCapabilities {
-                definition_provider: true,
-                references_provider: true,
-                rename_provider: true,
-                folding_range_provider,
-                document_symbol_provider: true,
-                document_formatting_provider: true,
-                completion_provider: CompletionOptions::default(),
-                signature_help_provider:
-                    SignatureHelpOptions::default(),
-                text_document_sync: TextDocumentSyncKind::Full,
-                hover_provider: true,
-            },
-        }
-    }
-}
-
 #[derive(Serialize, Deserialize, Clone)]
 pub struct WorkspaceEditResult {
-    pub changes: HashMap<String, Vec<TextEdit>>,
+    pub changes: HashMap<String, Vec<lsp::TextEdit>>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -132,9 +104,9 @@ pub struct CompletionItem {
     #[serde(rename = "insertTextFormat")]
     pub insert_text_format: InsertTextFormat,
     #[serde(rename = "textEdit")]
-    pub text_edit: Option<TextEdit>,
+    pub text_edit: Option<lsp::TextEdit>,
     #[serde(rename = "additionalTextEdits")]
-    pub additional_text_edits: Option<Vec<TextEdit>>,
+    pub additional_text_edits: Option<Vec<lsp::TextEdit>>,
 }
 
 impl CompletionItem {
@@ -153,48 +125,6 @@ impl CompletionItem {
             preselect: None,
             sort_text: Some(format!("{} {}", name, package)),
             text_edit: None,
-        }
-    }
-}
-
-#[derive(Serialize, Deserialize, Clone)]
-pub struct SignatureHelp {
-    pub signatures: Vec<SignatureInformation>,
-    #[serde(rename = "activeSignature")]
-    pub active_signature: Option<i32>,
-    #[serde(rename = "activeParameter")]
-    pub active_parameter: Option<i32>,
-}
-
-#[derive(Serialize, Deserialize, Clone)]
-pub struct SignatureInformation {
-    pub label: String,
-    pub documentation: Option<String>,
-    pub parameters: Option<Vec<ParameterInformation>>,
-}
-
-#[derive(Serialize, Deserialize, Clone)]
-pub struct ParameterInformation {
-    pub label: String,
-    pub documentation: Option<String>,
-}
-
-#[derive(Serialize, Deserialize, Clone)]
-pub struct HoverResult {
-    pub contents: MarkupContent,
-}
-
-#[derive(Serialize, Deserialize, Clone)]
-pub struct MarkupContent {
-    pub kind: String,
-    pub value: String,
-}
-
-impl MarkupContent {
-    pub fn new(content: String) -> Self {
-        MarkupContent {
-            kind: "markdown".to_string(),
-            value: content,
         }
     }
 }

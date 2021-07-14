@@ -1,14 +1,14 @@
-use crate::protocol::properties::Position;
-
 use std::cell::RefCell;
 use std::rc::Rc;
+
+use lspower::lsp;
 
 use flux::ast::walk::{self, Visitor};
 pub mod package_finder;
 
 fn contains_position(
     node: Rc<walk::Node<'_>>,
-    pos: Position,
+    pos: lsp::Position,
 ) -> bool {
     let start_line = node.base().location.start.line - 1;
     let start_col = node.base().location.start.column - 1;
@@ -70,11 +70,11 @@ pub struct CallFinderState<'a> {
 #[derive(Clone)]
 pub struct CallFinderVisitor<'a> {
     pub state: Rc<RefCell<CallFinderState<'a>>>,
-    pub position: Position,
+    pub position: lsp::Position,
 }
 
 impl<'a> CallFinderVisitor<'a> {
-    pub fn new(position: Position) -> Self {
+    pub fn new(position: lsp::Position) -> Self {
         CallFinderVisitor {
             state: Rc::new(RefCell::new(CallFinderState {
                 node: None,
@@ -88,8 +88,7 @@ impl<'a> Visitor<'a> for CallFinderVisitor<'a> {
     fn visit(&self, node: Rc<walk::Node<'a>>) -> Option<Self> {
         let mut state = self.state.borrow_mut();
 
-        let contains =
-            contains_position(node.clone(), self.position.clone());
+        let contains = contains_position(node.clone(), self.position);
 
         if contains {
             if let walk::Node::CallExpr(_) = node.as_ref() {
@@ -109,7 +108,7 @@ pub struct NodeFinderNode<'a> {
 
 pub struct NodeFinderState<'a> {
     pub node: Option<NodeFinderNode<'a>>,
-    pub position: Position,
+    pub position: lsp::Position,
 }
 
 impl<'a> NodeFinderState<'a> {}
@@ -120,7 +119,7 @@ pub struct NodeFinderVisitor<'a> {
 }
 
 impl<'a> NodeFinderVisitor<'a> {
-    pub fn new(position: Position) -> Self {
+    pub fn new(position: lsp::Position) -> Self {
         NodeFinderVisitor {
             state: Rc::new(RefCell::new(NodeFinderState {
                 node: None,
@@ -134,10 +133,8 @@ impl<'a> Visitor<'a> for NodeFinderVisitor<'a> {
     fn visit(&self, node: Rc<walk::Node<'a>>) -> Option<Self> {
         let mut state = self.state.borrow_mut();
 
-        let contains = contains_position(
-            node.clone(),
-            (*state).position.clone(),
-        );
+        let contains =
+            contains_position(node.clone(), (*state).position);
 
         if contains {
             let parent = (*state).node.clone();

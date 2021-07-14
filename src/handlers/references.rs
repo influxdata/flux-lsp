@@ -1,7 +1,6 @@
 use crate::cache::Cache;
 use crate::handlers::find_node;
 use crate::handlers::{Error, RequestHandler};
-use crate::protocol::properties::{Location, Position};
 use crate::protocol::requests::{
     PolymorphicRequest, ReferenceParams, Request,
 };
@@ -14,6 +13,8 @@ use crate::visitors::semantic::{
 
 use flux::semantic::nodes::FunctionExpr;
 use flux::semantic::walk::{self, Node};
+
+use lspower::lsp;
 
 use std::rc::Rc;
 
@@ -81,12 +82,12 @@ fn find_scope<'a>(
 }
 
 pub fn find_references(
-    uri: &'_ str,
-    position: Position,
+    uri: lsp::Url,
+    position: lsp::Position,
     cache: &Cache,
-) -> Result<Vec<Location>, String> {
-    let mut locations: Vec<Location> = vec![];
-    let pkg = create_semantic_package(uri, cache)?;
+) -> Result<Vec<lsp::Location>, String> {
+    let mut locations: Vec<lsp::Location> = vec![];
+    let pkg = create_semantic_package(uri.clone(), cache)?;
 
     let result = find_node(Node::Package(&pkg), position);
 
@@ -106,7 +107,7 @@ pub fn find_references(
 
                 for node in identifiers {
                     let loc = map_node_to_location(
-                        uri.to_string(),
+                        uri.clone(),
                         node.clone(),
                     );
                     locations.push(loc);
@@ -129,12 +130,13 @@ impl RequestHandler for FindReferencesHandler {
         _: crate::shared::RequestContext,
         cache: &Cache,
     ) -> Result<Option<String>, Error> {
-        let mut locations: Vec<Location> = vec![];
+        let mut locations: Vec<lsp::Location> = vec![];
         let request: Request<ReferenceParams> =
             Request::from_json(prequest.data.as_str())?;
         if let Some(params) = request.params {
             locations = find_references(
-                params.text_document.uri.as_str(),
+                lsp::Url::parse(params.text_document.uri.as_str())
+                    .unwrap(),
                 params.position,
                 cache,
             )?;

@@ -6,8 +6,9 @@ use flux::semantic::nodes::Expression;
 use flux::semantic::types::MonoType;
 use flux::semantic::walk::{Node, Visitor};
 
-use crate::protocol::properties::Position;
 use crate::shared::signatures::FunctionInfo;
+
+use lspower::lsp;
 
 #[derive(Default)]
 pub struct FunctionFinderState {
@@ -15,12 +16,12 @@ pub struct FunctionFinderState {
 }
 
 pub struct FunctionFinderVisitor {
-    pub pos: Position,
+    pub pos: lsp::Position,
     pub state: Rc<RefCell<FunctionFinderState>>,
 }
 
 impl FunctionFinderVisitor {
-    pub fn new(pos: Position) -> Self {
+    pub fn new(pos: lsp::Position) -> Self {
         FunctionFinderVisitor {
             state: Rc::new(RefCell::new(
                 FunctionFinderState::default(),
@@ -47,7 +48,10 @@ fn create_function_result(
     None
 }
 
-fn is_before_position(loc: &SourceLocation, pos: Position) -> bool {
+fn is_before_position(
+    loc: &SourceLocation,
+    pos: lsp::Position,
+) -> bool {
     if loc.start.line > pos.line + 1
         || (loc.start.line == pos.line + 1
             && loc.start.column > pos.character + 1)
@@ -61,7 +65,7 @@ fn is_before_position(loc: &SourceLocation, pos: Position) -> bool {
 impl<'a> Visitor<'a> for FunctionFinderVisitor {
     fn visit(&mut self, node: Rc<Node<'a>>) -> bool {
         let loc = node.loc();
-        let pos = self.pos.clone();
+        let pos = self.pos;
 
         if !is_before_position(loc, pos) {
             return true;

@@ -9,7 +9,6 @@ use crate::handlers::document_save::DocumentSaveHandler;
 use crate::handlers::document_symbol::DocumentSymbolHandler;
 use crate::handlers::folding::FoldingHandler;
 use crate::handlers::goto_definition::GotoDefinitionHandler;
-use crate::handlers::hover::HoverHandler;
 use crate::handlers::initialize::InitializeHandler;
 use crate::handlers::references::FindReferencesHandler;
 use crate::handlers::rename::RenameHandler;
@@ -79,10 +78,6 @@ impl Router {
         mapping.insert(
             "textDocument/rename".to_string(),
             Box::new(RenameHandler::default()),
-        );
-        mapping.insert(
-            "textDocument/hover".to_string(),
-            Box::new(HoverHandler::default()),
         );
         mapping.insert(
             "initialize".to_string(),

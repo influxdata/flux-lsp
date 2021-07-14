@@ -2,10 +2,7 @@ use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 
-use crate::protocol::properties::{
-    ContentChange, Position, TextDocument, TextDocumentIdentifier,
-    VersionedTextDocumentIdentifier,
-};
+use lspower::lsp;
 
 fn default_id() -> u32 {
     0
@@ -72,15 +69,15 @@ pub struct ReferenceContext {}
 #[derive(Serialize, Deserialize, Clone)]
 pub struct DocumentFormattingParams {
     #[serde(rename = "textDocument")]
-    pub text_document: TextDocumentIdentifier,
+    pub text_document: lsp::TextDocumentIdentifier,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct ReferenceParams {
     pub context: ReferenceContext,
     #[serde(rename = "textDocument")]
-    pub text_document: TextDocument,
-    pub position: Position,
+    pub text_document: lsp::TextDocumentItem,
+    pub position: lsp::Position,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -89,8 +86,8 @@ pub struct InitializeParams {}
 #[derive(Serialize, Deserialize, Clone)]
 pub struct RenameParams {
     #[serde(rename = "textDocument")]
-    pub text_document: TextDocument,
-    pub position: Position,
+    pub text_document: lsp::TextDocumentItem,
+    pub position: lsp::Position,
     #[serde(rename = "newName")]
     pub new_name: String,
 }
@@ -98,48 +95,48 @@ pub struct RenameParams {
 #[derive(Serialize, Deserialize, Clone)]
 pub struct TextDocumentPositionParams {
     #[serde(rename = "textDocument")]
-    pub text_document: TextDocument,
-    pub position: Position,
+    pub text_document: lsp::TextDocumentItem,
+    pub position: lsp::Position,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct TextDocumentParams {
     #[serde(rename = "textDocument")]
-    pub text_document: TextDocument,
+    pub text_document: lsp::TextDocumentItem,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct TextDocumentSaveParams {
     #[serde(rename = "textDocument")]
-    pub text_document: TextDocumentIdentifier,
+    pub text_document: lsp::TextDocumentIdentifier,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct TextDocumentChangeParams {
     #[serde(rename = "textDocument")]
-    pub text_document: VersionedTextDocumentIdentifier,
+    pub text_document: lsp::VersionedTextDocumentIdentifier,
     #[serde(rename = "contentChanges")]
-    pub content_changes: Vec<ContentChange>,
+    pub content_changes: Vec<lsp::TextDocumentContentChangeEvent>,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct FoldingRangeParams {
     #[serde(rename = "textDocument")]
-    pub text_document: TextDocument,
+    pub text_document: lsp::TextDocumentItem,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct DocumentSymbolParams {
     #[serde(rename = "textDocument")]
-    pub text_document: TextDocumentIdentifier,
+    pub text_document: lsp::TextDocumentIdentifier,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct CompletionParams {
     pub context: Option<CompletionContext>,
     #[serde(rename = "textDocument")]
-    pub text_document: TextDocumentIdentifier,
-    pub position: Position,
+    pub text_document: lsp::TextDocumentIdentifier,
+    pub position: lsp::Position,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -153,16 +150,16 @@ pub struct CompletionContext {
 #[derive(Serialize, Deserialize, Clone)]
 pub struct SignatureHelpParams {
     #[serde(rename = "textDocument")]
-    pub text_document: TextDocumentIdentifier,
-    pub position: Position,
+    pub text_document: lsp::TextDocumentIdentifier,
+    pub position: lsp::Position,
     pub context: Option<SignatureHelpContext>,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct HoverParams {
     #[serde(rename = "textDocument")]
-    pub text_document: TextDocumentIdentifier,
-    pub position: Position,
+    pub text_document: lsp::TextDocumentIdentifier,
+    pub position: lsp::Position,
 }
 
 #[derive(Serialize_repr, Deserialize_repr, Clone)]

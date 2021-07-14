@@ -3,7 +3,6 @@ use std::sync::Arc;
 
 use crate::cache::Cache;
 use crate::handlers::{Error, RequestHandler};
-use crate::protocol::properties::Position;
 use crate::protocol::requests::{
     CompletionParams, PolymorphicRequest, Request,
 };
@@ -33,6 +32,15 @@ use flux::ast::{Expression, PropertyKey};
 use flux::semantic::walk;
 
 use async_trait::async_trait;
+
+use lspower::lsp;
+
+fn move_back(position: lsp::Position, count: u32) -> lsp::Position {
+    lsp::Position {
+        line: position.line,
+        character: position.character - count,
+    }
+}
 
 struct ObjectMember {
     pub object: String,
@@ -78,17 +86,12 @@ async fn get_stdlib_completions(
 }
 
 fn get_user_completables(
-    uri: &'_ str,
-    pos: Position,
+    uri: lsp::Url,
+    pos: lsp::Position,
     ctx: RequestContext,
     cache: &Cache,
 ) -> Result<Vec<Arc<dyn Completable + Send + Sync>>, Error> {
-    let pkg = utils::create_completion_package(
-        uri,
-        pos.clone(),
-        ctx,
-        cache,
-    )?;
+    let pkg = utils::create_completion_package(uri, pos, ctx, cache)?;
     let walker = Rc::new(walk::Node::Package(&pkg));
     let mut visitor = CompletableFinderVisitor::new(pos);
 
@@ -109,8 +112,8 @@ async fn get_user_matches(
     cache: &Cache,
 ) -> Result<Vec<CompletionItem>, Error> {
     let completables = get_user_completables(
-        info.uri.as_str(),
-        info.position.clone(),
+        info.uri.clone(),
+        info.position,
         ctx.clone(),
         cache,
     )?;
@@ -232,7 +235,6 @@ async fn find_completions(
     cache: &Cache,
 ) -> Result<CompletionList, Error> {
     let uri = params.text_document.uri.clone();
-    let uri = uri.as_str();
     let info =
         CompletionInfo::create(params.clone(), ctx.clone(), cache)?;
 
@@ -395,17 +397,12 @@ fn new_param_completion(
 }
 
 fn get_user_functions(
-    uri: &'_ str,
-    pos: Position,
+    uri: lsp::Url,
+    pos: lsp::Position,
     ctx: RequestContext,
     cache: &Cache,
 ) -> Result<Vec<Function>, Error> {
-    let pkg = utils::create_completion_package(
-        uri,
-        pos.clone(),
-        ctx,
-        cache,
-    )?;
+    let pkg = utils::create_completion_package(uri, pos, ctx, cache)?;
     let walker = Rc::new(walk::Node::Package(&pkg));
     let mut visitor = FunctionFinderVisitor::new(pos);
 
@@ -439,8 +436,8 @@ fn get_provided_arguments(call: &CallExpr) -> Vec<String> {
 }
 
 fn get_object_functions(
-    uri: &'_ str,
-    pos: Position,
+    uri: lsp::Url,
+    pos: lsp::Position,
     ctx: RequestContext,
     object: String,
     cache: &Cache,
@@ -488,16 +485,16 @@ async fn find_param_completions(
     ctx: RequestContext,
     cache: &Cache,
 ) -> Result<CompletionList, Error> {
-    let uri = params.text_document.uri.as_str();
+    let uri = params.text_document.uri;
     let position = params.position;
 
-    let source = cache.get(uri)?;
+    let source = cache.get(uri.as_str())?;
     let pkg = crate::shared::conversion::create_file_node_from_text(
-        uri,
+        uri.clone(),
         source.contents,
     );
     let walker = Rc::new(AstNode::File(&pkg.files[0]));
-    let visitor = ast::CallFinderVisitor::new(position.move_back(1));
+    let visitor = ast::CallFinderVisitor::new(move_back(position, 1));
 
     walk_rc(&visitor, walker);
 
@@ -518,8 +515,8 @@ async fn find_param_completions(
                 ));
 
                 if let Ok(user_functions) = get_user_functions(
-                    uri,
-                    position.clone(),
+                    uri.clone(),
+                    position,
                     ctx.clone(),
                     cache,
                 ) {
@@ -623,8 +620,7 @@ async fn find_dot_completions(
     cache: &Cache,
 ) -> Result<CompletionList, Error> {
     let uri = params.text_document.uri.clone();
-    let uri = uri.as_str();
-    let pos = params.position.clone();
+    let pos = params.position;
     let info = CompletionInfo::create(params, ctx.clone(), cache)?;
 
     if let Some(info) = info.clone() {
@@ -691,8 +687,8 @@ async fn find_dot_completions(
 
 pub fn get_specific_object(
     name: String,
-    pos: Position,
-    uri: &'_ str,
+    pos: lsp::Position,
+    uri: lsp::Url,
     ctx: RequestContext,
     cache: &Cache,
 ) -> Result<Vec<Arc<dyn Completable + Send + Sync>>, Error> {

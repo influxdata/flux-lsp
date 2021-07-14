@@ -2,8 +2,9 @@ use std::collections::BTreeMap;
 
 use flux::semantic::types::{Function, MonoType};
 
-use crate::protocol::responses::ParameterInformation;
 use crate::shared::all_combos;
+
+use lspower::lsp;
 
 #[allow(clippy::implicit_hasher)]
 pub fn get_argument_names(
@@ -32,12 +33,14 @@ impl FunctionSignature {
         result
     }
 
-    pub fn create_parameters(&self) -> Vec<ParameterInformation> {
+    pub fn create_parameters(
+        &self,
+    ) -> Vec<lsp::ParameterInformation> {
         self.arguments
             .clone()
             .into_iter()
-            .map(|x| ParameterInformation {
-                label: format!("${}", x),
+            .map(|x| lsp::ParameterInformation {
+                label: lsp::ParameterLabel::Simple(format!("${}", x)),
                 documentation: None,
             })
             .collect()

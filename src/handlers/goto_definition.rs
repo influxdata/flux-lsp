@@ -2,7 +2,6 @@ use std::rc::Rc;
 
 use crate::cache::Cache;
 use crate::handlers::{Error, RequestHandler};
-use crate::protocol::properties::{Location, Position, Range};
 use crate::protocol::requests::{
     PolymorphicRequest, Request, TextDocumentPositionParams,
 };
@@ -15,27 +14,32 @@ use crate::visitors::semantic::{
 
 use flux::semantic::walk::{self, Node};
 
-fn ident_to_location(uri: String, node: Rc<Node<'_>>) -> Location {
-    let start = Position {
+use lspower::lsp;
+
+fn ident_to_location(
+    uri: lsp::Url,
+    node: Rc<Node<'_>>,
+) -> lsp::Location {
+    let start = lsp::Position {
         line: node.loc().start.line - 1,
         character: node.loc().start.column - 1,
     };
 
-    let end = Position {
+    let end = lsp::Position {
         line: node.loc().end.line - 1,
         character: node.loc().end.column - 1,
     };
 
-    let range = Range { start, end };
+    let range = lsp::Range { start, end };
 
-    Location { uri, range }
+    lsp::Location { uri, range }
 }
 
 fn find_scoped_definition(
-    uri: String,
+    uri: lsp::Url,
     ident_name: String,
     path: Vec<Rc<Node>>,
-) -> Option<Location> {
+) -> Option<lsp::Location> {
     let path_iter = path.iter().rev();
     for n in path_iter {
         match n.as_ref() {
@@ -83,14 +87,17 @@ impl RequestHandler for GotoDefinitionHandler {
         _: crate::shared::RequestContext,
         cache: &Cache,
     ) -> Result<Option<String>, Error> {
-        let mut result: Option<Location> = None;
+        let mut result: Option<lsp::Location> = None;
 
         let request: Request<TextDocumentPositionParams> =
             Request::from_json(prequest.data.as_str())?;
 
         if let Some(params) = request.params {
-            let uri = params.text_document.uri.as_str();
-            let pkg = utils::create_semantic_package(uri, cache)?;
+            let uri =
+                lsp::Url::parse(params.text_document.uri.as_str())
+                    .unwrap();
+            let pkg =
+                utils::create_semantic_package(uri.clone(), cache)?;
             let walker = Rc::new(walk::Node::Package(&pkg));
 
             let mut node_finder =
@@ -115,7 +122,7 @@ impl RequestHandler for GotoDefinitionHandler {
 
                 if let Some(name) = name {
                     result = find_scoped_definition(
-                        uri.to_string(),
+                        lsp::Url::parse(&uri.to_string()).unwrap(),
                         name,
                         path,
                     );
