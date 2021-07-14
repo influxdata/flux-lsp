@@ -1,4 +1,3 @@
-use crate::protocol::properties::{Position, Range, TextEdit};
 use crate::protocol::responses::{
     CompletionItem, CompletionItemKind, InsertTextFormat,
 };
@@ -17,6 +16,8 @@ use std::fmt;
 use std::iter::Iterator;
 
 use async_trait::async_trait;
+
+use lspower::lsp;
 
 pub const BUILTIN_PACKAGE: &str = "builtin";
 
@@ -185,11 +186,11 @@ impl Completable for PackageResult {
                 None => 0,
             };
 
-            additional_text_edits.push(TextEdit {
+            additional_text_edits.push(lsp::TextEdit {
                 new_text,
-                range: Range {
-                    start: Position { character: 0, line },
-                    end: Position { character: 0, line },
+                range: lsp::Range {
+                    start: lsp::Position { character: 0, line },
+                    end: lsp::Position { character: 0, line },
                 },
             })
         } else {
@@ -328,14 +329,14 @@ impl Completable for FunctionResult {
             imports.into_iter().any(|x| self.package == x.path);
 
         if !contains_pkg && self.package != BUILTIN_PACKAGE {
-            additional_text_edits.push(TextEdit {
+            additional_text_edits.push(lsp::TextEdit {
                 new_text: format!("import \"{}\"\n", self.package),
-                range: Range {
-                    start: Position {
+                range: lsp::Range {
+                    start: lsp::Position {
                         line: 0,
                         character: 0,
                     },
-                    end: Position {
+                    end: lsp::Position {
                         line: 0,
                         character: 0,
                     },

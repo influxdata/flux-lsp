@@ -1,3 +1,4 @@
+#![allow(deprecated)]
 use std::collections::HashMap;
 use std::fs;
 
@@ -27,7 +28,7 @@ fn create_request_context() -> RequestContext {
 }
 
 /// Get a uri path to a fixture file.
-fn get_fixture_path(name: &'static str) -> String {
+fn get_fixture_path(name: &'static str) -> lsp::Url {
     let mut pwd = std::env::current_dir().unwrap();
     pwd.push("tests");
     pwd.push("fixtures");
@@ -36,24 +37,23 @@ fn get_fixture_path(name: &'static str) -> String {
 
     let p = pwd.as_path().to_str().unwrap().to_string();
 
-    format!("file://{}", p)
+    lsp::Url::parse(&format!("file://{}", p)).unwrap()
 }
 
 /// Read the contents of a file.
-fn get_file_contents_from_uri(uri: String) -> String {
-    let url = Url::parse(uri.as_str()).unwrap();
-    let file_path = Url::to_file_path(&url).unwrap();
+fn get_file_contents_from_uri(uri: lsp::Url) -> String {
+    let file_path = Url::to_file_path(&uri).unwrap();
     fs::read_to_string(file_path).unwrap()
 }
 
 /// Open a file on the server, so it lives in memory.
-fn open_file_on_server(uri: String, router: &mut Router) {
+fn open_file_on_server(uri: lsp::Url, router: &mut Router) {
     let text = get_file_contents_from_uri(uri.clone());
     let did_open_request = requests::Request {
         id: 1,
         method: "textDocument/didOpen".to_string(),
         params: Some(requests::TextDocumentParams {
-            text_document: properties::TextDocument {
+            text_document: lsp::TextDocumentItem {
                 uri: uri,
                 language_id: FLUX.to_string(),
                 version: 1,
@@ -206,7 +206,7 @@ fn test_open_file() {
         id: 1,
         method: "textDocument/didOpen".to_string(),
         params: Some(requests::TextDocumentParams {
-            text_document: properties::TextDocument {
+            text_document: lsp::TextDocumentItem {
                 uri: uri.clone(),
                 language_id: FLUX.to_string(),
                 version: 1,
@@ -249,8 +249,8 @@ fn test_incomplete_option() {
         id: 1,
         method: "textDocument/didOpen".to_string(),
         params: Some(requests::TextDocumentParams {
-            text_document: properties::TextDocument {
-                uri: uri.to_string(),
+            text_document: lsp::TextDocumentItem {
+                uri: uri.clone(),
                 language_id: FLUX.to_string(),
                 version: 1,
                 text,
@@ -271,25 +271,31 @@ fn test_incomplete_option() {
     let response =
         block_on(router.route(request, create_request_context()))
             .unwrap();
-    let diagnostics = vec![properties::Diagnostic {
-        range: properties::Range {
-            start: properties::Position {
+    let diagnostics = vec![lsp::Diagnostic {
+        range: lsp::Range {
+            start: lsp::Position {
                 character: 0,
                 line: 0,
             },
-            end: properties::Position {
+            end: lsp::Position {
                 character: 6,
                 line: 0,
             },
         },
         message: "invalid statement: option".to_string(),
-        code: 1,
-        severity: 1,
+        code: Some(lsp::NumberOrString::Number(1)),
+        severity: Some(lsp::DiagnosticSeverity::Error),
+
+        code_description: None,
+        data: None,
+        related_information: None,
+        source: None,
+        tags: None,
     }];
 
     let expected_json =
         notifications::create_diagnostics_notification(
-            uri.to_string(),
+            uri,
             diagnostics,
         )
         .to_json()
@@ -311,8 +317,8 @@ fn test_error_on_error() {
         id: 1,
         method: "textDocument/didOpen".to_string(),
         params: Some(requests::TextDocumentParams {
-            text_document: properties::TextDocument {
-                uri: uri.to_string(),
+            text_document: lsp::TextDocumentItem {
+                uri: uri.clone(),
                 language_id: FLUX.to_string(),
                 version: 1,
                 text,
@@ -333,26 +339,32 @@ fn test_error_on_error() {
     let response =
         block_on(router.route(request, create_request_context()))
             .unwrap();
-    let diagnostics = vec![properties::Diagnostic {
-        range: properties::Range {
-            start: properties::Position {
+    let diagnostics = vec![lsp::Diagnostic {
+        range: lsp::Range {
+            start: lsp::Position {
                 character: 11,
                 line: 3,
             },
-            end: properties::Position {
+            end: lsp::Position {
                 character: 14,
                 line: 3,
             },
         },
         message: "pipe destination must be a function call"
             .to_string(),
-        code: 1,
-        severity: 1,
+        code: Some(lsp::NumberOrString::Number(1)),
+        severity: Some(lsp::DiagnosticSeverity::Error),
+
+        code_description: None,
+        data: None,
+        related_information: None,
+        source: None,
+        tags: None,
     }];
 
     let expected_json =
         notifications::create_diagnostics_notification(
-            uri.to_string(),
+            uri,
             diagnostics,
         )
         .to_json()
@@ -375,8 +387,8 @@ fn test_formatting() {
         id: 1,
         method: "textDocument/formatting".to_string(),
         params: Some(requests::DocumentFormattingParams {
-            text_document: properties::TextDocumentIdentifier {
-                uri: uri.to_string(),
+            text_document: lsp::TextDocumentIdentifier {
+                uri: uri.clone(),
             },
         }),
     };
@@ -393,10 +405,11 @@ fn test_formatting() {
     let response =
         block_on(router.route(request, create_request_context()))
             .unwrap();
-    let returned = from_str::<
-        responses::Response<Vec<properties::TextEdit>>,
-    >(response.unwrap().as_str())
-    .unwrap();
+    let returned =
+        from_str::<responses::Response<Vec<lsp::TextEdit>>>(
+            response.unwrap().as_str(),
+        )
+        .unwrap();
 
     let result = returned.result.unwrap();
     let edit = result.first().unwrap();
@@ -419,13 +432,11 @@ fn test_signature_help() {
         method: "textDocument/signatureHelp".to_string(),
         params: Some(requests::SignatureHelpParams {
             context: None,
-            position: properties::Position {
+            position: lsp::Position {
                 line: 0,
                 character: 5,
             },
-            text_document: properties::TextDocumentIdentifier {
-                uri: uri.to_string(),
-            },
+            text_document: lsp::TextDocumentIdentifier { uri },
         }),
     };
     let request_json =
@@ -470,13 +481,11 @@ fn test_object_param_completion() {
                 trigger_kind: 2,
                 trigger_character: Some("(".to_string()),
             }),
-            position: properties::Position {
+            position: lsp::Position {
                 character: 8,
                 line: 4,
             },
-            text_document: properties::TextDocumentIdentifier {
-                uri: uri.to_string(),
-            },
+            text_document: lsp::TextDocumentIdentifier { uri },
         }),
     };
 
@@ -530,13 +539,11 @@ fn test_param_completion() {
                 trigger_kind: 2,
                 trigger_character: Some("(".to_string()),
             }),
-            position: properties::Position {
+            position: lsp::Position {
                 character: 8,
                 line: 2,
             },
-            text_document: properties::TextDocumentIdentifier {
-                uri: uri.to_string(),
-            },
+            text_document: lsp::TextDocumentIdentifier { uri },
         }),
     };
 
@@ -596,13 +603,11 @@ fn test_param_completion_multiple_files() {
                 trigger_kind: 2,
                 trigger_character: Some(".".to_string()),
             }),
-            position: properties::Position {
+            position: lsp::Position {
                 character: 2,
                 line: 0,
             },
-            text_document: properties::TextDocumentIdentifier {
-                uri: uri2.to_string(),
-            },
+            text_document: lsp::TextDocumentIdentifier { uri: uri2 },
         }),
     };
 
@@ -645,13 +650,11 @@ fn test_package_completion() {
                 trigger_kind: 2,
                 trigger_character: Some(".".to_string()),
             }),
-            position: properties::Position {
+            position: lsp::Position {
                 character: 4,
                 line: 2,
             },
-            text_document: properties::TextDocumentIdentifier {
-                uri: uri.to_string(),
-            },
+            text_document: lsp::TextDocumentIdentifier { uri },
         }),
     };
 
@@ -691,12 +694,12 @@ fn test_variable_completion() {
         method: "textDocument/completion".to_string(),
         params: Some(requests::CompletionParams {
             context: None,
-            position: properties::Position {
+            position: lsp::Position {
                 character: 1,
                 line: 8,
             },
-            text_document: properties::TextDocumentIdentifier {
-                uri: uri.to_string(),
+            text_document: lsp::TextDocumentIdentifier {
+                uri: uri.clone(),
             },
         }),
     };
@@ -720,11 +723,11 @@ fn test_variable_completion() {
         ident: "".to_string(),
         imports: vec![],
         package: None,
-        position: properties::Position {
+        position: lsp::Position {
             character: 1,
             line: 8,
         },
-        uri: uri.to_string(),
+        uri,
     };
 
     let mut items = vec![block_on(
@@ -777,13 +780,11 @@ fn test_options_completion() {
         method: "textDocument/completion".to_string(),
         params: Some(requests::CompletionParams {
             context: None,
-            position: properties::Position {
+            position: lsp::Position {
                 character: 10,
                 line: 16,
             },
-            text_document: properties::TextDocumentIdentifier {
-                uri: uri.to_string(),
-            },
+            text_document: lsp::TextDocumentIdentifier { uri },
         }),
     };
 
@@ -839,13 +840,11 @@ fn test_option_object_members_completion() {
                 trigger_kind: 0,
                 trigger_character: Some(".".to_string()),
             }),
-            position: properties::Position {
+            position: lsp::Position {
                 character: 5,
                 line: 16,
             },
-            text_document: properties::TextDocumentIdentifier {
-                uri: uri.to_string(),
-            },
+            text_document: lsp::TextDocumentIdentifier { uri },
         }),
     };
 
@@ -887,13 +886,11 @@ fn test_option_function_completion() {
         method: "textDocument/completion".to_string(),
         params: Some(requests::CompletionParams {
             context: None,
-            position: properties::Position {
+            position: lsp::Position {
                 character: 1,
                 line: 10,
             },
-            text_document: properties::TextDocumentIdentifier {
-                uri: uri.to_string(),
-            },
+            text_document: lsp::TextDocumentIdentifier { uri },
         }),
     };
 
@@ -931,16 +928,17 @@ fn test_document_change() {
         id: 1,
         method: "textDocument/didChange".to_string(),
         params: Some(requests::TextDocumentChangeParams {
-            text_document:
-                properties::VersionedTextDocumentIdentifier {
-                    uri: uri.to_string(),
-                    version: 1,
+            text_document: lsp::VersionedTextDocumentIdentifier {
+                uri: uri.clone(),
+                version: 1,
+            },
+            content_changes: vec![
+                lsp::TextDocumentContentChangeEvent {
+                    text: text,
+                    range: None,
+                    range_length: None,
                 },
-            content_changes: vec![properties::ContentChange {
-                text: text,
-                range: None,
-                range_length: None,
-            }],
+            ],
         }),
     };
 
@@ -957,12 +955,9 @@ fn test_document_change() {
         block_on(router.route(request, create_request_context()))
             .unwrap();
     let expected_json =
-        notifications::create_diagnostics_notification(
-            uri.to_string(),
-            vec![],
-        )
-        .to_json()
-        .unwrap();
+        notifications::create_diagnostics_notification(uri, vec![])
+            .to_json()
+            .unwrap();
 
     assert_eq!(
         expected_json,
@@ -983,16 +978,17 @@ fn test_document_change_error() {
         id: 1,
         method: "textDocument/didChange".to_string(),
         params: Some(requests::TextDocumentChangeParams {
-            text_document:
-                properties::VersionedTextDocumentIdentifier {
-                    uri: uri.to_string(),
-                    version: 1,
+            text_document: lsp::VersionedTextDocumentIdentifier {
+                uri: uri.clone(),
+                version: 1,
+            },
+            content_changes: vec![
+                lsp::TextDocumentContentChangeEvent {
+                    text: text,
+                    range: None,
+                    range_length: None,
                 },
-            content_changes: vec![properties::ContentChange {
-                text: text,
-                range: None,
-                range_length: None,
-            }],
+            ],
         }),
     };
 
@@ -1008,26 +1004,32 @@ fn test_document_change_error() {
     let response =
         block_on(router.route(request, create_request_context()))
             .unwrap();
-    let diagnostics = vec![properties::Diagnostic {
-        range: properties::Range {
-            start: properties::Position {
+    let diagnostics = vec![lsp::Diagnostic {
+        range: lsp::Range {
+            start: lsp::Position {
                 character: 11,
                 line: 3,
             },
-            end: properties::Position {
+            end: lsp::Position {
                 character: 14,
                 line: 3,
             },
         },
         message: "pipe destination must be a function call"
             .to_string(),
-        code: 1,
-        severity: 1,
+        code: Some(lsp::NumberOrString::Number(1)),
+        severity: Some(lsp::DiagnosticSeverity::Error),
+
+        code_description: None,
+        data: None,
+        related_information: None,
+        source: None,
+        tags: None,
     }];
 
     let expected_json =
         notifications::create_diagnostics_notification(
-            uri.to_string(),
+            uri,
             diagnostics,
         )
         .to_json()
@@ -1090,13 +1092,13 @@ fn test_rename() {
         id: 1,
         method: "textDocument/rename".to_string(),
         params: Some(requests::RenameParams {
-            text_document: properties::TextDocument {
-                uri: uri.to_string(),
+            text_document: lsp::TextDocumentItem {
+                uri: uri.clone(),
                 language_id: FLUX.to_string(),
                 version: 1,
                 text: "".to_string(),
             },
-            position: properties::Position {
+            position: lsp::Position {
                 line: 1,
                 character: 1,
             },
@@ -1117,33 +1119,31 @@ fn test_rename() {
         block_on(router.route(request, create_request_context()))
             .unwrap();
 
-    let mut expected_changes: HashMap<
-        String,
-        Vec<properties::TextEdit>,
-    > = HashMap::new();
+    let mut expected_changes: HashMap<String, Vec<lsp::TextEdit>> =
+        HashMap::new();
 
     let edits = vec![
-        properties::TextEdit {
+        lsp::TextEdit {
             new_text: new_name.clone(),
-            range: properties::Range {
-                start: properties::Position {
+            range: lsp::Range {
+                start: lsp::Position {
                     line: 1,
                     character: 0,
                 },
-                end: properties::Position {
+                end: lsp::Position {
                     line: 1,
                     character: 3,
                 },
             },
         },
-        properties::TextEdit {
+        lsp::TextEdit {
             new_text: new_name,
-            range: properties::Range {
-                start: properties::Position {
+            range: lsp::Range {
+                start: lsp::Position {
                     line: 8,
                     character: 34,
                 },
-                end: properties::Position {
+                end: lsp::Position {
                     line: 8,
                     character: 37,
                 },
@@ -1151,7 +1151,7 @@ fn test_rename() {
         },
     ];
 
-    expected_changes.insert(uri.to_string(), edits);
+    expected_changes.insert(uri.as_str().to_string(), edits);
 
     let workspace_edit = responses::WorkspaceEditResult {
         changes: expected_changes,
@@ -1182,8 +1182,8 @@ fn test_folding() {
         id: 1,
         method: "textDocument/foldingRange".to_string(),
         params: Some(requests::FoldingRangeParams {
-            text_document: properties::TextDocument {
-                uri: uri.to_string(),
+            text_document: lsp::TextDocumentItem {
+                uri,
                 language_id: FLUX.to_string(),
                 version: 1,
                 text: "".to_string(),
@@ -1241,13 +1241,13 @@ fn test_go_to_definition() {
         id: 1,
         method: "textDocument/definition".to_string(),
         params: Some(requests::TextDocumentPositionParams {
-            text_document: properties::TextDocument {
-                uri: uri.to_string(),
+            text_document: lsp::TextDocumentItem {
+                uri: uri.clone(),
                 language_id: FLUX.to_string(),
                 version: 1,
                 text: "".to_string(),
             },
-            position: properties::Position {
+            position: lsp::Position {
                 line: 8,
                 character: 35,
             },
@@ -1267,17 +1267,17 @@ fn test_go_to_definition() {
         block_on(router.route(request, create_request_context()))
             .unwrap();
 
-    let expected: responses::Response<properties::Location> =
+    let expected: responses::Response<lsp::Location> =
         responses::Response {
             id: 1,
-            result: Some(properties::Location {
-                uri: uri.to_string(),
-                range: properties::Range {
-                    start: properties::Position {
+            result: Some(lsp::Location {
+                uri,
+                range: lsp::Range {
+                    start: lsp::Position {
                         line: 1,
                         character: 0,
                     },
-                    end: properties::Position {
+                    end: lsp::Position {
                         line: 1,
                         character: 24,
                     },
@@ -1304,13 +1304,13 @@ fn test_find_references() {
         method: "textDocument/references".to_string(),
         params: Some(requests::ReferenceParams {
             context: requests::ReferenceContext {},
-            text_document: properties::TextDocument {
-                uri: uri.to_string(),
+            text_document: lsp::TextDocumentItem {
+                uri: uri.clone(),
                 language_id: FLUX.to_string(),
                 version: 1,
                 text: "".to_string(),
             },
-            position: properties::Position {
+            position: lsp::Position {
                 line: 1,
                 character: 1,
             },
@@ -1330,31 +1330,31 @@ fn test_find_references() {
         block_on(router.route(request, create_request_context()))
             .unwrap();
 
-    let expected: responses::Response<Vec<properties::Location>> =
+    let expected: responses::Response<Vec<lsp::Location>> =
         responses::Response {
             id: 1,
             result: Some(vec![
-                properties::Location {
-                    uri: uri.to_string(),
-                    range: properties::Range {
-                        start: properties::Position {
+                lsp::Location {
+                    uri: uri.clone(),
+                    range: lsp::Range {
+                        start: lsp::Position {
                             line: 1,
                             character: 0,
                         },
-                        end: properties::Position {
+                        end: lsp::Position {
                             line: 1,
                             character: 3,
                         },
                     },
                 },
-                properties::Location {
-                    uri: uri.to_string(),
-                    range: properties::Range {
-                        start: properties::Position {
+                lsp::Location {
+                    uri,
+                    range: lsp::Range {
+                        start: lsp::Position {
                             line: 8,
                             character: 34,
                         },
-                        end: properties::Position {
+                        end: lsp::Position {
                             line: 8,
                             character: 37,
                         },
@@ -1381,8 +1381,8 @@ fn test_document_symbols() {
         id: 1,
         method: "textDocument/documentSymbol".to_string(),
         params: Some(requests::DocumentSymbolParams {
-            text_document: properties::TextDocumentIdentifier {
-                uri: uri.to_string(),
+            text_document: lsp::TextDocumentIdentifier {
+                uri: uri.clone(),
             },
         }),
     };
@@ -1401,68 +1401,70 @@ fn test_document_symbols() {
             .unwrap();
 
     let areas = vec![
-        properties::SymbolInformation {
+        lsp::SymbolInformation {
             name: "from".to_string(),
-            kind: properties::SymbolKind::Function,
-            deprecated: Some(false),
-            location: properties::Location {
-                uri: uri.to_string(),
-                range: properties::Range {
-                    start: properties::Position {
+            kind: lsp::SymbolKind::Function,
+            deprecated: None,
+            location: lsp::Location {
+                uri: uri.clone(),
+                range: lsp::Range {
+                    start: lsp::Position {
                         line: 0,
                         character: 0,
                     },
-                    end: properties::Position {
+                    end: lsp::Position {
                         line: 0,
                         character: 20,
                     },
                 },
             },
             container_name: None,
+            tags: None,
         },
-        properties::SymbolInformation {
+        lsp::SymbolInformation {
             name: "bucket".to_string(),
-            kind: properties::SymbolKind::Variable,
-            deprecated: Some(false),
-            location: properties::Location {
-                uri: uri.to_string(),
-                range: properties::Range {
-                    start: properties::Position {
+            kind: lsp::SymbolKind::Variable,
+            deprecated: None,
+            location: lsp::Location {
+                uri: uri.clone(),
+                range: lsp::Range {
+                    start: lsp::Position {
                         line: 0,
                         character: 5,
                     },
-                    end: properties::Position {
+                    end: lsp::Position {
                         line: 0,
                         character: 19,
                     },
                 },
             },
             container_name: None,
+            tags: None,
         },
-        properties::SymbolInformation {
+        lsp::SymbolInformation {
             name: "test".to_string(),
-            kind: properties::SymbolKind::String,
-            deprecated: Some(false),
-            location: properties::Location {
-                uri: uri.to_string(),
-                range: properties::Range {
-                    start: properties::Position {
+            kind: lsp::SymbolKind::String,
+            deprecated: None,
+            location: lsp::Location {
+                uri,
+                range: lsp::Range {
+                    start: lsp::Position {
                         line: 0,
                         character: 13,
                     },
-                    end: properties::Position {
+                    end: lsp::Position {
                         line: 0,
                         character: 19,
                     },
                 },
             },
             container_name: None,
+            tags: None,
         },
     ];
 
-    let expected: responses::Response<
-        Vec<properties::SymbolInformation>,
-    > = responses::Response::new(1, Some(areas));
+    let expected: responses::Response<Vec<lsp::SymbolInformation>> =
+        responses::Response::new(1, Some(areas));
 
     assert_eq!(
         expected.to_json().unwrap(),

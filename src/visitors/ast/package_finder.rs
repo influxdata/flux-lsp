@@ -5,15 +5,16 @@ use flux::ast::walk::walk_rc;
 use flux::ast::walk::{Node, Visitor};
 
 use crate::cache::Cache;
-use crate::protocol::properties::Position;
 use crate::shared::ast::create_ast_package;
 use crate::shared::conversion::flux_position_to_position;
 use crate::shared::RequestContext;
 
+use lspower::lsp;
+
 #[derive(Clone)]
 pub struct PackageInfo {
     pub name: String,
-    pub position: Position,
+    pub position: lsp::Position,
 }
 
 #[derive(Default)]
@@ -28,7 +29,7 @@ pub struct PackageFinderVisitor {
 
 impl PackageFinderVisitor {
     pub fn find(
-        uri: &'_ str,
+        uri: lsp::Url,
         ctx: RequestContext,
         cache: &Cache,
     ) -> Result<Option<PackageInfo>, String> {

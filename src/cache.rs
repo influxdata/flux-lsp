@@ -25,7 +25,7 @@ mod test {
 #[derive(Clone)]
 pub struct CacheValue {
     pub uri: String,
-    pub version: u32,
+    pub version: i32,
     pub contents: String,
 }
 
@@ -101,7 +101,7 @@ impl Cache {
     pub fn force(
         &self,
         uri: &'_ str,
-        version: u32,
+        version: i32,
         contents: String,
     ) -> Result<(), String> {
         let mut store = match self.store.lock() {
@@ -127,7 +127,7 @@ impl Cache {
     pub fn set(
         &self,
         uri: &'_ str,
-        version: u32,
+        version: i32,
         contents: String,
     ) -> Result<(), String> {
         let mut store = match self.store.lock() {

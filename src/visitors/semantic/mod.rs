@@ -2,11 +2,12 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
-use crate::protocol::properties::Position;
 use crate::shared::get_package_name;
 
 use flux::semantic::nodes::*;
 use flux::semantic::walk::{self, Node, Visitor};
+
+use lspower::lsp;
 
 mod completion;
 mod symbols;
@@ -20,7 +21,7 @@ pub use completion::{
 };
 pub use symbols::SymbolsVisitor;
 
-fn contains_position(node: Rc<Node<'_>>, pos: Position) -> bool {
+fn contains_position(node: Rc<Node<'_>>, pos: lsp::Position) -> bool {
     let start_line = node.loc().start.line - 1;
     let start_col = node.loc().start.column - 1;
     let end_line = node.loc().end.line - 1;
@@ -47,7 +48,7 @@ fn contains_position(node: Rc<Node<'_>>, pos: Position) -> bool {
 
 pub struct CallFinderState<'a> {
     pub node: Option<Rc<Node<'a>>>,
-    pub position: Position,
+    pub position: lsp::Position,
     pub path: Vec<Rc<Node<'a>>>,
 }
 
@@ -81,7 +82,7 @@ impl<'a> Visitor<'a> for CallFinderVisitor<'a> {
 }
 
 impl<'a> CallFinderVisitor<'a> {
-    pub fn new(pos: Position) -> CallFinderVisitor<'a> {
+    pub fn new(pos: lsp::Position) -> CallFinderVisitor<'a> {
         CallFinderVisitor {
             state: Arc::new(Mutex::new(CallFinderState {
                 node: None,
@@ -94,7 +95,7 @@ impl<'a> CallFinderVisitor<'a> {
 
 pub struct NodeFinderState<'a> {
     pub node: Option<Rc<Node<'a>>>,
-    pub position: Position,
+    pub position: lsp::Position,
     pub path: Vec<Rc<Node<'a>>>,
 }
 
@@ -122,7 +123,7 @@ impl<'a> Visitor<'a> for NodeFinderVisitor<'a> {
 }
 
 impl<'a> NodeFinderVisitor<'a> {
-    pub fn new(pos: Position) -> NodeFinderVisitor<'a> {
+    pub fn new(pos: lsp::Position) -> NodeFinderVisitor<'a> {
         NodeFinderVisitor {
             state: Rc::new(RefCell::new(NodeFinderState {
                 node: None,

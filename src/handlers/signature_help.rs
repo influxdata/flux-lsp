@@ -1,6 +1,5 @@
 use crate::cache::Cache;
 use crate::handlers::{find_node, Error, RequestHandler};
-use crate::protocol::properties::Position;
 use crate::protocol::requests::{
     PolymorphicRequest, Request, SignatureHelpParams,
 };
@@ -53,8 +52,8 @@ fn find_stdlib_signatures(
 }
 
 fn find_user_defined_signatures(
-    pos: Position,
-    uri: &'_ str,
+    pos: lsp::Position,
+    uri: lsp::Url,
     name: String,
     ctx: RequestContext,
     cache: &Cache,
@@ -91,8 +90,8 @@ fn find_signatures(
 
     if let Some(params) = request.params {
         let pos = params.position;
-        let uri = params.text_document.uri.as_str();
-        let pkg = create_semantic_package(uri, cache)?;
+        let uri = lsp::Url::parse(params.text_document.uri.as_str()).unwrap();
+        let pkg = create_semantic_package(uri.clone(), cache)?;
         let node_result = find_node(Node::Package(&pkg), pos.clone());
 
         if let Some(node) = node_result.node {

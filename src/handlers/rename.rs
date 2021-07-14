@@ -1,13 +1,14 @@
 use crate::cache::Cache;
 use crate::handlers::references::find_references;
 use crate::handlers::{Error, RequestHandler};
-use crate::protocol::properties::TextEdit;
 use crate::protocol::requests::{
     PolymorphicRequest, RenameParams, Request,
 };
-use crate::protocol::responses::{Response, WorkspaceEditResult};
+use crate::protocol::responses::Response;
 
 use std::collections::HashMap;
+
+use lspower::lsp;
 
 #[derive(Default)]
 pub struct RenameHandler {}
@@ -23,30 +24,25 @@ impl RequestHandler for RenameHandler {
         let request: Request<RenameParams> =
             Request::from_json(prequest.data.as_str())?;
 
-        let mut workspace_edit = WorkspaceEditResult {
-            changes: HashMap::new(),
-        };
-
+        let mut changes = HashMap::new();
         if let Some(params) = request.params {
-            let uri = params.text_document.uri.as_str();
+            let document_uri = lsp::Url::parse(params.text_document.uri.as_str()).unwrap();
             let new_name = params.new_name;
             let locations =
-                find_references(uri, params.position, cache)?;
+                find_references(document_uri, params.position, cache)?;
 
             for location in locations.iter() {
-                let uri = location.uri.clone();
-
-                if workspace_edit.changes.get(&uri.clone()).is_none()
+                if changes.get(&location.uri.clone()).is_none()
                 {
-                    workspace_edit
-                        .changes
-                        .insert(uri.clone(), vec![]);
+
+                        changes
+                        .insert(location.uri.clone(), vec![]);
                 }
 
                 if let Some(edits) =
-                    workspace_edit.changes.get_mut(&uri.clone())
+                    changes.get_mut(&location.uri.clone())
                 {
-                    let text_edit = TextEdit {
+                    let text_edit = lsp::TextEdit {
                         range: location.range.clone(),
                         new_text: new_name.clone(),
                     };
@@ -57,7 +53,11 @@ impl RequestHandler for RenameHandler {
         }
 
         let response =
-            Response::new(request.id, Some(workspace_edit));
+            Response::new(request.id, Some(lsp::WorkspaceEdit {
+                changes: Some(changes),
+                document_changes: None,
+                change_annotations: None,
+            }));
 
         let json = response.to_json()?;
 

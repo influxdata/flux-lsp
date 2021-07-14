@@ -11,6 +11,8 @@ use flux::semantic::walk::{self, Node};
 
 use std::rc::Rc;
 
+use lspower::lsp;
+
 fn node_to_folding_range(node: Rc<Node>) -> FoldingRange {
     FoldingRange {
         start_line: node.loc().start.line - 1,
@@ -22,10 +24,10 @@ fn node_to_folding_range(node: Rc<Node>) -> FoldingRange {
 }
 
 fn find_foldable_areas(
-    uri: &'_ str,
+    uri: lsp::Url,
     cache: &Cache,
 ) -> Result<Vec<FoldingRange>, String> {
-    let cv = cache.get(uri)?;
+    let cv = cache.get(uri.as_str())?;
     let pkg = utils::analyze_source(cv.contents.as_str())?;
     let walker = walk::Node::Package(&pkg);
     let mut visitor = FoldFinderVisitor::default();
@@ -59,7 +61,7 @@ impl RequestHandler for FoldingHandler {
         let mut areas: Option<Vec<FoldingRange>> = None;
         if let Some(params) = request.params {
             let foldable = find_foldable_areas(
-                params.text_document.uri.as_str(),
+                params.text_document.uri,
                 cache,
             )?;
             areas = Some(foldable);

@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::protocol::properties::Diagnostic;
+use lspower::lsp;
 
 #[derive(Serialize, Deserialize)]
 pub struct ShowMessageParams {
@@ -11,8 +11,8 @@ pub struct ShowMessageParams {
 
 #[derive(Serialize, Deserialize)]
 pub struct PublishDiagnosticsParams {
-    pub uri: String,
-    pub diagnostics: Vec<Diagnostic>,
+    pub uri: lsp::Url,
+    pub diagnostics: Vec<lsp::Diagnostic>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -36,8 +36,8 @@ where
 }
 
 pub fn create_diagnostics_notification(
-    uri: String,
-    diagnostics: Vec<Diagnostic>,
+    uri: lsp::Url,
+    diagnostics: Vec<lsp::Diagnostic>,
 ) -> Notification<PublishDiagnosticsParams> {
     let method = String::from("textDocument/publishDiagnostics");
     let params = PublishDiagnosticsParams { uri, diagnostics };

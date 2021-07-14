@@ -1,8 +1,8 @@
-use crate::protocol::properties::Position;
-
 use flux::ast::SourceLocation;
 use flux::semantic::nodes::*;
 use flux::semantic::types::MonoType;
+
+use lspower::lsp;
 
 pub fn follow_function_pipes(c: &CallExpr) -> &MonoType {
     if let Some(Expression::Call(call)) = &c.pipe {
@@ -12,7 +12,10 @@ pub fn follow_function_pipes(c: &CallExpr) -> &MonoType {
     &c.typ
 }
 
-pub fn defined_after(loc: &SourceLocation, pos: Position) -> bool {
+pub fn defined_after(
+    loc: &SourceLocation,
+    pos: lsp::Position,
+) -> bool {
     if loc.start.line > pos.line + 1
         || (loc.start.line == pos.line + 1
             && loc.start.column > pos.character + 1)

@@ -7,7 +7,6 @@ use utils::*;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
-use crate::protocol::properties::Position;
 use crate::shared::signatures::get_argument_names;
 use crate::shared::Function;
 use crate::stdlib::Completable;
@@ -16,17 +15,19 @@ use flux::semantic::nodes::*;
 use flux::semantic::types::MonoType;
 use flux::semantic::walk::{Node, Visitor};
 
+use lspower::lsp;
+
 pub struct FunctionFinderState {
     pub functions: Vec<Function>,
 }
 
 pub struct FunctionFinderVisitor {
-    pub pos: Position,
+    pub pos: lsp::Position,
     pub state: Arc<Mutex<FunctionFinderState>>,
 }
 
 impl FunctionFinderVisitor {
-    pub fn new(pos: Position) -> Self {
+    pub fn new(pos: lsp::Position) -> Self {
         FunctionFinderVisitor {
             pos,
             state: Arc::new(Mutex::new(FunctionFinderState {
@@ -98,7 +99,7 @@ pub struct CompletableFinderState {
 }
 
 pub struct CompletableFinderVisitor {
-    pub pos: Position,
+    pub pos: lsp::Position,
     pub state: Arc<Mutex<CompletableFinderState>>,
 }
 
@@ -170,7 +171,7 @@ impl<'a> Visitor<'a> for CompletableFinderVisitor {
 }
 
 impl CompletableFinderVisitor {
-    pub fn new(pos: Position) -> Self {
+    pub fn new(pos: lsp::Position) -> Self {
         CompletableFinderVisitor {
             state: Arc::new(Mutex::new(
                 CompletableFinderState::default(),

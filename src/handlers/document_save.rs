@@ -24,7 +24,7 @@ impl RequestHandler for DocumentSaveHandler {
     ) -> Result<Option<String>, Error> {
         let request = parse_save_request(prequest.data)?;
         if let Some(params) = request.params {
-            let uri = params.text_document.uri.as_str();
+            let uri = params.text_document.uri;
             let msg = create_diagnoistics(uri, ctx, cache)?;
             let json = msg.to_json()?;
 

@@ -1,6 +1,5 @@
 use crate::cache::Cache;
 use crate::handlers::{Error, RequestHandler};
-use crate::protocol::properties::ContentChange;
 use crate::protocol::requests::PolymorphicRequest;
 use crate::protocol::requests::{Request, TextDocumentChangeParams};
 use crate::shared::create_diagnoistics;
@@ -8,12 +7,14 @@ use crate::shared::structs::RequestContext;
 
 use async_trait::async_trait;
 
+use lspower::lsp;
+
 #[derive(Default)]
 pub struct DocumentChangeHandler {}
 
 fn apply_changes(
     original: String,
-    changes: Vec<ContentChange>,
+    changes: Vec<lsp::TextDocumentContentChangeEvent>,
 ) -> String {
     for change in changes {
         if change.range.is_none() {
@@ -40,14 +41,14 @@ fn handle_change(
 ) -> Result<Option<String>, Error> {
     let request = parse_change_request(data)?;
     if let Some(params) = request.params {
-        let uri = params.text_document.uri.as_str();
+        let uri = params.text_document.uri;
         let changes = params.content_changes;
         let version = params.text_document.version;
 
-        let cv = cache.get(uri)?;
+        let cv = cache.get(uri.as_str())?;
         let text = apply_changes(cv.contents, changes);
 
-        cache.set(uri, version, text)?;
+        cache.set(uri.as_str(), version, text)?;
 
         let msg = create_diagnoistics(uri, ctx, cache)?;
         let json = msg.to_json()?;

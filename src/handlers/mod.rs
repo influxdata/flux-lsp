@@ -25,7 +25,6 @@ use crate::protocol::notifications::{
     create_diagnostics_notification, Notification,
     PublishDiagnosticsParams,
 };
-use crate::protocol::properties::Position;
 use crate::protocol::requests::PolymorphicRequest;
 use crate::shared::conversion::map_errors_to_diagnostics;
 use crate::shared::RequestContext;
@@ -35,6 +34,8 @@ use std::rc::Rc;
 
 use async_trait::async_trait;
 use flux::ast::{check, walk};
+
+use lspower::lsp;
 
 #[derive(Debug)]
 pub struct Error {
@@ -57,7 +58,7 @@ pub trait RequestHandler {
 }
 
 pub fn create_diagnostics(
-    uri: String,
+    uri: lsp::Url,
     file: flux::ast::File,
 ) -> Result<Notification<PublishDiagnosticsParams>, String> {
     let walker = walk::Node::File(&file);
@@ -76,7 +77,7 @@ pub struct NodeFinderResult<'a> {
 
 pub fn find_node(
     node: flux::semantic::walk::Node<'_>,
-    position: Position,
+    position: lsp::Position,
 ) -> NodeFinderResult<'_> {
     let mut result = NodeFinderResult::default();
     let mut visitor = NodeFinderVisitor::new(position);

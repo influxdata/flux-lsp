@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use std::collections::HashMap;
 
-use crate::protocol::properties::TextEdit;
+use lspower::lsp;
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Response<T> {
@@ -39,7 +39,7 @@ pub struct ShutdownResult {}
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct WorkspaceEditResult {
-    pub changes: HashMap<String, Vec<TextEdit>>,
+    pub changes: HashMap<String, Vec<lsp::TextEdit>>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -104,9 +104,9 @@ pub struct CompletionItem {
     #[serde(rename = "insertTextFormat")]
     pub insert_text_format: InsertTextFormat,
     #[serde(rename = "textEdit")]
-    pub text_edit: Option<TextEdit>,
+    pub text_edit: Option<lsp::TextEdit>,
     #[serde(rename = "additionalTextEdits")]
-    pub additional_text_edits: Option<Vec<TextEdit>>,
+    pub additional_text_edits: Option<Vec<lsp::TextEdit>>,
 }
 
 impl CompletionItem {
