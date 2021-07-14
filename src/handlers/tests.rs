@@ -8,7 +8,6 @@ use serde_json::from_str;
 use url::Url;
 
 use crate::protocol::notifications;
-use crate::protocol::properties;
 use crate::protocol::requests;
 use crate::protocol::responses;
 use crate::shared::callbacks::Callbacks;
@@ -1205,23 +1204,23 @@ fn test_folding() {
             .unwrap();
 
     let areas = vec![
-        properties::FoldingRange {
+        lsp::FoldingRange {
             start_line: 5,
-            start_character: 25,
+            start_character: Some(25),
             end_line: 8,
-            end_character: 37,
-            kind: "region".to_string(),
+            end_character: Some(37),
+            kind: Some(lsp::FoldingRangeKind::Region),
         },
-        properties::FoldingRange {
+        lsp::FoldingRange {
             start_line: 14,
-            start_character: 25,
+            start_character: Some(25),
             end_line: 14,
-            end_character: 95,
-            kind: "region".to_string(),
+            end_character: Some(95),
+            kind: Some(lsp::FoldingRangeKind::Region),
         },
     ];
 
-    let expected: responses::Response<Vec<properties::FoldingRange>> =
+    let expected: responses::Response<Vec<lsp::FoldingRange>> =
         responses::Response::new(1, Some(areas));
 
     assert_eq!(
