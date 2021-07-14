@@ -130,11 +130,6 @@ impl CompletionItem {
 }
 
 #[derive(Serialize, Deserialize, Clone)]
-pub struct HoverResult {
-    pub contents: MarkupContent,
-}
-
-#[derive(Serialize, Deserialize, Clone)]
 pub struct MarkupContent {
     pub kind: String,
     pub value: String,

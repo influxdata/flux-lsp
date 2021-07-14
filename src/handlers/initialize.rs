@@ -45,7 +45,7 @@ impl RequestHandler for InitializeHandler {
                 execute_command_provider: None,
                 experimental: None,
                 folding_range_provider: Some(lsp::FoldingRangeProviderCapability::Simple(!self.disable_folding)),
-                hover_provider: Some(lsp::HoverProviderCapability::Simple(true)),
+                hover_provider: None,
                 implementation_provider: None,
                 linked_editing_range_provider: None,
                 moniker_provider: None,

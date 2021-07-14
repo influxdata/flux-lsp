@@ -147,9 +147,7 @@ fn test_initialize() {
                 folding_range_provider: Some(
                     lsp::FoldingRangeProviderCapability::Simple(true),
                 ),
-                hover_provider: Some(
-                    lsp::HoverProviderCapability::Simple(true),
-                ),
+                hover_provider: None,
                 implementation_provider: None,
                 linked_editing_range_provider: None,
                 moniker_provider: None,
