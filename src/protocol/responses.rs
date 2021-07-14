@@ -128,18 +128,3 @@ impl CompletionItem {
         }
     }
 }
-
-#[derive(Serialize, Deserialize, Clone)]
-pub struct MarkupContent {
-    pub kind: String,
-    pub value: String,
-}
-
-impl MarkupContent {
-    pub fn new(content: String) -> Self {
-        MarkupContent {
-            kind: "markdown".to_string(),
-            value: content,
-        }
-    }
-}
