@@ -2,10 +2,7 @@ use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use std::collections::HashMap;
 
-use crate::protocol::properties::{
-    CompletionOptions, ServerCapabilities, SignatureHelpOptions,
-    TextDocumentSyncKind, TextEdit,
-};
+use crate::protocol::properties::TextEdit;
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Response<T> {
@@ -39,31 +36,6 @@ where
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct ShutdownResult {}
-
-#[derive(Serialize, Clone)]
-pub struct InitializeResult {
-    pub capabilities: ServerCapabilities,
-}
-
-impl InitializeResult {
-    pub fn new(folding_range_provider: bool) -> Self {
-        InitializeResult {
-            capabilities: ServerCapabilities {
-                definition_provider: true,
-                references_provider: true,
-                rename_provider: true,
-                folding_range_provider,
-                document_symbol_provider: true,
-                document_formatting_provider: true,
-                completion_provider: CompletionOptions::default(),
-                signature_help_provider:
-                    SignatureHelpOptions::default(),
-                text_document_sync: TextDocumentSyncKind::Full,
-                hover_provider: true,
-            },
-        }
-    }
-}
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct WorkspaceEditResult {

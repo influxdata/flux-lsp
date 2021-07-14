@@ -3,7 +3,9 @@ use crate::handlers::{Error, RequestHandler};
 use crate::protocol::requests::{
     InitializeParams, PolymorphicRequest, Request,
 };
-use crate::protocol::responses::{InitializeResult, Response};
+use crate::protocol::responses::Response;
+
+use lspower::lsp;
 
 pub struct InitializeHandler {
     disable_folding: bool,
@@ -25,7 +27,48 @@ impl RequestHandler for InitializeHandler {
     ) -> Result<Option<String>, Error> {
         let _: Request<InitializeParams> =
             Request::from_json(prequest.data.as_str())?;
-        let result = InitializeResult::new(!self.disable_folding);
+        let result = lsp::InitializeResult {
+            capabilities: lsp::ServerCapabilities {
+                call_hierarchy_provider: None,
+                code_action_provider: None,
+                code_lens_provider: None,
+                color_provider: None,
+                completion_provider: Some(lsp::CompletionOptions::default()),
+                declaration_provider: None,
+                definition_provider: Some(lsp::OneOf::Left(true)),
+                document_formatting_provider: Some(lsp::OneOf::Left(true)),
+                document_highlight_provider: None,
+                document_link_provider: None,
+                document_on_type_formatting_provider: None,
+                document_range_formatting_provider: None,
+                document_symbol_provider: Some(lsp::OneOf::Left(true)),
+                execute_command_provider: None,
+                experimental: None,
+                folding_range_provider: Some(lsp::FoldingRangeProviderCapability::Simple(!self.disable_folding)),
+                hover_provider: Some(lsp::HoverProviderCapability::Simple(true)),
+                implementation_provider: None,
+                linked_editing_range_provider: None,
+                moniker_provider: None,
+                references_provider: Some(lsp::OneOf::Left(true)),
+                rename_provider: Some(lsp::OneOf::Left(true)),
+                selection_range_provider: None,
+                semantic_tokens_provider: None,
+                signature_help_provider: Some(lsp::SignatureHelpOptions::default()),
+                text_document_sync: Some(
+                    lsp::TextDocumentSyncCapability::Kind(
+                        lsp::TextDocumentSyncKind::Full
+                    )
+                ),
+                type_definition_provider: None,
+                workspace: None,
+                workspace_symbol_provider: None,
+            },
+            server_info: Some(lsp::ServerInfo {
+                name: "flux-lsp".to_string(),
+                version: Some("1.0".to_string()),
+            }),
+
+        };
         let response =
             Response::new(prequest.base_request.id, Some(result));
 
