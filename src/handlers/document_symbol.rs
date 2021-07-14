@@ -60,11 +60,8 @@ impl RequestHandler for DocumentSymbolHandler {
         let request: Request<DocumentSymbolParams> =
             Request::from_json(prequest.data.as_str())?;
         if let Some(params) = request.params {
-            let symbols = find_symbols(
-                params.text_document.uri,
-                ctx,
-                cache,
-            )?;
+            let symbols =
+                find_symbols(params.text_document.uri, ctx, cache)?;
             let response: Response<Vec<lsp::SymbolInformation>> =
                 Response::new(request.id, Some(symbols));
             let json = response.to_json()?;

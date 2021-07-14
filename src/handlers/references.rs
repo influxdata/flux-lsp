@@ -135,7 +135,8 @@ impl RequestHandler for FindReferencesHandler {
             Request::from_json(prequest.data.as_str())?;
         if let Some(params) = request.params {
             locations = find_references(
-                lsp::Url::parse(params.text_document.uri.as_str()).unwrap(),
+                lsp::Url::parse(params.text_document.uri.as_str())
+                    .unwrap(),
                 params.position,
                 cache,
             )?;

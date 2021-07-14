@@ -59,10 +59,8 @@ impl RequestHandler for FoldingHandler {
             Request::from_json(prequest.data.as_str())?;
         let mut areas: Option<Vec<lsp::FoldingRange>> = None;
         if let Some(params) = request.params {
-            let foldable = find_foldable_areas(
-                params.text_document.uri,
-                cache,
-            )?;
+            let foldable =
+                find_foldable_areas(params.text_document.uri, cache)?;
             areas = Some(foldable);
         }
 

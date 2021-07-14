@@ -90,7 +90,8 @@ fn find_signatures(
 
     if let Some(params) = request.params {
         let pos = params.position;
-        let uri = lsp::Url::parse(params.text_document.uri.as_str()).unwrap();
+        let uri = lsp::Url::parse(params.text_document.uri.as_str())
+            .unwrap();
         let pkg = create_semantic_package(uri.clone(), cache)?;
         let node_result = find_node(Node::Package(&pkg), pos.clone());
 

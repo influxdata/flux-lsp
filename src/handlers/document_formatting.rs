@@ -61,13 +61,14 @@ impl RequestHandler for DocumentFormattingHandler {
             let formatted =
                 formatter::format(file_contents.as_str())?;
 
-            let response: Response<Vec<lsp::TextEdit>> = Response::new(
-                prequest.base_request.id,
-                Some(vec![lsp::TextEdit {
-                    new_text: formatted,
-                    range,
-                }]),
-            );
+            let response: Response<Vec<lsp::TextEdit>> =
+                Response::new(
+                    prequest.base_request.id,
+                    Some(vec![lsp::TextEdit {
+                        new_text: formatted,
+                        range,
+                    }]),
+                );
 
             let json = response.to_json()?;
 

@@ -16,7 +16,10 @@ use flux::semantic::walk::{self, Node};
 
 use lspower::lsp;
 
-fn ident_to_location(uri: lsp::Url, node: Rc<Node<'_>>) -> lsp::Location {
+fn ident_to_location(
+    uri: lsp::Url,
+    node: Rc<Node<'_>>,
+) -> lsp::Location {
     let start = lsp::Position {
         line: node.loc().start.line - 1,
         character: node.loc().start.column - 1,
@@ -90,8 +93,11 @@ impl RequestHandler for GotoDefinitionHandler {
             Request::from_json(prequest.data.as_str())?;
 
         if let Some(params) = request.params {
-            let uri = lsp::Url::parse(params.text_document.uri.as_str()).unwrap();
-            let pkg = utils::create_semantic_package(uri.clone(), cache)?;
+            let uri =
+                lsp::Url::parse(params.text_document.uri.as_str())
+                    .unwrap();
+            let pkg =
+                utils::create_semantic_package(uri.clone(), cache)?;
             let walker = Rc::new(walk::Node::Package(&pkg));
 
             let mut node_finder =

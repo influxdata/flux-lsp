@@ -33,18 +33,28 @@ impl RequestHandler for InitializeHandler {
                 code_action_provider: None,
                 code_lens_provider: None,
                 color_provider: None,
-                completion_provider: Some(lsp::CompletionOptions::default()),
+                completion_provider: Some(
+                    lsp::CompletionOptions::default(),
+                ),
                 declaration_provider: None,
                 definition_provider: Some(lsp::OneOf::Left(true)),
-                document_formatting_provider: Some(lsp::OneOf::Left(true)),
+                document_formatting_provider: Some(lsp::OneOf::Left(
+                    true,
+                )),
                 document_highlight_provider: None,
                 document_link_provider: None,
                 document_on_type_formatting_provider: None,
                 document_range_formatting_provider: None,
-                document_symbol_provider: Some(lsp::OneOf::Left(true)),
+                document_symbol_provider: Some(lsp::OneOf::Left(
+                    true,
+                )),
                 execute_command_provider: None,
                 experimental: None,
-                folding_range_provider: Some(lsp::FoldingRangeProviderCapability::Simple(!self.disable_folding)),
+                folding_range_provider: Some(
+                    lsp::FoldingRangeProviderCapability::Simple(
+                        !self.disable_folding,
+                    ),
+                ),
                 hover_provider: None,
                 implementation_provider: None,
                 linked_editing_range_provider: None,
@@ -53,11 +63,13 @@ impl RequestHandler for InitializeHandler {
                 rename_provider: Some(lsp::OneOf::Left(true)),
                 selection_range_provider: None,
                 semantic_tokens_provider: None,
-                signature_help_provider: Some(lsp::SignatureHelpOptions::default()),
+                signature_help_provider: Some(
+                    lsp::SignatureHelpOptions::default(),
+                ),
                 text_document_sync: Some(
                     lsp::TextDocumentSyncCapability::Kind(
-                        lsp::TextDocumentSyncKind::Full
-                    )
+                        lsp::TextDocumentSyncKind::Full,
+                    ),
                 ),
                 type_definition_provider: None,
                 workspace: None,
@@ -67,7 +79,6 @@ impl RequestHandler for InitializeHandler {
                 name: "flux-lsp".to_string(),
                 version: Some("1.0".to_string()),
             }),
-
         };
         let response =
             Response::new(prequest.base_request.id, Some(result));

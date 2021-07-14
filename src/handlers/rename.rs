@@ -26,17 +26,19 @@ impl RequestHandler for RenameHandler {
 
         let mut changes = HashMap::new();
         if let Some(params) = request.params {
-            let document_uri = lsp::Url::parse(params.text_document.uri.as_str()).unwrap();
+            let document_uri =
+                lsp::Url::parse(params.text_document.uri.as_str())
+                    .unwrap();
             let new_name = params.new_name;
-            let locations =
-                find_references(document_uri, params.position, cache)?;
+            let locations = find_references(
+                document_uri,
+                params.position,
+                cache,
+            )?;
 
             for location in locations.iter() {
-                if changes.get(&location.uri.clone()).is_none()
-                {
-
-                        changes
-                        .insert(location.uri.clone(), vec![]);
+                if changes.get(&location.uri.clone()).is_none() {
+                    changes.insert(location.uri.clone(), vec![]);
                 }
 
                 if let Some(edits) =
@@ -52,12 +54,14 @@ impl RequestHandler for RenameHandler {
             }
         }
 
-        let response =
-            Response::new(request.id, Some(lsp::WorkspaceEdit {
+        let response = Response::new(
+            request.id,
+            Some(lsp::WorkspaceEdit {
                 changes: Some(changes),
                 document_changes: None,
                 change_annotations: None,
-            }));
+            }),
+        );
 
         let json = response.to_json()?;
 

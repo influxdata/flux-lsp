@@ -543,7 +543,11 @@ async fn find_param_completions(
                         get_package_functions(ident.name.clone());
 
                     let object_functions = get_object_functions(
-                        uri.clone(), position, ctx, ident.name, cache,
+                        uri.clone(),
+                        position,
+                        ctx,
+                        ident.name,
+                        cache,
                     )?;
 
                     let key = match me.property {
