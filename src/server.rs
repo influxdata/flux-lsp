@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
-use log::{debug, error};
+use log::{debug, error, warn};
 use lspower::jsonrpc::Result;
 use lspower::lsp;
 use lspower::LanguageServer;
@@ -110,7 +110,34 @@ impl LanguageServer for LspServer {
     ) -> () {
         let key = params.text_document.uri;
         let value = params.text_document.text;
-        self.store.lock().unwrap().insert(key, value);
+        let mut store = self.store.lock().unwrap();
+        if store.contains_key(&key) {
+            // The protocol spec is unclear on whether trying to open a file
+            // that is already opened is allowed, and research would indicate that
+            // there are badly behaved clients that do this. Rather than making this
+            // error, log the issue and move on.
+            warn!("textDocument/didOpen called on open file {}", key);
+        }
+        store.insert(key, value);
+    }
+    async fn did_close(
+        &self,
+        params: lsp::DidCloseTextDocumentParams,
+    ) -> () {
+        let key = params.text_document.uri;
+
+        let mut store = self.store.lock().unwrap();
+        if !store.contains_key(&key) {
+            // The protocol spec is unclear on whether trying to close a file
+            // that isn't open is allowed. To stop consistent with the
+            // implementation of textDocument/didOpen, this error is logged and
+            // allowed.
+            warn!(
+                "textDocument/didClose called on unknown file {}",
+                key
+            );
+        }
+        store.remove(&key);
     }
     async fn signature_help(
         &self,
@@ -261,6 +288,44 @@ mod tests {
         let result = block_on(server.did_open(params));
 
         assert_eq!((), result);
+    }
+
+    #[test]
+    fn test_did_close() {
+        let server = create_server();
+        open_file(&server, "from(".to_string());
+
+        let params = lsp::DidCloseTextDocumentParams {
+            text_document: lsp::TextDocumentIdentifier::new(
+                lsp::Url::parse("file:///home/user/file.flux")
+                    .unwrap(),
+            ),
+        };
+
+        // Close the opened filel. "Wait," you say. "Why not verify that the file
+        // could be worked on before asserting that closing it means it can't be
+        // used anymore?" There are other tests that test that functionality. We
+        // only care that it can't be worked on once it has been closed.
+        block_on(server.did_close(params));
+
+        let signature_params = lsp::SignatureHelpParams {
+            context: None,
+            text_document_position_params:
+                lsp::TextDocumentPositionParams::new(
+                    lsp::TextDocumentIdentifier::new(
+                        lsp::Url::parse(
+                            "file:///home/user/file.flux",
+                        )
+                        .unwrap(),
+                    ),
+                    lsp::Position::new(1, 1),
+                ),
+            work_done_progress_params: lsp::WorkDoneProgressParams {
+                work_done_token: None,
+            },
+        };
+        assert!(block_on(server.signature_help(signature_params))
+            .is_err());
     }
 
     // If the file hasn't been opened on the server get, return an error.
