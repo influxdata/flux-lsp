@@ -33,7 +33,7 @@ fn create_signature_information(
 #[derive(Default)]
 pub struct SignatureHelpHandler {}
 
-fn find_stdlib_signatures(
+pub fn find_stdlib_signatures(
     name: String,
     package: String,
 ) -> Vec<lsp::SignatureInformation> {
