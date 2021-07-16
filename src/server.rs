@@ -9,6 +9,12 @@ use lspower::LanguageServer;
 use crate::handlers::find_node;
 use crate::handlers::signature_help::find_stdlib_signatures;
 
+// The spec talks specifically about setting versions for files, but isn't
+// clear on how those versions are surfaced to the client, if ever. This
+// type could be extended to keep track of versions of files, but simplicity
+// is preferred at this point.
+type FileStore = Arc<Mutex<HashMap<lsp::Url, String>>>;
+
 fn parse_and_analyze(code: &str) -> flux::semantic::nodes::Package {
     let file = flux::parser::parse_string("", code);
     let ast_pkg = flux::ast::Package {
@@ -24,6 +30,38 @@ fn parse_and_analyze(code: &str) -> flux::semantic::nodes::Package {
     .unwrap()
 }
 
+/// Take a lsp::Range that contains a start and end lsp::Position, find the
+/// indexes of those points in the string, and replace that range with a new string.
+fn replace_string_in_range(
+    mut contents: String,
+    range: lsp::Range,
+    new: String,
+) -> String {
+    let mut string_range: (usize, usize) = (0, 0);
+    let lookup = line_col::LineColLookup::new(&contents);
+    for i in 0..contents.len() {
+        let linecol = lookup.get(i);
+        if string_range.0 == 0 {
+            if linecol.0 == (range.start.line as usize)
+                && linecol.1 == (range.start.character as usize)
+            {
+                string_range.0 = i;
+            }
+        } else if linecol.0 == (range.end.line as usize)
+            && linecol.1 == (range.end.character as usize)
+        {
+            string_range.1 = i + 1; // Range is not inclusive.
+            break;
+        }
+    }
+    if string_range.1 == 0 {
+        error!("range end not found after range start");
+        return contents;
+    }
+    contents.replace_range(string_range.0..string_range.1, &new);
+    contents
+}
+
 #[allow(dead_code)]
 struct LspServerOptions {
     folding: bool,
@@ -34,7 +72,7 @@ struct LspServerOptions {
 
 #[allow(dead_code)]
 pub struct LspServer {
-    store: Arc<Mutex<HashMap<lsp::Url, String>>>,
+    store: FileStore,
     options: LspServerOptions,
 }
 
@@ -119,6 +157,33 @@ impl LanguageServer for LspServer {
             warn!("textDocument/didOpen called on open file {}", key);
         }
         store.insert(key, value);
+    }
+    async fn did_change(
+        &self,
+        params: lsp::DidChangeTextDocumentParams,
+    ) -> () {
+        let key = params.text_document.uri;
+        let mut store = self.store.lock().unwrap();
+        if !store.contains_key(&key) {
+            error!(
+                "textDocument/didChange called on unknown file {}",
+                key
+            );
+            return;
+        }
+        for change in params.content_changes {
+            if let Some(range) = change.range {
+                let contents = store.get(&key).unwrap();
+                let new_contents = replace_string_in_range(
+                    contents.clone(),
+                    range,
+                    change.text,
+                );
+                store.insert(key.clone(), new_contents);
+            } else {
+                store.insert(key.clone(), change.text);
+            }
+        }
     }
     async fn did_close(
         &self,
@@ -285,15 +350,161 @@ mod tests {
             ),
         };
 
-        let result = block_on(server.did_open(params));
+        block_on(server.did_open(params));
 
-        assert_eq!((), result);
+        assert_eq!(
+            vec![&lsp::Url::parse("file:///home/user/file.flux")
+                .unwrap()],
+            server
+                .store
+                .lock()
+                .unwrap()
+                .keys()
+                .collect::<Vec<&lsp::Url>>()
+        );
+        let uri =
+            lsp::Url::parse("file:///home/user/file.flux").unwrap();
+        let contents =
+            server.store.lock().unwrap().get(&uri).unwrap().clone();
+        assert_eq!("from(", contents);
+    }
+
+    #[test]
+    fn test_did_change() {
+        let server = create_server();
+        open_file(
+            &server,
+            r#"from(bucket: "bucket") |> first()"#.to_string(),
+        );
+
+        let params = lsp::DidChangeTextDocumentParams {
+            text_document: lsp::VersionedTextDocumentIdentifier {
+                uri: lsp::Url::parse("file:///home/user/file.flux")
+                    .unwrap(),
+                version: -2,
+            },
+            content_changes: vec![
+                lsp::TextDocumentContentChangeEvent {
+                    range: None,
+                    range_length: None,
+                    text: r#"from(bucket: "bucket")"#.to_string(),
+                },
+            ],
+        };
+
+        block_on(server.did_change(params));
+
+        let uri =
+            lsp::Url::parse("file:///home/user/file.flux").unwrap();
+        let contents =
+            server.store.lock().unwrap().get(&uri).unwrap().clone();
+        assert_eq!(r#"from(bucket: "bucket")"#, contents);
+    }
+
+    #[test]
+    fn test_did_change_with_range() {
+        let server = create_server();
+        open_file(
+            &server,
+            r#"from(bucket: "bucket")
+|> last()"#
+                .to_string(),
+        );
+
+        let params = lsp::DidChangeTextDocumentParams {
+            text_document: lsp::VersionedTextDocumentIdentifier {
+                uri: lsp::Url::parse("file:///home/user/file.flux")
+                    .unwrap(),
+                version: -2,
+            },
+            content_changes: vec![
+                lsp::TextDocumentContentChangeEvent {
+                    range: Some(lsp::Range {
+                        start: lsp::Position {
+                            line: 2,
+                            character: 4,
+                        },
+                        end: lsp::Position {
+                            line: 2,
+                            character: 9,
+                        },
+                    }),
+                    range_length: None,
+                    text: r#" first()"#.to_string(),
+                },
+            ],
+        };
+
+        block_on(server.did_change(params));
+
+        let uri =
+            lsp::Url::parse("file:///home/user/file.flux").unwrap();
+        let contents =
+            server.store.lock().unwrap().get(&uri).unwrap().clone();
+        assert_eq!(
+            r#"from(bucket: "bucket")
+|>  first()"#,
+            contents
+        );
+    }
+
+    #[test]
+    fn test_did_change_with_multiline_range() {
+        let server = create_server();
+        open_file(
+            &server,
+            r#"from(bucket: "bucket")
+|> group()
+|> last()"#
+                .to_string(),
+        );
+
+        let params = lsp::DidChangeTextDocumentParams {
+            text_document: lsp::VersionedTextDocumentIdentifier {
+                uri: lsp::Url::parse("file:///home/user/file.flux")
+                    .unwrap(),
+                version: -2,
+            },
+            content_changes: vec![
+                lsp::TextDocumentContentChangeEvent {
+                    range: Some(lsp::Range {
+                        start: lsp::Position {
+                            line: 2,
+                            character: 3,
+                        },
+                        end: lsp::Position {
+                            line: 3,
+                            character: 8,
+                        },
+                    }),
+                    range_length: None,
+                    text: r#"drop(columns: ["_start", "_stop"])
+|>  first( "#
+                        .to_string(),
+                },
+            ],
+        };
+
+        block_on(server.did_change(params));
+
+        let uri =
+            lsp::Url::parse("file:///home/user/file.flux").unwrap();
+        let contents =
+            server.store.lock().unwrap().get(&uri).unwrap().clone();
+        assert_eq!(
+            r#"from(bucket: "bucket")
+|>drop(columns: ["_start", "_stop"])
+|>  first( )"#,
+            contents
+        );
     }
 
     #[test]
     fn test_did_close() {
         let server = create_server();
         open_file(&server, "from(".to_string());
+
+        assert!(server.store.lock().unwrap().keys().next().is_some());
 
         let params = lsp::DidCloseTextDocumentParams {
             text_document: lsp::TextDocumentIdentifier::new(
@@ -302,30 +513,9 @@ mod tests {
             ),
         };
 
-        // Close the opened filel. "Wait," you say. "Why not verify that the file
-        // could be worked on before asserting that closing it means it can't be
-        // used anymore?" There are other tests that test that functionality. We
-        // only care that it can't be worked on once it has been closed.
         block_on(server.did_close(params));
 
-        let signature_params = lsp::SignatureHelpParams {
-            context: None,
-            text_document_position_params:
-                lsp::TextDocumentPositionParams::new(
-                    lsp::TextDocumentIdentifier::new(
-                        lsp::Url::parse(
-                            "file:///home/user/file.flux",
-                        )
-                        .unwrap(),
-                    ),
-                    lsp::Position::new(1, 1),
-                ),
-            work_done_progress_params: lsp::WorkDoneProgressParams {
-                work_done_token: None,
-            },
-        };
-        assert!(block_on(server.signature_help(signature_params))
-            .is_err());
+        assert!(server.store.lock().unwrap().keys().next().is_none());
     }
 
     // If the file hasn't been opened on the server get, return an error.
