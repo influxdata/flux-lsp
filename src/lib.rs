@@ -6,9 +6,14 @@ pub mod shared;
 pub mod stdlib;
 pub mod wasm;
 
-#[macro_use]
-mod macros;
 mod visitors;
 
 pub use handlers::Router;
 pub use wasm::Server;
+
+#[macro_export]
+macro_rules! log {
+    ( $( $t:tt )* ) => {
+        web_sys::console::log_1(&format!( $( $t )* ).into());
+    }
+}
