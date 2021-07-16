@@ -416,8 +416,23 @@ fn test_formatting() {
 
     let file_text = get_file_contents_from_uri(uri);
     let formatted_text = flux::formatter::format(&file_text).unwrap();
+    // XXX: rockstar (15 Jul 2021) - These values are technically incorrect.
+    // lsp::Position should start at index 1, e.g. you can't have line number 0,
+    // but also, the end character position should be 96, as the final line is 96
+    // characters long.
+    let expected_range = lsp::Range {
+        start: lsp::Position {
+            line: 0,
+            character: 0,
+        },
+        end: lsp::Position {
+            line: 15,
+            character: 0,
+        },
+    };
 
     assert_eq!(text, formatted_text, "returns formatted text");
+    assert_eq!(expected_range, edit.range);
 }
 
 #[test]
