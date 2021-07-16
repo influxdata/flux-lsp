@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
-use log::{debug, error, warn};
+use log::{debug, error, info, warn};
 use lspower::jsonrpc::Result;
 use lspower::lsp;
 use lspower::LanguageServer;
@@ -202,11 +202,77 @@ impl LanguageServer for LspServer {
         };
         Ok(Some(response))
     }
+    async fn formatting(
+        &self,
+        params: lsp::DocumentFormattingParams,
+    ) -> Result<Option<Vec<lsp::TextEdit>>> {
+        let key = params.text_document.uri;
+        let store = self.store.lock().unwrap();
+        if !store.contains_key(&key) {
+            error!(
+                "formatting failed: file {} not open on server",
+                key
+            );
+            return Err(lspower::jsonrpc::Error::invalid_params(
+                format!("file not opened: {}", key),
+            ));
+        }
+        let contents = store.get(&key).unwrap();
+        let mut formatted =
+            flux::formatter::format(&contents).unwrap();
+        if let Some(trim_trailing_whitespace) =
+            params.options.trim_trailing_whitespace
+        {
+            if trim_trailing_whitespace {
+                info!("textDocument/formatting requested trimming trailing whitespace, but the flux formatter will always trim trailing whitespace");
+            }
+        }
+        if let Some(insert_final_newline) =
+            params.options.insert_final_newline
+        {
+            if insert_final_newline
+                && formatted.chars().nth(formatted.len() - 1).unwrap()
+                    != '\n'
+            {
+                formatted.push('\n');
+            }
+        }
+        if let Some(trim_final_newlines) =
+            params.options.trim_final_newlines
+        {
+            if trim_final_newlines
+                && formatted.chars().nth(formatted.len() - 1).unwrap()
+                    != '\n'
+            {
+                info!("textDocument/formatting requested trimming final newlines, but the flux formatter will always trim trailing whitespace");
+            }
+        }
+        let lookup = line_col::LineColLookup::new(formatted.as_str());
+        let end = lookup.get(formatted.len() - 1);
+
+        let edit = lsp::TextEdit::new(
+            lsp::Range {
+                start: lsp::Position {
+                    line: 1,
+                    character: 1,
+                },
+                end: lsp::Position {
+                    line: end.0 as u32,
+                    character: end.1 as u32,
+                },
+            },
+            formatted,
+        );
+
+        Ok(Some(vec![edit]))
+    }
 }
 
 #[cfg(test)]
 #[allow(deprecated)]
 mod tests {
+    use std::collections::HashMap;
+
     use lspower::lsp;
     use lspower::LanguageServer;
     use tokio_test::block_on;
@@ -412,5 +478,158 @@ mod tests {
                 .collect::<Vec<lsp::SignatureInformation>>()
                 .len()
         );
+    }
+
+    // If the file hasn't been opened on the server, return an error.
+    #[test]
+    fn test_formatting_not_opened() {
+        let server = create_server();
+
+        let params = lsp::DocumentFormattingParams {
+            text_document: lsp::TextDocumentIdentifier {
+                uri: lsp::Url::parse("file::///home/user/file.flux")
+                    .unwrap(),
+            },
+            options: lsp::FormattingOptions {
+                tab_size: 0,
+                insert_spaces: false,
+                properties:
+                    HashMap::<String, lsp::FormattingProperty>::new(),
+                trim_trailing_whitespace: None,
+                insert_final_newline: None,
+                trim_final_newlines: None,
+            },
+            work_done_progress_params: lsp::WorkDoneProgressParams {
+                work_done_token: None,
+            },
+        };
+        let result = block_on(server.formatting(params));
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_formatting() {
+        let fluxscript = r#"
+import "strings"
+env = "prod01-us-west-2"
+
+errorCounts = from(bucket:"kube-infra/monthly")
+      |> range(start: -3d)
+    |> filter(fn: (r) => r._measurement == "query_log" and
+                         r.error != "" and
+                         r._field == "responseSize" and
+                         r.env == env)
+      |> group(columns:["env", "error"])
+    |> count()
+  |> group(columns:["env", "_stop", "_start"])
+
+errorCounts
+    |> filter(fn: (r) => strings.containsStr(v: r.error, substr: "AppendMappedRecordWithNulls"))"#;
+        let server = create_server();
+        open_file(&server, fluxscript.to_string());
+
+        let params = lsp::DocumentFormattingParams {
+            text_document: lsp::TextDocumentIdentifier {
+                uri: lsp::Url::parse("file:///home/user/file.flux")
+                    .unwrap(),
+            },
+            options: lsp::FormattingOptions {
+                tab_size: 0,
+                insert_spaces: false,
+                properties:
+                    HashMap::<String, lsp::FormattingProperty>::new(),
+                trim_trailing_whitespace: None,
+                insert_final_newline: None,
+                trim_final_newlines: None,
+            },
+            work_done_progress_params: lsp::WorkDoneProgressParams {
+                work_done_token: None,
+            },
+        };
+        let result =
+            block_on(server.formatting(params)).unwrap().unwrap();
+
+        let expected = lsp::TextEdit::new(
+            lsp::Range {
+                start: lsp::Position {
+                    line: 1,
+                    character: 1,
+                },
+                end: lsp::Position {
+                    line: 15,
+                    character: 96,
+                },
+            },
+            flux::formatter::format(&fluxscript).unwrap(),
+        );
+        assert_eq!(vec![expected], result);
+    }
+
+    #[test]
+    fn test_formatting_insert_final_newline() {
+        let fluxscript = r#"
+import "strings"
+env = "prod01-us-west-2"
+
+errorCounts = from(bucket:"kube-infra/monthly")
+      |> range(start: -3d)
+    |> filter(fn: (r) => r._measurement == "query_log" and
+                         r.error != "" and
+                         r._field == "responseSize" and
+                         r.env == env)
+      |> group(columns:["env", "error"])
+    |> count()
+  |> group(columns:["env", "_stop", "_start"])
+
+errorCounts
+    |> filter(fn: (r) => strings.containsStr(v: r.error, substr: "AppendMappedRecordWithNulls"))
+
+"#;
+        let server = create_server();
+        open_file(&server, fluxscript.to_string());
+
+        let params = lsp::DocumentFormattingParams {
+            text_document: lsp::TextDocumentIdentifier {
+                uri: lsp::Url::parse("file:///home/user/file.flux")
+                    .unwrap(),
+            },
+            options: lsp::FormattingOptions {
+                tab_size: 0,
+                insert_spaces: false,
+                properties:
+                    HashMap::<String, lsp::FormattingProperty>::new(),
+                trim_trailing_whitespace: None,
+                insert_final_newline: Some(true),
+                trim_final_newlines: None,
+            },
+            work_done_progress_params: lsp::WorkDoneProgressParams {
+                work_done_token: None,
+            },
+        };
+        let result =
+            block_on(server.formatting(params)).unwrap().unwrap();
+
+        let mut formatted_text =
+            flux::formatter::format(&fluxscript).unwrap();
+        formatted_text.push('\n');
+        let expected = lsp::TextEdit::new(
+            lsp::Range {
+                start: lsp::Position {
+                    line: 1,
+                    character: 1,
+                },
+                // This reads funny, because line 15 is only 96 characters long.
+                // Character number 97 is a newline, but it doesn't show as line
+                // 16 because there aren't any characters on the line, and we
+                // can't uso character 0 there.
+                end: lsp::Position {
+                    line: 15,
+                    character: 97,
+                },
+            },
+            formatted_text,
+        );
+        assert_eq!(vec![expected], result);
     }
 }
