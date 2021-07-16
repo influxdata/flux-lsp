@@ -6,7 +6,7 @@ use std::convert::TryFrom;
 
 use flux::formatter;
 
-use lspower::lsp;
+use lsp_types as lsp;
 
 fn create_range(contents: String) -> lsp::Range {
     let lines = contents.split('\n').collect::<Vec<&str>>();

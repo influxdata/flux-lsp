@@ -11,7 +11,7 @@ use crate::visitors::semantic::{
 use flux::semantic::nodes::FunctionExpr;
 use flux::semantic::walk::{self, Node};
 
-use lspower::lsp;
+use lsp_types as lsp;
 
 use std::rc::Rc;
 

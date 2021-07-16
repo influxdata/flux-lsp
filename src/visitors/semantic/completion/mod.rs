@@ -15,7 +15,7 @@ use flux::semantic::nodes::*;
 use flux::semantic::types::MonoType;
 use flux::semantic::walk::{Node, Visitor};
 
-use lspower::lsp;
+use lsp_types as lsp;
 
 pub struct FunctionFinderState {
     pub functions: Vec<Function>,

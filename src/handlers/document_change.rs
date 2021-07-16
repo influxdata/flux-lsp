@@ -6,7 +6,7 @@ use crate::shared::structs::RequestContext;
 
 use async_trait::async_trait;
 
-use lspower::lsp;
+use lsp_types as lsp;
 
 #[derive(Default)]
 pub struct DocumentChangeHandler {}

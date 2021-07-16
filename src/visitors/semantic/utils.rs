@@ -11,7 +11,7 @@ use flux::semantic::nodes::Package;
 
 use flux::analyze;
 
-use lspower::lsp;
+use lsp_types as lsp;
 
 fn local_analyze(
     pkg: flux::ast::Package,

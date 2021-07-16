@@ -4,7 +4,7 @@ use crate::protocol::{PolymorphicRequest, Request};
 
 use async_trait::async_trait;
 
-use lspower::lsp;
+use lsp_types as lsp;
 
 #[derive(Default)]
 pub struct DocumentCloseHandler {}

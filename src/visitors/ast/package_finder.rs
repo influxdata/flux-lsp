@@ -9,7 +9,7 @@ use crate::shared::ast::create_ast_package;
 use crate::shared::conversion::flux_position_to_position;
 use crate::shared::RequestContext;
 
-use lspower::lsp;
+use lsp_types as lsp;
 
 #[derive(Clone)]
 pub struct PackageInfo {

@@ -20,15 +20,21 @@ jobs:
       - checkout
       - run:
           name: "run tests"
-          command: cargo test
+          command: |
+            cargo test
+            cargo test --features lsp2
 
   build:
     docker:
       - image: quay.io/influxdb/wasm-build
     steps:
       - checkout
-      - run: cargo build --verbose
-      - run: make wasm
+      - run: |
+          cargo build --verbose
+          cargo build --features lsp2 --verbose
+      - run: |
+          make wasm
+          LSP2=1 make wasm
 
   test-integration:
     docker:
@@ -41,6 +47,10 @@ jobs:
             cd integration
             npm install -f  # Force, because fsevents
             npm test
+            # XXX: rockstar (22 Jul 2021) - Enabling the `lsp2` feature flag
+            # does not enable a wasm binary, currently. That will have to be
+            # followed up.
+            # LSP2=1 npm test
 
   deploy:
     docker:

@@ -4,7 +4,7 @@ use crate::protocol::{PolymorphicRequest, Request};
 use crate::shared::create_diagnoistics;
 use crate::shared::structs::RequestContext;
 
-use lspower::lsp;
+use lsp_types as lsp;
 
 #[derive(Default)]
 pub struct DocumentOpenHandler {}

@@ -20,11 +20,12 @@ use std::rc::Rc;
 
 use flux::semantic::walk;
 
-use lspower::lsp;
+use lsp_types as lsp;
 
 pub mod ast;
 pub mod callbacks;
 pub mod conversion;
+#[cfg(not(feature = "lsp2"))]
 pub mod messages;
 pub mod signatures;
 pub mod structs;

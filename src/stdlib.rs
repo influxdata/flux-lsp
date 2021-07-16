@@ -14,7 +14,7 @@ use std::iter::Iterator;
 
 use async_trait::async_trait;
 
-use lspower::lsp;
+use lsp_types as lsp;
 
 pub const BUILTIN_PACKAGE: &str = "builtin";
 

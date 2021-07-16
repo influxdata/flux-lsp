@@ -2,7 +2,7 @@ use flux::ast::SourceLocation;
 use flux::semantic::nodes::*;
 use flux::semantic::types::MonoType;
 
-use lspower::lsp;
+use lsp_types as lsp;
 
 pub fn follow_function_pipes(c: &CallExpr) -> &MonoType {
     if let Some(Expression::Call(call)) = &c.pipe {

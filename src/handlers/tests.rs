@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use std::fs;
 
 use futures::executor::block_on;
-use lspower::lsp;
+use lsp_types as lsp;
 use serde_json::from_str;
 use url::Url;
 

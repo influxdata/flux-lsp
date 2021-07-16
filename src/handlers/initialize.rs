@@ -2,7 +2,7 @@ use crate::cache::Cache;
 use crate::handlers::{Error, RequestHandler};
 use crate::protocol::{PolymorphicRequest, Request, Response};
 
-use lspower::lsp;
+use lsp_types as lsp;
 
 pub struct InitializeHandler {
     disable_folding: bool,

@@ -14,7 +14,7 @@ use flux::semantic::walk::{walk, Node};
 
 use std::rc::Rc;
 
-use lspower::lsp;
+use lsp_types as lsp;
 
 fn create_signature_information(
     fs: FunctionSignature,
