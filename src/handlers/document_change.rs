@@ -1,7 +1,6 @@
 use crate::cache::Cache;
 use crate::handlers::{Error, RequestHandler};
-use crate::protocol::requests::PolymorphicRequest;
-use crate::protocol::requests::Request;
+use crate::protocol::{PolymorphicRequest, Request};
 use crate::shared::create_diagnoistics;
 use crate::shared::structs::RequestContext;
 

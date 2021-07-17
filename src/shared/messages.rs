@@ -1,4 +1,4 @@
-use crate::protocol::requests::{BaseRequest, PolymorphicRequest};
+use crate::protocol::{BaseRequest, PolymorphicRequest};
 
 pub fn wrap_message(s: String) -> String {
     let st = s.clone();

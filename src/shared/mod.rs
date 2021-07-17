@@ -1,7 +1,6 @@
 use crate::cache::Cache;
-use crate::protocol::notifications::{
+use crate::protocol::{
     create_diagnostics_notification, Notification,
-    PublishDiagnosticsParams,
 };
 use crate::shared::conversion::map_errors_to_diagnostics;
 use crate::visitors::ast::package_finder::{
@@ -64,7 +63,7 @@ pub fn create_diagnoistics(
     uri: lsp::Url,
     ctx: RequestContext,
     cache: &Cache,
-) -> Result<Notification<PublishDiagnosticsParams>, String> {
+) -> Result<Notification<lsp::PublishDiagnosticsParams>, String> {
     let package = create_ast_package(uri.clone(), ctx, cache)?;
     let walker = flux::ast::walk::Node::Package(&package);
     let errors = flux::ast::check::check(walker);

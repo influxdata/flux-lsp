@@ -1,7 +1,6 @@
 use crate::cache::Cache;
 use crate::handlers::{find_node, Error, RequestHandler};
-use crate::protocol::requests::{PolymorphicRequest, Request};
-use crate::protocol::responses::Response;
+use crate::protocol::{PolymorphicRequest, Request, Response};
 use crate::shared::signatures::FunctionSignature;
 use crate::shared::RequestContext;
 use crate::stdlib::{get_stdlib_functions, BUILTIN_PACKAGE};

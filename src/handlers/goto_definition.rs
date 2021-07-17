@@ -2,8 +2,7 @@ use std::rc::Rc;
 
 use crate::cache::Cache;
 use crate::handlers::{Error, RequestHandler};
-use crate::protocol::requests::{PolymorphicRequest, Request};
-use crate::protocol::responses::Response;
+use crate::protocol::{PolymorphicRequest, Request, Response};
 use crate::shared::conversion::map_node_to_location;
 use crate::visitors::semantic::utils;
 use crate::visitors::semantic::{

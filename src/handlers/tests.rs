@@ -7,9 +7,7 @@ use lspower::lsp;
 use serde_json::from_str;
 use url::Url;
 
-use crate::protocol::notifications;
-use crate::protocol::requests;
-use crate::protocol::responses;
+use crate::protocol;
 use crate::shared::callbacks::Callbacks;
 use crate::shared::{CompletionInfo, CompletionType, RequestContext};
 use crate::stdlib::{get_builtins, Completable, PackageResult};
@@ -48,7 +46,7 @@ fn get_file_contents_from_uri(uri: lsp::Url) -> String {
 /// Open a file on the server, so it lives in memory.
 fn open_file_on_server(uri: lsp::Url, router: &mut Router) {
     let text = get_file_contents_from_uri(uri.clone());
-    let did_open_request = requests::Request {
+    let did_open_request = protocol::Request {
         id: 1,
         method: "textDocument/didOpen".to_string(),
         params: Some(lsp::DidOpenTextDocumentParams {
@@ -63,8 +61,8 @@ fn open_file_on_server(uri: lsp::Url, router: &mut Router) {
 
     let did_open_request_json =
         serde_json::to_string(&did_open_request).unwrap();
-    let request = requests::PolymorphicRequest {
-        base_request: requests::BaseRequest {
+    let request = protocol::PolymorphicRequest {
+        base_request: protocol::BaseRequest {
             id: 1,
             method: "textDocument/didOpen".to_string(),
         },
@@ -78,8 +76,8 @@ fn open_file_on_server(uri: lsp::Url, router: &mut Router) {
 #[test]
 fn test_invalid_method() {
     let mut router = Router::new(false);
-    let request = requests::PolymorphicRequest {
-        base_request: requests::BaseRequest {
+    let request = protocol::PolymorphicRequest {
+        base_request: protocol::BaseRequest {
             id: 1,
             method: "unknwn".to_string(),
         },
@@ -97,7 +95,7 @@ fn test_invalid_method() {
 #[test]
 fn test_initialize() {
     let mut router = Router::new(false);
-    let initialize_request = requests::Request {
+    let initialize_request = protocol::Request {
         id: 1,
         params: Some(lsp::InitializeParams {
             capabilities: lsp::ClientCapabilities {
@@ -122,8 +120,8 @@ fn test_initialize() {
     let initialize_request_json =
         serde_json::to_string(&initialize_request).unwrap();
 
-    let request = requests::PolymorphicRequest {
-        base_request: requests::BaseRequest {
+    let request = protocol::PolymorphicRequest {
+        base_request: protocol::BaseRequest {
             id: 1,
             method: "initialize".to_string(),
         },
@@ -134,7 +132,7 @@ fn test_initialize() {
         block_on(router.route(request, create_request_context()))
             .unwrap()
             .unwrap();
-    let expected = responses::Response {
+    let expected = protocol::Response {
         id: 1,
         result: Some(lsp::InitializeResult {
             capabilities: lsp::ServerCapabilities {
@@ -197,8 +195,8 @@ fn test_initialize() {
 #[test]
 fn test_initialized() {
     let mut router = Router::new(false);
-    let request = requests::PolymorphicRequest {
-        base_request: requests::BaseRequest {
+    let request = protocol::PolymorphicRequest {
+        base_request: protocol::BaseRequest {
             id: 1,
             method: "initialized".to_string(),
         },
@@ -217,7 +215,7 @@ fn test_initialized() {
 fn test_open_file() {
     let mut router = Router::new(false);
     let uri = get_fixture_path("ok");
-    let did_open_request = requests::Request {
+    let did_open_request = protocol::Request {
         id: 1,
         method: "textDocument/didOpen".to_string(),
         params: Some(lsp::DidOpenTextDocumentParams {
@@ -232,8 +230,8 @@ fn test_open_file() {
 
     let did_open_request_json =
         serde_json::to_string(&did_open_request).unwrap();
-    let request = requests::PolymorphicRequest {
-        base_request: requests::BaseRequest {
+    let request = protocol::PolymorphicRequest {
+        base_request: protocol::BaseRequest {
             id: 1,
             method: "textDocument/didOpen".to_string(),
         },
@@ -245,7 +243,7 @@ fn test_open_file() {
             .unwrap()
             .unwrap();
     let expected_json =
-        notifications::create_diagnostics_notification(uri, vec![])
+        protocol::create_diagnostics_notification(uri, vec![])
             .to_json()
             .unwrap();
 
@@ -260,7 +258,7 @@ fn test_incomplete_option() {
     let mut router = Router::new(false);
     let uri = get_fixture_path("incomplete_option");
     let text = get_file_contents_from_uri(uri.clone());
-    let did_open_request = requests::Request {
+    let did_open_request = protocol::Request {
         id: 1,
         method: "textDocument/didOpen".to_string(),
         params: Some(lsp::DidOpenTextDocumentParams {
@@ -275,8 +273,8 @@ fn test_incomplete_option() {
 
     let did_open_request_json =
         serde_json::to_string(&did_open_request).unwrap();
-    let request = requests::PolymorphicRequest {
-        base_request: requests::BaseRequest {
+    let request = protocol::PolymorphicRequest {
+        base_request: protocol::BaseRequest {
             id: 1,
             method: "textDocument/didOpen".to_string(),
         },
@@ -309,12 +307,9 @@ fn test_incomplete_option() {
     }];
 
     let expected_json =
-        notifications::create_diagnostics_notification(
-            uri,
-            diagnostics,
-        )
-        .to_json()
-        .unwrap();
+        protocol::create_diagnostics_notification(uri, diagnostics)
+            .to_json()
+            .unwrap();
 
     assert_eq!(
         expected_json,
@@ -328,7 +323,7 @@ fn test_error_on_error() {
     let mut router = Router::new(false);
     let uri = get_fixture_path("error");
     let text = get_file_contents_from_uri(uri.clone());
-    let did_open_request = requests::Request {
+    let did_open_request = protocol::Request {
         id: 1,
         method: "textDocument/didOpen".to_string(),
         params: Some(lsp::DidOpenTextDocumentParams {
@@ -343,8 +338,8 @@ fn test_error_on_error() {
 
     let did_open_request_json =
         serde_json::to_string(&did_open_request).unwrap();
-    let request = requests::PolymorphicRequest {
-        base_request: requests::BaseRequest {
+    let request = protocol::PolymorphicRequest {
+        base_request: protocol::BaseRequest {
             id: 1,
             method: "textDocument/didOpen".to_string(),
         },
@@ -378,12 +373,9 @@ fn test_error_on_error() {
     }];
 
     let expected_json =
-        notifications::create_diagnostics_notification(
-            uri,
-            diagnostics,
-        )
-        .to_json()
-        .unwrap();
+        protocol::create_diagnostics_notification(uri, diagnostics)
+            .to_json()
+            .unwrap();
 
     assert_eq!(
         expected_json,
@@ -398,7 +390,7 @@ fn test_formatting() {
     let uri = get_fixture_path("formatting");
     open_file_on_server(uri.clone(), &mut router);
 
-    let formatting_request = requests::Request {
+    let formatting_request = protocol::Request {
         id: 1,
         method: "textDocument/formatting".to_string(),
         params: Some(lsp::DocumentFormattingParams {
@@ -421,8 +413,8 @@ fn test_formatting() {
     };
     let request_json =
         serde_json::to_string(&formatting_request).unwrap();
-    let request = requests::PolymorphicRequest {
-        base_request: requests::BaseRequest {
+    let request = protocol::PolymorphicRequest {
+        base_request: protocol::BaseRequest {
             id: 1,
             method: "textDocument/formatting".to_string(),
         },
@@ -433,7 +425,7 @@ fn test_formatting() {
         block_on(router.route(request, create_request_context()))
             .unwrap();
     let returned =
-        from_str::<responses::Response<Vec<lsp::TextEdit>>>(
+        from_str::<protocol::Response<Vec<lsp::TextEdit>>>(
             response.unwrap().as_str(),
         )
         .unwrap();
@@ -454,7 +446,7 @@ fn test_signature_help() {
     let uri = get_fixture_path("signatures");
     open_file_on_server(uri.clone(), &mut router);
 
-    let signature_help_request = requests::Request {
+    let signature_help_request = protocol::Request {
         id: 1,
         method: "textDocument/signatureHelp".to_string(),
         params: Some(lsp::SignatureHelpParams {
@@ -476,8 +468,8 @@ fn test_signature_help() {
     };
     let request_json =
         serde_json::to_string(&signature_help_request).unwrap();
-    let request = requests::PolymorphicRequest {
-        base_request: requests::BaseRequest {
+    let request = protocol::PolymorphicRequest {
+        base_request: protocol::BaseRequest {
             id: 1,
             method: "textDocument/signatureHelp".to_string(),
         },
@@ -488,7 +480,7 @@ fn test_signature_help() {
         block_on(router.route(request, create_request_context()))
             .unwrap();
     let returned =
-        from_str::<responses::Response<lsp::SignatureHelp>>(
+        from_str::<protocol::Response<lsp::SignatureHelp>>(
             response.unwrap().as_str(),
         )
         .unwrap();
@@ -508,7 +500,7 @@ fn test_object_param_completion() {
     let uri = get_fixture_path("object_param_completion");
     open_file_on_server(uri.clone(), &mut router);
 
-    let completion_request = requests::Request {
+    let completion_request = protocol::Request {
         id: 1,
         method: "textDocument/completion".to_string(),
         params: Some(lsp::CompletionParams {
@@ -534,8 +526,8 @@ fn test_object_param_completion() {
 
     let completion_request_json =
         serde_json::to_string(&completion_request).unwrap();
-    let request = requests::PolymorphicRequest {
-        base_request: requests::BaseRequest {
+    let request = protocol::PolymorphicRequest {
+        base_request: protocol::BaseRequest {
             id: 1,
             method: "textDocument/completion".to_string(),
         },
@@ -546,7 +538,7 @@ fn test_object_param_completion() {
         block_on(router.route(request, create_request_context()))
             .unwrap();
     let returned =
-        from_str::<responses::Response<lsp::CompletionList>>(
+        from_str::<protocol::Response<lsp::CompletionList>>(
             response.unwrap().as_str(),
         )
         .unwrap();
@@ -575,7 +567,7 @@ fn test_param_completion() {
     let uri = get_fixture_path("param_completion");
     open_file_on_server(uri.clone(), &mut router);
 
-    let completion_request = requests::Request {
+    let completion_request = protocol::Request {
         id: 1,
         method: "textDocument/completion".to_string(),
         params: Some(lsp::CompletionParams {
@@ -601,8 +593,8 @@ fn test_param_completion() {
 
     let completion_request_json =
         serde_json::to_string(&completion_request).unwrap();
-    let request = requests::PolymorphicRequest {
-        base_request: requests::BaseRequest {
+    let request = protocol::PolymorphicRequest {
+        base_request: protocol::BaseRequest {
             id: 1,
             method: "textDocument/completion".to_string(),
         },
@@ -613,7 +605,7 @@ fn test_param_completion() {
         block_on(router.route(request, create_request_context()))
             .unwrap();
     let returned =
-        from_str::<responses::Response<lsp::CompletionList>>(
+        from_str::<protocol::Response<lsp::CompletionList>>(
             response.unwrap().as_str(),
         )
         .unwrap();
@@ -648,7 +640,7 @@ fn test_param_completion_multiple_files() {
     let uri2 = get_fixture_path("multiple_2");
     open_file_on_server(uri2.clone(), &mut router);
 
-    let completion_request = requests::Request {
+    let completion_request = protocol::Request {
         id: 1,
         method: "textDocument/completion".to_string(),
         params: Some(lsp::CompletionParams {
@@ -674,8 +666,8 @@ fn test_param_completion_multiple_files() {
 
     let completion_request_json =
         serde_json::to_string(&completion_request).unwrap();
-    let request = requests::PolymorphicRequest {
-        base_request: requests::BaseRequest {
+    let request = protocol::PolymorphicRequest {
+        base_request: protocol::BaseRequest {
             id: 1,
             method: "textDocument/completion".to_string(),
         },
@@ -685,7 +677,7 @@ fn test_param_completion_multiple_files() {
         block_on(router.route(request, create_request_context()))
             .unwrap();
     let returned =
-        from_str::<responses::Response<lsp::CompletionList>>(
+        from_str::<protocol::Response<lsp::CompletionList>>(
             response.unwrap().as_str(),
         )
         .unwrap();
@@ -704,7 +696,7 @@ fn test_package_completion() {
     let uri = get_fixture_path("package_completion");
     open_file_on_server(uri.clone(), &mut router);
 
-    let completion_request = requests::Request {
+    let completion_request = protocol::Request {
         id: 1,
         method: "textDocument/completion".to_string(),
         params: Some(lsp::CompletionParams {
@@ -730,8 +722,8 @@ fn test_package_completion() {
 
     let completion_request_json =
         serde_json::to_string(&completion_request).unwrap();
-    let request = requests::PolymorphicRequest {
-        base_request: requests::BaseRequest {
+    let request = protocol::PolymorphicRequest {
+        base_request: protocol::BaseRequest {
             id: 1,
             method: "textDocument/completion".to_string(),
         },
@@ -741,7 +733,7 @@ fn test_package_completion() {
         block_on(router.route(request, create_request_context()))
             .unwrap();
     let returned =
-        from_str::<responses::Response<lsp::CompletionList>>(
+        from_str::<protocol::Response<lsp::CompletionList>>(
             response.unwrap().as_str(),
         )
         .unwrap();
@@ -760,7 +752,7 @@ fn test_variable_completion() {
     let uri = get_fixture_path("completion");
     open_file_on_server(uri.clone(), &mut router);
 
-    let completion_request = requests::Request {
+    let completion_request = protocol::Request {
         id: 1,
         method: "textDocument/completion".to_string(),
         params: Some(lsp::CompletionParams {
@@ -785,8 +777,8 @@ fn test_variable_completion() {
 
     let completion_request_json =
         serde_json::to_string(&completion_request).unwrap();
-    let request = requests::PolymorphicRequest {
-        base_request: requests::BaseRequest {
+    let request = protocol::PolymorphicRequest {
+        base_request: protocol::BaseRequest {
             id: 1,
             method: "textDocument/completion".to_string(),
         },
@@ -828,7 +820,7 @@ fn test_variable_completion() {
     }
 
     let returned =
-        from_str::<responses::Response<lsp::CompletionList>>(
+        from_str::<protocol::Response<lsp::CompletionList>>(
             response.unwrap().as_str(),
         )
         .unwrap();
@@ -855,7 +847,7 @@ fn test_options_completion() {
     let uri = get_fixture_path("options"); // This should be named options_completion
     open_file_on_server(uri.clone(), &mut router);
 
-    let completion_request = requests::Request {
+    let completion_request = protocol::Request {
         id: 1,
         method: "textDocument/completion".to_string(),
         params: Some(lsp::CompletionParams {
@@ -878,8 +870,8 @@ fn test_options_completion() {
 
     let completion_request_json =
         serde_json::to_string(&completion_request).unwrap();
-    let request = requests::PolymorphicRequest {
-        base_request: requests::BaseRequest {
+    let request = protocol::PolymorphicRequest {
+        base_request: protocol::BaseRequest {
             id: 1,
             method: "textDocument/completion".to_string(),
         },
@@ -890,7 +882,7 @@ fn test_options_completion() {
             .unwrap();
 
     let returned =
-        from_str::<responses::Response<lsp::CompletionList>>(
+        from_str::<protocol::Response<lsp::CompletionList>>(
             response.unwrap().as_str(),
         )
         .unwrap();
@@ -921,7 +913,7 @@ fn test_option_object_members_completion() {
     let uri = get_fixture_path("options_object_members");
     open_file_on_server(uri.clone(), &mut router);
 
-    let completion_request = requests::Request {
+    let completion_request = protocol::Request {
         id: 1,
         method: "textDocument/completion".to_string(),
         params: Some(lsp::CompletionParams {
@@ -947,8 +939,8 @@ fn test_option_object_members_completion() {
 
     let completion_request_json =
         serde_json::to_string(&completion_request).unwrap();
-    let request = requests::PolymorphicRequest {
-        base_request: requests::BaseRequest {
+    let request = protocol::PolymorphicRequest {
+        base_request: protocol::BaseRequest {
             id: 1,
             method: "textDocument/completion".to_string(),
         },
@@ -964,7 +956,7 @@ fn test_option_object_members_completion() {
     };
 
     let returned =
-        from_str::<responses::Response<lsp::CompletionList>>(
+        from_str::<protocol::Response<lsp::CompletionList>>(
             response.unwrap().as_str(),
         )
         .unwrap();
@@ -979,7 +971,7 @@ fn test_option_function_completion() {
     let uri = get_fixture_path("options_function");
     open_file_on_server(uri.clone(), &mut router);
 
-    let completion_request = requests::Request {
+    let completion_request = protocol::Request {
         id: 1,
         method: "textDocument/completion".to_string(),
         params: Some(lsp::CompletionParams {
@@ -1002,8 +994,8 @@ fn test_option_function_completion() {
 
     let completion_request_json =
         serde_json::to_string(&completion_request).unwrap();
-    let request = requests::PolymorphicRequest {
-        base_request: requests::BaseRequest {
+    let request = protocol::PolymorphicRequest {
+        base_request: protocol::BaseRequest {
             id: 1,
             method: "textDocument/completion".to_string(),
         },
@@ -1014,7 +1006,7 @@ fn test_option_function_completion() {
             .unwrap();
 
     let returned =
-        from_str::<responses::Response<lsp::CompletionList>>(
+        from_str::<protocol::Response<lsp::CompletionList>>(
             response.unwrap().as_str(),
         )
         .unwrap();
@@ -1031,7 +1023,7 @@ fn test_document_change() {
 
     let text = get_file_contents_from_uri(uri.clone());
 
-    let did_change_request = requests::Request {
+    let did_change_request = protocol::Request {
         id: 1,
         method: "textDocument/didChange".to_string(),
         params: Some(lsp::DidChangeTextDocumentParams {
@@ -1051,8 +1043,8 @@ fn test_document_change() {
 
     let did_change_request_json =
         serde_json::to_string(&did_change_request).unwrap();
-    let request = requests::PolymorphicRequest {
-        base_request: requests::BaseRequest {
+    let request = protocol::PolymorphicRequest {
+        base_request: protocol::BaseRequest {
             id: 1,
             method: "textDocument/didChange".to_string(),
         },
@@ -1062,7 +1054,7 @@ fn test_document_change() {
         block_on(router.route(request, create_request_context()))
             .unwrap();
     let expected_json =
-        notifications::create_diagnostics_notification(uri, vec![])
+        protocol::create_diagnostics_notification(uri, vec![])
             .to_json()
             .unwrap();
 
@@ -1081,7 +1073,7 @@ fn test_document_change_error() {
 
     let text = get_file_contents_from_uri(uri.clone());
 
-    let did_change_request = requests::Request {
+    let did_change_request = protocol::Request {
         id: 1,
         method: "textDocument/didChange".to_string(),
         params: Some(lsp::DidChangeTextDocumentParams {
@@ -1101,8 +1093,8 @@ fn test_document_change_error() {
 
     let did_change_request_json =
         serde_json::to_string(&did_change_request).unwrap();
-    let request = requests::PolymorphicRequest {
-        base_request: requests::BaseRequest {
+    let request = protocol::PolymorphicRequest {
+        base_request: protocol::BaseRequest {
             id: 1,
             method: "textDocument/didChange".to_string(),
         },
@@ -1135,12 +1127,9 @@ fn test_document_change_error() {
     }];
 
     let expected_json =
-        notifications::create_diagnostics_notification(
-            uri,
-            diagnostics,
-        )
-        .to_json()
-        .unwrap();
+        protocol::create_diagnostics_notification(uri, diagnostics)
+            .to_json()
+            .unwrap();
 
     assert_eq!(
         expected_json,
@@ -1152,9 +1141,9 @@ fn test_document_change_error() {
 #[test]
 fn test_shutdown() {
     let mut router = Router::new(false);
-    let shutdown_request: requests::Request<
-        requests::ShutdownParams,
-    > = requests::Request {
+    let shutdown_request: protocol::Request<
+        protocol::ShutdownParams,
+    > = protocol::Request {
         id: 1,
         method: "shutdown".to_string(),
         params: None,
@@ -1162,8 +1151,8 @@ fn test_shutdown() {
 
     let shutdown_request_json =
         serde_json::to_string(&shutdown_request).unwrap();
-    let request = requests::PolymorphicRequest {
-        base_request: requests::BaseRequest {
+    let request = protocol::PolymorphicRequest {
+        base_request: protocol::BaseRequest {
             id: 1,
             method: "shutdown".to_string(),
         },
@@ -1174,8 +1163,8 @@ fn test_shutdown() {
         block_on(router.route(request, create_request_context()))
             .unwrap();
 
-    let expected: responses::Response<responses::ShutdownResult> =
-        responses::Response {
+    let expected: protocol::Response<protocol::ShutdownResult> =
+        protocol::Response {
             id: 1,
             result: None,
             jsonrpc: JSONRPCVERSION.to_string(),
@@ -1195,7 +1184,7 @@ fn test_rename() {
     open_file_on_server(uri.clone(), &mut router);
 
     let new_name = "environment".to_string();
-    let rename_request = requests::Request {
+    let rename_request = protocol::Request {
         id: 1,
         method: "textDocument/rename".to_string(),
         params: Some(lsp::RenameParams {
@@ -1217,8 +1206,8 @@ fn test_rename() {
 
     let rename_request_json =
         serde_json::to_string(&rename_request).unwrap();
-    let request = requests::PolymorphicRequest {
-        base_request: requests::BaseRequest {
+    let request = protocol::PolymorphicRequest {
+        base_request: protocol::BaseRequest {
             id: 1,
             method: "textDocument/rename".to_string(),
         },
@@ -1268,8 +1257,8 @@ fn test_rename() {
         change_annotations: None,
     };
 
-    let expected: responses::Response<lsp::WorkspaceEdit> =
-        responses::Response {
+    let expected: protocol::Response<lsp::WorkspaceEdit> =
+        protocol::Response {
             id: 1,
             result: Some(workspace_edit),
             jsonrpc: JSONRPCVERSION.to_string(),
@@ -1288,7 +1277,7 @@ fn test_folding() {
     let uri = get_fixture_path("ok");
     open_file_on_server(uri.clone(), &mut router);
 
-    let folding_request = requests::Request {
+    let folding_request = protocol::Request {
         id: 1,
         method: "textDocument/foldingRange".to_string(),
         params: Some(lsp::FoldingRangeParams {
@@ -1304,8 +1293,8 @@ fn test_folding() {
 
     let folding_request_json =
         serde_json::to_string(&folding_request).unwrap();
-    let request = requests::PolymorphicRequest {
-        base_request: requests::BaseRequest {
+    let request = protocol::PolymorphicRequest {
+        base_request: protocol::BaseRequest {
             id: 1,
             method: "textDocument/foldingRange".to_string(),
         },
@@ -1332,8 +1321,8 @@ fn test_folding() {
         },
     ];
 
-    let expected: responses::Response<Vec<lsp::FoldingRange>> =
-        responses::Response::new(1, Some(areas));
+    let expected: protocol::Response<Vec<lsp::FoldingRange>> =
+        protocol::Response::new(1, Some(areas));
 
     assert_eq!(
         expected.to_json().unwrap(),
@@ -1348,7 +1337,7 @@ fn test_go_to_definition() {
     let uri = get_fixture_path("ok");
     open_file_on_server(uri.clone(), &mut router);
 
-    let find_references_request = requests::Request {
+    let find_references_request = protocol::Request {
         id: 1,
         method: "textDocument/definition".to_string(),
         params: Some(lsp::TextDocumentPositionParams {
@@ -1364,8 +1353,8 @@ fn test_go_to_definition() {
 
     let find_references_request_json =
         serde_json::to_string(&find_references_request).unwrap();
-    let request = requests::PolymorphicRequest {
-        base_request: requests::BaseRequest {
+    let request = protocol::PolymorphicRequest {
+        base_request: protocol::BaseRequest {
             id: 1,
             method: "textDocument/definition".to_string(),
         },
@@ -1375,8 +1364,8 @@ fn test_go_to_definition() {
         block_on(router.route(request, create_request_context()))
             .unwrap();
 
-    let expected: responses::Response<lsp::Location> =
-        responses::Response {
+    let expected: protocol::Response<lsp::Location> =
+        protocol::Response {
             id: 1,
             result: Some(lsp::Location {
                 uri,
@@ -1407,7 +1396,7 @@ fn test_find_references() {
     let uri = get_fixture_path("ok");
     open_file_on_server(uri.clone(), &mut router);
 
-    let find_references_request = requests::Request {
+    let find_references_request = protocol::Request {
         id: 1,
         method: "textDocument/references".to_string(),
         params: Some(lsp::ReferenceParams {
@@ -1434,8 +1423,8 @@ fn test_find_references() {
 
     let find_references_request_json =
         serde_json::to_string(&find_references_request).unwrap();
-    let request = requests::PolymorphicRequest {
-        base_request: requests::BaseRequest {
+    let request = protocol::PolymorphicRequest {
+        base_request: protocol::BaseRequest {
             id: 1,
             method: "textDocument/references".to_string(),
         },
@@ -1445,8 +1434,8 @@ fn test_find_references() {
         block_on(router.route(request, create_request_context()))
             .unwrap();
 
-    let expected: responses::Response<Vec<lsp::Location>> =
-        responses::Response {
+    let expected: protocol::Response<Vec<lsp::Location>> =
+        protocol::Response {
             id: 1,
             result: Some(vec![
                 lsp::Location {
@@ -1492,7 +1481,7 @@ fn test_document_symbols() {
     let uri = get_fixture_path("simple");
     open_file_on_server(uri.clone(), &mut router);
 
-    let symbols_request = requests::Request {
+    let symbols_request = protocol::Request {
         id: 1,
         method: "textDocument/documentSymbol".to_string(),
         params: Some(lsp::DocumentSymbolParams {
@@ -1510,8 +1499,8 @@ fn test_document_symbols() {
 
     let symbols_request_json =
         serde_json::to_string(&symbols_request).unwrap();
-    let request = requests::PolymorphicRequest {
-        base_request: requests::BaseRequest {
+    let request = protocol::PolymorphicRequest {
+        base_request: protocol::BaseRequest {
             id: 1,
             method: "textDocument/documentSymbol".to_string(),
         },
@@ -1584,8 +1573,8 @@ fn test_document_symbols() {
         },
     ];
 
-    let expected: responses::Response<Vec<lsp::SymbolInformation>> =
-        responses::Response::new(1, Some(areas));
+    let expected: protocol::Response<Vec<lsp::SymbolInformation>> =
+        protocol::Response::new(1, Some(areas));
 
     assert_eq!(
         expected.to_json().unwrap(),

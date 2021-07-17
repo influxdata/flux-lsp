@@ -1,8 +1,7 @@
 use crate::cache::Cache;
 use crate::handlers::find_node;
 use crate::handlers::{Error, RequestHandler};
-use crate::protocol::requests::{PolymorphicRequest, Request};
-use crate::protocol::responses::Response;
+use crate::protocol::{PolymorphicRequest, Request, Response};
 use crate::shared::conversion::map_node_to_location;
 use crate::visitors::semantic::utils::create_semantic_package;
 use crate::visitors::semantic::{

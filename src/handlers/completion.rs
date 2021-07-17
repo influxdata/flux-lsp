@@ -3,8 +3,7 @@ use std::sync::Arc;
 
 use crate::cache::Cache;
 use crate::handlers::{Error, RequestHandler};
-use crate::protocol::requests::{PolymorphicRequest, Request};
-use crate::protocol::responses::Response;
+use crate::protocol::{PolymorphicRequest, Request, Response};
 use crate::shared::{
     get_imports_removed, CompletionInfo, CompletionType, Function,
     RequestContext,

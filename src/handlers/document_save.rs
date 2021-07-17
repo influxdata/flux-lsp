@@ -1,6 +1,6 @@
 use crate::cache::Cache;
 use crate::handlers::{Error, RequestHandler};
-use crate::protocol::requests::{PolymorphicRequest, Request};
+use crate::protocol::{PolymorphicRequest, Request};
 use crate::shared::create_diagnoistics;
 
 use lspower::lsp;

@@ -1,8 +1,7 @@
 use crate::cache::Cache;
 use crate::handlers::references::find_references;
 use crate::handlers::{Error, RequestHandler};
-use crate::protocol::requests::{PolymorphicRequest, Request};
-use crate::protocol::responses::Response;
+use crate::protocol::{PolymorphicRequest, Request, Response};
 
 use std::collections::HashMap;
 

@@ -14,7 +14,7 @@ use crate::handlers::rename::RenameHandler;
 use crate::handlers::shutdown::ShutdownHandler;
 use crate::handlers::signature_help::SignatureHelpHandler;
 use crate::handlers::{Error, RequestHandler};
-use crate::protocol::requests::PolymorphicRequest;
+use crate::protocol::PolymorphicRequest;
 use crate::shared::RequestContext;
 
 use std::collections::HashMap;
