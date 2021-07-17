@@ -2,9 +2,7 @@ use std::rc::Rc;
 
 use crate::cache::Cache;
 use crate::handlers::{Error, RequestHandler};
-use crate::protocol::requests::{
-    PolymorphicRequest, Request, TextDocumentPositionParams,
-};
+use crate::protocol::requests::{PolymorphicRequest, Request};
 use crate::protocol::responses::Response;
 use crate::shared::conversion::map_node_to_location;
 use crate::visitors::semantic::utils;
@@ -89,7 +87,7 @@ impl RequestHandler for GotoDefinitionHandler {
     ) -> Result<Option<String>, Error> {
         let mut result: Option<lsp::Location> = None;
 
-        let request: Request<TextDocumentPositionParams> =
+        let request: Request<lsp::TextDocumentPositionParams> =
             Request::from_json(prequest.data.as_str())?;
 
         if let Some(params) = request.params {

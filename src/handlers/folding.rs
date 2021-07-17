@@ -1,8 +1,6 @@
 use crate::cache::Cache;
 use crate::handlers::{Error, RequestHandler};
-use crate::protocol::requests::{
-    FoldingRangeParams, PolymorphicRequest, Request,
-};
+use crate::protocol::requests::{PolymorphicRequest, Request};
 use crate::protocol::responses::Response;
 use crate::visitors::semantic::{utils, FoldFinderVisitor};
 
@@ -55,7 +53,7 @@ impl RequestHandler for FoldingHandler {
         _: crate::shared::RequestContext,
         cache: &Cache,
     ) -> Result<Option<String>, Error> {
-        let request: Request<FoldingRangeParams> =
+        let request: Request<lsp::FoldingRangeParams> =
             Request::from_json(prequest.data.as_str())?;
         let mut areas: Option<Vec<lsp::FoldingRange>> = None;
         if let Some(params) = request.params {

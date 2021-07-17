@@ -1,7 +1,7 @@
 use crate::cache::Cache;
 use crate::handlers::{Error, RequestHandler};
 use crate::protocol::requests::PolymorphicRequest;
-use crate::protocol::requests::{Request, TextDocumentChangeParams};
+use crate::protocol::requests::Request;
 use crate::shared::create_diagnoistics;
 use crate::shared::structs::RequestContext;
 
@@ -27,8 +27,8 @@ fn apply_changes(
 
 fn parse_change_request(
     data: String,
-) -> Result<Request<TextDocumentChangeParams>, String> {
-    let request: Request<TextDocumentChangeParams> =
+) -> Result<Request<lsp::DidChangeTextDocumentParams>, String> {
+    let request: Request<lsp::DidChangeTextDocumentParams> =
         Request::from_json(data.as_str())?;
 
     Ok(request)

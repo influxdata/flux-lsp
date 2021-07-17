@@ -1,6 +1,5 @@
 use crate::cache::Cache;
 use crate::handlers::completion::CompletionHandler;
-use crate::handlers::completion_resolve::CompletionResolveHandler;
 use crate::handlers::document_change::DocumentChangeHandler;
 use crate::handlers::document_close::DocumentCloseHandler;
 use crate::handlers::document_formatting::DocumentFormattingHandler;
@@ -102,10 +101,6 @@ impl Router {
         mapping.insert(
             "textDocument/completion".to_string(),
             Box::new(CompletionHandler::default()),
-        );
-        mapping.insert(
-            "completionItem/resolve".to_string(),
-            Box::new(CompletionResolveHandler::default()),
         );
         mapping.insert(
             "textDocument/signatureHelp".to_string(),

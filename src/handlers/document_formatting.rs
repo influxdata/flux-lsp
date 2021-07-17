@@ -1,8 +1,6 @@
 use crate::cache::Cache;
 use crate::handlers::{Error, RequestHandler};
-use crate::protocol::requests::{
-    DocumentFormattingParams, PolymorphicRequest, Request,
-};
+use crate::protocol::requests::{PolymorphicRequest, Request};
 use crate::protocol::responses::Response;
 
 use std::convert::TryFrom;
@@ -49,7 +47,7 @@ impl RequestHandler for DocumentFormattingHandler {
         _ctx: crate::shared::RequestContext,
         cache: &Cache,
     ) -> Result<Option<String>, Error> {
-        let request: Request<DocumentFormattingParams> =
+        let request: Request<lsp::DocumentFormattingParams> =
             Request::from_json(prequest.data.as_str())?;
 
         if let Some(params) = request.params {

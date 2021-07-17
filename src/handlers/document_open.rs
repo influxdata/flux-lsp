@@ -1,18 +1,18 @@
 use crate::cache::Cache;
 use crate::handlers::{Error, RequestHandler};
-use crate::protocol::requests::{
-    PolymorphicRequest, Request, TextDocumentParams,
-};
+use crate::protocol::requests::{PolymorphicRequest, Request};
 use crate::shared::create_diagnoistics;
 use crate::shared::structs::RequestContext;
+
+use lspower::lsp;
 
 #[derive(Default)]
 pub struct DocumentOpenHandler {}
 
 fn parse_open_request(
     data: String,
-) -> Result<Request<TextDocumentParams>, String> {
-    let request: Request<TextDocumentParams> =
+) -> Result<Request<lsp::DidOpenTextDocumentParams>, String> {
+    let request: Request<lsp::DidOpenTextDocumentParams> =
         Request::from_json(data.as_str())?;
 
     Ok(request)

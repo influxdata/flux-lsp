@@ -51,7 +51,7 @@ fn open_file_on_server(uri: lsp::Url, router: &mut Router) {
     let did_open_request = requests::Request {
         id: 1,
         method: "textDocument/didOpen".to_string(),
-        params: Some(requests::TextDocumentParams {
+        params: Some(lsp::DidOpenTextDocumentParams {
             text_document: lsp::TextDocumentItem {
                 uri: uri,
                 language_id: FLUX.to_string(),
@@ -99,7 +99,23 @@ fn test_initialize() {
     let mut router = Router::new(false);
     let initialize_request = requests::Request {
         id: 1,
-        params: Some(requests::InitializeParams {}),
+        params: Some(lsp::InitializeParams {
+            capabilities: lsp::ClientCapabilities {
+                workspace: None,
+                text_document: None,
+                window: None,
+                general: None,
+                experimental: None,
+            },
+            client_info: None,
+            initialization_options: None,
+            locale: None,
+            process_id: None,
+            root_path: None,
+            root_uri: None,
+            trace: None,
+            workspace_folders: None,
+        }),
         method: "initialize".to_string(),
     };
 
@@ -204,7 +220,7 @@ fn test_open_file() {
     let did_open_request = requests::Request {
         id: 1,
         method: "textDocument/didOpen".to_string(),
-        params: Some(requests::TextDocumentParams {
+        params: Some(lsp::DidOpenTextDocumentParams {
             text_document: lsp::TextDocumentItem {
                 uri: uri.clone(),
                 language_id: FLUX.to_string(),
@@ -247,7 +263,7 @@ fn test_incomplete_option() {
     let did_open_request = requests::Request {
         id: 1,
         method: "textDocument/didOpen".to_string(),
-        params: Some(requests::TextDocumentParams {
+        params: Some(lsp::DidOpenTextDocumentParams {
             text_document: lsp::TextDocumentItem {
                 uri: uri.clone(),
                 language_id: FLUX.to_string(),
@@ -315,7 +331,7 @@ fn test_error_on_error() {
     let did_open_request = requests::Request {
         id: 1,
         method: "textDocument/didOpen".to_string(),
-        params: Some(requests::TextDocumentParams {
+        params: Some(lsp::DidOpenTextDocumentParams {
             text_document: lsp::TextDocumentItem {
                 uri: uri.clone(),
                 language_id: FLUX.to_string(),
@@ -385,9 +401,21 @@ fn test_formatting() {
     let formatting_request = requests::Request {
         id: 1,
         method: "textDocument/formatting".to_string(),
-        params: Some(requests::DocumentFormattingParams {
+        params: Some(lsp::DocumentFormattingParams {
             text_document: lsp::TextDocumentIdentifier {
                 uri: uri.clone(),
+            },
+            work_done_progress_params: lsp::WorkDoneProgressParams {
+                work_done_token: None,
+            },
+            options: lsp::FormattingOptions {
+                tab_size: 0,
+                insert_spaces: true,
+                properties:
+                    HashMap::<String, lsp::FormattingProperty>::new(),
+                trim_trailing_whitespace: None,
+                insert_final_newline: None,
+                trim_final_newlines: None,
             },
         }),
     };
@@ -429,13 +457,21 @@ fn test_signature_help() {
     let signature_help_request = requests::Request {
         id: 1,
         method: "textDocument/signatureHelp".to_string(),
-        params: Some(requests::SignatureHelpParams {
+        params: Some(lsp::SignatureHelpParams {
             context: None,
-            position: lsp::Position {
-                line: 0,
-                character: 5,
+            text_document_position_params:
+                lsp::TextDocumentPositionParams {
+                    position: lsp::Position {
+                        line: 0,
+                        character: 5,
+                    },
+                    text_document: lsp::TextDocumentIdentifier {
+                        uri,
+                    },
+                },
+            work_done_progress_params: lsp::WorkDoneProgressParams {
+                work_done_token: None,
             },
-            text_document: lsp::TextDocumentIdentifier { uri },
         }),
     };
     let request_json =
@@ -475,16 +511,24 @@ fn test_object_param_completion() {
     let completion_request = requests::Request {
         id: 1,
         method: "textDocument/completion".to_string(),
-        params: Some(requests::CompletionParams {
-            context: Some(requests::CompletionContext {
-                trigger_kind: 2,
+        params: Some(lsp::CompletionParams {
+            context: Some(lsp::CompletionContext {
+                trigger_kind: lsp::CompletionTriggerKind::TriggerForIncompleteCompletions,
                 trigger_character: Some("(".to_string()),
             }),
-            position: lsp::Position {
-                character: 8,
-                line: 4,
+            text_document_position: lsp::TextDocumentPositionParams {
+                position: lsp::Position {
+                    character: 8,
+                    line: 4,
+                },
+                text_document: lsp::TextDocumentIdentifier { uri },
             },
-            text_document: lsp::TextDocumentIdentifier { uri },
+            work_done_progress_params: lsp::WorkDoneProgressParams {
+                work_done_token: None,
+            },
+            partial_result_params: lsp::PartialResultParams {
+                partial_result_token: None,
+            },
         }),
     };
 
@@ -501,10 +545,11 @@ fn test_object_param_completion() {
     let response =
         block_on(router.route(request, create_request_context()))
             .unwrap();
-    let returned = from_str::<
-        responses::Response<responses::CompletionList>,
-    >(response.unwrap().as_str())
-    .unwrap();
+    let returned =
+        from_str::<responses::Response<lsp::CompletionList>>(
+            response.unwrap().as_str(),
+        )
+        .unwrap();
     let returned_items = returned.result.unwrap().items;
 
     let mut labels = returned_items
@@ -533,16 +578,24 @@ fn test_param_completion() {
     let completion_request = requests::Request {
         id: 1,
         method: "textDocument/completion".to_string(),
-        params: Some(requests::CompletionParams {
-            context: Some(requests::CompletionContext {
-                trigger_kind: 2,
+        params: Some(lsp::CompletionParams {
+            context: Some(lsp::CompletionContext {
+                trigger_kind: lsp::CompletionTriggerKind::TriggerForIncompleteCompletions,
                 trigger_character: Some("(".to_string()),
             }),
-            position: lsp::Position {
-                character: 8,
-                line: 2,
+            text_document_position: lsp::TextDocumentPositionParams {
+                position: lsp::Position {
+                    character: 8,
+                    line: 2,
+                },
+                text_document: lsp::TextDocumentIdentifier { uri },
             },
-            text_document: lsp::TextDocumentIdentifier { uri },
+            work_done_progress_params: lsp::WorkDoneProgressParams {
+                work_done_token: None,
+            },
+            partial_result_params: lsp::PartialResultParams {
+                partial_result_token: None,
+            },
         }),
     };
 
@@ -559,10 +612,11 @@ fn test_param_completion() {
     let response =
         block_on(router.route(request, create_request_context()))
             .unwrap();
-    let returned = from_str::<
-        responses::Response<responses::CompletionList>,
-    >(response.unwrap().as_str())
-    .unwrap();
+    let returned =
+        from_str::<responses::Response<lsp::CompletionList>>(
+            response.unwrap().as_str(),
+        )
+        .unwrap();
     let returned_items = returned.result.unwrap().items;
 
     let mut labels = returned_items
@@ -597,16 +651,24 @@ fn test_param_completion_multiple_files() {
     let completion_request = requests::Request {
         id: 1,
         method: "textDocument/completion".to_string(),
-        params: Some(requests::CompletionParams {
-            context: Some(requests::CompletionContext {
-                trigger_kind: 2,
+        params: Some(lsp::CompletionParams {
+            context: Some(lsp::CompletionContext {
+                trigger_kind: lsp::CompletionTriggerKind::TriggerForIncompleteCompletions,
                 trigger_character: Some(".".to_string()),
             }),
-            position: lsp::Position {
-                character: 2,
-                line: 0,
+            text_document_position: lsp::TextDocumentPositionParams {
+                position: lsp::Position {
+                    character: 2,
+                    line: 0,
+                },
+                text_document: lsp::TextDocumentIdentifier { uri: uri2 },
             },
-            text_document: lsp::TextDocumentIdentifier { uri: uri2 },
+            work_done_progress_params: lsp::WorkDoneProgressParams {
+                work_done_token: None,
+            },
+            partial_result_params: lsp::PartialResultParams {
+                partial_result_token: None,
+            },
         }),
     };
 
@@ -622,10 +684,11 @@ fn test_param_completion_multiple_files() {
     let response =
         block_on(router.route(request, create_request_context()))
             .unwrap();
-    let returned = from_str::<
-        responses::Response<responses::CompletionList>,
-    >(response.unwrap().as_str())
-    .unwrap();
+    let returned =
+        from_str::<responses::Response<lsp::CompletionList>>(
+            response.unwrap().as_str(),
+        )
+        .unwrap();
     let returned_items = returned.result.unwrap().items;
 
     assert_eq!(
@@ -644,16 +707,24 @@ fn test_package_completion() {
     let completion_request = requests::Request {
         id: 1,
         method: "textDocument/completion".to_string(),
-        params: Some(requests::CompletionParams {
-            context: Some(requests::CompletionContext {
-                trigger_kind: 2,
+        params: Some(lsp::CompletionParams {
+            context: Some(lsp::CompletionContext {
+                trigger_kind: lsp::CompletionTriggerKind::TriggerForIncompleteCompletions,
                 trigger_character: Some(".".to_string()),
             }),
-            position: lsp::Position {
-                character: 4,
-                line: 2,
+            text_document_position: lsp::TextDocumentPositionParams {
+                position: lsp::Position {
+                    character: 4,
+                    line: 2,
+                },
+                text_document: lsp::TextDocumentIdentifier { uri },
             },
-            text_document: lsp::TextDocumentIdentifier { uri },
+            work_done_progress_params: lsp::WorkDoneProgressParams {
+                work_done_token: None,
+            },
+            partial_result_params: lsp::PartialResultParams {
+                partial_result_token: None,
+            },
         }),
     };
 
@@ -669,10 +740,11 @@ fn test_package_completion() {
     let response =
         block_on(router.route(request, create_request_context()))
             .unwrap();
-    let returned = from_str::<
-        responses::Response<responses::CompletionList>,
-    >(response.unwrap().as_str())
-    .unwrap();
+    let returned =
+        from_str::<responses::Response<lsp::CompletionList>>(
+            response.unwrap().as_str(),
+        )
+        .unwrap();
     let returned_items = returned.result.unwrap().items;
 
     assert_eq!(
@@ -691,14 +763,22 @@ fn test_variable_completion() {
     let completion_request = requests::Request {
         id: 1,
         method: "textDocument/completion".to_string(),
-        params: Some(requests::CompletionParams {
+        params: Some(lsp::CompletionParams {
             context: None,
-            position: lsp::Position {
-                character: 1,
-                line: 8,
+            text_document_position: lsp::TextDocumentPositionParams {
+                position: lsp::Position {
+                    character: 1,
+                    line: 8,
+                },
+                text_document: lsp::TextDocumentIdentifier {
+                    uri: uri.clone(),
+                },
             },
-            text_document: lsp::TextDocumentIdentifier {
-                uri: uri.clone(),
+            work_done_progress_params: lsp::WorkDoneProgressParams {
+                work_done_token: None,
+            },
+            partial_result_params: lsp::PartialResultParams {
+                partial_result_token: None,
             },
         }),
     };
@@ -747,10 +827,11 @@ fn test_variable_completion() {
         items.push(item);
     }
 
-    let returned = from_str::<
-        responses::Response<responses::CompletionList>,
-    >(response.unwrap().as_str())
-    .unwrap();
+    let returned =
+        from_str::<responses::Response<lsp::CompletionList>>(
+            response.unwrap().as_str(),
+        )
+        .unwrap();
     let returned_items = returned.result.unwrap().items;
 
     assert_eq!(117, returned_items.len(), "expects completion items");
@@ -777,13 +858,21 @@ fn test_options_completion() {
     let completion_request = requests::Request {
         id: 1,
         method: "textDocument/completion".to_string(),
-        params: Some(requests::CompletionParams {
+        params: Some(lsp::CompletionParams {
             context: None,
-            position: lsp::Position {
-                character: 10,
-                line: 16,
+            text_document_position: lsp::TextDocumentPositionParams {
+                position: lsp::Position {
+                    character: 10,
+                    line: 16,
+                },
+                text_document: lsp::TextDocumentIdentifier { uri },
             },
-            text_document: lsp::TextDocumentIdentifier { uri },
+            work_done_progress_params: lsp::WorkDoneProgressParams {
+                work_done_token: None,
+            },
+            partial_result_params: lsp::PartialResultParams {
+                partial_result_token: None,
+            },
         }),
     };
 
@@ -800,10 +889,11 @@ fn test_options_completion() {
         block_on(router.route(request, create_request_context()))
             .unwrap();
 
-    let returned = from_str::<
-        responses::Response<responses::CompletionList>,
-    >(response.unwrap().as_str())
-    .unwrap();
+    let returned =
+        from_str::<responses::Response<lsp::CompletionList>>(
+            response.unwrap().as_str(),
+        )
+        .unwrap();
     let returned_items = returned.result.unwrap().items;
 
     // This test may fail when flux is updated, as the number of
@@ -834,16 +924,24 @@ fn test_option_object_members_completion() {
     let completion_request = requests::Request {
         id: 1,
         method: "textDocument/completion".to_string(),
-        params: Some(requests::CompletionParams {
-            context: Some(requests::CompletionContext {
-                trigger_kind: 0,
+        params: Some(lsp::CompletionParams {
+            context: Some(lsp::CompletionContext {
+                trigger_kind: lsp::CompletionTriggerKind::Invoked,
                 trigger_character: Some(".".to_string()),
             }),
-            position: lsp::Position {
-                character: 5,
-                line: 16,
+            text_document_position: lsp::TextDocumentPositionParams {
+                position: lsp::Position {
+                    character: 5,
+                    line: 16,
+                },
+                text_document: lsp::TextDocumentIdentifier { uri },
             },
-            text_document: lsp::TextDocumentIdentifier { uri },
+            work_done_progress_params: lsp::WorkDoneProgressParams {
+                work_done_token: None,
+            },
+            partial_result_params: lsp::PartialResultParams {
+                partial_result_token: None,
+            },
         }),
     };
 
@@ -865,10 +963,11 @@ fn test_option_object_members_completion() {
         }
     };
 
-    let returned = from_str::<
-        responses::Response<responses::CompletionList>,
-    >(response.unwrap().as_str())
-    .unwrap();
+    let returned =
+        from_str::<responses::Response<lsp::CompletionList>>(
+            response.unwrap().as_str(),
+        )
+        .unwrap();
     let returned_items = returned.result.unwrap().items;
 
     assert_eq!(5, returned_items.len(), "expects completion items");
@@ -883,13 +982,21 @@ fn test_option_function_completion() {
     let completion_request = requests::Request {
         id: 1,
         method: "textDocument/completion".to_string(),
-        params: Some(requests::CompletionParams {
+        params: Some(lsp::CompletionParams {
             context: None,
-            position: lsp::Position {
-                character: 1,
-                line: 10,
+            text_document_position: lsp::TextDocumentPositionParams {
+                position: lsp::Position {
+                    character: 1,
+                    line: 10,
+                },
+                text_document: lsp::TextDocumentIdentifier { uri },
             },
-            text_document: lsp::TextDocumentIdentifier { uri },
+            work_done_progress_params: lsp::WorkDoneProgressParams {
+                work_done_token: None,
+            },
+            partial_result_params: lsp::PartialResultParams {
+                partial_result_token: None,
+            },
         }),
     };
 
@@ -906,10 +1013,11 @@ fn test_option_function_completion() {
         block_on(router.route(request, create_request_context()))
             .unwrap();
 
-    let returned = from_str::<
-        responses::Response<responses::CompletionList>,
-    >(response.unwrap().as_str())
-    .unwrap();
+    let returned =
+        from_str::<responses::Response<lsp::CompletionList>>(
+            response.unwrap().as_str(),
+        )
+        .unwrap();
     let returned_items = returned.result.unwrap().items;
 
     assert_eq!(117, returned_items.len(), "expects completion items");
@@ -926,7 +1034,7 @@ fn test_document_change() {
     let did_change_request = requests::Request {
         id: 1,
         method: "textDocument/didChange".to_string(),
-        params: Some(requests::TextDocumentChangeParams {
+        params: Some(lsp::DidChangeTextDocumentParams {
             text_document: lsp::VersionedTextDocumentIdentifier {
                 uri: uri.clone(),
                 version: 1,
@@ -976,7 +1084,7 @@ fn test_document_change_error() {
     let did_change_request = requests::Request {
         id: 1,
         method: "textDocument/didChange".to_string(),
-        params: Some(requests::TextDocumentChangeParams {
+        params: Some(lsp::DidChangeTextDocumentParams {
             text_document: lsp::VersionedTextDocumentIdentifier {
                 uri: uri.clone(),
                 version: 1,
@@ -1090,18 +1198,20 @@ fn test_rename() {
     let rename_request = requests::Request {
         id: 1,
         method: "textDocument/rename".to_string(),
-        params: Some(requests::RenameParams {
-            text_document: lsp::TextDocumentItem {
-                uri: uri.clone(),
-                language_id: FLUX.to_string(),
-                version: 1,
-                text: "".to_string(),
-            },
-            position: lsp::Position {
-                line: 1,
-                character: 1,
+        params: Some(lsp::RenameParams {
+            text_document_position: lsp::TextDocumentPositionParams {
+                text_document: lsp::TextDocumentIdentifier {
+                    uri: uri.clone(),
+                },
+                position: lsp::Position {
+                    line: 1,
+                    character: 1,
+                },
             },
             new_name: new_name.clone(),
+            work_done_progress_params: lsp::WorkDoneProgressParams {
+                work_done_token: None,
+            },
         }),
     };
 
@@ -1118,7 +1228,7 @@ fn test_rename() {
         block_on(router.route(request, create_request_context()))
             .unwrap();
 
-    let mut expected_changes: HashMap<String, Vec<lsp::TextEdit>> =
+    let mut expected_changes: HashMap<lsp::Url, Vec<lsp::TextEdit>> =
         HashMap::new();
 
     let edits = vec![
@@ -1150,19 +1260,20 @@ fn test_rename() {
         },
     ];
 
-    expected_changes.insert(uri.as_str().to_string(), edits);
+    expected_changes.insert(uri, edits);
 
-    let workspace_edit = responses::WorkspaceEditResult {
-        changes: expected_changes,
+    let workspace_edit = lsp::WorkspaceEdit {
+        changes: Some(expected_changes),
+        document_changes: None,
+        change_annotations: None,
     };
 
-    let expected: responses::Response<
-        responses::WorkspaceEditResult,
-    > = responses::Response {
-        id: 1,
-        result: Some(workspace_edit),
-        jsonrpc: JSONRPCVERSION.to_string(),
-    };
+    let expected: responses::Response<lsp::WorkspaceEdit> =
+        responses::Response {
+            id: 1,
+            result: Some(workspace_edit),
+            jsonrpc: JSONRPCVERSION.to_string(),
+        };
 
     assert_eq!(
         expected.to_json().unwrap(),
@@ -1180,12 +1291,13 @@ fn test_folding() {
     let folding_request = requests::Request {
         id: 1,
         method: "textDocument/foldingRange".to_string(),
-        params: Some(requests::FoldingRangeParams {
-            text_document: lsp::TextDocumentItem {
-                uri,
-                language_id: FLUX.to_string(),
-                version: 1,
-                text: "".to_string(),
+        params: Some(lsp::FoldingRangeParams {
+            text_document: lsp::TextDocumentIdentifier { uri },
+            work_done_progress_params: lsp::WorkDoneProgressParams {
+                work_done_token: None,
+            },
+            partial_result_params: lsp::PartialResultParams {
+                partial_result_token: None,
             },
         }),
     };
@@ -1239,12 +1351,9 @@ fn test_go_to_definition() {
     let find_references_request = requests::Request {
         id: 1,
         method: "textDocument/definition".to_string(),
-        params: Some(requests::TextDocumentPositionParams {
-            text_document: lsp::TextDocumentItem {
+        params: Some(lsp::TextDocumentPositionParams {
+            text_document: lsp::TextDocumentIdentifier {
                 uri: uri.clone(),
-                language_id: FLUX.to_string(),
-                version: 1,
-                text: "".to_string(),
             },
             position: lsp::Position {
                 line: 8,
@@ -1301,17 +1410,24 @@ fn test_find_references() {
     let find_references_request = requests::Request {
         id: 1,
         method: "textDocument/references".to_string(),
-        params: Some(requests::ReferenceParams {
-            context: requests::ReferenceContext {},
-            text_document: lsp::TextDocumentItem {
-                uri: uri.clone(),
-                language_id: FLUX.to_string(),
-                version: 1,
-                text: "".to_string(),
+        params: Some(lsp::ReferenceParams {
+            text_document_position: lsp::TextDocumentPositionParams {
+                text_document: lsp::TextDocumentIdentifier {
+                    uri: uri.clone(),
+                },
+                position: lsp::Position {
+                    line: 1,
+                    character: 1,
+                },
             },
-            position: lsp::Position {
-                line: 1,
-                character: 1,
+            context: lsp::ReferenceContext {
+                include_declaration: true,
+            },
+            work_done_progress_params: lsp::WorkDoneProgressParams {
+                work_done_token: None,
+            },
+            partial_result_params: lsp::PartialResultParams {
+                partial_result_token: None,
             },
         }),
     };
@@ -1379,9 +1495,15 @@ fn test_document_symbols() {
     let symbols_request = requests::Request {
         id: 1,
         method: "textDocument/documentSymbol".to_string(),
-        params: Some(requests::DocumentSymbolParams {
+        params: Some(lsp::DocumentSymbolParams {
             text_document: lsp::TextDocumentIdentifier {
                 uri: uri.clone(),
+            },
+            work_done_progress_params: lsp::WorkDoneProgressParams {
+                work_done_token: None,
+            },
+            partial_result_params: lsp::PartialResultParams {
+                partial_result_token: None,
             },
         }),
     };

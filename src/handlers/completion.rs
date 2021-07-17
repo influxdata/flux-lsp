@@ -3,13 +3,8 @@ use std::sync::Arc;
 
 use crate::cache::Cache;
 use crate::handlers::{Error, RequestHandler};
-use crate::protocol::requests::{
-    CompletionParams, PolymorphicRequest, Request,
-};
-use crate::protocol::responses::{
-    CompletionItem, CompletionItemKind, CompletionList,
-    InsertTextFormat, Response,
-};
+use crate::protocol::requests::{PolymorphicRequest, Request};
+use crate::protocol::responses::Response;
 use crate::shared::{
     get_imports_removed, CompletionInfo, CompletionType, Function,
     RequestContext,
@@ -70,7 +65,7 @@ async fn get_stdlib_completions(
     name: String,
     info: CompletionInfo,
     ctx: RequestContext,
-) -> Vec<CompletionItem> {
+) -> Vec<lsp::CompletionItem> {
     let mut matches = vec![];
     let completes = get_stdlib();
 
@@ -110,7 +105,7 @@ async fn get_user_matches(
     info: CompletionInfo,
     ctx: RequestContext,
     cache: &Cache,
-) -> Result<Vec<CompletionItem>, Error> {
+) -> Result<Vec<lsp::CompletionItem>, Error> {
     let completables = get_user_completables(
         info.uri.clone(),
         info.position,
@@ -118,7 +113,7 @@ async fn get_user_matches(
         cache,
     )?;
 
-    let mut result: Vec<CompletionItem> = vec![];
+    let mut result: Vec<lsp::CompletionItem> = vec![];
     for x in completables {
         result
             .push(x.completion_item(ctx.clone(), info.clone()).await)
@@ -128,15 +123,15 @@ async fn get_user_matches(
 }
 
 async fn get_measurement_completions(
-    params: CompletionParams,
+    params: lsp::CompletionParams,
     ctx: RequestContext,
     bucket: Option<String>,
-) -> Result<Option<CompletionList>, Error> {
+) -> Result<Option<lsp::CompletionList>, Error> {
     if let Some(bucket) = bucket {
         let measurements =
             ctx.callbacks.get_measurements(bucket).await?;
 
-        let items: Vec<CompletionItem> = measurements
+        let items: Vec<lsp::CompletionItem> = measurements
             .into_iter()
             .map(|value| {
                 new_string_arg_completion(
@@ -146,7 +141,7 @@ async fn get_measurement_completions(
             })
             .collect();
 
-        return Ok(Some(CompletionList {
+        return Ok(Some(lsp::CompletionList {
             is_incomplete: false,
             items,
         }));
@@ -158,30 +153,36 @@ async fn get_measurement_completions(
 async fn get_tag_keys_completions(
     ctx: RequestContext,
     bucket: Option<String>,
-) -> Result<Option<CompletionList>, Error> {
+) -> Result<Option<lsp::CompletionList>, Error> {
     if let Some(bucket) = bucket {
         let tag_keys = ctx.callbacks.get_tag_keys(bucket).await?;
 
-        let items: Vec<CompletionItem> = tag_keys
+        let items: Vec<lsp::CompletionItem> = tag_keys
             .into_iter()
-            .map(|value| CompletionItem {
+            .map(|value| lsp::CompletionItem {
                 additional_text_edits: None,
                 commit_characters: None,
-                deprecated: false,
+                deprecated: None,
                 detail: None,
                 documentation: None,
                 filter_text: None,
                 insert_text: Some(value.clone()),
                 label: value,
-                insert_text_format: InsertTextFormat::Snippet,
-                kind: Some(CompletionItemKind::Property),
+                insert_text_format: Some(
+                    lsp::InsertTextFormat::Snippet,
+                ),
+                kind: Some(lsp::CompletionItemKind::Property),
                 preselect: None,
                 sort_text: None,
                 text_edit: None,
+                command: None,
+                data: None,
+                insert_text_mode: None,
+                tags: None,
             })
             .collect();
 
-        return Ok(Some(CompletionList {
+        return Ok(Some(lsp::CompletionList {
             is_incomplete: false,
             items,
         }));
@@ -194,32 +195,38 @@ async fn get_tag_values_completions(
     ctx: RequestContext,
     bucket: Option<String>,
     field: Option<String>,
-) -> Result<Option<CompletionList>, Error> {
+) -> Result<Option<lsp::CompletionList>, Error> {
     if let Some(bucket) = bucket {
         if let Some(field) = field {
             let tag_values =
                 ctx.callbacks.get_tag_values(bucket, field).await?;
 
-            let items: Vec<CompletionItem> = tag_values
+            let items: Vec<lsp::CompletionItem> = tag_values
                 .into_iter()
-                .map(|value| CompletionItem {
+                .map(|value| lsp::CompletionItem {
                     additional_text_edits: None,
                     commit_characters: None,
-                    deprecated: false,
+                    deprecated: None,
                     detail: None,
                     documentation: None,
                     filter_text: None,
                     insert_text: Some(value.clone()),
                     label: value,
-                    insert_text_format: InsertTextFormat::Snippet,
-                    kind: Some(CompletionItemKind::Property),
+                    insert_text_format: Some(
+                        lsp::InsertTextFormat::Snippet,
+                    ),
+                    kind: Some(lsp::CompletionItemKind::Property),
                     preselect: None,
                     sort_text: None,
                     text_edit: None,
+                    command: None,
+                    data: None,
+                    insert_text_mode: None,
+                    tags: None,
                 })
                 .collect();
 
-            return Ok(Some(CompletionList {
+            return Ok(Some(lsp::CompletionList {
                 is_incomplete: false,
                 items,
             }));
@@ -230,15 +237,15 @@ async fn get_tag_values_completions(
 }
 
 async fn find_completions(
-    params: CompletionParams,
+    params: lsp::CompletionParams,
     ctx: RequestContext,
     cache: &Cache,
-) -> Result<CompletionList, Error> {
-    let uri = params.text_document.uri.clone();
+) -> Result<lsp::CompletionList, Error> {
+    let uri = params.text_document_position.text_document.uri.clone();
     let info =
         CompletionInfo::create(params.clone(), ctx.clone(), cache)?;
 
-    let mut items: Vec<CompletionItem> = vec![];
+    let mut items: Vec<lsp::CompletionItem> = vec![];
 
     if let Some(info) = info {
         match info.completion_type {
@@ -319,7 +326,7 @@ async fn find_completions(
                     }
                 }
 
-                return Ok(CompletionList {
+                return Ok(lsp::CompletionList {
                     is_incomplete: false,
                     items,
                 });
@@ -331,7 +338,7 @@ async fn find_completions(
         }
     }
 
-    Ok(CompletionList {
+    Ok(lsp::CompletionList {
         is_incomplete: false,
         items,
     })
@@ -340,7 +347,7 @@ async fn find_completions(
 fn new_string_arg_completion(
     value: String,
     trigger: Option<String>,
-) -> CompletionItem {
+) -> lsp::CompletionItem {
     let trigger = trigger.unwrap_or_else(|| "".to_string());
     let insert_text = if trigger == "\"" {
         value
@@ -348,8 +355,8 @@ fn new_string_arg_completion(
         format!("\"{}\"", value)
     };
 
-    CompletionItem {
-        deprecated: false,
+    lsp::CompletionItem {
+        deprecated: None,
         commit_characters: None,
         detail: None,
         label: insert_text.clone(),
@@ -359,16 +366,20 @@ fn new_string_arg_completion(
         documentation: None,
         sort_text: None,
         preselect: None,
-        insert_text_format: InsertTextFormat::Snippet,
+        insert_text_format: Some(lsp::InsertTextFormat::Snippet),
         text_edit: None,
-        kind: Some(CompletionItemKind::Value),
+        kind: Some(lsp::CompletionItemKind::Value),
+        command: None,
+        data: None,
+        insert_text_mode: None,
+        tags: None,
     }
 }
 
 fn new_param_completion(
     name: String,
     trigger: Option<String>,
-) -> CompletionItem {
+) -> lsp::CompletionItem {
     let insert_text = if let Some(trigger) = trigger {
         if trigger == "(" {
             format!("{}: ", name)
@@ -379,8 +390,8 @@ fn new_param_completion(
         format!("{}: ", name)
     };
 
-    CompletionItem {
-        deprecated: false,
+    lsp::CompletionItem {
+        deprecated: None,
         commit_characters: None,
         detail: None,
         label: name,
@@ -390,9 +401,13 @@ fn new_param_completion(
         documentation: None,
         sort_text: None,
         preselect: None,
-        insert_text_format: InsertTextFormat::Snippet,
+        insert_text_format: Some(lsp::InsertTextFormat::Snippet),
         text_edit: None,
-        kind: Some(CompletionItemKind::Field),
+        kind: Some(lsp::CompletionItemKind::Field),
+        command: None,
+        data: None,
+        insert_text_mode: None,
+        tags: None,
     }
 }
 
@@ -481,12 +496,12 @@ fn get_function_params(
 
 async fn find_param_completions(
     trigger: Option<String>,
-    params: CompletionParams,
+    params: lsp::CompletionParams,
     ctx: RequestContext,
     cache: &Cache,
-) -> Result<CompletionList, Error> {
-    let uri = params.text_document.uri;
-    let position = params.position;
+) -> Result<lsp::CompletionList, Error> {
+    let uri = params.text_document_position.text_document.uri;
+    let position = params.text_document_position.position;
 
     let source = cache.get(uri.as_str())?;
     let pkg = crate::shared::conversion::create_file_node_from_text(
@@ -557,7 +572,7 @@ async fn find_param_completions(
         }
     }
 
-    Ok(CompletionList {
+    Ok(lsp::CompletionList {
         is_incomplete: false,
         items: items
             .into_iter()
@@ -566,7 +581,7 @@ async fn find_param_completions(
     })
 }
 
-fn get_trigger(params: CompletionParams) -> Option<String> {
+fn get_trigger(params: lsp::CompletionParams) -> Option<String> {
     if let Some(context) = params.context {
         context.trigger_character
     } else {
@@ -577,27 +592,27 @@ fn get_trigger(params: CompletionParams) -> Option<String> {
 async fn get_bucket_completions(
     ctx: RequestContext,
     trigger: Option<String>,
-) -> Result<CompletionList, Error> {
+) -> Result<lsp::CompletionList, Error> {
     let buckets = ctx.callbacks.get_buckets().await?;
 
-    let items: Vec<CompletionItem> = buckets
+    let items: Vec<lsp::CompletionItem> = buckets
         .into_iter()
         .map(|value| {
             new_string_arg_completion(value, trigger.clone())
         })
         .collect();
 
-    Ok(CompletionList {
+    Ok(lsp::CompletionList {
         is_incomplete: false,
         items,
     })
 }
 
 async fn find_arg_completions(
-    params: CompletionParams,
+    params: lsp::CompletionParams,
     ctx: RequestContext,
     cache: &Cache,
-) -> Result<CompletionList, Error> {
+) -> Result<lsp::CompletionList, Error> {
     let info =
         CompletionInfo::create(params.clone(), ctx.clone(), cache)?;
 
@@ -608,19 +623,19 @@ async fn find_arg_completions(
         }
     }
 
-    Ok(CompletionList {
+    Ok(lsp::CompletionList {
         is_incomplete: false,
         items: vec![],
     })
 }
 
 async fn find_dot_completions(
-    params: CompletionParams,
+    params: lsp::CompletionParams,
     ctx: RequestContext,
     cache: &Cache,
-) -> Result<CompletionList, Error> {
-    let uri = params.text_document.uri.clone();
-    let pos = params.position;
+) -> Result<lsp::CompletionList, Error> {
+    let uri = params.text_document_position.text_document.uri.clone();
+    let pos = params.text_document_position.position;
     let info = CompletionInfo::create(params, ctx.clone(), cache)?;
 
     if let Some(info) = info.clone() {
@@ -673,13 +688,13 @@ async fn find_dot_completions(
             );
         }
 
-        return Ok(CompletionList {
+        return Ok(lsp::CompletionList {
             is_incomplete: false,
             items,
         });
     }
 
-    Ok(CompletionList {
+    Ok(lsp::CompletionList {
         is_incomplete: false,
         items: vec![],
     })
@@ -712,10 +727,10 @@ pub struct CompletionHandler {}
 
 async fn triggered_completion(
     trigger: Option<String>,
-    params: CompletionParams,
+    params: lsp::CompletionParams,
     ctx: RequestContext,
     cache: &Cache,
-) -> Result<CompletionList, Error> {
+) -> Result<lsp::CompletionList, Error> {
     if let Some(ch) = trigger.clone() {
         if ch == "." {
             return find_dot_completions(params, ctx, cache).await;
@@ -739,7 +754,7 @@ impl RequestHandler for CompletionHandler {
         ctx: RequestContext,
         cache: &Cache,
     ) -> Result<Option<String>, Error> {
-        let req: Request<CompletionParams> =
+        let req: Request<lsp::CompletionParams> =
             Request::from_json(prequest.data.as_str())?;
         if let Some(params) = req.params {
             if let Some(context) = params.clone().context {
