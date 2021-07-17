@@ -1,4 +1,5 @@
 pub mod completion;
+pub mod completion_resolve;
 pub mod document_change;
 pub mod document_close;
 pub mod document_formatting;
@@ -21,8 +22,7 @@ pub use router::Router;
 
 use crate::cache::Cache;
 use crate::protocol::{
-    create_diagnostics_notification, Notification,
-    PolymorphicRequest,
+    create_diagnostics_notification, Notification, PolymorphicRequest,
 };
 use crate::shared::conversion::map_errors_to_diagnostics;
 use crate::shared::RequestContext;

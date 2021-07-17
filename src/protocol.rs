@@ -96,19 +96,6 @@ where
 pub struct ShutdownResult {}
 
 #[derive(Serialize, Deserialize)]
-pub struct ShowMessageParams {
-    #[serde(rename = "type")]
-    pub message_type: u32,
-    message: String,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct PublishDiagnosticsParams {
-    pub uri: lsp::Url,
-    pub diagnostics: Vec<lsp::Diagnostic>,
-}
-
-#[derive(Serialize, Deserialize)]
 pub struct Notification<T> {
     method: String,
     params: T,
@@ -131,8 +118,12 @@ where
 pub fn create_diagnostics_notification(
     uri: lsp::Url,
     diagnostics: Vec<lsp::Diagnostic>,
-) -> Notification<PublishDiagnosticsParams> {
+) -> Notification<lsp::PublishDiagnosticsParams> {
     let method = String::from("textDocument/publishDiagnostics");
-    let params = PublishDiagnosticsParams { uri, diagnostics };
+    let params = lsp::PublishDiagnosticsParams {
+        uri,
+        diagnostics,
+        version: None,
+    };
     Notification { method, params }
 }
