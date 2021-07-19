@@ -1,6 +1,8 @@
 use std::collections::HashMap;
+use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
+use flux::semantic::walk;
 use log::{debug, error, info, warn};
 use lspower::jsonrpc::Result;
 use lspower::lsp;
@@ -8,6 +10,7 @@ use lspower::LanguageServer;
 
 use crate::handlers::find_node;
 use crate::handlers::signature_help::find_stdlib_signatures;
+use crate::visitors::semantic::FoldFinderVisitor;
 
 // The spec talks specifically about setting versions for files, but isn't
 // clear on how those versions are surfaced to the client, if ever. This
@@ -330,6 +333,44 @@ impl LanguageServer for LspServer {
         );
 
         Ok(Some(vec![edit]))
+    }
+    async fn folding_range(
+        &self,
+        params: lsp::FoldingRangeParams,
+    ) -> Result<Option<Vec<lsp::FoldingRange>>> {
+        let key = params.text_document.uri;
+        let store = self.store.lock().unwrap();
+        if !store.contains_key(&key) {
+            error!(
+                "formatting failed: file {} not open on server",
+                key
+            );
+            return Err(lspower::jsonrpc::Error::invalid_params(
+                format!("file not opened: {}", key),
+            ));
+        }
+        let contents = store.get(&key).unwrap();
+        let pkg = parse_and_analyze(contents.as_str());
+        let mut visitor = FoldFinderVisitor::default();
+        let pkg_node = walk::Node::Package(&pkg);
+
+        walk::walk(&mut visitor, Rc::new(pkg_node));
+
+        let state = visitor.state.borrow();
+        let nodes = (*state).nodes.clone();
+
+        let mut results = vec![];
+        for node in nodes {
+            results.push(lsp::FoldingRange {
+                start_line: node.loc().start.line,
+                start_character: Some(node.loc().start.column),
+                end_line: node.loc().end.line,
+                end_character: Some(node.loc().end.column),
+                kind: Some(lsp::FoldingRangeKind::Region),
+            })
+        }
+
+        Ok(Some(results))
     }
 }
 
@@ -821,5 +862,83 @@ errorCounts
             formatted_text,
         );
         assert_eq!(vec![expected], result);
+    }
+
+    #[test]
+    fn test_folding_not_opened() {
+        let server = create_server();
+
+        let params = lsp::FoldingRangeParams {
+            text_document: lsp::TextDocumentIdentifier {
+                uri: lsp::Url::parse("file:///home/user/file.flux")
+                    .unwrap(),
+            },
+            work_done_progress_params: lsp::WorkDoneProgressParams {
+                work_done_token: None,
+            },
+            partial_result_params: lsp::PartialResultParams {
+                partial_result_token: None,
+            },
+        };
+
+        let result = block_on(server.folding_range(params));
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_folding() {
+        let fluxscript = r#"import "strings"
+env = "prod01-us-west-2"
+
+errorCounts = from(bucket:"kube-infra/monthly")
+    |> range(start: -3d)
+    |> filter(fn: (r) => r._measurement == "query_log" and
+                         r.error != "" and
+                         r._field == "responseSize" and
+                         r.env == env)
+    |> group(columns:["env", "error"])
+    |> count()
+    |> group(columns:["env", "_stop", "_start"])
+
+errorCounts
+    |> filter(fn: (r) => strings.containsStr(v: r.error, substr: "AppendMappedRecordWithNulls"))"#;
+        let server = create_server();
+        open_file(&server, fluxscript.to_string());
+
+        let params = lsp::FoldingRangeParams {
+            text_document: lsp::TextDocumentIdentifier {
+                uri: lsp::Url::parse("file:///home/user/file.flux")
+                    .unwrap(),
+            },
+            work_done_progress_params: lsp::WorkDoneProgressParams {
+                work_done_token: None,
+            },
+            partial_result_params: lsp::PartialResultParams {
+                partial_result_token: None,
+            },
+        };
+
+        let result =
+            block_on(server.folding_range(params)).unwrap().unwrap();
+
+        let expected = vec![
+            lsp::FoldingRange {
+                start_line: 6,
+                start_character: Some(26),
+                end_line: 9,
+                end_character: Some(38),
+                kind: Some(lsp::FoldingRangeKind::Region),
+            },
+            lsp::FoldingRange {
+                start_line: 15,
+                start_character: Some(26),
+                end_line: 15,
+                end_character: Some(96),
+                kind: Some(lsp::FoldingRangeKind::Region),
+            },
+        ];
+
+        assert_eq!(expected, result);
     }
 }
