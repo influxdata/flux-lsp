@@ -13,7 +13,7 @@ use std::rc::Rc;
 
 use lspower::lsp;
 
-fn sort_symbols(
+pub fn sort_symbols(
     a: &lsp::SymbolInformation,
     b: &lsp::SymbolInformation,
 ) -> std::cmp::Ordering {
