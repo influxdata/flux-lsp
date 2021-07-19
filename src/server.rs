@@ -383,7 +383,7 @@ impl LanguageServer for LspServer {
             error!(
                 "documentSymbol request failed: file {} not open on server",
                 key,
-						);
+            );
             return Err(lspower::jsonrpc::Error::invalid_params(
                 format!("file not opened: {}", key),
             ));
