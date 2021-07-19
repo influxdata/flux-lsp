@@ -8,9 +8,10 @@ use lspower::jsonrpc::Result;
 use lspower::lsp;
 use lspower::LanguageServer;
 
+use crate::handlers::document_symbol::sort_symbols;
 use crate::handlers::find_node;
 use crate::handlers::signature_help::find_stdlib_signatures;
-use crate::visitors::semantic::FoldFinderVisitor;
+use crate::visitors::semantic::{FoldFinderVisitor, SymbolsVisitor};
 
 // The spec talks specifically about setting versions for files, but isn't
 // clear on how those versions are surfaced to the client, if ever. This
@@ -371,6 +372,37 @@ impl LanguageServer for LspServer {
         }
 
         Ok(Some(results))
+    }
+    async fn document_symbol(
+        &self,
+        params: lsp::DocumentSymbolParams,
+    ) -> Result<Option<lsp::DocumentSymbolResponse>> {
+        let key = params.text_document.uri;
+        let store = self.store.lock().unwrap();
+        if !store.contains_key(&key) {
+            error!(
+                "documentSymbol request failed: file {} not open on server",
+                key,
+						);
+            return Err(lspower::jsonrpc::Error::invalid_params(
+                format!("file not opened: {}", key),
+            ));
+        }
+
+        let contents = store.get(&key).unwrap();
+        let pkg = parse_and_analyze(contents);
+        let pkg_node = walk::Node::Package(&pkg);
+        let mut visitor = SymbolsVisitor::new(key);
+        walk::walk(&mut visitor, Rc::new(pkg_node));
+
+        let state = visitor.state.borrow();
+        let mut symbols = (*state).symbols.clone();
+
+        symbols.sort_by(|a, b| sort_symbols(a, b));
+
+        let response = lsp::DocumentSymbolResponse::Flat(symbols);
+
+        Ok(Some(response))
     }
 }
 
@@ -940,5 +972,72 @@ errorCounts
         ];
 
         assert_eq!(expected, result);
+    }
+
+    #[test]
+    fn test_document_symbol_not_opened() {
+        let server = create_server();
+
+        let params = lsp::DocumentSymbolParams {
+            text_document: lsp::TextDocumentIdentifier {
+                uri: lsp::Url::parse("file:///home/user/file.flux")
+                    .unwrap(),
+            },
+            work_done_progress_params: lsp::WorkDoneProgressParams {
+                work_done_token: None,
+            },
+            partial_result_params: lsp::PartialResultParams {
+                partial_result_token: None,
+            },
+        };
+
+        let result = block_on(server.document_symbol(params));
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_document_symbol() {
+        let fluxscript = r#"import "strings"
+env = "prod01-us-west-2"
+
+errorCounts = from(bucket:"kube-infra/monthly")
+    |> range(start: -3d)
+    |> filter(fn: (r) => r._measurement == "query_log" and
+                         r.error != "" and
+                         r._field == "responseSize" and
+                         r.env == env)
+    |> group(columns:["env", "error"])
+    |> count()
+    |> group(columns:["env", "_stop", "_start"])
+
+errorCounts
+    |> filter(fn: (r) => strings.containsStr(v: r.error, substr: "AppendMappedRecordWithNulls"))"#;
+        let server = create_server();
+        open_file(&server, fluxscript.to_string());
+
+        let params = lsp::DocumentSymbolParams {
+            text_document: lsp::TextDocumentIdentifier {
+                uri: lsp::Url::parse("file:///home/user/file.flux")
+                    .unwrap(),
+            },
+            work_done_progress_params: lsp::WorkDoneProgressParams {
+                work_done_token: None,
+            },
+            partial_result_params: lsp::PartialResultParams {
+                partial_result_token: None,
+            },
+        };
+        let symbol_response =
+            block_on(server.document_symbol(params))
+                .unwrap()
+                .unwrap();
+
+        match symbol_response {
+            lsp::DocumentSymbolResponse::Flat(symbols) => {
+                assert_eq!(symbols.len(), 38)
+            }
+            _ => unreachable!(),
+        }
     }
 }
