@@ -97,7 +97,7 @@ function tag_lsp_release() {
 	v=v`version $LSP_DIR/Cargo.toml`
 	git tag -a -s $v -m "Release $v"
 	git push origin master $v
-	flux_version=$(grep -m 1 'flux = ' $LSP_DIR/Cargo.toml | version)
+	flux_version=v$(grep -m 1 'flux = ' $LSP_DIR/Cargo.toml | version)
 	hub release create $v -m "Release $v
 
 	- Upgrade to [Flux $flux_version](https://github.com/influxdata/flux/releases/tag/$flux_version)" -e
@@ -105,12 +105,6 @@ function tag_lsp_release() {
 
 cd $LSP_DIR
 lsp_version=$(version Cargo.toml)
-
-if ! hub release show $lsp_version &> /dev/null
-then
-	echo "Release v$lsp_version already exists"
-	exit 1
-fi
 
 echo "Cutting release for Flux LSP v$lsp_version"
 tag_lsp_release

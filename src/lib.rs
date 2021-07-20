@@ -1,20 +1,14 @@
 #![cfg_attr(feature = "strict", deny(warnings))]
-
 extern crate clap;
 
-pub mod cache;
-pub mod handlers;
-pub mod protocol;
-pub mod shared;
-pub mod stdlib;
-pub mod wasm;
+mod cache;
+mod handlers;
+mod protocol;
+mod server;
+mod shared;
+mod stdlib;
+mod wasm;
 
-#[macro_use]
-mod macros;
 mod visitors;
 
-pub use handlers::Router;
-pub use wasm::Server;
-
-mod server;
 pub use server::LspServer;
