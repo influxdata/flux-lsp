@@ -1,6 +1,3 @@
-use crate::protocol::responses::{
-    CompletionItem, CompletionItemKind, InsertTextFormat,
-};
 use crate::shared::get_package_name;
 use crate::shared::signatures::{get_argument_names, FunctionInfo};
 use crate::shared::CompletionInfo;
@@ -27,7 +24,7 @@ pub trait Completable {
         &self,
         ctx: RequestContext,
         info: CompletionInfo,
-    ) -> CompletionItem;
+    ) -> lsp::CompletionItem;
     fn matches(&self, text: String, info: CompletionInfo) -> bool;
 }
 
@@ -76,24 +73,33 @@ impl Completable for VarResult {
         &self,
         _ctx: RequestContext,
         _info: CompletionInfo,
-    ) -> CompletionItem {
-        CompletionItem {
+    ) -> lsp::CompletionItem {
+        lsp::CompletionItem {
             label: format!("{} ({})", self.name, self.package),
             additional_text_edits: None,
             commit_characters: None,
-            deprecated: false,
+            deprecated: None,
             detail: Some(self.detail()),
-            documentation: Some(format!("from {}", self.package)),
+            documentation: Some(lsp::Documentation::String(format!(
+                "from {}",
+                self.package
+            ))),
             filter_text: Some(self.name.clone()),
             insert_text: Some(self.name.clone()),
-            insert_text_format: InsertTextFormat::PlainText,
-            kind: Some(CompletionItemKind::Variable),
+            insert_text_format: Some(
+                lsp::InsertTextFormat::PlainText,
+            ),
+            kind: Some(lsp::CompletionItemKind::Variable),
             preselect: None,
             sort_text: Some(format!(
                 "{} {}",
                 self.name, self.package
             )),
             text_edit: None,
+            command: None,
+            data: None,
+            insert_text_mode: None,
+            tags: None,
         }
     }
 
@@ -163,7 +169,7 @@ impl Completable for PackageResult {
         &self,
         _ctx: RequestContext,
         info: CompletionInfo,
-    ) -> CompletionItem {
+    ) -> lsp::CompletionItem {
         let imports = info.imports;
         let mut additional_text_edits = vec![];
         let mut insert_text = self.name.clone();
@@ -201,20 +207,28 @@ impl Completable for PackageResult {
             }
         }
 
-        CompletionItem {
+        lsp::CompletionItem {
             label: self.full_name.clone(),
             additional_text_edits: Some(additional_text_edits),
             commit_characters: None,
-            deprecated: false,
+            deprecated: None,
             detail: Some("Package".to_string()),
-            documentation: Some(self.full_name.clone()),
+            documentation: Some(lsp::Documentation::String(
+                self.full_name.clone(),
+            )),
             filter_text: Some(self.name.clone()),
             insert_text: Some(insert_text),
-            insert_text_format: InsertTextFormat::PlainText,
-            kind: Some(CompletionItemKind::Module),
+            insert_text_format: Some(
+                lsp::InsertTextFormat::PlainText,
+            ),
+            kind: Some(lsp::CompletionItemKind::Module),
             preselect: None,
             sort_text: Some(self.name.clone()),
             text_edit: None,
+            command: None,
+            data: None,
+            insert_text_mode: None,
+            tags: None,
         }
     }
 
@@ -321,7 +335,7 @@ impl Completable for FunctionResult {
         &self,
         ctx: RequestContext,
         info: CompletionInfo,
-    ) -> CompletionItem {
+    ) -> lsp::CompletionItem {
         let imports = info.imports;
         let mut additional_text_edits = vec![];
 
@@ -344,22 +358,26 @@ impl Completable for FunctionResult {
             })
         }
 
-        CompletionItem {
+        lsp::CompletionItem {
             label: self.name.clone(),
             additional_text_edits: Some(additional_text_edits),
             commit_characters: None,
-            deprecated: false,
+            deprecated: None,
             detail: Some(self.signature.clone()),
-            documentation: Some(make_documentation(
-                self.package.clone(),
+            documentation: Some(lsp::Documentation::String(
+                make_documentation(self.package.clone()),
             )),
             filter_text: Some(self.name.clone()),
             insert_text: Some(self.insert_text(ctx).await),
-            insert_text_format: InsertTextFormat::Snippet,
-            kind: Some(CompletionItemKind::Function),
+            insert_text_format: Some(lsp::InsertTextFormat::Snippet),
+            kind: Some(lsp::CompletionItemKind::Function),
             preselect: None,
             sort_text: Some(self.name.clone()),
             text_edit: None,
+            command: None,
+            data: None,
+            insert_text_mode: None,
+            tags: None,
         }
     }
 

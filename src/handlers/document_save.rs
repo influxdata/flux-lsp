@@ -1,13 +1,13 @@
 use crate::cache::Cache;
 use crate::handlers::{Error, RequestHandler};
-use crate::protocol::requests::{
-    PolymorphicRequest, Request, TextDocumentSaveParams,
-};
+use crate::protocol::{PolymorphicRequest, Request};
 use crate::shared::create_diagnoistics;
+
+use lspower::lsp;
 
 fn parse_save_request(
     data: String,
-) -> Result<Request<TextDocumentSaveParams>, String> {
+) -> Result<Request<lsp::DidSaveTextDocumentParams>, String> {
     Request::from_json(data.as_str())
 }
 

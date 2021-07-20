@@ -1,7 +1,6 @@
 use crate::cache::Cache;
 use crate::handlers::{Error, RequestHandler};
-use crate::protocol::requests::PolymorphicRequest;
-use crate::protocol::responses::{Response, ShutdownResult};
+use crate::protocol::{PolymorphicRequest, Response, ShutdownResult};
 
 pub struct ShutdownHandler {}
 

@@ -1,18 +1,18 @@
 use crate::cache::Cache;
 use crate::handlers::{Error, RequestHandler};
-use crate::protocol::requests::{
-    PolymorphicRequest, Request, TextDocumentParams,
-};
+use crate::protocol::{PolymorphicRequest, Request};
 
 use async_trait::async_trait;
+
+use lspower::lsp;
 
 #[derive(Default)]
 pub struct DocumentCloseHandler {}
 
 fn parse_close_request(
     data: String,
-) -> Result<Request<TextDocumentParams>, String> {
-    let request: Request<TextDocumentParams> =
+) -> Result<Request<lsp::DidCloseTextDocumentParams>, String> {
+    let request: Request<lsp::DidCloseTextDocumentParams> =
         Request::from_json(data.as_str())?;
 
     Ok(request)

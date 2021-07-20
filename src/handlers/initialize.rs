@@ -1,9 +1,6 @@
 use crate::cache::Cache;
 use crate::handlers::{Error, RequestHandler};
-use crate::protocol::requests::{
-    InitializeParams, PolymorphicRequest, Request,
-};
-use crate::protocol::responses::Response;
+use crate::protocol::{PolymorphicRequest, Request, Response};
 
 use lspower::lsp;
 
@@ -25,7 +22,7 @@ impl RequestHandler for InitializeHandler {
         _: crate::shared::RequestContext,
         _: &Cache,
     ) -> Result<Option<String>, Error> {
-        let _: Request<InitializeParams> =
+        let _: Request<lsp::InitializeParams> =
             Request::from_json(prequest.data.as_str())?;
         let result = lsp::InitializeResult {
             capabilities: lsp::ServerCapabilities {

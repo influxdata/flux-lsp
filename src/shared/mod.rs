@@ -1,9 +1,7 @@
 use crate::cache::Cache;
-use crate::protocol::notifications::{
+use crate::protocol::{
     create_diagnostics_notification, Notification,
-    PublishDiagnosticsParams,
 };
-use crate::protocol::requests::CompletionParams;
 use crate::shared::conversion::map_errors_to_diagnostics;
 use crate::visitors::ast::package_finder::{
     PackageFinderVisitor, PackageInfo,
@@ -65,7 +63,7 @@ pub fn create_diagnoistics(
     uri: lsp::Url,
     ctx: RequestContext,
     cache: &Cache,
-) -> Result<Notification<PublishDiagnosticsParams>, String> {
+) -> Result<Notification<lsp::PublishDiagnosticsParams>, String> {
     let package = create_ast_package(uri.clone(), ctx, cache)?;
     let walker = flux::ast::walk::Node::Package(&package);
     let errors = flux::ast::check::check(walker);
@@ -101,12 +99,13 @@ pub struct CompletionInfo {
 
 impl CompletionInfo {
     pub fn create(
-        params: CompletionParams,
+        params: lsp::CompletionParams,
         ctx: RequestContext,
         cache: &Cache,
     ) -> Result<Option<CompletionInfo>, String> {
-        let uri = params.text_document.uri.clone();
-        let position = params.position;
+        let uri =
+            params.text_document_position.text_document.uri.clone();
+        let position = params.text_document_position.position;
 
         let source = cache.get(uri.as_str())?;
         let pkg =
@@ -362,12 +361,12 @@ impl CompletionInfo {
 }
 
 fn find_bucket(
-    params: CompletionParams,
+    params: lsp::CompletionParams,
     ctx: RequestContext,
     cache: &Cache,
 ) -> Result<Option<String>, String> {
-    let uri = params.text_document.uri;
-    let pos = params.position;
+    let uri = params.text_document_position.text_document.uri;
+    let pos = params.text_document_position.position;
     let pkg = utils::create_clean_package(uri, ctx, cache)?;
     let walker = Rc::new(walk::Node::Package(&pkg));
     let mut visitor = CallFinderVisitor::new(pos);

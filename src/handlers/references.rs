@@ -1,10 +1,7 @@
 use crate::cache::Cache;
 use crate::handlers::find_node;
 use crate::handlers::{Error, RequestHandler};
-use crate::protocol::requests::{
-    PolymorphicRequest, ReferenceParams, Request,
-};
-use crate::protocol::responses::Response;
+use crate::protocol::{PolymorphicRequest, Request, Response};
 use crate::shared::conversion::map_node_to_location;
 use crate::visitors::semantic::utils::create_semantic_package;
 use crate::visitors::semantic::{
@@ -131,13 +128,19 @@ impl RequestHandler for FindReferencesHandler {
         cache: &Cache,
     ) -> Result<Option<String>, Error> {
         let mut locations: Vec<lsp::Location> = vec![];
-        let request: Request<ReferenceParams> =
+        let request: Request<lsp::ReferenceParams> =
             Request::from_json(prequest.data.as_str())?;
         if let Some(params) = request.params {
             locations = find_references(
-                lsp::Url::parse(params.text_document.uri.as_str())
-                    .unwrap(),
-                params.position,
+                lsp::Url::parse(
+                    params
+                        .text_document_position
+                        .text_document
+                        .uri
+                        .as_str(),
+                )
+                .unwrap(),
+                params.text_document_position.position,
                 cache,
             )?;
         }

@@ -1,6 +1,3 @@
-use crate::protocol::responses::{
-    CompletionItem, CompletionItemKind, InsertTextFormat,
-};
 use crate::shared::signatures::get_argument_names;
 use crate::shared::{CompletionInfo, RequestContext};
 use crate::stdlib::{create_function_signature, Completable};
@@ -8,6 +5,8 @@ use crate::visitors::semantic::completion::utils::follow_function_pipes;
 
 use flux::semantic::nodes::*;
 use flux::semantic::types::MonoType;
+
+use lspower::lsp;
 
 #[derive(Clone)]
 pub struct ImportAliasResult {
@@ -27,21 +26,29 @@ impl Completable for ImportAliasResult {
         &self,
         _ctx: RequestContext,
         _info: CompletionInfo,
-    ) -> CompletionItem {
-        CompletionItem {
+    ) -> lsp::CompletionItem {
+        lsp::CompletionItem {
             label: format!("{} ({})", self.alias, "self".to_string()),
             additional_text_edits: None,
             commit_characters: None,
-            deprecated: false,
+            deprecated: None,
             detail: Some("Package".to_string()),
-            documentation: Some(format!("from {}", self.path)),
+            documentation: Some(lsp::Documentation::String(format!(
+                "from {}",
+                self.path
+            ))),
             filter_text: Some(self.alias.clone()),
             insert_text: Some(self.alias.clone()),
-            insert_text_format: InsertTextFormat::Snippet,
-            kind: Some(CompletionItemKind::Module),
+            insert_text_format: Some(lsp::InsertTextFormat::Snippet),
+            kind: Some(lsp::CompletionItemKind::Module),
             preselect: None,
             sort_text: Some(self.alias.clone()),
             text_edit: None,
+
+            command: None,
+            data: None,
+            insert_text_mode: None,
+            tags: None,
         }
     }
 
@@ -91,21 +98,27 @@ impl Completable for FunctionResult {
         &self,
         _ctx: RequestContext,
         _info: CompletionInfo,
-    ) -> CompletionItem {
-        CompletionItem {
+    ) -> lsp::CompletionItem {
+        lsp::CompletionItem {
             label: format!("{} ({})", self.name, "self".to_string()),
             additional_text_edits: None,
             commit_characters: None,
-            deprecated: false,
+            deprecated: None,
             detail: Some(self.signature.clone()),
-            documentation: Some("from self".to_string()),
+            documentation: Some(lsp::Documentation::String(
+                "from self".to_string(),
+            )),
             filter_text: Some(self.name.clone()),
             insert_text: Some(self.insert_text()),
-            insert_text_format: InsertTextFormat::Snippet,
-            kind: Some(CompletionItemKind::Function),
+            insert_text_format: Some(lsp::InsertTextFormat::Snippet),
+            kind: Some(lsp::CompletionItemKind::Function),
             preselect: None,
             sort_text: Some(self.name.clone()),
             text_edit: None,
+            command: None,
+            data: None,
+            insert_text_mode: None,
+            tags: None,
         }
     }
 
@@ -159,21 +172,29 @@ impl Completable for VarResult {
         &self,
         _ctx: RequestContext,
         _info: CompletionInfo,
-    ) -> CompletionItem {
-        CompletionItem {
+    ) -> lsp::CompletionItem {
+        lsp::CompletionItem {
             label: format!("{} ({})", self.name, "self".to_string()),
             additional_text_edits: None,
             commit_characters: None,
-            deprecated: false,
+            deprecated: None,
             detail: Some(self.detail()),
-            documentation: Some("from self".to_string()),
+            documentation: Some(lsp::Documentation::String(
+                "from self".to_string(),
+            )),
             filter_text: Some(self.name.clone()),
             insert_text: Some(self.name.clone()),
-            insert_text_format: InsertTextFormat::PlainText,
-            kind: Some(CompletionItemKind::Variable),
+            insert_text_format: Some(
+                lsp::InsertTextFormat::PlainText,
+            ),
+            kind: Some(lsp::CompletionItemKind::Variable),
             preselect: None,
             sort_text: Some(self.name.clone()),
             text_edit: None,
+            command: None,
+            data: None,
+            insert_text_mode: None,
+            tags: None,
         }
     }
 

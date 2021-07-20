@@ -1,9 +1,6 @@
 use crate::cache::Cache;
 use crate::handlers::{Error, RequestHandler};
-use crate::protocol::requests::{
-    DocumentSymbolParams, PolymorphicRequest, Request,
-};
-use crate::protocol::responses::Response;
+use crate::protocol::{PolymorphicRequest, Request, Response};
 use crate::shared::structs::RequestContext;
 use crate::visitors::semantic::utils;
 use crate::visitors::semantic::SymbolsVisitor;
@@ -57,7 +54,7 @@ impl RequestHandler for DocumentSymbolHandler {
         ctx: crate::shared::RequestContext,
         cache: &Cache,
     ) -> Result<Option<String>, Error> {
-        let request: Request<DocumentSymbolParams> =
+        let request: Request<lsp::DocumentSymbolParams> =
             Request::from_json(prequest.data.as_str())?;
         if let Some(params) = request.params {
             let symbols =
