@@ -140,9 +140,21 @@ fn test_initialize() {
                 code_action_provider: None,
                 code_lens_provider: None,
                 color_provider: None,
-                completion_provider: Some(
-                    lsp::CompletionOptions::default(),
-                ),
+                completion_provider: Some(lsp::CompletionOptions {
+                    resolve_provider: Some(true),
+                    trigger_characters: Some(vec![
+                        ".".to_string(),
+                        ":".to_string(),
+                        "(".to_string(),
+                        ",".to_string(),
+                        "\"".to_string(),
+                    ]),
+                    all_commit_characters: None,
+                    work_done_progress_options:
+                        lsp::WorkDoneProgressOptions {
+                            work_done_progress: None,
+                        },
+                }),
                 declaration_provider: None,
                 definition_provider: Some(lsp::OneOf::Left(true)),
                 document_formatting_provider: Some(lsp::OneOf::Left(
@@ -160,7 +172,9 @@ fn test_initialize() {
                 folding_range_provider: Some(
                     lsp::FoldingRangeProviderCapability::Simple(true),
                 ),
-                hover_provider: None,
+                hover_provider: Some(
+                    lsp::HoverProviderCapability::Simple(true),
+                ),
                 implementation_provider: None,
                 linked_editing_range_provider: None,
                 moniker_provider: None,
@@ -169,7 +183,18 @@ fn test_initialize() {
                 selection_range_provider: None,
                 semantic_tokens_provider: None,
                 signature_help_provider: Some(
-                    lsp::SignatureHelpOptions::default(),
+                    lsp::SignatureHelpOptions {
+                        trigger_characters: Some(vec![
+                            "(".to_string()
+                        ]),
+                        retrigger_characters: Some(vec![
+                            "(".to_string()
+                        ]),
+                        work_done_progress_options:
+                            lsp::WorkDoneProgressOptions {
+                                work_done_progress: None,
+                            },
+                    },
                 ),
                 text_document_sync: Some(
                     lsp::TextDocumentSyncCapability::Kind(

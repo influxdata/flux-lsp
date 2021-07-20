@@ -46,6 +46,10 @@ describe('LSP Server integration tests', () => {
                         "retriggerCharacters": ["("]
                     },
                     "hoverProvider":true
+                },
+                "serverInfo": {
+                    "name": "flux-lsp",
+                    "version": "1.0"
                 }
             }
         };
@@ -82,7 +86,7 @@ describe('LSP Server integration tests', () => {
             params: {
                 textDocument: {
                     uri: "file:///path/to/file.flux",
-                    language: "flux",
+                    languageId: "flux",
                     version: 1,
                     text: `from(bucket:"my-bucket")|>group()|>last()`
                 }
@@ -102,7 +106,7 @@ describe('LSP Server integration tests', () => {
                 options: {
                     tabSize: 4,
                     insertSpaces: true,
-                    properties: {},
+                    //properties: {},
                 },
                 work_done_progress_params: {},
             }
