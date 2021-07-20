@@ -11,7 +11,10 @@ use lspower::LanguageServer;
 use crate::handlers::document_symbol::sort_symbols;
 use crate::handlers::find_node;
 use crate::handlers::signature_help::find_stdlib_signatures;
-use crate::visitors::semantic::{FoldFinderVisitor, SymbolsVisitor};
+use crate::visitors::semantic::{
+    DefinitionFinderVisitor, FoldFinderVisitor, NodeFinderVisitor,
+    SymbolsVisitor,
+};
 
 // The spec talks specifically about setting versions for files, but isn't
 // clear on how those versions are surfaced to the client, if ever. This
@@ -403,6 +406,125 @@ impl LanguageServer for LspServer {
         let response = lsp::DocumentSymbolResponse::Flat(symbols);
 
         Ok(Some(response))
+    }
+    async fn goto_definition(
+        &self,
+        params: lsp::GotoDefinitionParams,
+    ) -> Result<Option<lsp::GotoDefinitionResponse>> {
+        let key =
+            params.text_document_position_params.text_document.uri;
+        let store = self.store.lock().unwrap();
+        if !store.contains_key(&key) {
+            error!(
+                "formatting failed: file {} not open on server",
+                key
+            );
+            return Err(lspower::jsonrpc::Error::invalid_params(
+                format!("file not opened: {}", key),
+            ));
+        }
+        let contents = store.get(&key).unwrap();
+        let pkg = parse_and_analyze(contents);
+        let pkg_node = flux::semantic::walk::Node::Package(&pkg);
+        let mut visitor = NodeFinderVisitor::new(
+            params.text_document_position_params.position,
+        );
+
+        flux::semantic::walk::walk(&mut visitor, Rc::new(pkg_node));
+
+        let state = visitor.state.borrow();
+        let node = (*state).node.clone();
+        let path = (*state).path.clone();
+
+        if let Some(node) = node {
+            let name = match node.as_ref() {
+                flux::semantic::walk::Node::Identifier(ident) => {
+                    Some(ident.name.clone())
+                }
+                flux::semantic::walk::Node::IdentifierExpr(ident) => {
+                    Some(ident.name.clone())
+                }
+                _ => return Ok(None),
+            };
+
+            if let Some(node_name) = name {
+                let path_iter = path.iter().rev();
+                for n in path_iter {
+                    match n.as_ref() {
+                        flux::semantic::walk::Node::FunctionExpr(
+                            _,
+                        )
+                        | flux::semantic::walk::Node::Package(_)
+                        | flux::semantic::walk::Node::File(_) => {
+                            if let flux::semantic::walk::Node::FunctionExpr(f) = n.as_ref() {
+                                for param in f.params.clone() {
+                                    let name = param.key.name;
+                                    if name != node_name {
+                                        continue;
+                                    }
+                                    let location = {
+                                        let start = lsp::Position {
+                                            line: node.loc().start.line - 1,
+                                            character: node.loc().start.column - 1,
+                                        };
+
+                                        let end = lsp::Position {
+                                            line: node.loc().end.line - 1,
+                                            character: node.loc().end.column - 1,
+                                        };
+
+                                        let range = lsp::Range { start, end };
+
+                                        lsp::Location { uri: key, range }
+                                    };
+                                    return Ok(Some(lsp::GotoDefinitionResponse::Scalar(location)));
+                                }
+                            }
+
+                            let mut definition_visitor: DefinitionFinderVisitor =
+                                DefinitionFinderVisitor::new(node_name.clone());
+
+                            flux::semantic::walk::walk(
+                                &mut definition_visitor,
+                                n.clone(),
+                            );
+
+                            let state =
+                                definition_visitor.state.borrow();
+                            if let Some(node) = state.node.clone() {
+                                let location = {
+                                    let start_line =
+                                        node.loc().start.line;
+                                    let start_col =
+                                        node.loc().start.column;
+                                    let end_line =
+                                        node.loc().end.line;
+                                    let end_col =
+                                        node.loc().end.column;
+
+                                    lsp::Location {
+                                        uri: key,
+                                        range: lsp::Range {
+                                            start: lsp::Position {
+                                                line: start_line,
+                                                character: start_col,
+                                            },
+                                            end: lsp::Position {
+                                                line: end_line,
+                                                character: end_col,
+                                            },
+                                        },
+                                    }
+                                };
+                                return Ok(Some(lsp::GotoDefinitionResponse::Scalar(location)));
+                            }
+                        }
+                        _ => (),
+                    }
+                }
+            }
+        }
+        Ok(None)
     }
 }
 
@@ -1039,5 +1161,95 @@ errorCounts
             }
             _ => unreachable!(),
         }
+    }
+
+    #[test]
+    fn test_goto_definition_not_opened() {
+        let server = create_server();
+
+        let params = lsp::GotoDefinitionParams {
+            text_document_position_params:
+                lsp::TextDocumentPositionParams::new(
+                    lsp::TextDocumentIdentifier::new(
+                        lsp::Url::parse(
+                            "file:///home/user/file.flux",
+                        )
+                        .unwrap(),
+                    ),
+                    lsp::Position::new(1, 1),
+                ),
+            work_done_progress_params: lsp::WorkDoneProgressParams {
+                work_done_token: None,
+            },
+            partial_result_params: lsp::PartialResultParams {
+                partial_result_token: None,
+            },
+        };
+
+        let result = block_on(server.goto_definition(params));
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_goto_definition() {
+        let fluxscript = r#"import "strings"
+env = "prod01-us-west-2"
+
+errorCounts = from(bucket:"kube-infra/monthly")
+    |> range(start: -3d)
+    |> filter(fn: (r) => r._measurement == "query_log" and
+                         r.error != "" and
+                         r._field == "responseSize" and
+                         r.env == env)
+    |> group(columns:["env", "error"])
+    |> count()
+    |> group(columns:["env", "_stop", "_start"])
+
+errorCounts
+    |> filter(fn: (r) => strings.containsStr(v: r.error, substr: "AppendMappedRecordWithNulls"))"#;
+        let server = create_server();
+        open_file(&server, fluxscript.to_string());
+
+        let params = lsp::GotoDefinitionParams {
+            text_document_position_params:
+                lsp::TextDocumentPositionParams::new(
+                    lsp::TextDocumentIdentifier::new(
+                        lsp::Url::parse(
+                            "file:///home/user/file.flux",
+                        )
+                        .unwrap(),
+                    ),
+                    lsp::Position::new(8, 35),
+                ),
+            work_done_progress_params: lsp::WorkDoneProgressParams {
+                work_done_token: None,
+            },
+            partial_result_params: lsp::PartialResultParams {
+                partial_result_token: None,
+            },
+        };
+
+        let result = block_on(server.goto_definition(params))
+            .unwrap()
+            .unwrap();
+
+        let expected =
+            lsp::GotoDefinitionResponse::Scalar(lsp::Location {
+                uri: lsp::Url::parse("file:///home/user/file.flux")
+                    .unwrap(),
+                range: lsp::Range {
+                    start: lsp::Position {
+                        line: 2,
+                        character: 1,
+                    },
+                    end: lsp::Position {
+                        line: 2,
+                        character: 25,
+                    },
+                },
+            });
+
+        assert_eq!(expected, result);
     }
 }
