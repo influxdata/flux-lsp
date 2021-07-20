@@ -82,7 +82,7 @@ describe('LSP Server integration tests', () => {
             params: {
                 textDocument: {
                     uri: "file:///path/to/file.flux",
-                    languague: "flux",
+                    language: "flux",
                     version: 1,
                     text: `from(bucket:"my-bucket")|>group()|>last()`
                 }

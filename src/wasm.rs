@@ -1,3 +1,10 @@
+/* There are many `allow(dead_code)` pragmas in this file. The reason
+ * these are necessary is because they are used solely by the wasm build
+ * process, and aren't used when building the lib itself. We want still want
+ * the "X is never used" messages in this file, so we mark only the things we
+ * know are being used with the pragma. There is an integration test that
+ * we can use to assert what is actually being used here.
+ */
 use crate::handlers::{Error, Router};
 use crate::shared::callbacks::Callbacks;
 use crate::shared::messages::{
@@ -23,20 +30,22 @@ pub struct Server {
 
 #[wasm_bindgen]
 #[derive(Deserialize)]
-pub struct ServerResponse {
+struct ServerResponse {
+    #[allow(dead_code)]
     message: Option<String>,
+    #[allow(dead_code)]
     error: Option<String>,
 }
 
 #[derive(Serialize)]
-pub struct ServerError {
-    pub id: u32,
-    pub error: ResponseError,
-    pub jsonrpc: String,
+struct ServerError {
+    id: u32,
+    error: ResponseError,
+    jsonrpc: String,
 }
 
 impl ServerError {
-    pub fn from_error(id: u32, err: Error) -> Result<String, Error> {
+    fn from_error(id: u32, err: Error) -> Result<String, Error> {
         let se = ServerError {
             id,
             error: ResponseError {
@@ -56,17 +65,19 @@ impl ServerError {
 }
 
 #[derive(Serialize)]
-pub struct ResponseError {
+struct ResponseError {
     code: u32,
     message: String,
 }
 
 #[wasm_bindgen]
 impl ServerResponse {
+    #[allow(dead_code)]
     pub fn get_message(&self) -> Option<String> {
         self.message.clone()
     }
 
+    #[allow(dead_code)]
     pub fn get_error(&self) -> Option<String> {
         self.error.clone()
     }

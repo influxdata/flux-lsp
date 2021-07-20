@@ -50,16 +50,6 @@ impl Cache {
         Ok(())
     }
 
-    pub fn clear(&self) -> Result<(), String> {
-        let keys = self.keys()?;
-
-        for key in keys {
-            self.remove(key.as_str())?;
-        }
-
-        Ok(())
-    }
-
     pub fn keys(&self) -> Result<Vec<String>, String> {
         let store = match self.store.lock() {
             Ok(s) => s,

@@ -59,26 +59,6 @@ pub struct DocumentSymbol {
     pub children: Option<Vec<DocumentSymbol>>,
 }
 
-impl DocumentSymbol {
-    pub fn new(
-        kind: SymbolKind,
-        name: String,
-        detail: String,
-        loc: &SourceLocation,
-    ) -> DocumentSymbol {
-        let range = loc_to_range(loc);
-        DocumentSymbol {
-            children: None,
-            deprecated: None,
-            kind,
-            selection_range: range.clone(),
-            range,
-            name,
-            detail: Some(detail),
-        }
-    }
-}
-
 #[derive(Serialize, Deserialize, Clone)]
 pub struct SymbolInformation {
     pub name: String,

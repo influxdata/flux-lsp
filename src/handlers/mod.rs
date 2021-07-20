@@ -22,20 +22,14 @@ mod tests;
 pub use router::Router;
 
 use crate::cache::Cache;
-use crate::protocol::notifications::{
-    create_diagnostics_notification, Notification,
-    PublishDiagnosticsParams,
-};
 use crate::protocol::properties::Position;
 use crate::protocol::requests::PolymorphicRequest;
-use crate::shared::conversion::map_errors_to_diagnostics;
 use crate::shared::RequestContext;
 use crate::visitors::semantic::NodeFinderVisitor;
 
 use std::rc::Rc;
 
 use async_trait::async_trait;
-use flux::ast::{check, walk};
 
 #[derive(Debug)]
 pub struct Error {
@@ -55,18 +49,6 @@ pub trait RequestHandler {
         ctx: RequestContext,
         cache: &Cache,
     ) -> Result<Option<String>, Error>;
-}
-
-pub fn create_diagnostics(
-    uri: String,
-    file: flux::ast::File,
-) -> Result<Notification<PublishDiagnosticsParams>, String> {
-    let walker = walk::Node::File(&file);
-
-    let errors = check::check(walker);
-    let diagnostics = map_errors_to_diagnostics(errors);
-
-    Ok(create_diagnostics_notification(uri, diagnostics))
 }
 
 #[derive(Default, Clone)]
