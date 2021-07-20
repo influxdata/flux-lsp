@@ -137,26 +137,6 @@ pub struct CompletionItem {
     pub additional_text_edits: Option<Vec<TextEdit>>,
 }
 
-impl CompletionItem {
-    pub fn new(name: String, package: String) -> Self {
-        CompletionItem {
-            label: format!("{} ({})", name, package),
-            additional_text_edits: None,
-            commit_characters: None,
-            deprecated: false,
-            detail: Some(format!("package: {}", package)),
-            documentation: Some(format!("package: {}", package)),
-            filter_text: Some(name.clone()),
-            insert_text: Some(name.clone()),
-            insert_text_format: InsertTextFormat::PlainText,
-            kind: Some(CompletionItemKind::Function),
-            preselect: None,
-            sort_text: Some(format!("{} {}", name, package)),
-            text_edit: None,
-        }
-    }
-}
-
 #[derive(Serialize, Deserialize, Clone)]
 pub struct SignatureHelp {
     pub signatures: Vec<SignatureInformation>,
@@ -188,13 +168,4 @@ pub struct HoverResult {
 pub struct MarkupContent {
     pub kind: String,
     pub value: String,
-}
-
-impl MarkupContent {
-    pub fn new(content: String) -> Self {
-        MarkupContent {
-            kind: "markdown".to_string(),
-            value: content,
-        }
-    }
 }

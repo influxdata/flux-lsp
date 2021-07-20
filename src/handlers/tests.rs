@@ -5,6 +5,7 @@ use futures::executor::block_on;
 use serde_json::from_str;
 use url::Url;
 
+use super::Router;
 use crate::protocol::notifications;
 use crate::protocol::properties;
 use crate::protocol::requests;
@@ -12,7 +13,6 @@ use crate::protocol::responses;
 use crate::shared::callbacks::Callbacks;
 use crate::shared::{CompletionInfo, CompletionType, RequestContext};
 use crate::stdlib::{get_builtins, Completable, PackageResult};
-use crate::Router;
 
 const FLUX: &'static str = "flux";
 const JSONRPCVERSION: &'static str = "2.0";
