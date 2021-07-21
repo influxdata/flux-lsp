@@ -21,17 +21,13 @@ mod tests;
 pub use router::Router;
 
 use crate::cache::Cache;
-use crate::protocol::{
-    create_diagnostics_notification, Notification, PolymorphicRequest,
-};
-use crate::shared::conversion::map_errors_to_diagnostics;
+use crate::protocol::PolymorphicRequest;
 use crate::shared::RequestContext;
 use crate::visitors::semantic::NodeFinderVisitor;
 
 use std::rc::Rc;
 
 use async_trait::async_trait;
-use flux::ast::{check, walk};
 
 use lspower::lsp;
 
@@ -53,18 +49,6 @@ pub trait RequestHandler {
         ctx: RequestContext,
         cache: &Cache,
     ) -> Result<Option<String>, Error>;
-}
-
-pub fn create_diagnostics(
-    uri: lsp::Url,
-    file: flux::ast::File,
-) -> Result<Notification<lsp::PublishDiagnosticsParams>, String> {
-    let walker = walk::Node::File(&file);
-
-    let errors = check::check(walker);
-    let diagnostics = map_errors_to_diagnostics(errors);
-
-    Ok(create_diagnostics_notification(uri, diagnostics))
 }
 
 #[derive(Default, Clone)]

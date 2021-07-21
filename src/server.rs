@@ -114,7 +114,21 @@ impl LanguageServer for LspServer {
                 code_action_provider: None,
                 code_lens_provider: None,
                 color_provider: None,
-                completion_provider: None,
+                completion_provider: Some(lsp::CompletionOptions {
+                    resolve_provider: Some(true),
+                    trigger_characters: Some(vec![
+                        ".".to_string(),
+                        ":".to_string(),
+                        "(".to_string(),
+                        ",".to_string(),
+                        "\"".to_string(),
+                    ]),
+                    all_commit_characters: None,
+                    work_done_progress_options:
+                        lsp::WorkDoneProgressOptions {
+                            work_done_progress: None,
+                        },
+                }),
                 declaration_provider: None,
                 definition_provider: None,
                 document_formatting_provider: None,
@@ -125,8 +139,12 @@ impl LanguageServer for LspServer {
                 document_symbol_provider: None,
                 execute_command_provider: None,
                 experimental: None,
-                folding_range_provider: None,
-                hover_provider: None,
+                folding_range_provider: Some(
+                    lsp::FoldingRangeProviderCapability::Simple(true),
+                ),
+                hover_provider: Some(
+                    lsp::HoverProviderCapability::Simple(true),
+                ),
                 implementation_provider: None,
                 linked_editing_range_provider: None,
                 moniker_provider: None,
@@ -134,7 +152,20 @@ impl LanguageServer for LspServer {
                 rename_provider: None,
                 selection_range_provider: None,
                 semantic_tokens_provider: None,
-                signature_help_provider: None,
+                signature_help_provider: Some(
+                    lsp::SignatureHelpOptions {
+                        trigger_characters: Some(vec![
+                            "(".to_string()
+                        ]),
+                        retrigger_characters: Some(vec![
+                            "(".to_string()
+                        ]),
+                        work_done_progress_options:
+                            lsp::WorkDoneProgressOptions {
+                                work_done_progress: None,
+                            },
+                    },
+                ),
                 text_document_sync: None,
                 type_definition_provider: None,
                 workspace: None,
