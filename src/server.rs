@@ -2,7 +2,8 @@ use std::collections::HashMap;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
-use flux::semantic::walk;
+use flux::semantic::nodes::FunctionExpr;
+use flux::semantic::walk::{self, Node};
 use log::{debug, error, info, warn};
 use lspower::jsonrpc::Result;
 use lspower::lsp;
@@ -11,9 +12,10 @@ use lspower::LanguageServer;
 use crate::handlers::document_symbol::sort_symbols;
 use crate::handlers::find_node;
 use crate::handlers::signature_help::find_stdlib_signatures;
+use crate::shared::conversion::map_node_to_location;
 use crate::visitors::semantic::{
-    DefinitionFinderVisitor, FoldFinderVisitor, NodeFinderVisitor,
-    SymbolsVisitor,
+    DefinitionFinderVisitor, FoldFinderVisitor, IdentFinderVisitor,
+    NodeFinderVisitor, SymbolsVisitor,
 };
 
 // The spec talks specifically about setting versions for files, but isn't
@@ -67,6 +69,84 @@ fn replace_string_in_range(
     }
     contents.replace_range(string_range.0..string_range.1, &new);
     contents
+}
+
+fn function_defines(name: String, f: &FunctionExpr) -> bool {
+    for param in f.params.clone() {
+        if param.key.name == name {
+            return true;
+        }
+    }
+
+    false
+}
+
+fn is_scope(name: String, n: Rc<Node<'_>>) -> bool {
+    let mut dvisitor: DefinitionFinderVisitor =
+        DefinitionFinderVisitor::new(name);
+
+    walk::walk(&mut dvisitor, n.clone());
+
+    let state = dvisitor.state.borrow();
+
+    state.node.is_some()
+}
+
+fn find_references(
+    uri: lsp::Url,
+    contents: String,
+    position: lsp::Position,
+) -> Vec<lsp::Location> {
+    let mut locations: Vec<lsp::Location> = vec![];
+    let pkg = parse_and_analyze(&contents);
+    let result = find_node(
+        flux::semantic::walk::Node::Package(&pkg),
+        position,
+    );
+
+    if let Some(node) = result.node {
+        let name = match node.as_ref() {
+            Node::Identifier(ident) => Some(ident.name.clone()),
+            Node::IdentifierExpr(ident) => Some(ident.name.clone()),
+            _ => None,
+        };
+
+        if let Some(name) = name {
+            let mut path_iter = result.path.iter().rev();
+            let scope: Option<Rc<Node>> =
+                path_iter.find_map(|n| match n.as_ref() {
+                    Node::FunctionExpr(f)
+                        if function_defines(name.clone(), f) =>
+                    {
+                        Some(n.clone())
+                    }
+                    Node::Package(_) | Node::File(_)
+                        if is_scope(name.clone(), n.clone()) =>
+                    {
+                        Some(n.clone())
+                    }
+                    _ => None,
+                });
+
+            if let Some(scope) = scope {
+                let mut visitor = IdentFinderVisitor::new(name);
+                walk::walk(&mut visitor, scope);
+
+                let state = visitor.state.borrow();
+                let identifiers = (*state).identifiers.clone();
+
+                for node in identifiers {
+                    let loc = map_node_to_location(
+                        uri.clone(),
+                        node.clone(),
+                    );
+                    locations.push(loc);
+                }
+            }
+        }
+    }
+
+    locations
 }
 
 #[allow(dead_code)]
@@ -598,6 +678,41 @@ impl LanguageServer for LspServer {
             }
         }
         Ok(None)
+    }
+    async fn rename(
+        &self,
+        params: lsp::RenameParams,
+    ) -> Result<Option<lsp::WorkspaceEdit>> {
+        let key = params.text_document_position.text_document.uri;
+        let store = self.store.lock().unwrap();
+        if !store.contains_key(&key) {
+            error!(
+                "textDocument/didChange called on unknown file {}",
+                key
+            );
+        }
+        let contents = store.get(&key).unwrap();
+        let pos = params.text_document_position.position;
+        let mut changes = HashMap::new();
+        changes.insert(key.clone(), Vec::new());
+        let locations =
+            find_references(key.clone(), contents.to_owned(), pos);
+
+        for location in locations {
+            let change = lsp::TextEdit {
+                range: location.range,
+                new_text: params.new_name.clone(),
+            };
+
+            changes.get_mut(&key).unwrap().push(change);
+        }
+
+        let response = lsp::WorkspaceEdit {
+            changes: Some(changes),
+            document_changes: None,
+            change_annotations: None,
+        };
+        Ok(Some(response))
     }
 }
 
@@ -1322,6 +1437,91 @@ errorCounts
                     },
                 },
             });
+
+        assert_eq!(expected, result);
+    }
+    #[test]
+    fn test_rename() {
+        let fluxscript = r#"import "strings"
+env = "prod01-us-west-2"
+
+errorCounts = from(bucket:"kube-infra/monthly")
+    |> range(start: -3d)
+    |> filter(fn: (r) => r._measurement == "query_log" and
+                         r.error != "" and
+                         r._field == "responseSize" and
+                         r.env == env)
+    |> group(columns:["env", "error"])
+    |> count()
+    |> group(columns:["env", "_stop", "_start"])
+
+errorCounts
+    |> filter(fn: (r) => strings.containsStr(v: r.error, substr: "AppendMappedRecordWithNulls"))"#;
+        let server = create_server();
+        open_file(&server, fluxscript.to_string());
+
+        let params = lsp::RenameParams {
+            text_document_position: lsp::TextDocumentPositionParams {
+                text_document: lsp::TextDocumentIdentifier {
+                    uri: lsp::Url::parse(
+                        "file:///home/user/file.flux",
+                    )
+                    .unwrap(),
+                },
+                position: lsp::Position {
+                    line: 1,
+                    character: 1,
+                },
+            },
+            new_name: "environment".to_string(),
+            work_done_progress_params: lsp::WorkDoneProgressParams {
+                work_done_token: None,
+            },
+        };
+
+        let result =
+            block_on(server.rename(params)).unwrap().unwrap();
+
+        let edits = vec![
+            lsp::TextEdit {
+                new_text: "environment".to_string(),
+                range: lsp::Range {
+                    start: lsp::Position {
+                        line: 1,
+                        character: 0,
+                    },
+                    end: lsp::Position {
+                        line: 1,
+                        character: 3,
+                    },
+                },
+            },
+            lsp::TextEdit {
+                new_text: "environment".to_string(),
+                range: lsp::Range {
+                    start: lsp::Position {
+                        line: 8,
+                        character: 34,
+                    },
+                    end: lsp::Position {
+                        line: 8,
+                        character: 37,
+                    },
+                },
+            },
+        ];
+        let mut changes: HashMap<lsp::Url, Vec<lsp::TextEdit>> =
+            HashMap::new();
+        changes.insert(
+            lsp::Url::parse("file:///home/user/file.flux").unwrap(),
+            edits,
+        );
+
+        let expected = lsp::WorkspaceEdit {
+            changes: Some(changes),
+            document_changes: None,
+            change_annotations: None,
+        };
 
         assert_eq!(expected, result);
     }
