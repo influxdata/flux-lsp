@@ -29,7 +29,7 @@ use std::rc::Rc;
 
 use async_trait::async_trait;
 
-use lspower::lsp;
+use lsp_types as lsp;
 
 #[derive(Debug)]
 pub struct Error {

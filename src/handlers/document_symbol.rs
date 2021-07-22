@@ -8,7 +8,7 @@ use crate::visitors::semantic::SymbolsVisitor;
 use flux::semantic::walk::{self, Node};
 use std::rc::Rc;
 
-use lspower::lsp;
+use lsp_types as lsp;
 
 pub fn sort_symbols(
     a: &lsp::SymbolInformation,

@@ -1,7 +1,7 @@
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 
-use lspower::lsp;
+use lsp_types as lsp;
 
 fn default_id() -> u32 {
     0

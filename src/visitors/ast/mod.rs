@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use lspower::lsp;
+use lsp_types as lsp;
 
 use flux::ast::walk::{self, Visitor};
 pub mod package_finder;

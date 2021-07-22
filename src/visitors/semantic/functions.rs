@@ -8,7 +8,7 @@ use flux::semantic::walk::{Node, Visitor};
 
 use crate::shared::signatures::FunctionInfo;
 
-use lspower::lsp;
+use lsp_types as lsp;
 
 #[derive(Default)]
 pub struct FunctionFinderState {

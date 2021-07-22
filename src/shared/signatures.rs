@@ -4,7 +4,7 @@ use flux::semantic::types::{Function, MonoType};
 
 use crate::shared::all_combos;
 
-use lspower::lsp;
+use lsp_types as lsp;
 
 #[allow(clippy::implicit_hasher)]
 pub fn get_argument_names(

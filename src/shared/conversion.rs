@@ -5,7 +5,7 @@ use flux::semantic::walk::Node;
 
 use std::rc::Rc;
 
-use lspower::lsp;
+use lsp_types as lsp;
 
 pub fn map_node_to_location(
     uri: lsp::Url,

@@ -3,7 +3,7 @@ use crate::handlers::{Error, RequestHandler};
 use crate::protocol::{PolymorphicRequest, Request};
 use crate::shared::create_diagnoistics;
 
-use lspower::lsp;
+use lsp_types as lsp;
 
 fn parse_save_request(
     data: String,

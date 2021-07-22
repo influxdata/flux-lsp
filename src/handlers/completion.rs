@@ -27,7 +27,7 @@ use flux::semantic::walk;
 
 use async_trait::async_trait;
 
-use lspower::lsp;
+use lsp_types as lsp;
 
 fn move_back(position: lsp::Position, count: u32) -> lsp::Position {
     lsp::Position {

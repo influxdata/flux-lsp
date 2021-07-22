@@ -2,7 +2,7 @@ use crate::cache;
 use crate::cache::Cache;
 use crate::shared::structs::RequestContext;
 
-use lspower::lsp;
+use lsp_types as lsp;
 
 pub fn is_in_node(
     pos: lsp::Position,

@@ -5,7 +5,7 @@ use crate::protocol::{PolymorphicRequest, Request, Response};
 
 use std::collections::HashMap;
 
-use lspower::lsp;
+use lsp_types as lsp;
 
 #[derive(Default)]
 pub struct RenameHandler {}

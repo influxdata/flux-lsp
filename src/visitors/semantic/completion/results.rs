@@ -6,7 +6,7 @@ use crate::visitors::semantic::completion::utils::follow_function_pipes;
 use flux::semantic::nodes::*;
 use flux::semantic::types::MonoType;
 
-use lspower::lsp;
+use lsp_types as lsp;
 
 #[derive(Clone)]
 pub struct ImportAliasResult {

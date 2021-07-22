@@ -7,7 +7,7 @@ use flux::semantic::walk::{self, Node};
 
 use std::rc::Rc;
 
-use lspower::lsp;
+use lsp_types as lsp;
 
 fn node_to_folding_range(node: Rc<Node>) -> lsp::FoldingRange {
     lsp::FoldingRange {
