@@ -86,7 +86,20 @@ async fn main() {
     let stdout = tokio::io::stdout();
 
     let (service, messages) = LspService::new(|_client| {
-        LspServer::new(!disable_folding, influxdb_url, token, org)
+        let mut server = LspServer::default();
+        if disable_folding {
+            server = server.disable_folding();
+        }
+        if let Some(value) = influxdb_url {
+            server = server.with_influxdb_url(value);
+        }
+        if let Some(value) = token {
+            server = server.with_token(value);
+        }
+        if let Some(value) = org {
+            server = server.with_org(value);
+        }
+        server
     });
     // service(LspService).server is an instance of the LspServer
     // service.call sends request to LspServer

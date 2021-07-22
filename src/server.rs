@@ -84,19 +84,61 @@ pub struct LspServer {
 }
 
 impl LspServer {
-    pub fn new(
-        folding: bool,
-        influxdb_url: Option<String>,
-        token: Option<String>,
-        org: Option<String>,
-    ) -> Self {
+    pub fn disable_folding(self) -> Self {
+        Self {
+            store: self.store,
+            options: LspServerOptions {
+                folding: false,
+                influxdb_url: self.options.influxdb_url,
+                token: self.options.token,
+                org: self.options.org,
+            },
+        }
+    }
+    pub fn with_influxdb_url(self, influxdb_url: String) -> Self {
+        Self {
+            store: self.store,
+            options: LspServerOptions {
+                folding: self.options.folding,
+                influxdb_url: Some(influxdb_url),
+                token: self.options.token,
+                org: self.options.org,
+            },
+        }
+    }
+    pub fn with_token(self, token: String) -> Self {
+        Self {
+            store: self.store,
+            options: LspServerOptions {
+                folding: self.options.folding,
+                influxdb_url: self.options.influxdb_url,
+                token: Some(token),
+                org: self.options.org,
+            },
+        }
+    }
+    pub fn with_org(self, org: String) -> Self {
+        Self {
+            store: self.store,
+            options: LspServerOptions {
+                folding: self.options.folding,
+                influxdb_url: self.options.influxdb_url,
+                token: self.options.token,
+                org: Some(org),
+            },
+        }
+    }
+}
+
+impl Default for LspServer {
+    fn default() -> Self {
         Self {
             store: Arc::new(Mutex::new(HashMap::new())),
             options: LspServerOptions {
-                folding,
-                influxdb_url,
-                token,
-                org,
+                folding: true,
+                influxdb_url: None,
+                token: None,
+                org: None,
             },
         }
     }
@@ -575,7 +617,7 @@ mod tests {
         include_str!("../tests/fixtures/signatures.flux");
 
     fn create_server() -> LspServer {
-        LspServer::new(true, None, None, None)
+        LspServer::default()
     }
 
     fn open_file(server: &LspServer, text: String) {
