@@ -1,31 +1,29 @@
 use crate::cache::Cache;
 use crate::handlers::{Error, RequestHandler};
-use crate::protocol::properties::FoldingRange;
-use crate::protocol::requests::{
-    FoldingRangeParams, PolymorphicRequest, Request,
-};
-use crate::protocol::responses::Response;
+use crate::protocol::{PolymorphicRequest, Request, Response};
 use crate::visitors::semantic::{utils, FoldFinderVisitor};
 
 use flux::semantic::walk::{self, Node};
 
 use std::rc::Rc;
 
-fn node_to_folding_range(node: Rc<Node>) -> FoldingRange {
-    FoldingRange {
+use lsp_types as lsp;
+
+fn node_to_folding_range(node: Rc<Node>) -> lsp::FoldingRange {
+    lsp::FoldingRange {
         start_line: node.loc().start.line - 1,
-        start_character: node.loc().start.column - 1,
+        start_character: Some(node.loc().start.column - 1),
         end_line: node.loc().end.line - 1,
-        end_character: node.loc().end.column - 1,
-        kind: "region".to_string(),
+        end_character: Some(node.loc().end.column - 1),
+        kind: Some(lsp::FoldingRangeKind::Region),
     }
 }
 
 fn find_foldable_areas(
-    uri: &'_ str,
+    uri: lsp::Url,
     cache: &Cache,
-) -> Result<Vec<FoldingRange>, String> {
-    let cv = cache.get(uri)?;
+) -> Result<Vec<lsp::FoldingRange>, String> {
+    let cv = cache.get(uri.as_str())?;
     let pkg = utils::analyze_source(cv.contents.as_str())?;
     let walker = walk::Node::Package(&pkg);
     let mut visitor = FoldFinderVisitor::default();
@@ -54,14 +52,12 @@ impl RequestHandler for FoldingHandler {
         _: crate::shared::RequestContext,
         cache: &Cache,
     ) -> Result<Option<String>, Error> {
-        let request: Request<FoldingRangeParams> =
+        let request: Request<lsp::FoldingRangeParams> =
             Request::from_json(prequest.data.as_str())?;
-        let mut areas: Option<Vec<FoldingRange>> = None;
+        let mut areas: Option<Vec<lsp::FoldingRange>> = None;
         if let Some(params) = request.params {
-            let foldable = find_foldable_areas(
-                params.text_document.uri.as_str(),
-                cache,
-            )?;
+            let foldable =
+                find_foldable_areas(params.text_document.uri, cache)?;
             areas = Some(foldable);
         }
 

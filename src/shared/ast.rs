@@ -2,9 +2,12 @@ use crate::cache;
 use crate::cache::Cache;
 use crate::shared::structs::RequestContext;
 
-use crate::protocol::properties::Position;
+use lsp_types as lsp;
 
-pub fn is_in_node(pos: Position, base: &flux::ast::BaseNode) -> bool {
+pub fn is_in_node(
+    pos: lsp::Position,
+    base: &flux::ast::BaseNode,
+) -> bool {
     let start_line = base.location.start.line - 1;
     let start_col = base.location.start.column - 1;
     let end_line = base.location.end.line - 1;
@@ -30,16 +33,16 @@ pub fn is_in_node(pos: Position, base: &flux::ast::BaseNode) -> bool {
 }
 
 pub fn create_ast_package(
-    uri: &'_ str,
+    uri: lsp::Url,
     ctx: RequestContext,
     cache: &Cache,
 ) -> Result<flux::ast::Package, String> {
-    let values =
-        cache.get_package(uri, ctx.support_multiple_files)?;
+    let values = cache
+        .get_package(uri.as_str(), ctx.support_multiple_files)?;
 
     let pkgs = values.into_iter().map(|v: cache::CacheValue| {
         crate::shared::conversion::create_file_node_from_text(
-            v.uri.as_str(),
+            lsp::Url::parse(&v.uri).unwrap(),
             v.contents,
         )
     });
@@ -58,7 +61,7 @@ pub fn create_ast_package(
     if let Some(mut pkg) = pkg {
         let mut files = pkg.files;
         files.sort_by(|a, _b| {
-            if a.name == uri {
+            if a.name == uri.as_str() {
                 std::cmp::Ordering::Greater
             } else {
                 std::cmp::Ordering::Less

@@ -1,10 +1,7 @@
 use crate::cache::Cache;
-use crate::protocol::notifications::{
+use crate::protocol::{
     create_diagnostics_notification, Notification,
-    PublishDiagnosticsParams,
 };
-use crate::protocol::properties::Position;
-use crate::protocol::requests::CompletionParams;
 use crate::shared::conversion::map_errors_to_diagnostics;
 use crate::visitors::ast::package_finder::{
     PackageFinderVisitor, PackageInfo,
@@ -23,9 +20,12 @@ use std::rc::Rc;
 
 use flux::semantic::walk;
 
+use lsp_types as lsp;
+
 pub mod ast;
 pub mod callbacks;
 pub mod conversion;
+#[cfg(not(feature = "lsp2"))]
 pub mod messages;
 pub mod signatures;
 pub mod structs;
@@ -34,6 +34,13 @@ use combinations::Combinations;
 
 pub use ast::create_ast_package;
 pub use structs::{Function, RequestContext};
+
+fn move_back(position: lsp::Position, count: u32) -> lsp::Position {
+    lsp::Position {
+        line: position.line,
+        character: position.character - count,
+    }
+}
 
 pub fn all_combos<T>(l: Vec<T>) -> Vec<Vec<T>>
 where
@@ -54,19 +61,16 @@ where
 }
 
 pub fn create_diagnoistics(
-    uri: &'_ str,
+    uri: lsp::Url,
     ctx: RequestContext,
     cache: &Cache,
-) -> Result<Notification<PublishDiagnosticsParams>, String> {
-    let package = create_ast_package(uri, ctx, cache)?;
+) -> Result<Notification<lsp::PublishDiagnosticsParams>, String> {
+    let package = create_ast_package(uri.clone(), ctx, cache)?;
     let walker = flux::ast::walk::Node::Package(&package);
     let errors = flux::ast::check::check(walker);
     let diagnostics = map_errors_to_diagnostics(errors);
 
-    Ok(create_diagnostics_notification(
-        uri.to_string(),
-        diagnostics,
-    ))
+    Ok(create_diagnostics_notification(uri, diagnostics))
 }
 
 pub fn get_package_name(name: String) -> Option<String> {
@@ -88,35 +92,38 @@ pub struct CompletionInfo {
     pub completion_type: CompletionType,
     pub ident: String,
     pub bucket: Option<String>,
-    pub position: Position,
-    pub uri: String,
+    pub position: lsp::Position,
+    pub uri: lsp::Url,
     pub imports: Vec<Import>,
     pub package: Option<PackageInfo>,
 }
 
 impl CompletionInfo {
     pub fn create(
-        params: CompletionParams,
+        params: lsp::CompletionParams,
         ctx: RequestContext,
         cache: &Cache,
     ) -> Result<Option<CompletionInfo>, String> {
-        let uri = params.text_document.uri.clone();
-        let uri = uri.as_str();
-        let position = params.position.clone();
+        let uri =
+            params.text_document_position.text_document.uri.clone();
+        let position = params.text_document_position.position;
 
-        let source = cache.get(uri)?;
+        let source = cache.get(uri.as_str())?;
         let pkg =
             crate::shared::conversion::create_file_node_from_text(
-                uri,
+                uri.clone(),
                 source.contents,
             );
         let walker = Rc::new(AstNode::File(&pkg.files[0]));
-        let visitor = NodeFinderVisitor::new(position.move_back(1));
+        let visitor = NodeFinderVisitor::new(move_back(position, 1));
 
         walk_rc(&visitor, walker);
 
-        let package =
-            PackageFinderVisitor::find(uri, ctx.clone(), cache)?;
+        let package = PackageFinderVisitor::find(
+            uri.clone(),
+            ctx.clone(),
+            cache,
+        )?;
 
         let state = visitor.state.borrow();
         let finder_node = (*state).node.clone();
@@ -138,8 +145,8 @@ impl CompletionInfo {
                                 ),
                             ident: obj.name,
                             bucket,
-                            position: position.clone(),
-                            uri: uri.to_string(),
+                            position,
+                            uri: uri.clone(),
                             imports: get_imports_removed(
                                 uri, position, ctx, cache,
                             )?,
@@ -155,8 +162,8 @@ impl CompletionInfo {
                         completion_type: CompletionType::Import,
                         ident: "".to_string(),
                         bucket,
-                        position: position.clone(),
-                        uri: uri.to_string(),
+                        position,
+                        uri: uri.clone(),
                         imports: get_imports_removed(
                             uri, position, ctx, cache,
                         )?,
@@ -193,8 +200,8 @@ impl CompletionInfo {
                                         return Ok(Some(CompletionInfo {
                                     completion_type: CompletionType::CallProperty(func.name), ident: name,
                                     bucket,
-                                    position: position.clone(),
-                                    uri: uri.to_string(),
+                                    position,
+                                    uri: uri.clone(),
                                     imports: get_imports(uri, position, ctx,cache)?,
                                     package,
                                 }));
@@ -218,8 +225,8 @@ impl CompletionInfo {
                                     ),
                                 ident: name,
                                 bucket,
-                                position: position.clone(),
-                                uri: uri.to_string(),
+                                position,
+                                uri: uri.clone(),
                                 imports: get_imports(
                                     uri, position, ctx, cache,
                                 )?,
@@ -249,8 +256,8 @@ impl CompletionInfo {
                                         ),
                                     ident: name,
                                     bucket,
-                                    position: position.clone(),
-                                    uri: uri.to_string(),
+                                    position,
+                                    uri: uri.clone(),
                                     imports: get_imports(
                                         uri, position, ctx, cache,
                                     )?,
@@ -276,8 +283,8 @@ impl CompletionInfo {
                             ),
                             ident: name,
                             bucket,
-                            position: position.clone(),
-                            uri: uri.to_string(),
+                            position,
+                            uri: uri.clone(),
                             imports: get_imports(
                                 uri, position, ctx, cache,
                             )?,
@@ -291,8 +298,8 @@ impl CompletionInfo {
                         completion_type: CompletionType::Generic,
                         ident: name,
                         bucket,
-                        position: position.clone(),
-                        uri: uri.to_string(),
+                        position,
+                        uri: uri.clone(),
                         imports: get_imports(
                             uri, position, ctx, cache,
                         )?,
@@ -305,8 +312,8 @@ impl CompletionInfo {
                         completion_type: CompletionType::Bad,
                         ident: name,
                         bucket,
-                        position: position.clone(),
-                        uri: uri.to_string(),
+                        position,
+                        uri: uri.clone(),
                         imports: get_imports(
                             uri, position, ctx, cache,
                         )?,
@@ -320,8 +327,8 @@ impl CompletionInfo {
                             completion_type: CompletionType::Generic,
                             ident: ident.name.clone(),
                             bucket,
-                            position: position.clone(),
-                            uri: uri.to_string(),
+                            position,
+                            uri: uri.clone(),
                             imports: get_imports(
                                 uri, position, ctx, cache,
                             )?,
@@ -337,8 +344,8 @@ impl CompletionInfo {
                             completion_type: CompletionType::Generic,
                             ident: ident.name.clone(),
                             bucket,
-                            position: position.clone(),
-                            uri: uri.to_string(),
+                            position,
+                            uri: uri.clone(),
                             imports: get_imports(
                                 uri, position, ctx, cache,
                             )?,
@@ -355,12 +362,12 @@ impl CompletionInfo {
 }
 
 fn find_bucket(
-    params: CompletionParams,
+    params: lsp::CompletionParams,
     ctx: RequestContext,
     cache: &Cache,
 ) -> Result<Option<String>, String> {
-    let uri = params.text_document.uri.as_str();
-    let pos = params.position;
+    let uri = params.text_document_position.text_document.uri;
+    let pos = params.text_document_position.position;
     let pkg = utils::create_clean_package(uri, ctx, cache)?;
     let walker = Rc::new(walk::Node::Package(&pkg));
     let mut visitor = CallFinderVisitor::new(pos);
@@ -383,8 +390,8 @@ fn find_bucket(
 }
 
 pub fn get_imports(
-    uri: &'_ str,
-    pos: Position,
+    uri: lsp::Url,
+    pos: lsp::Position,
     ctx: RequestContext,
     cache: &Cache,
 ) -> Result<Vec<Import>, String> {
@@ -400,8 +407,8 @@ pub fn get_imports(
 }
 
 pub fn get_imports_removed(
-    uri: &'_ str,
-    pos: Position,
+    uri: lsp::Url,
+    pos: lsp::Position,
     ctx: RequestContext,
     cache: &Cache,
 ) -> Result<Vec<Import>, String> {

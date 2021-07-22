@@ -1,12 +1,6 @@
 use crate::cache::Cache;
 use crate::handlers::{find_node, Error, RequestHandler};
-use crate::protocol::properties::Position;
-use crate::protocol::requests::{
-    PolymorphicRequest, Request, SignatureHelpParams,
-};
-use crate::protocol::responses::{
-    Response, SignatureHelp, SignatureInformation,
-};
+use crate::protocol::{PolymorphicRequest, Request, Response};
 use crate::shared::signatures::FunctionSignature;
 use crate::shared::RequestContext;
 use crate::stdlib::{get_stdlib_functions, BUILTIN_PACKAGE};
@@ -20,23 +14,26 @@ use flux::semantic::walk::{walk, Node};
 
 use std::rc::Rc;
 
+use lsp_types as lsp;
+
 fn create_signature_information(
     fs: FunctionSignature,
-) -> SignatureInformation {
-    SignatureInformation {
+) -> lsp::SignatureInformation {
+    lsp::SignatureInformation {
         label: fs.create_signature(),
         parameters: Some(fs.create_parameters()),
         documentation: None,
+        active_parameter: None,
     }
 }
 
 #[derive(Default)]
 pub struct SignatureHelpHandler {}
 
-fn find_stdlib_signatures(
+pub fn find_stdlib_signatures(
     name: String,
     package: String,
-) -> Vec<SignatureInformation> {
+) -> Vec<lsp::SignatureInformation> {
     get_stdlib_functions()
         .into_iter()
         .filter(|x| x.name == name && x.package_name == package)
@@ -52,14 +49,13 @@ fn find_stdlib_signatures(
 }
 
 fn find_user_defined_signatures(
-    pos: Position,
-    uri: &'_ str,
+    pos: lsp::Position,
+    uri: lsp::Url,
     name: String,
     ctx: RequestContext,
     cache: &Cache,
-) -> Result<Vec<SignatureInformation>, String> {
-    let pkg =
-        create_completion_package(uri, pos.clone(), ctx, cache)?;
+) -> Result<Vec<lsp::SignatureInformation>, String> {
+    let pkg = create_completion_package(uri, pos, ctx, cache)?;
     let mut visitor = FunctionFinderVisitor::new(pos);
 
     walk(&mut visitor, Rc::new(Node::Package(&pkg)));
@@ -82,17 +78,24 @@ fn find_user_defined_signatures(
 }
 
 fn find_signatures(
-    request: Request<SignatureHelpParams>,
+    request: Request<lsp::SignatureHelpParams>,
     ctx: RequestContext,
     cache: &Cache,
-) -> Result<Vec<SignatureInformation>, String> {
+) -> Result<Vec<lsp::SignatureInformation>, String> {
     let mut result = vec![];
 
     if let Some(params) = request.params {
-        let pos = params.position;
-        let uri = params.text_document.uri.as_str();
-        let pkg = create_semantic_package(uri, cache)?;
-        let node_result = find_node(Node::Package(&pkg), pos.clone());
+        let pos = params.text_document_position_params.position;
+        let uri = lsp::Url::parse(
+            params
+                .text_document_position_params
+                .text_document
+                .uri
+                .as_str(),
+        )
+        .unwrap();
+        let pkg = create_semantic_package(uri.clone(), cache)?;
+        let node_result = find_node(Node::Package(&pkg), pos);
 
         if let Some(node) = node_result.node {
             if let Node::CallExpr(call) = node.as_ref() {
@@ -131,10 +134,10 @@ impl RequestHandler for SignatureHelpHandler {
         ctx: RequestContext,
         cache: &Cache,
     ) -> Result<Option<String>, Error> {
-        let req: Request<SignatureHelpParams> =
+        let req: Request<lsp::SignatureHelpParams> =
             Request::from_json(prequest.data.as_str())?;
 
-        let sh = SignatureHelp {
+        let sh = lsp::SignatureHelp {
             signatures: find_signatures(req.clone(), ctx, cache)?,
             active_signature: None,
             active_parameter: None,
