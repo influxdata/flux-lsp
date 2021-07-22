@@ -1,16 +1,14 @@
 use crate::cache::Cache;
 use crate::handlers::{Error, RequestHandler};
-use crate::protocol::properties::{Position, Range, TextEdit};
-use crate::protocol::requests::{
-    DocumentFormattingParams, PolymorphicRequest, Request,
-};
-use crate::protocol::responses::Response;
+use crate::protocol::{PolymorphicRequest, Request, Response};
 
 use std::convert::TryFrom;
 
 use flux::formatter;
 
-fn create_range(contents: String) -> Range {
+use lsp_types as lsp;
+
+fn create_range(contents: String) -> lsp::Range {
     let lines = contents.split('\n').collect::<Vec<&str>>();
     let last = match lines.last() {
         Some(l) => (*l).to_string(),
@@ -19,12 +17,12 @@ fn create_range(contents: String) -> Range {
     let line_count: u32 = u32::try_from(lines.len()).unwrap();
     let char_count: u32 = u32::try_from(last.len()).unwrap();
 
-    Range {
-        start: Position {
+    lsp::Range {
+        start: lsp::Position {
             line: 0,
             character: 0,
         },
-        end: Position {
+        end: lsp::Position {
             line: line_count - 1,
             character: char_count,
         },
@@ -48,7 +46,7 @@ impl RequestHandler for DocumentFormattingHandler {
         _ctx: crate::shared::RequestContext,
         cache: &Cache,
     ) -> Result<Option<String>, Error> {
-        let request: Request<DocumentFormattingParams> =
+        let request: Request<lsp::DocumentFormattingParams> =
             Request::from_json(prequest.data.as_str())?;
 
         if let Some(params) = request.params {
@@ -60,13 +58,14 @@ impl RequestHandler for DocumentFormattingHandler {
             let formatted =
                 formatter::format(file_contents.as_str())?;
 
-            let response: Response<Vec<TextEdit>> = Response::new(
-                prequest.base_request.id,
-                Some(vec![TextEdit {
-                    new_text: formatted,
-                    range,
-                }]),
-            );
+            let response: Response<Vec<lsp::TextEdit>> =
+                Response::new(
+                    prequest.base_request.id,
+                    Some(vec![lsp::TextEdit {
+                        new_text: formatted,
+                        range,
+                    }]),
+                );
 
             let json = response.to_json()?;
 

@@ -8,7 +8,6 @@ pub mod document_save;
 pub mod document_symbol;
 pub mod folding;
 pub mod goto_definition;
-pub mod hover;
 pub mod initialize;
 pub mod references;
 pub mod rename;
@@ -22,14 +21,15 @@ mod tests;
 pub use router::Router;
 
 use crate::cache::Cache;
-use crate::protocol::properties::Position;
-use crate::protocol::requests::PolymorphicRequest;
+use crate::protocol::PolymorphicRequest;
 use crate::shared::RequestContext;
 use crate::visitors::semantic::NodeFinderVisitor;
 
 use std::rc::Rc;
 
 use async_trait::async_trait;
+
+use lsp_types as lsp;
 
 #[derive(Debug)]
 pub struct Error {
@@ -53,13 +53,13 @@ pub trait RequestHandler {
 
 #[derive(Default, Clone)]
 pub struct NodeFinderResult<'a> {
-    node: Option<Rc<flux::semantic::walk::Node<'a>>>,
-    path: Vec<Rc<flux::semantic::walk::Node<'a>>>,
+    pub node: Option<Rc<flux::semantic::walk::Node<'a>>>,
+    pub path: Vec<Rc<flux::semantic::walk::Node<'a>>>,
 }
 
 pub fn find_node(
     node: flux::semantic::walk::Node<'_>,
-    position: Position,
+    position: lsp::Position,
 ) -> NodeFinderResult<'_> {
     let mut result = NodeFinderResult::default();
     let mut visitor = NodeFinderVisitor::new(position);

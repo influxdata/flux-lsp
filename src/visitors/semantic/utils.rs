@@ -1,5 +1,4 @@
 use crate::cache::Cache;
-use crate::protocol::properties::Position;
 use crate::shared::ast::is_in_node;
 use crate::shared::RequestContext;
 
@@ -11,6 +10,8 @@ use flux::semantic::fresh::Fresher;
 use flux::semantic::nodes::Package;
 
 use flux::analyze;
+
+use lsp_types as lsp;
 
 fn local_analyze(
     pkg: flux::ast::Package,
@@ -35,12 +36,12 @@ pub fn analyze_source(
 
 fn valid_node(
     node: &flux::ast::BaseNode,
-    position: Position,
+    position: lsp::Position,
 ) -> bool {
     !is_in_node(position, node)
 }
 
-fn remove_character(source: String, pos: Position) -> String {
+fn remove_character(source: String, pos: lsp::Position) -> String {
     source
         .split('\n')
         .enumerate()
@@ -66,35 +67,40 @@ fn remove_character(source: String, pos: Position) -> String {
 }
 
 pub fn create_completion_package_removed(
-    uri: &'_ str,
-    pos: Position,
+    uri: lsp::Url,
+    pos: lsp::Position,
     ctx: RequestContext,
     cache: &Cache,
 ) -> Result<Package, String> {
-    let cv = cache.get(uri)?;
-    let contents = remove_character(cv.contents, pos.clone());
+    let cv = cache.get(uri.as_str())?;
+    let contents = remove_character(cv.contents, pos);
     let mut file = parse_string("", contents.as_str());
 
     file.imports = file
         .imports
         .into_iter()
-        .filter(|x| valid_node(&x.base, pos.clone()))
+        .filter(|x| valid_node(&x.base, pos))
         .collect();
 
     file.body = file
         .body
         .into_iter()
-        .filter(|x| valid_node(x.base(), pos.clone()))
+        .filter(|x| valid_node(x.base(), pos))
         .collect();
 
-    let mut pkg = crate::shared::create_ast_package(uri, ctx, cache)?;
+    let mut pkg =
+        crate::shared::create_ast_package(uri.clone(), ctx, cache)?;
 
     pkg.files = pkg
         .files
         .into_iter()
-        .map(
-            |curr| if curr.name == uri { file.clone() } else { curr },
-        )
+        .map(|curr| {
+            if curr.name == uri.as_str() {
+                file.clone()
+            } else {
+                curr
+            }
+        })
         .collect();
 
     match analyze(pkg) {
@@ -104,18 +110,18 @@ pub fn create_completion_package_removed(
 }
 
 pub fn create_completion_package(
-    uri: &'_ str,
-    pos: Position,
+    uri: lsp::Url,
+    pos: lsp::Position,
     ctx: RequestContext,
     cache: &Cache,
 ) -> Result<Package, String> {
     create_filtered_package(uri, ctx, cache, |x| {
-        valid_node(x.base(), pos.clone())
+        valid_node(x.base(), pos)
     })
 }
 
 pub fn create_clean_package(
-    uri: &'_ str,
+    uri: lsp::Url,
     ctx: RequestContext,
     cache: &Cache,
 ) -> Result<Package, String> {
@@ -128,7 +134,7 @@ pub fn create_clean_package(
 }
 
 fn create_filtered_package<F>(
-    uri: &'_ str,
+    uri: lsp::Url,
     ctx: RequestContext,
     cache: &Cache,
     mut filter: F,
@@ -137,13 +143,13 @@ where
     F: FnMut(&flux::ast::Statement) -> bool,
 {
     let mut ast_pkg =
-        crate::shared::create_ast_package(uri, ctx, cache)?;
+        crate::shared::create_ast_package(uri.clone(), ctx, cache)?;
 
     ast_pkg.files = ast_pkg
         .files
         .into_iter()
         .map(|mut file| {
-            if file.name == uri {
+            if file.name == uri.as_str() {
                 file.body = file
                     .body
                     .into_iter()
@@ -162,10 +168,10 @@ where
 }
 
 pub fn create_semantic_package(
-    uri: &'_ str,
+    uri: lsp::Url,
     cache: &Cache,
 ) -> Result<Package, String> {
-    let cv = cache.get(uri)?;
+    let cv = cache.get(uri.as_str())?;
     let pkg = analyze_source(cv.contents.as_str())?;
 
     Ok(pkg)

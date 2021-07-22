@@ -1,13 +1,13 @@
 use crate::cache::Cache;
 use crate::handlers::{Error, RequestHandler};
-use crate::protocol::requests::{
-    PolymorphicRequest, Request, TextDocumentSaveParams,
-};
+use crate::protocol::{PolymorphicRequest, Request};
 use crate::shared::create_diagnoistics;
+
+use lsp_types as lsp;
 
 fn parse_save_request(
     data: String,
-) -> Result<Request<TextDocumentSaveParams>, String> {
+) -> Result<Request<lsp::DidSaveTextDocumentParams>, String> {
     Request::from_json(data.as_str())
 }
 
@@ -24,7 +24,7 @@ impl RequestHandler for DocumentSaveHandler {
     ) -> Result<Option<String>, Error> {
         let request = parse_save_request(prequest.data)?;
         if let Some(params) = request.params {
-            let uri = params.text_document.uri.as_str();
+            let uri = params.text_document.uri;
             let msg = create_diagnoistics(uri, ctx, cache)?;
             let json = msg.to_json()?;
 

@@ -9,14 +9,13 @@ use crate::handlers::document_save::DocumentSaveHandler;
 use crate::handlers::document_symbol::DocumentSymbolHandler;
 use crate::handlers::folding::FoldingHandler;
 use crate::handlers::goto_definition::GotoDefinitionHandler;
-use crate::handlers::hover::HoverHandler;
 use crate::handlers::initialize::InitializeHandler;
 use crate::handlers::references::FindReferencesHandler;
 use crate::handlers::rename::RenameHandler;
 use crate::handlers::shutdown::ShutdownHandler;
 use crate::handlers::signature_help::SignatureHelpHandler;
 use crate::handlers::{Error, RequestHandler};
-use crate::protocol::requests::PolymorphicRequest;
+use crate::protocol::PolymorphicRequest;
 use crate::shared::RequestContext;
 
 use std::collections::HashMap;
@@ -81,10 +80,6 @@ impl Router {
             Box::new(RenameHandler::default()),
         );
         mapping.insert(
-            "textDocument/hover".to_string(),
-            Box::new(HoverHandler::default()),
-        );
-        mapping.insert(
             "initialize".to_string(),
             Box::new(InitializeHandler::new(disable_folding)),
         );
@@ -112,6 +107,7 @@ impl Router {
             "completionItem/resolve".to_string(),
             Box::new(CompletionResolveHandler::default()),
         );
+
         mapping.insert(
             "textDocument/signatureHelp".to_string(),
             Box::new(SignatureHelpHandler::default()),

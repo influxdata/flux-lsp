@@ -1,76 +1,161 @@
+#![allow(deprecated)]
 use std::cell::RefCell;
 use std::rc::Rc;
-
-use crate::protocol::properties::{SymbolInformation, SymbolKind};
 
 use flux::semantic::nodes::{self, Expression};
 use flux::semantic::walk::{Node, Visitor};
 
+use lsp_types as lsp;
+
 fn parse_variable_assignment(
-    uri: String,
+    uri: lsp::Url,
     node: Rc<Node>,
     va: &nodes::VariableAssgn,
-) -> Vec<SymbolInformation> {
+) -> Vec<lsp::SymbolInformation> {
     let mut result = vec![];
 
     if let Expression::Function(f) = va.init.clone() {
-        result.push(SymbolInformation::new(
-            SymbolKind::Function,
-            va.id.name.clone(),
-            uri.clone(),
-            node.loc(),
-        ));
+        result.push(lsp::SymbolInformation {
+            kind: lsp::SymbolKind::Function,
+            name: va.id.name.clone(),
+            location: lsp::Location {
+                uri: uri.clone(),
+                range: lsp::Range {
+                    start: lsp::Position {
+                        line: node.loc().start.line - 1,
+                        character: node.loc().start.column - 1,
+                    },
+                    end: lsp::Position {
+                        line: node.loc().end.line - 1,
+                        character: node.loc().end.column - 1,
+                    },
+                },
+            },
+            tags: None,
+            deprecated: None,
+            container_name: None,
+        });
 
         for param in f.params {
-            result.push(SymbolInformation::new(
-                SymbolKind::Variable,
-                param.key.name,
-                uri.clone(),
-                &param.loc,
-            ));
+            result.push(lsp::SymbolInformation {
+                kind: lsp::SymbolKind::Variable,
+                name: param.key.name,
+                location: lsp::Location {
+                    uri: uri.clone(),
+                    range: lsp::Range {
+                        start: lsp::Position {
+                            line: param.loc.start.line - 1,
+                            character: param.loc.start.column - 1,
+                        },
+                        end: lsp::Position {
+                            line: param.loc.end.line - 1,
+                            character: param.loc.end.column - 1,
+                        },
+                    },
+                },
+                tags: None,
+                deprecated: None,
+                container_name: None,
+            });
         }
     } else {
-        result.push(SymbolInformation::new(
-            SymbolKind::Variable,
-            va.id.name.clone(),
-            uri,
-            node.loc(),
-        ))
+        result.push(lsp::SymbolInformation {
+            kind: lsp::SymbolKind::Variable,
+            name: va.id.name.clone(),
+            location: lsp::Location {
+                uri,
+                range: lsp::Range {
+                    start: lsp::Position {
+                        line: node.loc().start.line - 1,
+                        character: node.loc().start.column - 1,
+                    },
+                    end: lsp::Position {
+                        line: node.loc().end.line - 1,
+                        character: node.loc().end.column - 1,
+                    },
+                },
+            },
+            tags: None,
+            deprecated: None,
+            container_name: None,
+        })
     }
 
     result
 }
 
 fn parse_call_expression(
-    uri: String,
+    uri: lsp::Url,
     c: &nodes::CallExpr,
-) -> Vec<SymbolInformation> {
+) -> Vec<lsp::SymbolInformation> {
     let mut result = vec![];
 
     if let Expression::Identifier(ident) = c.callee.clone() {
-        result.push(SymbolInformation::new(
-            SymbolKind::Function,
-            ident.name,
-            uri.clone(),
-            &c.loc,
-        ))
+        result.push(lsp::SymbolInformation {
+            kind: lsp::SymbolKind::Function,
+            name: ident.name,
+            location: lsp::Location {
+                uri: uri.clone(),
+                range: lsp::Range {
+                    start: lsp::Position {
+                        line: c.loc.start.line - 1,
+                        character: c.loc.start.column - 1,
+                    },
+                    end: lsp::Position {
+                        line: c.loc.end.line - 1,
+                        character: c.loc.end.column - 1,
+                    },
+                },
+            },
+            tags: None,
+            deprecated: None,
+            container_name: None,
+        })
     }
 
     for arg in c.arguments.clone() {
         if let Expression::Function(_) = arg.value {
-            result.push(SymbolInformation::new(
-                SymbolKind::Function,
-                arg.key.name.clone(),
-                uri.clone(),
-                &arg.loc,
-            ));
+            result.push(lsp::SymbolInformation {
+                kind: lsp::SymbolKind::Function,
+                name: arg.key.name.clone(),
+                location: lsp::Location {
+                    uri: uri.clone(),
+                    range: lsp::Range {
+                        start: lsp::Position {
+                            line: arg.loc.start.line - 1,
+                            character: arg.loc.start.column - 1,
+                        },
+                        end: lsp::Position {
+                            line: arg.loc.end.line - 1,
+                            character: arg.loc.end.column - 1,
+                        },
+                    },
+                },
+                tags: None,
+                deprecated: None,
+                container_name: None,
+            });
         } else {
-            result.push(SymbolInformation::new(
-                SymbolKind::Variable,
-                arg.key.name.clone(),
-                uri.clone(),
-                &arg.loc,
-            ));
+            result.push(lsp::SymbolInformation {
+                kind: lsp::SymbolKind::Variable,
+                name: arg.key.name.clone(),
+                location: lsp::Location {
+                    uri: uri.clone(),
+                    range: lsp::Range {
+                        start: lsp::Position {
+                            line: arg.loc.start.line - 1,
+                            character: arg.loc.start.column - 1,
+                        },
+                        end: lsp::Position {
+                            line: arg.loc.end.line - 1,
+                            character: arg.loc.end.column - 1,
+                        },
+                    },
+                },
+                tags: None,
+                deprecated: None,
+                container_name: None,
+            });
         }
     }
 
@@ -78,46 +163,72 @@ fn parse_call_expression(
 }
 
 fn parse_binary_expression(
-    uri: String,
+    uri: lsp::Url,
     be: &nodes::BinaryExpr,
-) -> Vec<SymbolInformation> {
+) -> Vec<lsp::SymbolInformation> {
     let mut result = vec![];
 
     if let Expression::Identifier(ident) = be.left.clone() {
-        result.push(SymbolInformation::new(
-            SymbolKind::Variable,
-            ident.name.clone(),
-            uri.clone(),
-            &ident.loc,
-        ))
+        result.push(lsp::SymbolInformation {
+            kind: lsp::SymbolKind::Variable,
+            name: ident.name.clone(),
+            location: lsp::Location {
+                uri: uri.clone(),
+                range: lsp::Range {
+                    start: lsp::Position {
+                        line: ident.loc.start.line - 1,
+                        character: ident.loc.start.column - 1,
+                    },
+                    end: lsp::Position {
+                        line: ident.loc.end.line - 1,
+                        character: ident.loc.end.column - 1,
+                    },
+                },
+            },
+            tags: None,
+            deprecated: None,
+            container_name: None,
+        })
     }
 
     if let Expression::Identifier(ident) = be.right.clone() {
-        result.push(SymbolInformation::new(
-            SymbolKind::Variable,
-            ident.name.clone(),
-            uri,
-            &ident.loc,
-        ))
+        result.push(lsp::SymbolInformation {
+            kind: lsp::SymbolKind::Variable,
+            name: ident.name.clone(),
+            location: lsp::Location {
+                uri,
+                range: lsp::Range {
+                    start: lsp::Position {
+                        line: ident.loc.start.line - 1,
+                        character: ident.loc.start.column - 1,
+                    },
+                    end: lsp::Position {
+                        line: ident.loc.end.line - 1,
+                        character: ident.loc.end.column - 1,
+                    },
+                },
+            },
+            tags: None,
+            deprecated: None,
+            container_name: None,
+        })
     }
 
     result
 }
 
-#[derive(Default)]
 pub struct SymbolsState<'a> {
-    pub symbols: Vec<SymbolInformation>,
-    pub uri: String,
+    pub symbols: Vec<lsp::SymbolInformation>,
+    pub uri: lsp::Url,
     pub path: Vec<Rc<Node<'a>>>,
 }
 
-#[derive(Default)]
 pub struct SymbolsVisitor<'a> {
     pub state: Rc<RefCell<SymbolsState<'a>>>,
 }
 
 impl<'a> SymbolsVisitor<'a> {
-    pub fn new(uri: String) -> SymbolsVisitor<'a> {
+    pub fn new(uri: lsp::Url) -> SymbolsVisitor<'a> {
         let state = SymbolsState {
             path: vec![],
             symbols: vec![],
@@ -168,66 +279,165 @@ impl<'a> Visitor<'a> for SymbolsVisitor<'a> {
             }
             Node::MemberExpr(me) => {
                 if let Some(source) = me.loc.source.clone() {
-                    (*state).symbols.push(SymbolInformation::new(
-                        SymbolKind::Object,
-                        source,
-                        uri,
-                        &me.loc,
-                    ))
+                    (*state).symbols.push(lsp::SymbolInformation {
+                        kind: lsp::SymbolKind::Object,
+                        name: source,
+                        location: lsp::Location {
+                            uri,
+                            range: lsp::Range {
+                                start: lsp::Position {
+                                    line: me.loc.start.line - 1,
+                                    character: me.loc.start.column
+                                        - 1,
+                                },
+                                end: lsp::Position {
+                                    line: me.loc.end.line - 1,
+                                    character: me.loc.end.column - 1,
+                                },
+                            },
+                        },
+                        tags: None,
+                        deprecated: None,
+                        container_name: None,
+                    });
                 }
             }
             Node::FloatLit(num) => {
-                (*state).symbols.push(SymbolInformation::new(
-                    SymbolKind::Number,
-                    num.value.to_string(),
-                    uri,
-                    &num.loc,
-                ));
+                (*state).symbols.push(lsp::SymbolInformation {
+                    kind: lsp::SymbolKind::Number,
+                    name: num.value.to_string(),
+                    location: lsp::Location {
+                        uri,
+                        range: lsp::Range {
+                            start: lsp::Position {
+                                line: num.loc.start.line - 1,
+                                character: num.loc.start.column - 1,
+                            },
+                            end: lsp::Position {
+                                line: num.loc.end.line - 1,
+                                character: num.loc.end.column - 1,
+                            },
+                        },
+                    },
+                    tags: None,
+                    deprecated: None,
+                    container_name: None,
+                });
                 return false;
             }
             Node::IntegerLit(num) => {
-                (*state).symbols.push(SymbolInformation::new(
-                    SymbolKind::Number,
-                    num.value.to_string(),
-                    uri,
-                    &num.loc,
-                ));
+                (*state).symbols.push(lsp::SymbolInformation {
+                    kind: lsp::SymbolKind::Number,
+                    name: num.value.to_string(),
+                    location: lsp::Location {
+                        uri,
+                        range: lsp::Range {
+                            start: lsp::Position {
+                                line: num.loc.start.line - 1,
+                                character: num.loc.start.column - 1,
+                            },
+                            end: lsp::Position {
+                                line: num.loc.end.line - 1,
+                                character: num.loc.end.column - 1,
+                            },
+                        },
+                    },
+                    tags: None,
+                    deprecated: None,
+                    container_name: None,
+                });
                 return false;
             }
             Node::DateTimeLit(d) => {
-                (*state).symbols.push(SymbolInformation::new(
-                    SymbolKind::Constant,
-                    d.value.to_string(),
-                    uri,
-                    &d.loc,
-                ));
+                (*state).symbols.push(lsp::SymbolInformation {
+                    kind: lsp::SymbolKind::Constant,
+                    name: d.value.to_string(),
+                    location: lsp::Location {
+                        uri,
+                        range: lsp::Range {
+                            start: lsp::Position {
+                                line: d.loc.start.line - 1,
+                                character: d.loc.start.column - 1,
+                            },
+                            end: lsp::Position {
+                                line: d.loc.end.line - 1,
+                                character: d.loc.end.column - 1,
+                            },
+                        },
+                    },
+                    tags: None,
+                    deprecated: None,
+                    container_name: None,
+                });
                 return false;
             }
             Node::BooleanLit(b) => {
-                (*state).symbols.push(SymbolInformation::new(
-                    SymbolKind::Boolean,
-                    b.value.to_string(),
-                    uri,
-                    &b.loc,
-                ));
+                (*state).symbols.push(lsp::SymbolInformation {
+                    kind: lsp::SymbolKind::Boolean,
+                    name: b.value.to_string(),
+                    location: lsp::Location {
+                        uri,
+                        range: lsp::Range {
+                            start: lsp::Position {
+                                line: b.loc.start.line - 1,
+                                character: b.loc.start.column - 1,
+                            },
+                            end: lsp::Position {
+                                line: b.loc.end.line - 1,
+                                character: b.loc.end.column - 1,
+                            },
+                        },
+                    },
+                    tags: None,
+                    deprecated: None,
+                    container_name: None,
+                });
                 return false;
             }
             Node::StringLit(s) => {
-                (*state).symbols.push(SymbolInformation::new(
-                    SymbolKind::String,
-                    s.value.clone(),
-                    uri,
-                    &s.loc,
-                ));
+                (*state).symbols.push(lsp::SymbolInformation {
+                    kind: lsp::SymbolKind::String,
+                    name: s.value.clone(),
+                    location: lsp::Location {
+                        uri,
+                        range: lsp::Range {
+                            start: lsp::Position {
+                                line: s.loc.start.line - 1,
+                                character: s.loc.start.column - 1,
+                            },
+                            end: lsp::Position {
+                                line: s.loc.end.line - 1,
+                                character: s.loc.end.column - 1,
+                            },
+                        },
+                    },
+                    tags: None,
+                    deprecated: None,
+                    container_name: None,
+                });
                 return false;
             }
             Node::ArrayExpr(a) => {
-                (*state).symbols.push(SymbolInformation::new(
-                    SymbolKind::Array,
-                    String::from("[]"),
-                    uri,
-                    &a.loc,
-                ))
+                (*state).symbols.push(lsp::SymbolInformation {
+                    kind: lsp::SymbolKind::Array,
+                    name: String::from("[]"),
+                    location: lsp::Location {
+                        uri,
+                        range: lsp::Range {
+                            start: lsp::Position {
+                                line: a.loc.start.line - 1,
+                                character: a.loc.start.column - 1,
+                            },
+                            end: lsp::Position {
+                                line: a.loc.end.line - 1,
+                                character: a.loc.end.column - 1,
+                            },
+                        },
+                    },
+                    tags: None,
+                    deprecated: None,
+                    container_name: None,
+                })
             }
             _ => (),
         }
