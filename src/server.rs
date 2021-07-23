@@ -73,7 +73,7 @@ fn replace_string_in_range(
 
 fn function_defines(
     name: String,
-    params: Vec<FunctionParameter>,
+    params: &Vec<FunctionParameter>,
 ) -> bool {
     for param in params {
         if param.key.name == name {
@@ -95,7 +95,6 @@ fn is_scope(name: String, n: Rc<walk::Node<'_>>) -> bool {
 fn find_references(
     uri: lsp::Url,
     result: NodeFinderResult,
-    position: lsp::Position,
 ) -> Vec<lsp::Location> {
     let mut locations: Vec<lsp::Location> = vec![];
 
@@ -115,7 +114,7 @@ fn find_references(
                     walk::Node::FunctionExpr(f)
                         if function_defines(
                             name.clone(),
-                            f.params,
+                            &f.params,
                         ) =>
                     {
                         Some(n.clone())
@@ -711,7 +710,7 @@ impl LanguageServer for LspServer {
         let pkg = parse_and_analyze(contents);
         let node = find_node(walk::Node::Package(&pkg), pos);
 
-        let locations = find_references(key.clone(), node, pos);
+        let locations = find_references(key.clone(), node);
 
         let mut changes = HashMap::new();
         changes.insert(key.clone(), Vec::new());
