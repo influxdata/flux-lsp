@@ -13,7 +13,7 @@ wasm-opt = ["-Oz", "--enable-mutable-globals"]
 [features]
 default = ["strict"]
 strict = []
-lsp2 = ["lspower"]
+lsp2 = ["lspower/runtime-agnostic"]
 
 [lib]
 name = "flux_lsp"
@@ -29,6 +29,7 @@ required-features = ["lsp2"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+async-std = { version = "1.9.0", features = ["attributes"] }
 async-trait = "0.1.50"
 clap = "2.33.3"
 combinations = "0.1.0"
@@ -38,12 +39,11 @@ js-sys = "0.3.51"
 line-col = "0.2.1"
 log = "0.4.14"
 lsp-types = "0.89.2"
-lspower = { version = "1.1.0", optional = true }
+lspower = { version = "1.1.0", default-features = false, optional = true }
 serde = { version = "1.0.126", features = ["derive"] }
 serde_json = "1.0.64"
 serde_repr = "0.1.7"
 simplelog = "0.10.0"
-tokio = { version = "1.7.1", features = ["io-std", "macros", "rt", "rt-multi-thread"] }
 url = "2.2.2"
 wasm-bindgen = "0.2.74"
 wasm-bindgen-futures = "0.4.24"
@@ -51,4 +51,3 @@ web-sys = { version = "0.3.51", features = ["console"] }
 
 [dev-dependencies]
 futures = "0.3.15"
-tokio-test = "*"

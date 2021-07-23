@@ -606,9 +606,9 @@ impl LanguageServer for LspServer {
 mod tests {
     use std::collections::HashMap;
 
+    use async_std::task::block_on;
     use lspower::lsp;
     use lspower::LanguageServer;
-    use tokio_test::block_on;
 
     use super::LspServer;
 
