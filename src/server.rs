@@ -73,7 +73,7 @@ fn replace_string_in_range(
 
 fn function_defines(
     name: &str,
-    params: &Vec<FunctionParameter>,
+    params: &[FunctionParameter],
 ) -> bool {
     params.iter().any(|param| param.key.name == name)
 }
@@ -698,9 +698,11 @@ impl LanguageServer for LspServer {
                 ));
             }
         };
-        let pos = params.text_document_position.position;
         let pkg = parse_and_analyze(contents);
-        let node = find_node(walk::Node::Package(&pkg), pos);
+        let node = find_node(
+            walk::Node::Package(&pkg),
+            params.text_document_position.position,
+        );
 
         let locations = find_references(key.clone(), node);
         let edits = locations
@@ -740,11 +742,13 @@ impl LanguageServer for LspServer {
                 ));
             }
         };
-        let pos = params.text_document_position.position;
         let pkg = parse_and_analyze(contents);
-        let node = find_node(walk::Node::Package(&pkg), pos);
+        let node = find_node(
+            walk::Node::Package(&pkg),
+            params.text_document_position.position,
+        );
 
-        Ok(Some(find_references(key.clone(), node)))
+        Ok(Some(find_references(key, node)))
     }
 }
 
