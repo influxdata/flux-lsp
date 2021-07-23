@@ -2,8 +2,8 @@ use std::collections::HashMap;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
-use flux::semantic::nodes::FunctionExpr;
-use flux::semantic::walk::{self, Node};
+use flux::semantic::nodes::FunctionParameter;
+use flux::semantic::walk;
 use log::{debug, error, info, warn};
 use lspower::jsonrpc::Result;
 use lspower::lsp;
@@ -71,8 +71,11 @@ fn replace_string_in_range(
     contents
 }
 
-fn function_defines(name: String, f: &FunctionExpr) -> bool {
-    for param in f.params.clone() {
+fn function_defines(
+    name: String,
+    params: Vec<FunctionParameter>,
+) -> bool {
+    for param in params {
         if param.key.name == name {
             return true;
         }
@@ -81,12 +84,9 @@ fn function_defines(name: String, f: &FunctionExpr) -> bool {
     false
 }
 
-fn is_scope(name: String, n: Rc<Node<'_>>) -> bool {
-    let mut dvisitor: DefinitionFinderVisitor =
-        DefinitionFinderVisitor::new(name);
-
+fn is_scope(name: String, n: Rc<walk::Node<'_>>) -> bool {
+    let mut dvisitor = DefinitionFinderVisitor::new(name);
     walk::walk(&mut dvisitor, n.clone());
-
     let state = dvisitor.state.borrow();
 
     state.node.is_some()
@@ -99,28 +99,30 @@ fn find_references(
 ) -> Vec<lsp::Location> {
     let mut locations: Vec<lsp::Location> = vec![];
     let pkg = parse_and_analyze(&contents);
-    let result = find_node(
-        flux::semantic::walk::Node::Package(&pkg),
-        position,
-    );
+    let result = find_node(walk::Node::Package(&pkg), position);
 
     if let Some(node) = result.node {
         let name = match node.as_ref() {
-            Node::Identifier(ident) => Some(ident.name.clone()),
-            Node::IdentifierExpr(ident) => Some(ident.name.clone()),
+            walk::Node::Identifier(ident) => Some(ident.name.clone()),
+            walk::Node::IdentifierExpr(ident) => {
+                Some(ident.name.clone())
+            }
             _ => None,
         };
 
         if let Some(name) = name {
             let mut path_iter = result.path.iter().rev();
-            let scope: Option<Rc<Node>> =
+            let scope: Option<Rc<walk::Node>> =
                 path_iter.find_map(|n| match n.as_ref() {
-                    Node::FunctionExpr(f)
-                        if function_defines(name.clone(), f) =>
+                    walk::Node::FunctionExpr(f)
+                        if function_defines(
+                            name.clone(),
+                            f.params,
+                        ) =>
                     {
                         Some(n.clone())
                     }
-                    Node::Package(_) | Node::File(_)
+                    walk::Node::Package(_) | walk::Node::File(_)
                         if is_scope(name.clone(), n.clone()) =>
                     {
                         Some(n.clone())
@@ -387,14 +389,12 @@ impl LanguageServer for LspServer {
 
         let pkg = parse_and_analyze(&data);
         let node_finder_result = find_node(
-            flux::semantic::walk::Node::Package(&pkg),
+            walk::Node::Package(&pkg),
             params.text_document_position_params.position,
         );
 
         if let Some(node) = node_finder_result.node {
-            if let flux::semantic::walk::Node::CallExpr(call) =
-                node.as_ref()
-            {
+            if let walk::Node::CallExpr(call) = node.as_ref() {
                 let callee = call.callee.clone();
 
                 if let flux::semantic::nodes::Expression::Member(member) = callee.clone() {
@@ -578,7 +578,7 @@ impl LanguageServer for LspServer {
         }
         let contents = store.get(&key).unwrap();
         let pkg = parse_and_analyze(contents);
-        let pkg_node = flux::semantic::walk::Node::Package(&pkg);
+        let pkg_node = walk::Node::Package(&pkg);
         let mut visitor = NodeFinderVisitor::new(
             params.text_document_position_params.position,
         );
@@ -591,10 +591,10 @@ impl LanguageServer for LspServer {
 
         if let Some(node) = node {
             let name = match node.as_ref() {
-                flux::semantic::walk::Node::Identifier(ident) => {
+                walk::Node::Identifier(ident) => {
                     Some(ident.name.clone())
                 }
-                flux::semantic::walk::Node::IdentifierExpr(ident) => {
+                walk::Node::IdentifierExpr(ident) => {
                     Some(ident.name.clone())
                 }
                 _ => return Ok(None),
@@ -604,12 +604,12 @@ impl LanguageServer for LspServer {
                 let path_iter = path.iter().rev();
                 for n in path_iter {
                     match n.as_ref() {
-                        flux::semantic::walk::Node::FunctionExpr(
-                            _,
-                        )
-                        | flux::semantic::walk::Node::Package(_)
-                        | flux::semantic::walk::Node::File(_) => {
-                            if let flux::semantic::walk::Node::FunctionExpr(f) = n.as_ref() {
+                        walk::Node::FunctionExpr(_)
+                        | walk::Node::Package(_)
+                        | walk::Node::File(_) => {
+                            if let walk::Node::FunctionExpr(f) =
+                                n.as_ref()
+                            {
                                 for param in f.params.clone() {
                                     let name = param.key.name;
                                     if name != node_name {
@@ -617,18 +617,35 @@ impl LanguageServer for LspServer {
                                     }
                                     let location = {
                                         let start = lsp::Position {
-                                            line: node.loc().start.line - 1,
-                                            character: node.loc().start.column - 1,
+                                            line: node
+                                                .loc()
+                                                .start
+                                                .line
+                                                - 1,
+                                            character: node
+                                                .loc()
+                                                .start
+                                                .column
+                                                - 1,
                                         };
 
                                         let end = lsp::Position {
-                                            line: node.loc().end.line - 1,
-                                            character: node.loc().end.column - 1,
+                                            line: node.loc().end.line
+                                                - 1,
+                                            character: node
+                                                .loc()
+                                                .end
+                                                .column
+                                                - 1,
                                         };
 
-                                        let range = lsp::Range { start, end };
+                                        let range =
+                                            lsp::Range { start, end };
 
-                                        lsp::Location { uri: key, range }
+                                        lsp::Location {
+                                            uri: key,
+                                            range,
+                                        }
                                     };
                                     return Ok(Some(lsp::GotoDefinitionResponse::Scalar(location)));
                                 }
