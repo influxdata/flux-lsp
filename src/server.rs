@@ -10,8 +10,8 @@ use lspower::lsp;
 use lspower::LanguageServer;
 
 use crate::handlers::document_symbol::sort_symbols;
-use crate::handlers::find_node;
 use crate::handlers::signature_help::find_stdlib_signatures;
+use crate::handlers::{find_node, NodeFinderResult};
 use crate::shared::conversion::map_node_to_location;
 use crate::visitors::semantic::{
     DefinitionFinderVisitor, FoldFinderVisitor, IdentFinderVisitor,
@@ -94,12 +94,10 @@ fn is_scope(name: String, n: Rc<walk::Node<'_>>) -> bool {
 
 fn find_references(
     uri: lsp::Url,
-    contents: String,
+    result: NodeFinderResult,
     position: lsp::Position,
 ) -> Vec<lsp::Location> {
     let mut locations: Vec<lsp::Location> = vec![];
-    let pkg = parse_and_analyze(&contents);
-    let result = find_node(walk::Node::Package(&pkg), position);
 
     if let Some(node) = result.node {
         let name = match node.as_ref() {
@@ -710,11 +708,13 @@ impl LanguageServer for LspServer {
         }
         let contents = store.get(&key).unwrap();
         let pos = params.text_document_position.position;
+        let pkg = parse_and_analyze(contents);
+        let node = find_node(walk::Node::Package(&pkg), pos);
+
+        let locations = find_references(key.clone(), node, pos);
+
         let mut changes = HashMap::new();
         changes.insert(key.clone(), Vec::new());
-        let locations =
-            find_references(key.clone(), contents.to_owned(), pos);
-
         for location in locations {
             let change = lsp::TextEdit {
                 range: location.range,
