@@ -90,48 +90,48 @@ fn find_references(
     uri: lsp::Url,
     result: NodeFinderResult,
 ) -> Vec<lsp::Location> {
-    let mut locations: Vec<lsp::Location> = vec![];
-
     if let Some(node) = result.node {
         let name = match node.as_ref() {
             walk::Node::Identifier(ident) => ident.name.as_str(),
             walk::Node::IdentifierExpr(ident) => ident.name.as_str(),
-            _ => return locations,
+            _ => return Vec::new(),
         };
 
         let mut path_iter = result.path.iter().rev();
-        let scope: Option<Rc<walk::Node>> =
-            path_iter.find_map(|n| match n.as_ref() {
+        let scope: Rc<walk::Node> =
+            match path_iter.find_map(|n| match n.as_ref() {
                 walk::Node::FunctionExpr(f)
                     if function_defines(name, &f.params) =>
                 {
-                    Some(n.to_owned())
+                    Some(n)
                 }
                 walk::Node::Package(_) | walk::Node::File(_)
                     if is_scope(name, n.clone()) =>
                 {
-                    Some(n.to_owned())
+                    Some(n)
                 }
                 _ => None,
-            });
+            }) {
+                Some(n) => n.to_owned(),
+                None => return Vec::new(),
+            };
 
-        if let Some(scope) = scope {
-            let mut visitor =
-                IdentFinderVisitor::new(name.to_string());
-            walk::walk(&mut visitor, scope);
+        let mut visitor = IdentFinderVisitor::new(name.to_string());
+        walk::walk(&mut visitor, scope);
 
-            let state = visitor.state.borrow();
-            let identifiers = (*state).identifiers.clone();
+        let state = visitor.state.borrow();
 
-            for node in identifiers {
-                let loc =
-                    map_node_to_location(uri.clone(), node.clone());
-                locations.push(loc);
-            }
-        }
+        let locations: Vec<lsp::Location> = (*state)
+            .identifiers
+            .iter()
+            .map(|node| {
+                map_node_to_location(uri.clone(), node.clone())
+            })
+            .collect();
+        locations
+    } else {
+        Vec::new()
     }
-
-    locations
 }
 
 #[allow(dead_code)]
