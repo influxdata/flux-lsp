@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
+use flux::semantic::nodes::FunctionParameter;
 use flux::semantic::walk;
 use log::{debug, error, info, warn};
 use lspower::jsonrpc::Result;
@@ -9,11 +10,12 @@ use lspower::lsp;
 use lspower::LanguageServer;
 
 use crate::handlers::document_symbol::sort_symbols;
-use crate::handlers::find_node;
 use crate::handlers::signature_help::find_stdlib_signatures;
+use crate::handlers::{find_node, NodeFinderResult};
+use crate::shared::conversion::map_node_to_location;
 use crate::visitors::semantic::{
-    DefinitionFinderVisitor, FoldFinderVisitor, NodeFinderVisitor,
-    SymbolsVisitor,
+    DefinitionFinderVisitor, FoldFinderVisitor, IdentFinderVisitor,
+    NodeFinderVisitor, SymbolsVisitor,
 };
 
 // The spec talks specifically about setting versions for files, but isn't
@@ -67,6 +69,69 @@ fn replace_string_in_range(
     }
     contents.replace_range(string_range.0..string_range.1, &new);
     contents
+}
+
+fn function_defines(
+    name: &str,
+    params: &Vec<FunctionParameter>,
+) -> bool {
+    params.iter().any(|param| param.key.name == name)
+}
+
+fn is_scope(name: &str, n: Rc<walk::Node<'_>>) -> bool {
+    let mut dvisitor = DefinitionFinderVisitor::new(name.to_string());
+    walk::walk(&mut dvisitor, n.clone());
+    let state = dvisitor.state.borrow();
+
+    state.node.is_some()
+}
+
+fn find_references(
+    uri: lsp::Url,
+    result: NodeFinderResult,
+) -> Vec<lsp::Location> {
+    if let Some(node) = result.node {
+        let name = match node.as_ref() {
+            walk::Node::Identifier(ident) => ident.name.as_str(),
+            walk::Node::IdentifierExpr(ident) => ident.name.as_str(),
+            _ => return Vec::new(),
+        };
+
+        let mut path_iter = result.path.iter().rev();
+        let scope: Rc<walk::Node> =
+            match path_iter.find_map(|n| match n.as_ref() {
+                walk::Node::FunctionExpr(f)
+                    if function_defines(name, &f.params) =>
+                {
+                    Some(n)
+                }
+                walk::Node::Package(_) | walk::Node::File(_)
+                    if is_scope(name, n.clone()) =>
+                {
+                    Some(n)
+                }
+                _ => None,
+            }) {
+                Some(n) => n.to_owned(),
+                None => return Vec::new(),
+            };
+
+        let mut visitor = IdentFinderVisitor::new(name.to_string());
+        walk::walk(&mut visitor, scope);
+
+        let state = visitor.state.borrow();
+
+        let locations: Vec<lsp::Location> = (*state)
+            .identifiers
+            .iter()
+            .map(|node| {
+                map_node_to_location(uri.clone(), node.clone())
+            })
+            .collect();
+        locations
+    } else {
+        Vec::new()
+    }
 }
 
 #[allow(dead_code)]
@@ -307,14 +372,12 @@ impl LanguageServer for LspServer {
 
         let pkg = parse_and_analyze(&data);
         let node_finder_result = find_node(
-            flux::semantic::walk::Node::Package(&pkg),
+            walk::Node::Package(&pkg),
             params.text_document_position_params.position,
         );
 
         if let Some(node) = node_finder_result.node {
-            if let flux::semantic::walk::Node::CallExpr(call) =
-                node.as_ref()
-            {
+            if let walk::Node::CallExpr(call) = node.as_ref() {
                 let callee = call.callee.clone();
 
                 if let flux::semantic::nodes::Expression::Member(member) = callee.clone() {
@@ -498,7 +561,7 @@ impl LanguageServer for LspServer {
         }
         let contents = store.get(&key).unwrap();
         let pkg = parse_and_analyze(contents);
-        let pkg_node = flux::semantic::walk::Node::Package(&pkg);
+        let pkg_node = walk::Node::Package(&pkg);
         let mut visitor = NodeFinderVisitor::new(
             params.text_document_position_params.position,
         );
@@ -511,10 +574,10 @@ impl LanguageServer for LspServer {
 
         if let Some(node) = node {
             let name = match node.as_ref() {
-                flux::semantic::walk::Node::Identifier(ident) => {
+                walk::Node::Identifier(ident) => {
                     Some(ident.name.clone())
                 }
-                flux::semantic::walk::Node::IdentifierExpr(ident) => {
+                walk::Node::IdentifierExpr(ident) => {
                     Some(ident.name.clone())
                 }
                 _ => return Ok(None),
@@ -524,12 +587,12 @@ impl LanguageServer for LspServer {
                 let path_iter = path.iter().rev();
                 for n in path_iter {
                     match n.as_ref() {
-                        flux::semantic::walk::Node::FunctionExpr(
-                            _,
-                        )
-                        | flux::semantic::walk::Node::Package(_)
-                        | flux::semantic::walk::Node::File(_) => {
-                            if let flux::semantic::walk::Node::FunctionExpr(f) = n.as_ref() {
+                        walk::Node::FunctionExpr(_)
+                        | walk::Node::Package(_)
+                        | walk::Node::File(_) => {
+                            if let walk::Node::FunctionExpr(f) =
+                                n.as_ref()
+                            {
                                 for param in f.params.clone() {
                                     let name = param.key.name;
                                     if name != node_name {
@@ -537,18 +600,35 @@ impl LanguageServer for LspServer {
                                     }
                                     let location = {
                                         let start = lsp::Position {
-                                            line: node.loc().start.line - 1,
-                                            character: node.loc().start.column - 1,
+                                            line: node
+                                                .loc()
+                                                .start
+                                                .line
+                                                - 1,
+                                            character: node
+                                                .loc()
+                                                .start
+                                                .column
+                                                - 1,
                                         };
 
                                         let end = lsp::Position {
-                                            line: node.loc().end.line - 1,
-                                            character: node.loc().end.column - 1,
+                                            line: node.loc().end.line
+                                                - 1,
+                                            character: node
+                                                .loc()
+                                                .end
+                                                .column
+                                                - 1,
                                         };
 
-                                        let range = lsp::Range { start, end };
+                                        let range =
+                                            lsp::Range { start, end };
 
-                                        lsp::Location { uri: key, range }
+                                        lsp::Location {
+                                            uri: key,
+                                            range,
+                                        }
                                     };
                                     return Ok(Some(lsp::GotoDefinitionResponse::Scalar(location)));
                                 }
@@ -598,6 +678,48 @@ impl LanguageServer for LspServer {
             }
         }
         Ok(None)
+    }
+    async fn rename(
+        &self,
+        params: lsp::RenameParams,
+    ) -> Result<Option<lsp::WorkspaceEdit>> {
+        let key =
+            params.text_document_position.text_document.uri.clone();
+        let store = self.store.lock().unwrap();
+        let contents = match store.get(&key) {
+            Some(v) => v,
+            None => {
+                error!(
+                    "textDocument/rename called on unknown file {}",
+                    key
+                );
+                return Err(lspower::jsonrpc::Error::invalid_params(
+                    format!("file not opened: {}", key),
+                ));
+            }
+        };
+        let pos = params.text_document_position.position;
+        let pkg = parse_and_analyze(contents);
+        let node = find_node(walk::Node::Package(&pkg), pos);
+
+        let locations = find_references(key.clone(), node);
+        let edits = locations
+            .iter()
+            .map(|location| lsp::TextEdit {
+                range: location.range,
+                new_text: params.new_name.clone(),
+            })
+            .collect::<Vec<lsp::TextEdit>>();
+
+        let mut changes = HashMap::new();
+        changes.insert(key.clone(), edits);
+
+        let response = lsp::WorkspaceEdit {
+            changes: Some(changes),
+            document_changes: None,
+            change_annotations: None,
+        };
+        Ok(Some(response))
     }
 }
 
@@ -1322,6 +1444,91 @@ errorCounts
                     },
                 },
             });
+
+        assert_eq!(expected, result);
+    }
+    #[test]
+    fn test_rename() {
+        let fluxscript = r#"import "strings"
+env = "prod01-us-west-2"
+
+errorCounts = from(bucket:"kube-infra/monthly")
+    |> range(start: -3d)
+    |> filter(fn: (r) => r._measurement == "query_log" and
+                         r.error != "" and
+                         r._field == "responseSize" and
+                         r.env == env)
+    |> group(columns:["env", "error"])
+    |> count()
+    |> group(columns:["env", "_stop", "_start"])
+
+errorCounts
+    |> filter(fn: (r) => strings.containsStr(v: r.error, substr: "AppendMappedRecordWithNulls"))"#;
+        let server = create_server();
+        open_file(&server, fluxscript.to_string());
+
+        let params = lsp::RenameParams {
+            text_document_position: lsp::TextDocumentPositionParams {
+                text_document: lsp::TextDocumentIdentifier {
+                    uri: lsp::Url::parse(
+                        "file:///home/user/file.flux",
+                    )
+                    .unwrap(),
+                },
+                position: lsp::Position {
+                    line: 1,
+                    character: 1,
+                },
+            },
+            new_name: "environment".to_string(),
+            work_done_progress_params: lsp::WorkDoneProgressParams {
+                work_done_token: None,
+            },
+        };
+
+        let result =
+            block_on(server.rename(params)).unwrap().unwrap();
+
+        let edits = vec![
+            lsp::TextEdit {
+                new_text: "environment".to_string(),
+                range: lsp::Range {
+                    start: lsp::Position {
+                        line: 1,
+                        character: 0,
+                    },
+                    end: lsp::Position {
+                        line: 1,
+                        character: 3,
+                    },
+                },
+            },
+            lsp::TextEdit {
+                new_text: "environment".to_string(),
+                range: lsp::Range {
+                    start: lsp::Position {
+                        line: 8,
+                        character: 34,
+                    },
+                    end: lsp::Position {
+                        line: 8,
+                        character: 37,
+                    },
+                },
+            },
+        ];
+        let mut changes: HashMap<lsp::Url, Vec<lsp::TextEdit>> =
+            HashMap::new();
+        changes.insert(
+            lsp::Url::parse("file:///home/user/file.flux").unwrap(),
+            edits,
+        );
+
+        let expected = lsp::WorkspaceEdit {
+            changes: Some(changes),
+            document_changes: None,
+            change_annotations: None,
+        };
 
         assert_eq!(expected, result);
     }
