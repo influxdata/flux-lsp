@@ -72,20 +72,14 @@ fn replace_string_in_range(
 }
 
 fn function_defines(
-    name: String,
+    name: &str,
     params: &Vec<FunctionParameter>,
 ) -> bool {
-    for param in params {
-        if param.key.name == name {
-            return true;
-        }
-    }
-
-    false
+    params.iter().any(|param| param.key.name == name)
 }
 
-fn is_scope(name: String, n: Rc<walk::Node<'_>>) -> bool {
-    let mut dvisitor = DefinitionFinderVisitor::new(name);
+fn is_scope(name: &str, n: Rc<walk::Node<'_>>) -> bool {
+    let mut dvisitor = DefinitionFinderVisitor::new(name.to_string());
     walk::walk(&mut dvisitor, n.clone());
     let state = dvisitor.state.borrow();
 
@@ -100,47 +94,39 @@ fn find_references(
 
     if let Some(node) = result.node {
         let name = match node.as_ref() {
-            walk::Node::Identifier(ident) => Some(ident.name.clone()),
-            walk::Node::IdentifierExpr(ident) => {
-                Some(ident.name.clone())
-            }
-            _ => None,
+            walk::Node::Identifier(ident) => &ident.name[..],
+            walk::Node::IdentifierExpr(ident) => &ident.name[..],
+            _ => return locations,
         };
 
-        if let Some(name) = name {
-            let mut path_iter = result.path.iter().rev();
-            let scope: Option<Rc<walk::Node>> =
-                path_iter.find_map(|n| match n.as_ref() {
-                    walk::Node::FunctionExpr(f)
-                        if function_defines(
-                            name.clone(),
-                            &f.params,
-                        ) =>
-                    {
-                        Some(n.clone())
-                    }
-                    walk::Node::Package(_) | walk::Node::File(_)
-                        if is_scope(name.clone(), n.clone()) =>
-                    {
-                        Some(n.clone())
-                    }
-                    _ => None,
-                });
-
-            if let Some(scope) = scope {
-                let mut visitor = IdentFinderVisitor::new(name);
-                walk::walk(&mut visitor, scope);
-
-                let state = visitor.state.borrow();
-                let identifiers = (*state).identifiers.clone();
-
-                for node in identifiers {
-                    let loc = map_node_to_location(
-                        uri.clone(),
-                        node.clone(),
-                    );
-                    locations.push(loc);
+        let mut path_iter = result.path.iter().rev();
+        let scope: Option<Rc<walk::Node>> =
+            path_iter.find_map(|n| match n.as_ref() {
+                walk::Node::FunctionExpr(f)
+                    if function_defines(name, &f.params) =>
+                {
+                    Some(n.to_owned())
                 }
+                walk::Node::Package(_) | walk::Node::File(_)
+                    if is_scope(name, n.clone()) =>
+                {
+                    Some(n.to_owned())
+                }
+                _ => None,
+            });
+
+        if let Some(scope) = scope {
+            let mut visitor =
+                IdentFinderVisitor::new(name.to_string());
+            walk::walk(&mut visitor, scope);
+
+            let state = visitor.state.borrow();
+            let identifiers = (*state).identifiers.clone();
+
+            for node in identifiers {
+                let loc =
+                    map_node_to_location(uri.clone(), node.clone());
+                locations.push(loc);
             }
         }
     }
@@ -699,13 +685,18 @@ impl LanguageServer for LspServer {
     ) -> Result<Option<lsp::WorkspaceEdit>> {
         let key = params.text_document_position.text_document.uri;
         let store = self.store.lock().unwrap();
-        if !store.contains_key(&key) {
-            error!(
-                "textDocument/didChange called on unknown file {}",
-                key
-            );
-        }
-        let contents = store.get(&key).unwrap();
+        let contents = match store.get(&key) {
+            Some(v) => v,
+            None => {
+                error!(
+                    "textDocument/rename called on unknown file {}",
+                    key
+                );
+                return Err(lspower::jsonrpc::Error::invalid_params(
+                    format!("file not opened: {}", key),
+                ));
+            }
+        };
         let pos = params.text_document_position.position;
         let pkg = parse_and_analyze(contents);
         let node = find_node(walk::Node::Package(&pkg), pos);
