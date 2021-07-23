@@ -683,7 +683,8 @@ impl LanguageServer for LspServer {
         &self,
         params: lsp::RenameParams,
     ) -> Result<Option<lsp::WorkspaceEdit>> {
-        let key = params.text_document_position.text_document.uri;
+        let key =
+            params.text_document_position.text_document.uri.clone();
         let store = self.store.lock().unwrap();
         let contents = match store.get(&key) {
             Some(v) => v,
@@ -702,17 +703,16 @@ impl LanguageServer for LspServer {
         let node = find_node(walk::Node::Package(&pkg), pos);
 
         let locations = find_references(key.clone(), node);
-
-        let mut changes = HashMap::new();
-        changes.insert(key.clone(), Vec::new());
-        for location in locations {
-            let change = lsp::TextEdit {
+        let edits = locations
+            .iter()
+            .map(|location| lsp::TextEdit {
                 range: location.range,
                 new_text: params.new_name.clone(),
-            };
+            })
+            .collect::<Vec<lsp::TextEdit>>();
 
-            changes.get_mut(&key).unwrap().push(change);
-        }
+        let mut changes = HashMap::new();
+        changes.insert(key.clone(), edits);
 
         let response = lsp::WorkspaceEdit {
             changes: Some(changes),
