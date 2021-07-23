@@ -94,8 +94,8 @@ fn find_references(
 
     if let Some(node) = result.node {
         let name = match node.as_ref() {
-            walk::Node::Identifier(ident) => &ident.name[..],
-            walk::Node::IdentifierExpr(ident) => &ident.name[..],
+            walk::Node::Identifier(ident) => ident.name.as_str(),
+            walk::Node::IdentifierExpr(ident) => ident.name.as_str(),
             _ => return locations,
         };
 
