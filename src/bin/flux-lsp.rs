@@ -7,7 +7,7 @@ use simplelog::{CombinedLogger, Config, LevelFilter, WriteLogger};
 
 use flux_lsp::LspServer;
 
-#[tokio::main]
+#[async_std::main]
 async fn main() {
     let matches = App::new("flux-lsp")
         .version("2.0")
@@ -82,8 +82,8 @@ async fn main() {
     };
 
     debug!("Starting lsp client");
-    let stdin = tokio::io::stdin();
-    let stdout = tokio::io::stdout();
+    let stdin = async_std::io::stdin();
+    let stdout = async_std::io::stdout();
 
     let (service, messages) = LspService::new(|_client| {
         let mut server = LspServer::default();
