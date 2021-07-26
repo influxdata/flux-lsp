@@ -73,7 +73,7 @@ fn replace_string_in_range(
 
 fn function_defines(
     name: &str,
-    params: &Vec<FunctionParameter>,
+    params: &[FunctionParameter],
 ) -> bool {
     params.iter().any(|param| param.key.name == name)
 }
@@ -698,9 +698,11 @@ impl LanguageServer for LspServer {
                 ));
             }
         };
-        let pos = params.text_document_position.position;
         let pkg = parse_and_analyze(contents);
-        let node = find_node(walk::Node::Package(&pkg), pos);
+        let node = find_node(
+            walk::Node::Package(&pkg),
+            params.text_document_position.position,
+        );
 
         let locations = find_references(key.clone(), node);
         let edits = locations
@@ -720,6 +722,33 @@ impl LanguageServer for LspServer {
             change_annotations: None,
         };
         Ok(Some(response))
+    }
+    async fn references(
+        &self,
+        params: lsp::ReferenceParams,
+    ) -> Result<Option<Vec<lsp::Location>>> {
+        let key =
+            params.text_document_position.text_document.uri.clone();
+        let store = self.store.lock().unwrap();
+        let contents = match store.get(&key) {
+            Some(v) => v,
+            None => {
+                error!(
+                    "textDocument/references called on unknown file {}",
+                    key
+                );
+                return Err(lspower::jsonrpc::Error::invalid_params(
+                    format!("file not opened: {}", key),
+                ));
+            }
+        };
+        let pkg = parse_and_analyze(contents);
+        let node = find_node(
+            walk::Node::Package(&pkg),
+            params.text_document_position.position,
+        );
+
+        Ok(Some(find_references(key, node)))
     }
 }
 
@@ -1448,7 +1477,7 @@ errorCounts
         assert_eq!(expected, result);
     }
     #[test]
-    fn test_rename() {
+    fn test_references() {
         let fluxscript = r#"import "strings"
 env = "prod01-us-west-2"
 
@@ -1529,6 +1558,94 @@ errorCounts
             document_changes: None,
             change_annotations: None,
         };
+
+        assert_eq!(expected, result);
+    }
+    #[test]
+    fn test_rename() {
+        let fluxscript = r#"import "strings"
+env = "prod01-us-west-2"
+
+errorCounts = from(bucket:"kube-infra/monthly")
+    |> range(start: -3d)
+    |> filter(fn: (r) => r._measurement == "query_log" and
+                         r.error != "" and
+                         r._field == "responseSize" and
+                         r.env == env)
+    |> group(columns:["env", "error"])
+    |> count()
+    |> group(columns:["env", "_stop", "_start"])
+
+errorCounts
+    |> filter(fn: (r) => strings.containsStr(v: r.error, substr: "AppendMappedRecordWithNulls"))"#;
+        let server = create_server();
+        open_file(&server, fluxscript.to_string());
+
+        let params = lsp::ReferenceParams {
+            text_document_position: lsp::TextDocumentPositionParams {
+                text_document: lsp::TextDocumentIdentifier {
+                    uri: lsp::Url::parse(
+                        "file:///home/user/file.flux",
+                    )
+                    .unwrap(),
+                },
+                position: lsp::Position {
+                    line: 1,
+                    character: 1,
+                },
+            },
+            work_done_progress_params: lsp::WorkDoneProgressParams {
+                work_done_token: None,
+            },
+            partial_result_params: lsp::PartialResultParams {
+                partial_result_token: None,
+            },
+            context: lsp::ReferenceContext {
+                // declaration is included whether this is true or false
+                include_declaration: true,
+            },
+        };
+
+        let result = block_on(server.references(params.clone()))
+            .unwrap()
+            .unwrap();
+
+        let expected = vec![
+            lsp::Location {
+                uri: params
+                    .text_document_position
+                    .text_document
+                    .uri
+                    .clone(),
+                range: lsp::Range {
+                    start: lsp::Position {
+                        line: 1,
+                        character: 0,
+                    },
+                    end: lsp::Position {
+                        line: 1,
+                        character: 3,
+                    },
+                },
+            },
+            lsp::Location {
+                uri: params
+                    .text_document_position
+                    .text_document
+                    .uri
+                    .clone(),
+                range: lsp::Range {
+                    start: lsp::Position {
+                        line: 8,
+                        character: 34,
+                    },
+                    end: lsp::Position {
+                        line: 8,
+                        character: 37,
+                    },
+                },
+            },
+        ];
 
         assert_eq!(expected, result);
     }
