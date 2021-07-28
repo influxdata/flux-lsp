@@ -1,8 +1,10 @@
 #!/bin/bash
 
+set -e
+
 EXTRA_ARGS="--"
 if [[ ! -z "${LSP2}" ]]; then
-    echo "Building with --featurs lsp2"
+    echo "Building with --features lsp2"
     EXTRA_ARGS="${EXTRA_ARGS} --features lsp2"
 fi
 

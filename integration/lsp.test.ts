@@ -54,17 +54,18 @@ describe('LSP Server integration tests', () => {
             }
         };
 
-        const request = {method: "initialize"};
+        const request = {method: "initialize", params: { capabilities: {}}};
 
         const response = await server.process(buildRequest(request));
         const error = response.get_error();
         expect(error).toBe(undefined);
         const message = parseResponse(response.get_message());
-        expect(message).toStrictEqual(expected);
+        // XXX: rockstar (27 Jul 2021) - The serverInfo between the two servers
+        // is different, which would cause this to fail.
+        expect(message.result["capabilities"]).toStrictEqual(expected.result["capabilities"]);
     });
 
     it('formats', async () => {
-
         const expected = {
             result: [{
                 newText: "from(bucket: \"my-bucket\") |> group() |> last()",

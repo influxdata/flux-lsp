@@ -1,9 +1,22 @@
+#![allow(dead_code, unused_imports)]
+use std::ops::Add;
 use std::str;
 
 use js_sys::{Function, Promise};
 use serde::{Deserialize, Serialize};
+use tower_service::Service;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::future_to_promise;
+
+use crate::LspServer;
+
+fn wrap_message(s: String) -> String {
+    let st = s.clone();
+    let result = st.as_bytes();
+    let size = result.len();
+
+    format!("Content-Length: {}\r\n\r\n{}", size, s)
+}
 
 #[derive(Serialize)]
 struct ResponseError {
@@ -41,28 +54,78 @@ struct ServerError {
 }
 
 #[wasm_bindgen]
-pub struct Server {}
+pub struct Server {
+    service: lspower::LspService,
+}
 
 #[wasm_bindgen]
 impl Server {
     #[wasm_bindgen(constructor)]
     pub fn new(
-        _disable_folding: bool,
+        disable_folding: bool,
         _support_multiple_files: bool,
     ) -> Self {
-        Server {}
+        let (service, _messages) =
+            lspower::LspService::new(|_client| {
+                let mut server = LspServer::default();
+                if disable_folding {
+                    server = server.disable_folding();
+                }
+                server
+            });
+
+        Server { service }
     }
 
     pub fn process(&mut self, msg: String) -> Promise {
+        let json_contents: String =
+            msg.lines().skip(2).fold(String::new(), |c, l| c.add(l));
+
+        let message: lspower::jsonrpc::Incoming =
+            serde_json::from_str(&json_contents).unwrap();
+        let call = self.service.call(message);
         future_to_promise(async move {
-            Ok(JsValue::from(ServerResponse {
-                message: Some(
-                    str::from_utf8(msg.as_bytes())
-                        .unwrap()
-                        .to_string(),
-                ),
-                error: None,
-            }))
+            match call.await {
+                Ok(result) => match result {
+                    Some(result_inner) => match result_inner {
+                        lspower::jsonrpc::Outgoing::Response(
+                            response,
+                        ) => match serde_json::to_string(&response) {
+                            Ok(value) => {
+                                Ok(JsValue::from(ServerResponse {
+                                    message: Some(wrap_message(
+                                        value,
+                                    )),
+                                    error: None,
+                                }))
+                            }
+                            Err(err) => {
+                                Ok(JsValue::from(ServerResponse {
+                                    message: None,
+                                    error: Some(format!("{}", err)),
+                                }))
+                            }
+                        },
+                        lspower::jsonrpc::Outgoing::Request(
+                            _client_request,
+                        ) => {
+                            panic!("Outgoing requests from server to client are not implemented");
+                        }
+                    },
+                    None => {
+                        // Some endpoints don't have results,
+                        // e.g. textDocument/didOpen
+                        Ok(JsValue::from(ServerResponse {
+                            message: None,
+                            error: None,
+                        }))
+                    }
+                },
+                Err(err) => Ok(JsValue::from(ServerResponse {
+                    message: None,
+                    error: Some(format!("{}", err)),
+                })),
+            }
         })
     }
 

@@ -46,10 +46,7 @@ jobs:
             cd integration
             npm install -f  # Force, because fsevents
             npm test
-            # XXX: rockstar (22 Jul 2021) - Enabling the `lsp2` feature flag
-            # does not enable a wasm binary, currently. That will have to be
-            # followed up.
-            # LSP2=1 npm test
+            LSP2=1 npm test
 
   deploy:
     docker:

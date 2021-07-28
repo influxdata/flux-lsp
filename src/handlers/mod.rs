@@ -15,7 +15,9 @@ pub mod router;
 pub mod shutdown;
 pub mod signature_help;
 
-#[cfg(test)]
+// Url::to_file_path doesn't exist in wasm-unknown-unknown, for kinda
+// obvious reasons. Ignore these tests when executing against that target.
+#[cfg(all(test, not(target_arch = "wasm32")))]
 mod tests;
 
 pub use router::Router;

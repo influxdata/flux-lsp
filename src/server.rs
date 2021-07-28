@@ -234,13 +234,17 @@ impl LanguageServer for LspServer {
                         },
                 }),
                 declaration_provider: None,
-                definition_provider: None,
-                document_formatting_provider: None,
+                definition_provider: Some(lsp::OneOf::Left(true)),
+                document_formatting_provider: Some(lsp::OneOf::Left(
+                    true,
+                )),
                 document_highlight_provider: None,
                 document_link_provider: None,
                 document_on_type_formatting_provider: None,
                 document_range_formatting_provider: None,
-                document_symbol_provider: None,
+                document_symbol_provider: Some(lsp::OneOf::Left(
+                    true,
+                )),
                 execute_command_provider: None,
                 experimental: None,
                 folding_range_provider: Some(
@@ -252,8 +256,8 @@ impl LanguageServer for LspServer {
                 implementation_provider: None,
                 linked_editing_range_provider: None,
                 moniker_provider: None,
-                references_provider: None,
-                rename_provider: None,
+                references_provider: Some(lsp::OneOf::Left(true)),
+                rename_provider: Some(lsp::OneOf::Left(true)),
                 selection_range_provider: None,
                 semantic_tokens_provider: None,
                 signature_help_provider: Some(
@@ -270,7 +274,11 @@ impl LanguageServer for LspServer {
                             },
                     },
                 ),
-                text_document_sync: None,
+                text_document_sync: Some(
+                    lsp::TextDocumentSyncCapability::Kind(
+                        lsp::TextDocumentSyncKind::Full,
+                    ),
+                ),
                 type_definition_provider: None,
                 workspace: None,
                 workspace_symbol_provider: None,
@@ -701,7 +709,9 @@ impl LanguageServer for LspServer {
     }
 }
 
-#[cfg(test)]
+// Url::to_file_path doesn't exist in wasm-unknown-unknown, for kinda
+// obvious reasons. Ignore these tests when executing against that target.
+#[cfg(all(test, not(target_arch = "wasm32")))]
 #[allow(deprecated)]
 mod tests {
     use std::collections::HashMap;
