@@ -460,8 +460,11 @@ impl LanguageServer for LspServer {
                 info!("textDocument/formatting requested trimming final newlines, but the flux formatter will always trim trailing whitespace");
             }
         }
-        let lookup = line_col::LineColLookup::new(formatted.as_str());
-        let end = lookup.get(formatted.len() - 1);
+
+        // The new text shows the range of the previously replaced section,
+        // not the range of the new section.
+        let lookup = line_col::LineColLookup::new(contents.as_str());
+        let end = lookup.get(contents.len());
 
         let edit = lsp::TextEdit::new(
             lsp::Range {
@@ -1125,8 +1128,8 @@ errorCounts
                     character: 0,
                 },
                 end: lsp::Position {
-                    line: 14,
-                    character: 95,
+                    line: 15,
+                    character: 96,
                 },
             },
             flux::formatter::format(&fluxscript).unwrap(),
@@ -1187,13 +1190,9 @@ errorCounts
                     line: 0,
                     character: 0,
                 },
-                // This reads funny, because line 15 is only 96 characters long.
-                // Character number 97 is a newline, but it doesn't show as line
-                // 16 because there aren't any characters on the line, and we
-                // can't use character 0 there.
                 end: lsp::Position {
-                    line: 14,
-                    character: 96,
+                    line: 17,
+                    character: 0,
                 },
             },
             formatted_text,
