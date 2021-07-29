@@ -9,10 +9,10 @@ use lspower::jsonrpc::Result;
 use lspower::lsp;
 use lspower::LanguageServer;
 
+use crate::convert;
 use crate::handlers::document_symbol::sort_symbols;
 use crate::handlers::signature_help::find_stdlib_signatures;
 use crate::handlers::{find_node, NodeFinderResult};
-use crate::shared::conversion::map_node_to_location;
 use crate::visitors::semantic::{
     DefinitionFinderVisitor, FoldFinderVisitor, IdentFinderVisitor,
     NodeFinderVisitor, SymbolsVisitor,
@@ -50,20 +50,19 @@ fn replace_string_in_range(
     let lookup = line_col::LineColLookup::new(&contents);
     for i in 0..contents.len() {
         let linecol = lookup.get(i);
-        if string_range.0 == 0 {
-            if linecol.0 == (range.start.line as usize)
-                && linecol.1 == (range.start.character as usize)
-            {
-                string_range.0 = i;
-            }
-        } else if linecol.0 == (range.end.line as usize)
-            && linecol.1 == (range.end.character as usize)
+        if linecol.0 == (range.start.line as usize) + 1
+            && linecol.1 == (range.start.character as usize) + 1
+        {
+            string_range.0 = i;
+        }
+        if linecol.0 == (range.end.line as usize) + 1
+            && linecol.1 == (range.end.character as usize) + 1
         {
             string_range.1 = i + 1; // Range is not inclusive.
             break;
         }
     }
-    if string_range.1 == 0 {
+    if string_range.1 < string_range.0 {
         error!("range end not found after range start");
         return contents;
     }
@@ -124,9 +123,7 @@ fn find_references(
         let locations: Vec<lsp::Location> = (*state)
             .identifiers
             .iter()
-            .map(|node| {
-                map_node_to_location(uri.clone(), node.clone())
-            })
+            .map(|node| convert::node_to_location(&node, uri.clone()))
             .collect();
         locations
     } else {
@@ -461,12 +458,12 @@ impl LanguageServer for LspServer {
         let edit = lsp::TextEdit::new(
             lsp::Range {
                 start: lsp::Position {
-                    line: 1,
-                    character: 1,
+                    line: 0,
+                    character: 0,
                 },
                 end: lsp::Position {
-                    line: end.0 as u32,
-                    character: end.1 as u32,
+                    line: (end.0 - 1) as u32,
+                    character: (end.1 - 1) as u32,
                 },
             },
             formatted,
@@ -598,38 +595,10 @@ impl LanguageServer for LspServer {
                                     if name != node_name {
                                         continue;
                                     }
-                                    let location = {
-                                        let start = lsp::Position {
-                                            line: node
-                                                .loc()
-                                                .start
-                                                .line
-                                                - 1,
-                                            character: node
-                                                .loc()
-                                                .start
-                                                .column
-                                                - 1,
-                                        };
-
-                                        let end = lsp::Position {
-                                            line: node.loc().end.line
-                                                - 1,
-                                            character: node
-                                                .loc()
-                                                .end
-                                                .column
-                                                - 1,
-                                        };
-
-                                        let range =
-                                            lsp::Range { start, end };
-
-                                        lsp::Location {
-                                            uri: key,
-                                            range,
-                                        }
-                                    };
+                                    let location =
+                                        convert::node_to_location(
+                                            &node, key,
+                                        );
                                     return Ok(Some(lsp::GotoDefinitionResponse::Scalar(location)));
                                 }
                             }
@@ -645,30 +614,10 @@ impl LanguageServer for LspServer {
                             let state =
                                 definition_visitor.state.borrow();
                             if let Some(node) = state.node.clone() {
-                                let location = {
-                                    let start_line =
-                                        node.loc().start.line;
-                                    let start_col =
-                                        node.loc().start.column;
-                                    let end_line =
-                                        node.loc().end.line;
-                                    let end_col =
-                                        node.loc().end.column;
-
-                                    lsp::Location {
-                                        uri: key,
-                                        range: lsp::Range {
-                                            start: lsp::Position {
-                                                line: start_line,
-                                                character: start_col,
-                                            },
-                                            end: lsp::Position {
-                                                line: end_line,
-                                                character: end_col,
-                                            },
-                                        },
-                                    }
-                                };
+                                let location =
+                                    convert::node_to_location(
+                                        &node, key,
+                                    );
                                 return Ok(Some(lsp::GotoDefinitionResponse::Scalar(location)));
                             }
                         }
@@ -906,12 +855,12 @@ mod tests {
                 lsp::TextDocumentContentChangeEvent {
                     range: Some(lsp::Range {
                         start: lsp::Position {
-                            line: 2,
-                            character: 4,
+                            line: 1,
+                            character: 3,
                         },
                         end: lsp::Position {
-                            line: 2,
-                            character: 9,
+                            line: 1,
+                            character: 8,
                         },
                     }),
                     range_length: None,
@@ -954,12 +903,12 @@ mod tests {
                 lsp::TextDocumentContentChangeEvent {
                     range: Some(lsp::Range {
                         start: lsp::Position {
-                            line: 2,
-                            character: 3,
+                            line: 1,
+                            character: 2,
                         },
                         end: lsp::Position {
-                            line: 3,
-                            character: 8,
+                            line: 2,
+                            character: 7,
                         },
                     }),
                     range_length: None,
@@ -1018,7 +967,7 @@ mod tests {
                         )
                         .unwrap(),
                     ),
-                    lsp::Position::new(1, 1),
+                    lsp::Position::new(0, 0),
                 ),
             work_done_progress_params: lsp::WorkDoneProgressParams {
                 work_done_token: None,
@@ -1162,12 +1111,12 @@ errorCounts
         let expected = lsp::TextEdit::new(
             lsp::Range {
                 start: lsp::Position {
-                    line: 1,
-                    character: 1,
+                    line: 0,
+                    character: 0,
                 },
                 end: lsp::Position {
-                    line: 15,
-                    character: 96,
+                    line: 14,
+                    character: 95,
                 },
             },
             flux::formatter::format(&fluxscript).unwrap(),
@@ -1225,16 +1174,16 @@ errorCounts
         let expected = lsp::TextEdit::new(
             lsp::Range {
                 start: lsp::Position {
-                    line: 1,
-                    character: 1,
+                    line: 0,
+                    character: 0,
                 },
                 // This reads funny, because line 15 is only 96 characters long.
                 // Character number 97 is a newline, but it doesn't show as line
                 // 16 because there aren't any characters on the line, and we
-                // can't uso character 0 there.
+                // can't use character 0 there.
                 end: lsp::Position {
-                    line: 15,
-                    character: 97,
+                    line: 14,
+                    character: 96,
                 },
             },
             formatted_text,
@@ -1464,12 +1413,12 @@ errorCounts
                     .unwrap(),
                 range: lsp::Range {
                     start: lsp::Position {
-                        line: 2,
-                        character: 1,
+                        line: 1,
+                        character: 0,
                     },
                     end: lsp::Position {
-                        line: 2,
-                        character: 25,
+                        line: 1,
+                        character: 24,
                     },
                 },
             });

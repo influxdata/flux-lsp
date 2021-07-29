@@ -1,35 +1,8 @@
 use flux::ast::check;
 use flux::ast::Package;
 use flux::parser::parse_string;
-use flux::semantic::walk::Node;
-
-use std::rc::Rc;
 
 use lsp_types as lsp;
-
-pub fn map_node_to_location(
-    uri: lsp::Url,
-    node: Rc<Node>,
-) -> lsp::Location {
-    let start_line = node.loc().start.line - 1;
-    let start_col = node.loc().start.column - 1;
-    let end_line = node.loc().end.line - 1;
-    let end_col = node.loc().end.column - 1;
-
-    lsp::Location {
-        uri,
-        range: lsp::Range {
-            start: lsp::Position {
-                line: start_line,
-                character: start_col,
-            },
-            end: lsp::Position {
-                line: end_line,
-                character: end_col,
-            },
-        },
-    }
-}
 
 pub fn create_file_node_from_text(
     uri: lsp::Url,

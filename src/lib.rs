@@ -2,6 +2,7 @@
 extern crate clap;
 
 mod cache;
+mod convert;
 mod handlers;
 mod protocol;
 #[cfg(feature = "lsp2")]
