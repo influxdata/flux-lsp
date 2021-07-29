@@ -101,16 +101,6 @@ async fn main() {
         }
         server
     });
-    // service(LspService).server is an instance of the LspServer
-    // service.call sends request to LspServer
-    // crate::generated_impl::handle_request
-    //   - takes the LspServer instance as first argument
-    //   - state
-    //   - pending server messages
-    //   - req
-    //  handle_request does the following:
-    //   - get the method by checking the ServerRequest.kind
-    //   - if the method is not known, return the request_else result
     Server::new(stdin, stdout)
         .interleave(messages)
         .serve(service)

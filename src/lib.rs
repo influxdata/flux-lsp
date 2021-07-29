@@ -19,8 +19,9 @@ mod visitors;
 #[cfg(feature = "lsp2")]
 pub use server::LspServer;
 
+#[cfg(target_arch = "wasm32")]
 #[macro_export]
-macro_rules! log {
+macro_rules! console_log {
     ( $( $t:tt )* ) => {
         web_sys::console::log_1(&format!( $( $t )* ).into());
     }

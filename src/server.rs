@@ -234,13 +234,17 @@ impl LanguageServer for LspServer {
                         },
                 }),
                 declaration_provider: None,
-                definition_provider: None,
-                document_formatting_provider: None,
+                definition_provider: Some(lsp::OneOf::Left(true)),
+                document_formatting_provider: Some(lsp::OneOf::Left(
+                    true,
+                )),
                 document_highlight_provider: None,
                 document_link_provider: None,
                 document_on_type_formatting_provider: None,
                 document_range_formatting_provider: None,
-                document_symbol_provider: None,
+                document_symbol_provider: Some(lsp::OneOf::Left(
+                    true,
+                )),
                 execute_command_provider: None,
                 experimental: None,
                 folding_range_provider: Some(
@@ -252,8 +256,8 @@ impl LanguageServer for LspServer {
                 implementation_provider: None,
                 linked_editing_range_provider: None,
                 moniker_provider: None,
-                references_provider: None,
-                rename_provider: None,
+                references_provider: Some(lsp::OneOf::Left(true)),
+                rename_provider: Some(lsp::OneOf::Left(true)),
                 selection_range_provider: None,
                 semantic_tokens_provider: None,
                 signature_help_provider: Some(
@@ -270,7 +274,11 @@ impl LanguageServer for LspServer {
                             },
                     },
                 ),
-                text_document_sync: None,
+                text_document_sync: Some(
+                    lsp::TextDocumentSyncCapability::Kind(
+                        lsp::TextDocumentSyncKind::Full,
+                    ),
+                ),
                 type_definition_provider: None,
                 workspace: None,
                 workspace_symbol_provider: None,
@@ -452,8 +460,11 @@ impl LanguageServer for LspServer {
                 info!("textDocument/formatting requested trimming final newlines, but the flux formatter will always trim trailing whitespace");
             }
         }
-        let lookup = line_col::LineColLookup::new(formatted.as_str());
-        let end = lookup.get(formatted.len() - 1);
+
+        // The new text shows the range of the previously replaced section,
+        // not the range of the new section.
+        let lookup = line_col::LineColLookup::new(contents.as_str());
+        let end = lookup.get(contents.len());
 
         let edit = lsp::TextEdit::new(
             lsp::Range {
@@ -701,7 +712,9 @@ impl LanguageServer for LspServer {
     }
 }
 
-#[cfg(test)]
+// Url::to_file_path doesn't exist in wasm-unknown-unknown, for kinda
+// obvious reasons. Ignore these tests when executing against that target.
+#[cfg(all(test, not(target_arch = "wasm32")))]
 #[allow(deprecated)]
 mod tests {
     use std::collections::HashMap;
@@ -1115,8 +1128,8 @@ errorCounts
                     character: 0,
                 },
                 end: lsp::Position {
-                    line: 14,
-                    character: 95,
+                    line: 15,
+                    character: 96,
                 },
             },
             flux::formatter::format(&fluxscript).unwrap(),
@@ -1177,13 +1190,9 @@ errorCounts
                     line: 0,
                     character: 0,
                 },
-                // This reads funny, because line 15 is only 96 characters long.
-                // Character number 97 is a newline, but it doesn't show as line
-                // 16 because there aren't any characters on the line, and we
-                // can't use character 0 there.
                 end: lsp::Position {
-                    line: 14,
-                    character: 96,
+                    line: 17,
+                    character: 0,
                 },
             },
             formatted_text,
