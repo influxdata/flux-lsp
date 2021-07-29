@@ -1,8 +1,8 @@
 use crate::cache::Cache;
+use crate::convert;
 use crate::handlers::find_node;
 use crate::handlers::{Error, RequestHandler};
 use crate::protocol::{PolymorphicRequest, Request, Response};
-use crate::shared::conversion::map_node_to_location;
 use crate::visitors::semantic::utils::create_semantic_package;
 use crate::visitors::semantic::{
     DefinitionFinderVisitor, IdentFinderVisitor,
@@ -103,11 +103,10 @@ pub fn find_references(
                 let identifiers = (*state).identifiers.clone();
 
                 for node in identifiers {
-                    let loc = map_node_to_location(
+                    locations.push(convert::node_to_location(
+                        &node,
                         uri.clone(),
-                        node.clone(),
-                    );
-                    locations.push(loc);
+                    ));
                 }
             }
         }

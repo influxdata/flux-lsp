@@ -1,9 +1,9 @@
 use std::rc::Rc;
 
 use crate::cache::Cache;
+use crate::convert;
 use crate::handlers::{Error, RequestHandler};
 use crate::protocol::{PolymorphicRequest, Request, Response};
-use crate::shared::conversion::map_node_to_location;
 use crate::visitors::semantic::utils;
 use crate::visitors::semantic::{
     DefinitionFinderVisitor, NodeFinderVisitor,
@@ -63,8 +63,9 @@ fn find_scoped_definition(
                 let state = dvisitor.state.borrow();
 
                 if let Some(node) = state.node.clone() {
-                    let loc = map_node_to_location(uri, node);
-                    return Some(loc);
+                    return Some(convert::node_to_location(
+                        &node, uri,
+                    ));
                 }
             }
             _ => (),
