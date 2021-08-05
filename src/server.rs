@@ -335,6 +335,23 @@ impl LanguageServer for LspServer {
             }
         }
     }
+    async fn did_save(
+        &self,
+        params: lsp::DidSaveTextDocumentParams,
+    ) -> () {
+        if let Some(text) = params.text {
+            let key = params.text_document.uri;
+            let mut store = self.store.lock().unwrap();
+            if !store.contains_key(&key) {
+                warn!(
+                    "textDocument/didSave called on unknown file {}",
+                    key
+                );
+                return;
+            }
+            store.insert(key, text);
+        }
+    }
     async fn did_close(
         &self,
         params: lsp::DidCloseTextDocumentParams,
@@ -944,6 +961,30 @@ mod tests {
 |>  first( )"#,
             contents
         );
+    }
+
+    #[test]
+    fn test_did_save() {
+        let server = create_server();
+        open_file(
+            &server,
+            r#"from(bucket: "test") |> count()"#.to_string(),
+        );
+
+        let uri =
+            lsp::Url::parse("file:///home/user/file.flux").unwrap();
+
+        let params = lsp::DidSaveTextDocumentParams {
+            text_document: lsp::TextDocumentIdentifier::new(
+                uri.clone(),
+            ),
+            text: Some(r#"from(bucket: "test2")"#.to_string()),
+        };
+        block_on(server.did_save(params));
+
+        let contents =
+            server.store.lock().unwrap().get(&uri).unwrap().clone();
+        assert_eq!(r#"from(bucket: "test2")"#.to_string(), contents);
     }
 
     #[test]
