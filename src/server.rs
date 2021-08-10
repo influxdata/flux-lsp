@@ -2666,16 +2666,12 @@ fn find_dot_completions(
     let pos = params.text_document_position.position;
     let info = CompletionInfo::create(params, contents.clone())?;
 
-    if let Some(info) = info.clone() {
+    if let Some(info) = info {
         let imports = info.imports.clone();
 
         let mut list = vec![];
         let name = info.ident.clone();
-        get_specific_package_functions(
-            &mut list,
-            name,
-            imports.clone(),
-        );
+        get_specific_package_functions(&mut list, name, imports);
 
         let mut items = vec![];
         let obj_results = get_specific_object(
@@ -3194,13 +3190,12 @@ impl Completable for PackageResult {
         let mut additional_text_edits = vec![];
         let mut insert_text = self.name.clone();
 
-        let current_imports = imports
+        if imports
             .clone()
             .into_iter()
             .map(|x| x.path)
-            .collect::<Vec<String>>();
-
-        if !current_imports.contains(&self.full_name) {
+            .any(|x| x == self.full_name)
+        {
             let alias =
                 find_alias_name(imports, self.name.clone(), 1);
 
