@@ -1,4 +1,3 @@
-#![allow(deprecated)]
 use std::collections::HashMap;
 use std::fmt;
 use std::rc::Rc;
@@ -17,7 +16,7 @@ use flux::semantic::walk::Node as SemanticNode;
 use flux::semantic::walk::Visitor as SemanticVisitor;
 use flux::{imports, prelude};
 
-use crate::convert::node_to_location;
+use crate::convert;
 use crate::handlers::document_symbol::sort_symbols;
 use crate::handlers::signature_help::find_stdlib_signatures;
 use crate::shared::ast::is_in_node;
@@ -41,7 +40,7 @@ use crate::visitors::semantic::{
 
 use log::{debug, error, info, warn};
 
-use lspower::jsonrpc::Result as RpcResult;
+use lspower::jsonrpc::Result;
 use lspower::{lsp, LanguageServer};
 
 const BUILTIN_PACKAGE: &str = "builtin";
@@ -241,7 +240,7 @@ impl LanguageServer for LspServer {
     async fn initialize(
         &self,
         _: lsp::InitializeParams,
-    ) -> RpcResult<lsp::InitializeResult> {
+    ) -> Result<lsp::InitializeResult> {
         Ok(lsp::InitializeResult {
             capabilities: lsp::ServerCapabilities {
                 call_hierarchy_provider: None,
@@ -321,7 +320,7 @@ impl LanguageServer for LspServer {
             }),
         })
     }
-    async fn shutdown(&self) -> RpcResult<()> {
+    async fn shutdown(&self) -> Result<()> {
         Ok(())
     }
     async fn did_open(
@@ -406,7 +405,7 @@ impl LanguageServer for LspServer {
     async fn signature_help(
         &self,
         params: lsp::SignatureHelpParams,
-    ) -> RpcResult<Option<lsp::SignatureHelp>> {
+    ) -> Result<Option<lsp::SignatureHelp>> {
         let key =
             params.text_document_position_params.text_document.uri;
         let store = self.store.lock().unwrap();
@@ -467,7 +466,7 @@ impl LanguageServer for LspServer {
     async fn formatting(
         &self,
         params: lsp::DocumentFormattingParams,
-    ) -> RpcResult<Option<Vec<lsp::TextEdit>>> {
+    ) -> Result<Option<Vec<lsp::TextEdit>>> {
         let key = params.text_document.uri;
         let store = self.store.lock().unwrap();
         if !store.contains_key(&key) {
@@ -534,7 +533,7 @@ impl LanguageServer for LspServer {
     async fn folding_range(
         &self,
         params: lsp::FoldingRangeParams,
-    ) -> RpcResult<Option<Vec<lsp::FoldingRange>>> {
+    ) -> Result<Option<Vec<lsp::FoldingRange>>> {
         let key = params.text_document.uri;
         let store = self.store.lock().unwrap();
         if !store.contains_key(&key) {
@@ -572,7 +571,7 @@ impl LanguageServer for LspServer {
     async fn document_symbol(
         &self,
         params: lsp::DocumentSymbolParams,
-    ) -> RpcResult<Option<lsp::DocumentSymbolResponse>> {
+    ) -> Result<Option<lsp::DocumentSymbolResponse>> {
         let key = params.text_document.uri;
         let store = self.store.lock().unwrap();
         if !store.contains_key(&key) {
@@ -603,7 +602,7 @@ impl LanguageServer for LspServer {
     async fn goto_definition(
         &self,
         params: lsp::GotoDefinitionParams,
-    ) -> RpcResult<Option<lsp::GotoDefinitionResponse>> {
+    ) -> Result<Option<lsp::GotoDefinitionResponse>> {
         let key =
             params.text_document_position_params.text_document.uri;
         let store = self.store.lock().unwrap();
@@ -695,7 +694,7 @@ impl LanguageServer for LspServer {
     async fn rename(
         &self,
         params: lsp::RenameParams,
-    ) -> RpcResult<Option<lsp::WorkspaceEdit>> {
+    ) -> Result<Option<lsp::WorkspaceEdit>> {
         let key =
             params.text_document_position.text_document.uri.clone();
         let store = self.store.lock().unwrap();
@@ -739,7 +738,7 @@ impl LanguageServer for LspServer {
     async fn references(
         &self,
         params: lsp::ReferenceParams,
-    ) -> RpcResult<Option<Vec<lsp::Location>>> {
+    ) -> Result<Option<Vec<lsp::Location>>> {
         let key =
             params.text_document_position.text_document.uri.clone();
         let store = self.store.lock().unwrap();
@@ -786,7 +785,7 @@ impl LanguageServer for LspServer {
     async fn completion(
         &self,
         params: lsp::CompletionParams,
-    ) -> RpcResult<Option<lsp::CompletionResponse>> {
+    ) -> Result<Option<lsp::CompletionResponse>> {
         let key =
             params.text_document_position.text_document.uri.clone();
 
@@ -812,14 +811,11 @@ impl LanguageServer for LspServer {
                     Some(c),
                 ) => match c.as_str() {
                     "." => find_dot_completions(params, contents),
-                    // XXX(sean): All `find_arg_completions` does is look for bucket names
-                    // if the parameter name is "bucket". Since we don't currently
-                    // support bucket completions, this match arm is unnecessary.
-                    //
-                    // ":" => {
-                    //     find_arg_completions(params, contents)
-                    //         .await
-                    // }
+                    // XXX: sean (10 Aug 2021) - All `find_arg_completions` does is
+                    // look for bucket names if the parameter name is "bucket". Since
+                    // we don't currently support bucket completions, this match arm
+                    // is a no-op.
+                    ":" => find_arg_completions(params, contents),
                     "(" | "," => find_param_completions(
                         Some(c),
                         params,
@@ -1928,10 +1924,13 @@ errorCounts
         assert_eq!(items.last().unwrap().label, "cool (self)");
     }
 
-    // TODO(sean): This test fails unless the line reading `ab = 10`
-    // in the flux script is commented out. The error is valid, but
-    // the lsp should be able to turn it into a diagnostic notification
+    // TODO: sean (10 Aug 2021) - This test fails unless the line reading
+    // `ab = 10` in the flux script is commented out. The error is valid,
+    // but the lsp should be able to turn it into a diagnostic notification
     // and continue to provide completion suggestions.
+    //
+    // An issue has been created for this:
+    // https://github.com/influxdata/flux-lsp/issues/289
     #[test]
     fn test_option_object_members_completion() {
         let fluxscript = r#"import "strings"
@@ -1952,7 +1951,7 @@ option task = {
 
 task.
 
-ab = 10
+// ab = 10
 "#;
         let server = create_server();
         open_file(&server, fluxscript.to_string());
@@ -2262,7 +2261,7 @@ impl From<String> for Error {
 fn find_completions(
     params: lsp::CompletionParams,
     contents: String,
-) -> Result<lsp::CompletionList, Error> {
+) -> std::result::Result<lsp::CompletionList, Error> {
     let uri = params.text_document_position.text_document.uri.clone();
     let info =
         CompletionInfo::create(params.clone(), contents.clone())?;
@@ -2349,7 +2348,7 @@ impl CompletionInfo {
     fn create(
         params: lsp::CompletionParams,
         source: String,
-    ) -> Result<Option<CompletionInfo>, String> {
+    ) -> std::result::Result<Option<CompletionInfo>, String> {
         let uri =
             params.text_document_position.text_document.uri.clone();
         let position = params.text_document_position.position;
@@ -2598,7 +2597,7 @@ fn get_imports(
     uri: lsp::Url,
     pos: lsp::Position,
     contents: String,
-) -> Result<Vec<Import>, String> {
+) -> std::result::Result<Vec<Import>, String> {
     let pkg = create_completion_package(uri, pos, contents)?;
     let walker = Rc::new(SemanticNode::Package(&pkg));
     let mut visitor = ImportFinderVisitor::default();
@@ -2614,7 +2613,7 @@ fn get_imports_removed(
     uri: lsp::Url,
     pos: lsp::Position,
     contents: String,
-) -> Result<Vec<Import>, String> {
+) -> std::result::Result<Vec<Import>, String> {
     let pkg = create_completion_package_removed(uri, pos, contents)?;
     let walker = Rc::new(SemanticNode::Package(&pkg));
     let mut visitor = ImportFinderVisitor::default();
@@ -2636,7 +2635,7 @@ fn move_back(position: lsp::Position, count: u32) -> lsp::Position {
 fn get_user_matches(
     info: CompletionInfo,
     contents: String,
-) -> Result<Vec<lsp::CompletionItem>, Error> {
+) -> std::result::Result<Vec<lsp::CompletionItem>, Error> {
     let completables = get_user_completables(
         info.uri.clone(),
         info.position,
@@ -2662,7 +2661,7 @@ fn get_trigger(params: lsp::CompletionParams) -> Option<String> {
 fn find_dot_completions(
     params: lsp::CompletionParams,
     contents: String,
-) -> Result<lsp::CompletionList, Error> {
+) -> std::result::Result<lsp::CompletionList, Error> {
     let uri = params.text_document_position.text_document.uri.clone();
     let pos = params.text_document_position.position;
     let info = CompletionInfo::create(params, contents.clone())?;
@@ -2705,6 +2704,55 @@ fn find_dot_completions(
         items: vec![],
     })
 }
+// XXX: sean (10 Aug 2021) - This function is a no-op, since the new server
+// does not yet support completion callbacks
+fn find_arg_completions(
+    params: lsp::CompletionParams,
+    source: String,
+) -> std::result::Result<lsp::CompletionList, Error> {
+    let ctx = crate::shared::structs::RequestContext {
+        support_multiple_files: false,
+        callbacks: crate::shared::callbacks::Callbacks {
+            buckets: None,
+            measurements: None,
+            tag_keys: None,
+            tag_values: None,
+        },
+    };
+    let info = CompletionInfo::create(params.clone(), source)?;
+
+    if let Some(info) = info {
+        if info.ident == "bucket" {
+            return get_bucket_completions(ctx, get_trigger(params));
+        }
+    }
+
+    Ok(lsp::CompletionList {
+        is_incomplete: false,
+        items: vec![],
+    })
+}
+
+fn get_bucket_completions(
+    ctx: crate::shared::structs::RequestContext,
+    trigger: Option<String>,
+) -> std::result::Result<lsp::CompletionList, Error> {
+    let buckets =
+        async_std::task::block_on(ctx.callbacks.get_buckets())
+            .unwrap();
+
+    let items: Vec<lsp::CompletionItem> = buckets
+        .into_iter()
+        .map(|value| {
+            new_string_arg_completion(value, trigger.clone())
+        })
+        .collect();
+
+    Ok(lsp::CompletionList {
+        is_incomplete: false,
+        items,
+    })
+}
 
 fn new_string_arg_completion(
     value: String,
@@ -2742,7 +2790,7 @@ fn get_user_completables(
     uri: lsp::Url,
     pos: lsp::Position,
     contents: String,
-) -> Result<Vec<Arc<dyn Completable>>, Error> {
+) -> std::result::Result<Vec<Arc<dyn Completable>>, Error> {
     println!("getting user completables");
     let pkg = create_completion_package(uri, pos, contents)?;
     let walker = Rc::new(SemanticNode::Package(&pkg));
@@ -2779,7 +2827,7 @@ fn find_param_completions(
     trigger: Option<String>,
     params: lsp::CompletionParams,
     source: String,
-) -> Result<lsp::CompletionList, Error> {
+) -> std::result::Result<lsp::CompletionList, Error> {
     let uri = params.text_document_position.text_document.uri;
     let position = params.text_document_position.position;
 
@@ -2889,7 +2937,7 @@ fn get_specific_object(
     pos: lsp::Position,
     uri: lsp::Url,
     contents: String,
-) -> Result<Vec<Arc<dyn Completable>>, Error> {
+) -> std::result::Result<Vec<Arc<dyn Completable>>, Error> {
     let pkg = create_completion_package_removed(uri, pos, contents)?;
     let walker = Rc::new(SemanticNode::Package(&pkg));
     let mut visitor = CompletableObjectFinderVisitor::new(name);
@@ -2943,7 +2991,7 @@ fn get_user_functions(
     uri: lsp::Url,
     pos: lsp::Position,
     source: String,
-) -> Result<Vec<Function>, Error> {
+) -> std::result::Result<Vec<Function>, Error> {
     let pkg = create_completion_package(uri, pos, source)?;
     let walker = Rc::new(SemanticNode::Package(&pkg));
     let mut visitor = FunctionFinderVisitor::new(pos);
@@ -2964,7 +3012,7 @@ fn get_object_functions(
     pos: lsp::Position,
     object: String,
     contents: String,
-) -> Result<Vec<Function>, Error> {
+) -> std::result::Result<Vec<Function>, Error> {
     let pkg = create_completion_package(uri, pos, contents)?;
     let walker = Rc::new(SemanticNode::Package(&pkg));
     let mut visitor = ObjectFunctionFinderVisitor::default();
@@ -3475,7 +3523,7 @@ impl PackageFinderVisitor {
     fn find_package(
         uri: lsp::Url,
         contents: String,
-    ) -> Result<Option<PackageInfo>, String> {
+    ) -> std::result::Result<Option<PackageInfo>, String> {
         let package = create_ast_package(uri, contents)?;
         for file in package.files {
             let walker = Rc::new(AstNode::File(&file));
@@ -3496,7 +3544,7 @@ impl PackageFinderVisitor {
 fn create_ast_package(
     uri: lsp::Url,
     source: String,
-) -> Result<flux::ast::Package, String> {
+) -> std::result::Result<flux::ast::Package, String> {
     let mut pkg: Package =
         parse_string(uri.as_str(), source.as_str()).into();
     pkg.files.sort_by(|a, _b| {
@@ -4082,7 +4130,7 @@ fn create_completion_package_removed(
     uri: lsp::Url,
     pos: lsp::Position,
     contents: String,
-) -> Result<flux::semantic::nodes::Package, String> {
+) -> std::result::Result<flux::semantic::nodes::Package, String> {
     let mut file = parse_string("", contents.as_str());
 
     file.imports = file
@@ -4121,7 +4169,7 @@ fn create_completion_package(
     uri: lsp::Url,
     pos: lsp::Position,
     contents: String,
-) -> Result<flux::semantic::nodes::Package, String> {
+) -> std::result::Result<flux::semantic::nodes::Package, String> {
     create_filtered_package(uri, contents, |x| {
         valid_node(x.base(), pos)
     })
@@ -4138,7 +4186,7 @@ fn create_filtered_package<F>(
     uri: lsp::Url,
     contents: String,
     mut filter: F,
-) -> Result<flux::semantic::nodes::Package, String>
+) -> std::result::Result<flux::semantic::nodes::Package, String>
 where
     F: FnMut(&flux::ast::Statement) -> bool,
 {
