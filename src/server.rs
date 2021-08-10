@@ -1930,7 +1930,7 @@ errorCounts
     // and continue to provide completion suggestions.
     //
     // An issue has been created for this:
-    // https://github.com/influxdata/flux-lsp/issues/289
+    // https://github.com/influxdata/flux-lsp/issues/290
     #[test]
     fn test_option_object_members_completion() {
         let fluxscript = r#"import "strings"
