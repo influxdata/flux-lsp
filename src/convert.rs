@@ -6,7 +6,7 @@ use flux::semantic::walk::Node;
 // XXX: rockstar (28 Jul 2021) - This can't be implemented in a From trait
 // without some clownshoes type aliasing, so this conversion function will work.
 fn ast_to_lsp_position(
-    position: ast::Position,
+    position: &ast::Position,
 ) -> lsp_types::Position {
     lsp_types::Position {
         line: position.line - 1,
@@ -22,12 +22,12 @@ pub fn node_to_location(
     node: &Node,
     uri: lsp_types::Url,
 ) -> lsp_types::Location {
-    let node_location = node.loc().clone();
+    let node_location = node.loc();
     lsp_types::Location {
         uri,
         range: lsp_types::Range {
-            start: ast_to_lsp_position(node_location.start),
-            end: ast_to_lsp_position(node_location.end),
+            start: ast_to_lsp_position(&node_location.start),
+            end: ast_to_lsp_position(&node_location.end),
         },
     }
 }
@@ -52,7 +52,7 @@ mod tests {
             line: 23,
             column: 8,
         };
-        let result = ast_to_lsp_position(ast_position);
+        let result = ast_to_lsp_position(&ast_position);
 
         assert_eq!(expected, result);
     }

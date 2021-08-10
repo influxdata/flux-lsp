@@ -6,7 +6,7 @@ use lsp_types as lsp;
 
 pub fn follow_function_pipes(c: &CallExpr) -> &MonoType {
     if let Some(Expression::Call(call)) = &c.pipe {
-        return follow_function_pipes(&call);
+        return follow_function_pipes(call);
     }
 
     &c.typ
