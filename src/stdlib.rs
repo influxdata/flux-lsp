@@ -487,7 +487,7 @@ pub fn create_function_signature(
         .collect::<BTreeMap<_, _>>()
         .iter()
         .map(|(&k, &v)| Property {
-            k: String::from("?") + &k,
+            k: String::from("?") + k,
             v: get_type_string(v.clone(), &mut mapping),
         })
         .collect::<Vec<_>>();

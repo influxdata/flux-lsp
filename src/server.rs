@@ -123,7 +123,7 @@ fn find_references(
         let locations: Vec<lsp::Location> = (*state)
             .identifiers
             .iter()
-            .map(|node| convert::node_to_location(&node, uri.clone()))
+            .map(|node| convert::node_to_location(node, uri.clone()))
             .collect();
         locations
     } else {
@@ -248,7 +248,9 @@ impl LanguageServer for LspServer {
                 execute_command_provider: None,
                 experimental: None,
                 folding_range_provider: Some(
-                    lsp::FoldingRangeProviderCapability::Simple(true),
+                    lsp::FoldingRangeProviderCapability::Simple(
+                        self.options.folding,
+                    ),
                 ),
                 hover_provider: Some(
                     lsp::HoverProviderCapability::Simple(true),
@@ -392,7 +394,7 @@ impl LanguageServer for LspServer {
         let mut signatures = vec![];
         let data = store.get(&key).unwrap();
 
-        let pkg = parse_and_analyze(&data);
+        let pkg = parse_and_analyze(data);
         let node_finder_result = find_node(
             walk::Node::Package(&pkg),
             params.text_document_position_params.position,
@@ -449,7 +451,7 @@ impl LanguageServer for LspServer {
         }
         let contents = store.get(&key).unwrap();
         let mut formatted =
-            flux::formatter::format(&contents).unwrap();
+            flux::formatter::format(contents).unwrap();
         if let Some(trim_trailing_whitespace) =
             params.options.trim_trailing_whitespace
         {
@@ -627,7 +629,7 @@ impl LanguageServer for LspServer {
                                         convert::node_to_location(
                                             &node, key,
                                         );
-                                    return Ok(Some(lsp::GotoDefinitionResponse::Scalar(location)));
+                                    return Ok(Some(lsp::GotoDefinitionResponse::from(location)));
                                 }
                             }
 
@@ -646,7 +648,11 @@ impl LanguageServer for LspServer {
                                     convert::node_to_location(
                                         &node, key,
                                     );
-                                return Ok(Some(lsp::GotoDefinitionResponse::Scalar(location)));
+                                return Ok(Some(
+                                    lsp::GotoDefinitionResponse::from(
+                                        location,
+                                    ),
+                                ));
                             }
                         }
                         _ => (),
@@ -726,6 +732,26 @@ impl LanguageServer for LspServer {
         );
 
         Ok(Some(find_references(key, node)))
+    }
+
+    // XXX: rockstar (9 Aug 2021) - This implementation exists here *solely* for
+    // compatibility with the previous server. This behavior is identical to it,
+    // although very clearly kinda useless.
+    async fn hover(
+        &self,
+        _params: lsp::HoverParams,
+    ) -> Result<Option<lsp::Hover>> {
+        Ok(None)
+    }
+
+    // XXX: rockstar (9 Aug 2021) - This implementation exists here *solely* for
+    // compatibility with the previous server. This behavior is identical to it,
+    // although very clearly kinda useless.
+    async fn completion_resolve(
+        &self,
+        params: lsp::CompletionItem,
+    ) -> Result<lsp::CompletionItem> {
+        Ok(params)
     }
 }
 
@@ -1647,5 +1673,50 @@ errorCounts
         ];
 
         assert_eq!(expected, result);
+    }
+
+    #[test]
+    fn test_hover() {
+        let fluxscript = r#"import "strings"#;
+        let server = create_server();
+        open_file(&server, fluxscript.to_string());
+
+        let params = lsp::HoverParams {
+            text_document_position_params:
+                lsp::TextDocumentPositionParams::new(
+                    lsp::TextDocumentIdentifier::new(
+                        lsp::Url::parse(
+                            "file:///home/user/file.flux",
+                        )
+                        .unwrap(),
+                    ),
+                    lsp::Position::new(1, 1),
+                ),
+            work_done_progress_params: lsp::WorkDoneProgressParams {
+                work_done_token: None,
+            },
+        };
+
+        let result = block_on(server.hover(params)).unwrap();
+
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_completion_resolve() {
+        let fluxscript = r#"import "strings"#;
+        let server = create_server();
+        open_file(&server, fluxscript.to_string());
+
+        let params = lsp::CompletionItem::new_simple(
+            "label".to_string(),
+            "detail".to_string(),
+        );
+
+        let result =
+            block_on(server.completion_resolve(params.clone()))
+                .unwrap();
+
+        assert_eq!(params, result);
     }
 }
