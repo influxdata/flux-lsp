@@ -796,9 +796,9 @@ impl LanguageServer for LspServer {
             Some(v) => v.to_string(),
             None => {
                 error!(
-										"textDocument/completion called on unknown file {}",
-										key
-								);
+                    "textDocument/completion called on unknown file {}",
+                    key
+                );
                 return Err(lspower::jsonrpc::Error::invalid_params(
                     format!("file not opened: {}", key),
                 ));
@@ -1863,7 +1863,7 @@ sql."#;
 
     #[test]
     fn test_variable_completion() {
-        let fluxscript = r#" import "strings"
+        let fluxscript = r#"import "strings"
 import "csv"
 
 cal = 10
