@@ -3,9 +3,9 @@
 set -e
 
 EXTRA_ARGS="--"
-if [[ ! -z "${LSP2}" ]]; then
-    echo "Building with --features lsp2"
-    EXTRA_ARGS="${EXTRA_ARGS} --features lsp2"
+if [[ "${LSP2}" == "0" ]]; then
+    echo "Building with --no-default-features"
+    EXTRA_ARGS="${EXTRA_ARGS} --no-default-features"
 fi
 
 wasm-pack build -t nodejs -d pkg-node --out-name flux-lsp-node --scope influxdata --release $EXTRA_ARGS
