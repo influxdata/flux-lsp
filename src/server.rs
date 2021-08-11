@@ -2718,7 +2718,9 @@ fn find_arg_completions(
 
     if let Some(info) = info {
         if info.ident == "bucket" {
-            return get_bucket_completions(ctx, get_trigger(params));
+            return async_std::task::block_on(
+                get_bucket_completions(ctx, get_trigger(params)),
+            );
         }
     }
 
@@ -2728,15 +2730,15 @@ fn find_arg_completions(
     })
 }
 
-fn get_bucket_completions(
+async fn get_bucket_completions(
     ctx: crate::shared::structs::RequestContext,
     trigger: Option<String>,
 ) -> std::result::Result<lsp::CompletionList, Error> {
-    let buckets =
-        async_std::task::block_on(ctx.callbacks.get_buckets())
-            .unwrap();
+    // let buckets = ctx.callbacks.get_buckets();
+    let buckets = ctx.callbacks.get_buckets().await;
 
     let items: Vec<lsp::CompletionItem> = buckets
+        .unwrap()
         .into_iter()
         .map(|value| {
             new_string_arg_completion(value, trigger.clone())
