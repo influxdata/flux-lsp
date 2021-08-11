@@ -22,7 +22,7 @@ jobs:
           name: "run tests"
           command: |
             cargo test
-            cargo test --features lsp2
+            cargo test --no-default-features
 
   build:
     docker:
@@ -31,7 +31,7 @@ jobs:
       - checkout
       - run: |
           cargo build --verbose
-          cargo build --features lsp2 --verbose
+          cargo build --no-default-features --verbose
           make wasm
           LSP2=1 make wasm
 
@@ -46,7 +46,7 @@ jobs:
             cd integration
             npm install -f  # Force, because fsevents
             npm test
-            LSP2=1 npm test
+            LSP2=0 npm test
 
   deploy:
     docker:

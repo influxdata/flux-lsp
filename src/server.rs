@@ -3771,7 +3771,7 @@ fn create_function_result(
 
 fn follow_function_pipes(c: &CallExpr) -> &MonoType {
     if let Some(SemanticExpression::Call(call)) = &c.pipe {
-        return follow_function_pipes(&call);
+        return follow_function_pipes(call);
     }
 
     &c.typ

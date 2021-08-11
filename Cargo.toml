@@ -1,6 +1,6 @@
 [package]
 name = "flux-lsp"
-version = "0.5.99"
+version = "0.6.0"
 authors = ["Flux Developers <flux-developers@influxdata.com>"]
 edition = "2018"
 license = "MIT"
@@ -11,7 +11,7 @@ repository = "https://github.com/influxdata/flux-lsp"
 wasm-opt = ["-Oz", "--enable-mutable-globals"]
 
 [features]
-default = ["strict"]
+default = ["strict", "lsp2"]
 strict = []
 lsp2 = ["lspower/runtime-agnostic", "tower-service"]
 
