@@ -15,6 +15,10 @@ use flux::semantic::walk;
 use flux::semantic::walk::Node as SemanticNode;
 use flux::semantic::walk::Visitor as SemanticVisitor;
 use flux::{imports, prelude};
+use log::{debug, error, info, warn};
+use lspower::jsonrpc::Result;
+use lspower::lsp;
+use lspower::LanguageServer;
 
 use crate::convert;
 use crate::handlers::document_symbol::sort_symbols;
@@ -37,11 +41,6 @@ use crate::visitors::semantic::{
     FunctionFinderVisitor, IdentFinderVisitor, Import,
     ImportFinderVisitor, ObjectFunctionFinderVisitor, SymbolsVisitor,
 };
-
-use log::{debug, error, info, warn};
-
-use lspower::jsonrpc::Result;
-use lspower::{lsp, LanguageServer};
 
 const BUILTIN_PACKAGE: &str = "builtin";
 
