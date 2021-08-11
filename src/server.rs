@@ -814,7 +814,9 @@ impl LanguageServer for LspServer {
                     // look for bucket names if the parameter name is "bucket". Since
                     // we don't currently support bucket completions, this match arm
                     // is a no-op.
-                    ":" => find_arg_completions(params, contents),
+                    ":" => {
+                        find_arg_completions(params, contents).await
+                    }
                     "(" | "," => find_param_completions(
                         Some(c),
                         params,
@@ -2701,7 +2703,7 @@ fn find_dot_completions(
 }
 // XXX: sean (10 Aug 2021) - This function is a no-op, since the new server
 // does not yet support completion callbacks
-fn find_arg_completions(
+async fn find_arg_completions(
     params: lsp::CompletionParams,
     source: String,
 ) -> std::result::Result<lsp::CompletionList, Error> {
@@ -2718,9 +2720,8 @@ fn find_arg_completions(
 
     if let Some(info) = info {
         if info.ident == "bucket" {
-            return async_std::task::block_on(
-                get_bucket_completions(ctx, get_trigger(params)),
-            );
+            return get_bucket_completions(ctx, get_trigger(params))
+                .await;
         }
     }
 
