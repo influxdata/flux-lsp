@@ -21,15 +21,15 @@ use lspower::lsp;
 use lspower::LanguageServer;
 
 use crate::convert;
-use crate::handlers::document_symbol::sort_symbols;
-use crate::handlers::signature_help::find_stdlib_signatures;
 use crate::shared::ast::is_in_node;
 use crate::shared::get_package_name;
-use crate::shared::signatures::get_argument_names;
+use crate::shared::signatures::{
+    get_argument_names, FunctionSignature,
+};
 use crate::shared::structs::Function;
 use crate::stdlib::{
     create_function_signature, get_builtin_functions,
-    get_package_functions, get_package_infos,
+    get_package_functions, get_package_infos, get_stdlib_functions,
 };
 use crate::visitors::ast::package_finder::{
     PackageFinderVisitor, PackageInfo,
@@ -157,6 +157,35 @@ fn find_references(
     } else {
         Vec::new()
     }
+}
+
+fn create_signature_information(
+    fs: FunctionSignature,
+) -> lsp::SignatureInformation {
+    lsp::SignatureInformation {
+        label: fs.create_signature(),
+        parameters: Some(fs.create_parameters()),
+        documentation: None,
+        active_parameter: None,
+    }
+}
+
+pub fn find_stdlib_signatures(
+    name: String,
+    package: String,
+) -> Vec<lsp::SignatureInformation> {
+    get_stdlib_functions()
+        .into_iter()
+        .filter(|x| x.name == name && x.package_name == package)
+        .map(|x| {
+            x.signatures()
+                .into_iter()
+                .map(create_signature_information)
+        })
+        .fold(vec![], |mut acc, x| {
+            acc.extend(x);
+            acc
+        })
 }
 
 #[allow(dead_code)]
@@ -592,7 +621,16 @@ impl LanguageServer for LspServer {
         let state = visitor.state.borrow();
         let mut symbols = (*state).symbols.clone();
 
-        symbols.sort_by(|a, b| sort_symbols(a, b));
+        symbols.sort_by(|a, b| {
+            let a_start = a.location.range.start;
+            let b_start = b.location.range.start;
+
+            if a_start.line == b_start.line {
+                a_start.character.cmp(&b_start.character)
+            } else {
+                a_start.line.cmp(&b_start.line)
+            }
+        });
 
         let response = lsp::DocumentSymbolResponse::Flat(symbols);
 
@@ -2707,21 +2745,21 @@ async fn find_arg_completions(
     params: lsp::CompletionParams,
     source: String,
 ) -> std::result::Result<lsp::CompletionList, Error> {
-    let ctx = crate::shared::structs::RequestContext {
-        support_multiple_files: false,
-        callbacks: crate::shared::callbacks::Callbacks {
-            buckets: None,
-            measurements: None,
-            tag_keys: None,
-            tag_values: None,
-        },
+    let callbacks = crate::shared::callbacks::Callbacks {
+        buckets: None,
+        measurements: None,
+        tag_keys: None,
+        tag_values: None,
     };
     let info = CompletionInfo::create(params.clone(), source)?;
 
     if let Some(info) = info {
         if info.ident == "bucket" {
-            return get_bucket_completions(ctx, get_trigger(params))
-                .await;
+            return get_bucket_completions(
+                callbacks,
+                get_trigger(params),
+            )
+            .await;
         }
     }
 
@@ -2732,11 +2770,10 @@ async fn find_arg_completions(
 }
 
 async fn get_bucket_completions(
-    ctx: crate::shared::structs::RequestContext,
+    callbacks: crate::shared::callbacks::Callbacks,
     trigger: Option<String>,
 ) -> std::result::Result<lsp::CompletionList, Error> {
-    // let buckets = ctx.callbacks.get_buckets();
-    let buckets = ctx.callbacks.get_buckets().await;
+    let buckets = callbacks.get_buckets().await;
 
     let items: Vec<lsp::CompletionItem> = buckets
         .unwrap()

@@ -1,5 +1,6 @@
 use std::cell::RefCell;
 use std::rc::Rc;
+#[cfg(not(feature = "lsp2"))]
 use std::sync::{Arc, Mutex};
 
 use crate::shared::get_package_name;
@@ -13,10 +14,14 @@ mod completion;
 mod symbols;
 
 pub mod functions;
+#[cfg(not(feature = "lsp2"))]
 pub mod utils;
 
+#[cfg(not(feature = "lsp2"))]
 pub use completion::{
     CompletableFinderVisitor, CompletableObjectFinderVisitor,
+};
+pub use completion::{
     FunctionFinderVisitor, ObjectFunctionFinderVisitor,
 };
 pub use symbols::SymbolsVisitor;
@@ -46,17 +51,20 @@ fn contains_position(node: Rc<Node<'_>>, pos: lsp::Position) -> bool {
     true
 }
 
+#[cfg(not(feature = "lsp2"))]
 pub struct CallFinderState<'a> {
     pub node: Option<Rc<Node<'a>>>,
     pub position: lsp::Position,
     pub path: Vec<Rc<Node<'a>>>,
 }
 
+#[cfg(not(feature = "lsp2"))]
 #[derive(Clone)]
 pub struct CallFinderVisitor<'a> {
     pub state: Arc<Mutex<CallFinderState<'a>>>,
 }
 
+#[cfg(not(feature = "lsp2"))]
 impl<'a> Visitor<'a> for CallFinderVisitor<'a> {
     fn visit(&mut self, node: Rc<Node<'a>>) -> bool {
         if let Ok(mut state) = self.state.lock() {
@@ -79,6 +87,7 @@ impl<'a> Visitor<'a> for CallFinderVisitor<'a> {
     }
 }
 
+#[cfg(not(feature = "lsp2"))]
 impl<'a> CallFinderVisitor<'a> {
     pub fn new(pos: lsp::Position) -> CallFinderVisitor<'a> {
         CallFinderVisitor {

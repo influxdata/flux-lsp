@@ -1,9 +1,13 @@
+#[cfg(not(feature = "lsp2"))]
 use flux::ast::check;
+#[cfg(not(feature = "lsp2"))]
 use flux::ast::Package;
+#[cfg(not(feature = "lsp2"))]
 use flux::parser::parse_string;
 
 use lsp_types as lsp;
 
+#[cfg(not(feature = "lsp2"))]
 pub fn create_file_node_from_text(
     uri: lsp::Url,
     text: String,
@@ -20,6 +24,7 @@ pub fn flux_position_to_position(
     }
 }
 
+#[cfg(not(feature = "lsp2"))]
 pub fn map_errors_to_diagnostics(
     errors: Vec<check::Error>,
 ) -> Vec<lsp::Diagnostic> {
@@ -32,6 +37,7 @@ pub fn map_errors_to_diagnostics(
     result
 }
 
+#[cfg(not(feature = "lsp2"))]
 pub fn location_to_range(
     location: flux::ast::SourceLocation,
 ) -> lsp::Range {
@@ -41,6 +47,7 @@ pub fn location_to_range(
     }
 }
 
+#[cfg(not(feature = "lsp2"))]
 fn map_error_to_diagnostic(error: check::Error) -> lsp::Diagnostic {
     lsp::Diagnostic {
         severity: Some(lsp::DiagnosticSeverity::Error),

@@ -1,7 +1,12 @@
 use crate::shared::get_package_name;
-use crate::shared::signatures::{get_argument_names, FunctionInfo};
+use crate::shared::signatures::get_argument_names;
+use crate::shared::signatures::FunctionInfo;
+#[cfg(not(feature = "lsp2"))]
 use crate::shared::CompletionInfo;
-use crate::shared::{Function, RequestContext};
+use crate::shared::Function;
+#[cfg(not(feature = "lsp2"))]
+use crate::shared::RequestContext;
+#[cfg(not(feature = "lsp2"))]
 use crate::visitors::semantic::Import;
 
 use flux::imports;
@@ -12,12 +17,15 @@ use std::collections::{BTreeMap, HashMap};
 use std::fmt;
 use std::iter::Iterator;
 
+#[cfg(not(feature = "lsp2"))]
 use async_trait::async_trait;
 
+#[cfg(not(feature = "lsp2"))]
 use lsp_types as lsp;
 
 pub const BUILTIN_PACKAGE: &str = "builtin";
 
+#[cfg(not(feature = "lsp2"))]
 #[async_trait]
 pub trait Completable {
     async fn completion_item(
@@ -28,6 +36,7 @@ pub trait Completable {
     fn matches(&self, text: String, info: CompletionInfo) -> bool;
 }
 
+#[cfg(not(feature = "lsp2"))]
 #[derive(Clone)]
 pub enum VarType {
     Int,
@@ -42,6 +51,7 @@ pub enum VarType {
     Time,
 }
 
+#[cfg(not(feature = "lsp2"))]
 #[derive(Clone)]
 pub struct VarResult {
     pub name: String,
@@ -50,6 +60,7 @@ pub struct VarResult {
     pub package_name: Option<String>,
 }
 
+#[cfg(not(feature = "lsp2"))]
 impl VarResult {
     pub fn detail(&self) -> String {
         match self.var_type {
@@ -67,6 +78,7 @@ impl VarResult {
     }
 }
 
+#[cfg(not(feature = "lsp2"))]
 #[async_trait]
 impl Completable for VarResult {
     async fn completion_item(
@@ -128,10 +140,12 @@ pub struct PackageResult {
     pub full_name: String,
 }
 
+#[cfg(not(feature = "lsp2"))]
 fn create_import_paths(imports: Vec<Import>) -> Vec<String> {
     imports.into_iter().map(|x| x.path).collect::<Vec<String>>()
 }
 
+#[cfg(not(feature = "lsp2"))]
 fn find_alias_name(
     imports: Vec<Import>,
     name: String,
@@ -163,6 +177,7 @@ fn find_alias_name(
     Some(format!("{}{}", name, iteration))
 }
 
+#[cfg(not(feature = "lsp2"))]
 #[async_trait]
 impl Completable for PackageResult {
     async fn completion_item(
@@ -243,10 +258,12 @@ impl Completable for PackageResult {
     }
 }
 
+#[cfg(not(feature = "lsp2"))]
 fn default_arg_insert_text(arg: &str, index: usize) -> String {
     format!("{}: ${}", arg, index + 1)
 }
 
+#[cfg(not(feature = "lsp2"))]
 fn bucket_list_to_snippet(
     buckets: Vec<String>,
     index: usize,
@@ -262,6 +279,7 @@ fn bucket_list_to_snippet(
     return format!("{}: {}", arg, text);
 }
 
+#[cfg(not(feature = "lsp2"))]
 async fn get_bucket_insert_text(
     arg: &str,
     index: usize,
@@ -278,6 +296,7 @@ async fn get_bucket_insert_text(
     }
 }
 
+#[cfg(not(feature = "lsp2"))]
 async fn arg_insert_text(
     arg: &str,
     index: usize,
@@ -289,6 +308,7 @@ async fn arg_insert_text(
     }
 }
 
+#[cfg(not(feature = "lsp2"))]
 #[derive(Clone)]
 pub struct FunctionResult {
     pub name: String,
@@ -299,6 +319,7 @@ pub struct FunctionResult {
     pub signature: String,
 }
 
+#[cfg(not(feature = "lsp2"))]
 impl FunctionResult {
     async fn insert_text(&self, ctx: RequestContext) -> String {
         let mut insert_text = format!("{}(", self.name);
@@ -325,10 +346,12 @@ impl FunctionResult {
     }
 }
 
+#[cfg(not(feature = "lsp2"))]
 fn make_documentation(package: String) -> String {
     String::from("from ") + package.as_str()
 }
 
+#[cfg(not(feature = "lsp2"))]
 #[async_trait]
 impl Completable for FunctionResult {
     async fn completion_item(
@@ -520,6 +543,7 @@ pub fn create_function_signature(
     )
 }
 
+#[cfg(not(feature = "lsp2"))]
 fn walk(
     package: String,
     list: &mut Vec<Box<dyn Completable + Send + Sync>>,
@@ -649,6 +673,7 @@ pub fn get_package_infos() -> Vec<PackageInfo> {
     result
 }
 
+#[cfg(not(feature = "lsp2"))]
 pub fn add_package_result(
     name: String,
     list: &mut Vec<Box<dyn Completable + Send + Sync>>,
@@ -662,6 +687,7 @@ pub fn add_package_result(
     }
 }
 
+#[cfg(not(feature = "lsp2"))]
 pub fn get_packages(
     list: &mut Vec<Box<dyn Completable + Send + Sync>>,
 ) {
@@ -717,6 +743,7 @@ pub fn get_package_functions(name: String) -> Vec<Function> {
     list
 }
 
+#[cfg(not(feature = "lsp2"))]
 pub fn get_specific_package_functions(
     list: &mut Vec<Box<dyn Completable + Send + Sync>>,
     name: String,
@@ -813,6 +840,7 @@ pub fn get_builtin_functions() -> Vec<Function> {
     list
 }
 
+#[cfg(not(feature = "lsp2"))]
 pub fn get_builtins(
     list: &mut Vec<Box<dyn Completable + Sync + Send>>,
 ) {
@@ -893,6 +921,7 @@ pub fn get_builtins(
     }
 }
 
+#[cfg(not(feature = "lsp2"))]
 pub fn get_stdlib() -> Vec<Box<dyn Completable + Sync + Send>> {
     let mut list = vec![];
 
@@ -902,7 +931,7 @@ pub fn get_stdlib() -> Vec<Box<dyn Completable + Sync + Send>> {
     list
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(feature = "lsp2")))]
 mod test {
     use super::*;
     #[test]

@@ -1,6 +1,8 @@
+#[cfg(not(feature = "lsp2"))]
 mod results;
 mod utils;
 
+#[cfg(not(feature = "lsp2"))]
 use results::*;
 use utils::*;
 
@@ -9,6 +11,7 @@ use std::sync::{Arc, Mutex};
 
 use crate::shared::signatures::get_argument_names;
 use crate::shared::Function;
+#[cfg(not(feature = "lsp2"))]
 use crate::stdlib::Completable;
 
 use flux::semantic::nodes::*;
@@ -92,16 +95,19 @@ impl<'a> Visitor<'a> for FunctionFinderVisitor {
     }
 }
 
+#[cfg(not(feature = "lsp2"))]
 #[derive(Default)]
 pub struct CompletableFinderState {
     pub completables: Vec<Arc<dyn Completable + Send + Sync>>,
 }
 
+#[cfg(not(feature = "lsp2"))]
 pub struct CompletableFinderVisitor {
     pub pos: lsp::Position,
     pub state: Arc<Mutex<CompletableFinderState>>,
 }
 
+#[cfg(not(feature = "lsp2"))]
 impl<'a> Visitor<'a> for CompletableFinderVisitor {
     fn visit(&mut self, node: Rc<Node<'a>>) -> bool {
         if let Ok(mut state) = self.state.lock() {
@@ -168,6 +174,7 @@ impl<'a> Visitor<'a> for CompletableFinderVisitor {
     }
 }
 
+#[cfg(not(feature = "lsp2"))]
 impl CompletableFinderVisitor {
     pub fn new(pos: lsp::Position) -> Self {
         CompletableFinderVisitor {
@@ -275,16 +282,19 @@ impl<'a> Visitor<'a> for ObjectFunctionFinderVisitor {
     }
 }
 
+#[cfg(not(feature = "lsp2"))]
 #[derive(Default)]
 pub struct CompletableObjectFinderState {
     pub completables: Vec<Arc<dyn Completable + Send + Sync>>,
 }
 
+#[cfg(not(feature = "lsp2"))]
 pub struct CompletableObjectFinderVisitor {
     pub name: String,
     pub state: Arc<Mutex<CompletableObjectFinderState>>,
 }
 
+#[cfg(not(feature = "lsp2"))]
 impl CompletableObjectFinderVisitor {
     pub fn new(name: String) -> Self {
         CompletableObjectFinderVisitor {
@@ -296,6 +306,7 @@ impl CompletableObjectFinderVisitor {
     }
 }
 
+#[cfg(not(feature = "lsp2"))]
 impl<'a> Visitor<'a> for CompletableObjectFinderVisitor {
     fn visit(&mut self, node: Rc<Node<'a>>) -> bool {
         if let Ok(mut state) = self.state.lock() {
