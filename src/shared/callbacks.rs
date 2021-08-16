@@ -85,6 +85,7 @@ pub struct Callback {
     f: Function,
 }
 
+#[allow(dead_code)]
 impl Callback {
     pub fn new(f: Function) -> Self {
         Callback { f }
@@ -127,6 +128,7 @@ pub struct Callbacks {
     pub tag_values: Option<Callback>,
 }
 
+#[allow(dead_code)]
 impl Callbacks {
     // All of the `register_*_callback` methods have been disabled
     // to prevent the LSP from crashing. Autocomplete for user-specific

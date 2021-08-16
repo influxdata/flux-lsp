@@ -1,9 +1,12 @@
 #![cfg_attr(feature = "strict", deny(warnings))]
 extern crate clap;
 
+#[cfg(not(feature = "lsp2"))]
 mod cache;
 mod convert;
+#[cfg(not(feature = "lsp2"))]
 mod handlers;
+#[cfg(not(feature = "lsp2"))]
 mod protocol;
 #[cfg(feature = "lsp2")]
 mod server;

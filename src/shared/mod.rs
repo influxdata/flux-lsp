@@ -1,25 +1,38 @@
+#[cfg(not(feature = "lsp2"))]
 use crate::cache::Cache;
+#[cfg(not(feature = "lsp2"))]
 use crate::protocol::{
     create_diagnostics_notification, Notification,
 };
+#[cfg(not(feature = "lsp2"))]
 use crate::shared::conversion::map_errors_to_diagnostics;
+#[cfg(not(feature = "lsp2"))]
 use crate::visitors::ast::package_finder::{
     PackageFinderVisitor, PackageInfo,
 };
+#[cfg(not(feature = "lsp2"))]
 use crate::visitors::ast::NodeFinderVisitor;
+#[cfg(not(feature = "lsp2"))]
 use crate::visitors::semantic::{
     utils, CallFinderVisitor, Import, ImportFinderVisitor,
 };
 
+#[cfg(not(feature = "lsp2"))]
 use flux::ast::walk::walk_rc;
+#[cfg(not(feature = "lsp2"))]
 use flux::ast::walk::Node as AstNode;
+#[cfg(not(feature = "lsp2"))]
 use flux::ast::{Expression, PropertyKey};
+#[cfg(not(feature = "lsp2"))]
 use flux::semantic::nodes::CallExpr;
 
+#[cfg(not(feature = "lsp2"))]
 use std::rc::Rc;
 
+#[cfg(not(feature = "lsp2"))]
 use flux::semantic::walk;
 
+#[cfg(not(feature = "lsp2"))]
 use lsp_types as lsp;
 
 pub mod ast;
@@ -32,9 +45,13 @@ pub mod structs;
 
 use combinations::Combinations;
 
+#[cfg(not(feature = "lsp2"))]
 pub use ast::create_ast_package;
-pub use structs::{Function, RequestContext};
+pub use structs::Function;
+#[cfg(not(feature = "lsp2"))]
+pub use structs::RequestContext;
 
+#[cfg(not(feature = "lsp2"))]
 fn move_back(position: lsp::Position, count: u32) -> lsp::Position {
     lsp::Position {
         line: position.line,
@@ -60,6 +77,7 @@ where
     result
 }
 
+#[cfg(not(feature = "lsp2"))]
 pub fn create_diagnoistics(
     uri: lsp::Url,
     ctx: RequestContext,
@@ -77,6 +95,7 @@ pub fn get_package_name(name: String) -> Option<String> {
     let items = name.split('/');
     items.last().map(|n| n.to_string())
 }
+#[cfg(not(feature = "lsp2"))]
 #[derive(Clone)]
 pub enum CompletionType {
     Generic,
@@ -87,6 +106,7 @@ pub enum CompletionType {
     Bad,
 }
 
+#[cfg(not(feature = "lsp2"))]
 #[derive(Clone)]
 pub struct CompletionInfo {
     pub completion_type: CompletionType,
@@ -98,6 +118,7 @@ pub struct CompletionInfo {
     pub package: Option<PackageInfo>,
 }
 
+#[cfg(not(feature = "lsp2"))]
 impl CompletionInfo {
     pub fn create(
         params: lsp::CompletionParams,
@@ -361,6 +382,7 @@ impl CompletionInfo {
     }
 }
 
+#[cfg(not(feature = "lsp2"))]
 fn find_bucket(
     params: lsp::CompletionParams,
     ctx: RequestContext,
@@ -389,6 +411,7 @@ fn find_bucket(
     Ok(None)
 }
 
+#[cfg(not(feature = "lsp2"))]
 pub fn get_imports(
     uri: lsp::Url,
     pos: lsp::Position,
@@ -406,6 +429,7 @@ pub fn get_imports(
     Ok((*state).imports.clone())
 }
 
+#[cfg(not(feature = "lsp2"))]
 pub fn get_imports_removed(
     uri: lsp::Url,
     pos: lsp::Position,
@@ -425,6 +449,7 @@ pub fn get_imports_removed(
     Ok((*state).imports.clone())
 }
 
+#[cfg(not(feature = "lsp2"))]
 fn follow_pipes_for_bucket(call: Box<CallExpr>) -> Option<String> {
     for arg in call.arguments {
         if arg.key.name == "bucket" {

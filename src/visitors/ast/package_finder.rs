@@ -1,12 +1,16 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
+#[cfg(not(feature = "lsp2"))]
 use flux::ast::walk::walk_rc;
 use flux::ast::walk::{Node, Visitor};
 
+#[cfg(not(feature = "lsp2"))]
 use crate::cache::Cache;
+#[cfg(not(feature = "lsp2"))]
 use crate::shared::ast::create_ast_package;
 use crate::shared::conversion::flux_position_to_position;
+#[cfg(not(feature = "lsp2"))]
 use crate::shared::RequestContext;
 
 use lsp_types as lsp;
@@ -27,6 +31,7 @@ pub struct PackageFinderVisitor {
     pub state: Rc<RefCell<PackageFinderState>>,
 }
 
+#[cfg(not(feature = "lsp2"))]
 impl PackageFinderVisitor {
     pub fn find(
         uri: lsp::Url,

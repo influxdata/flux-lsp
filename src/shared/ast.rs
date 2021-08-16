@@ -1,5 +1,8 @@
+#[cfg(not(feature = "lsp2"))]
 use crate::cache;
+#[cfg(not(feature = "lsp2"))]
 use crate::cache::Cache;
+#[cfg(not(feature = "lsp2"))]
 use crate::shared::structs::RequestContext;
 
 use lsp_types as lsp;
@@ -32,6 +35,7 @@ pub fn is_in_node(
     true
 }
 
+#[cfg(not(feature = "lsp2"))]
 pub fn create_ast_package(
     uri: lsp::Url,
     ctx: RequestContext,
