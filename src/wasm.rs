@@ -1,31 +1,27 @@
-/* There are many `allow(dead_code)` pragmas in this file. The reason
- * these are necessary is because they are used solely by the wasm build
- * process, and aren't used when building the lib itself. We want still want
- * the "X is never used" messages in this file, so we mark only the things we
- * know are being used with the pragma. There is an integration test that
- * we can use to assert what is actually being used here.
- */
-use crate::handlers::{Error, Router};
-use crate::shared::callbacks::Callbacks;
-use crate::shared::messages::{
-    create_polymorphic_request, wrap_message,
-};
-use crate::shared::RequestContext;
-
-use std::cell::RefCell;
+#![allow(dead_code, unused_imports)]
 use std::ops::Add;
-use std::rc::Rc;
+use std::str;
 
 use js_sys::{Function, Promise};
 use serde::{Deserialize, Serialize};
+use tower_service::Service;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::future_to_promise;
 
-#[wasm_bindgen]
-pub struct Server {
-    handler: Rc<RefCell<Router>>,
-    callbacks: Callbacks,
-    support_multiple_files: bool,
+use crate::LspServer;
+
+fn wrap_message(s: String) -> String {
+    let st = s.clone();
+    let result = st.as_bytes();
+    let size = result.len();
+
+    format!("Content-Length: {}\r\n\r\n{}", size, s)
+}
+
+#[derive(Serialize)]
+struct ResponseError {
+    code: u32,
+    message: String,
 }
 
 #[wasm_bindgen]
@@ -35,39 +31,6 @@ struct ServerResponse {
     message: Option<String>,
     #[allow(dead_code)]
     error: Option<String>,
-}
-
-#[derive(Serialize)]
-struct ServerError {
-    id: u32,
-    error: ResponseError,
-    jsonrpc: String,
-}
-
-impl ServerError {
-    fn from_error(id: u32, err: Error) -> Result<String, Error> {
-        let se = ServerError {
-            id,
-            error: ResponseError {
-                code: 100,
-                message: err.msg,
-            },
-            jsonrpc: "2.0".to_string(),
-        };
-
-        match serde_json::to_string(&se) {
-            Ok(val) => Ok(val),
-            Err(_) => Err(Error {
-                msg: "failed to serialize error".to_string(),
-            }),
-        }
-    }
-}
-
-#[derive(Serialize)]
-struct ResponseError {
-    code: u32,
-    message: String,
 }
 
 #[wasm_bindgen]
@@ -83,90 +46,91 @@ impl ServerResponse {
     }
 }
 
+#[derive(Serialize)]
+struct ServerError {
+    id: u32,
+    error: ResponseError,
+    jsonrpc: String,
+}
+
+#[wasm_bindgen]
+pub struct Server {
+    service: lspower::LspService,
+}
+
 #[wasm_bindgen]
 impl Server {
     #[wasm_bindgen(constructor)]
     pub fn new(
         disable_folding: bool,
-        support_multiple_files: bool,
-    ) -> Server {
-        Server {
-            handler: Rc::new(RefCell::new(Router::new(
-                disable_folding,
-            ))),
-            callbacks: Callbacks::default(),
-            support_multiple_files,
-        }
-    }
+        _support_multiple_files: bool,
+    ) -> Self {
+        let (service, _messages) =
+            lspower::LspService::new(|_client| {
+                let mut server = LspServer::default();
+                if disable_folding {
+                    server = server.disable_folding();
+                }
+                server
+            });
 
-    pub fn register_buckets_callback(&mut self, f: Function) {
-        self.callbacks.register_buckets_callback(f);
-    }
-
-    pub fn register_measurements_callback(&mut self, f: Function) {
-        self.callbacks.register_measurements_callback(f);
-    }
-
-    pub fn register_tag_keys_callback(&mut self, f: Function) {
-        self.callbacks.register_tag_keys_callback(f);
-    }
-
-    pub fn register_tag_values_callback(&mut self, f: Function) {
-        self.callbacks.register_tag_values_callback(f);
+        Server { service }
     }
 
     pub fn process(&mut self, msg: String) -> Promise {
-        let router = self.handler.clone();
-        let callbacks = self.callbacks.clone();
-        let support_multiple_files = self.support_multiple_files;
+        let json_contents: String =
+            msg.lines().skip(2).fold(String::new(), |c, l| c.add(l));
 
+        let message: lspower::jsonrpc::Incoming =
+            serde_json::from_str(&json_contents).unwrap();
+        let call = self.service.call(message);
         future_to_promise(async move {
-            let lines = msg.lines();
-            let content: String =
-                lines.skip(2).fold(String::new(), |c, l| c.add(l));
-
-            match create_polymorphic_request(content.clone()) {
-                Ok(req) => {
-                    let id = req.base_request.id;
-                    let ctx = RequestContext::new(
-                        callbacks.clone(),
-                        support_multiple_files,
-                    );
-                    let mut h = router.borrow_mut();
-                    match (*h).route(req, ctx).await {
-                        Ok(response) => {
-                            if let Some(response) = response {
+            match call.await {
+                Ok(result) => match result {
+                    Some(result_inner) => match result_inner {
+                        lspower::jsonrpc::Outgoing::Response(
+                            response,
+                        ) => match serde_json::to_string(&response) {
+                            Ok(value) => {
                                 Ok(JsValue::from(ServerResponse {
                                     message: Some(wrap_message(
-                                        response,
+                                        value,
                                     )),
                                     error: None,
                                 }))
-                            } else {
+                            }
+                            Err(err) => {
                                 Ok(JsValue::from(ServerResponse {
                                     message: None,
-                                    error: None,
+                                    error: Some(format!("{}", err)),
                                 }))
                             }
+                        },
+                        lspower::jsonrpc::Outgoing::Request(
+                            _client_request,
+                        ) => {
+                            panic!("Outgoing requests from server to client are not implemented");
                         }
-                        Err(error) => {
-                            Ok(JsValue::from(ServerResponse {
-                                message: Some(wrap_message(
-                                    ServerError::from_error(
-                                        id, error,
-                                    )
-                                    .unwrap(),
-                                )),
-                                error: None,
-                            }))
-                        }
+                    },
+                    None => {
+                        // Some endpoints don't have results,
+                        // e.g. textDocument/didOpen
+                        Ok(JsValue::from(ServerResponse {
+                            message: None,
+                            error: None,
+                        }))
                     }
-                }
-                Err(e) => Ok(JsValue::from(ServerResponse {
+                },
+                Err(err) => Ok(JsValue::from(ServerResponse {
                     message: None,
-                    error: Some(format!("{} -> {}", e, content)),
+                    error: Some(format!("{}", err)),
                 })),
             }
         })
     }
+
+    pub fn register_buckets_callback(&mut self, _f: Function) {}
+    pub fn register_measurements_callback(&mut self, _f: Function) {}
+    pub fn register_tag_keys_callback(&mut self, _f: Function) {}
+    pub fn register_tag_values_callback(&mut self, _f: Function) {}
 }

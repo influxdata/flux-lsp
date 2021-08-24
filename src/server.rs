@@ -899,10 +899,6 @@ mod tests {
 
     use super::LspServer;
 
-    #[allow(dead_code)]
-    const SIGNATURE_HELP: &'static str =
-        include_str!("../tests/fixtures/signatures.flux");
-
     fn create_server() -> LspServer {
         LspServer::default()
     }

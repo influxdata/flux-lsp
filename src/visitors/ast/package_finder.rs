@@ -1,17 +1,9 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-#[cfg(not(feature = "lsp2"))]
-use flux::ast::walk::walk_rc;
 use flux::ast::walk::{Node, Visitor};
 
-#[cfg(not(feature = "lsp2"))]
-use crate::cache::Cache;
-#[cfg(not(feature = "lsp2"))]
-use crate::shared::ast::create_ast_package;
 use crate::shared::conversion::flux_position_to_position;
-#[cfg(not(feature = "lsp2"))]
-use crate::shared::RequestContext;
 
 use lsp_types as lsp;
 
@@ -29,30 +21,6 @@ pub struct PackageFinderState {
 #[derive(Clone, Default)]
 pub struct PackageFinderVisitor {
     pub state: Rc<RefCell<PackageFinderState>>,
-}
-
-#[cfg(not(feature = "lsp2"))]
-impl PackageFinderVisitor {
-    pub fn find(
-        uri: lsp::Url,
-        ctx: RequestContext,
-        cache: &Cache,
-    ) -> Result<Option<PackageInfo>, String> {
-        let package = create_ast_package(uri, ctx, cache)?;
-        for file in package.files {
-            let walker = Rc::new(flux::ast::walk::Node::File(&file));
-            let visitor = PackageFinderVisitor::default();
-
-            walk_rc(&visitor, walker);
-
-            let state = visitor.state.borrow();
-            if let Some(info) = state.info.clone() {
-                return Ok(Some(info));
-            }
-        }
-
-        Ok(None)
-    }
 }
 
 impl<'a> Visitor<'a> for PackageFinderVisitor {
