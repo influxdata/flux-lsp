@@ -33,20 +33,6 @@ jobs:
           cargo build --verbose
           cargo build --no-default-features --verbose
           make wasm
-          LSP2=1 make wasm
-
-  test-integration:
-    docker:
-      - image: quay.io/influxdb/wasm-build
-    steps:
-      - checkout
-      - run:
-          name: "run tests"
-          command: |
-            cd integration
-            npm install -f  # Force, because fsevents
-            npm test
-            LSP2=0 npm test
 
   deploy:
     docker:
@@ -66,7 +52,6 @@ workflows:
       - lint
       - build
       - test
-      - test-integration
 
   build-and-deploy:
     jobs:

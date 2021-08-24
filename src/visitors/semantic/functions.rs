@@ -20,18 +20,6 @@ pub struct FunctionFinderVisitor {
     pub state: Rc<RefCell<FunctionFinderState>>,
 }
 
-#[cfg(not(feature = "lsp2"))]
-impl FunctionFinderVisitor {
-    pub fn new(pos: lsp::Position) -> Self {
-        FunctionFinderVisitor {
-            state: Rc::new(RefCell::new(
-                FunctionFinderState::default(),
-            )),
-            pos,
-        }
-    }
-}
-
 fn create_function_result(
     name: String,
     expr: &Expression,

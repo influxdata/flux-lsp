@@ -11,9 +11,8 @@ repository = "https://github.com/influxdata/flux-lsp"
 wasm-opt = ["-Oz", "--enable-mutable-globals"]
 
 [features]
-default = ["strict", "lsp2"]
+default = ["strict"]
 strict = []
-lsp2 = ["lspower/runtime-agnostic", "tower-service"]
 
 [lib]
 name = "flux_lsp"
@@ -24,7 +23,6 @@ path = "src/lib.rs"
 name = "flux-lsp"
 test = false
 bench = false
-required-features = ["lsp2"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -39,12 +37,12 @@ js-sys = "0.3.51"
 line-col = "0.2.1"
 log = "0.4.14"
 lsp-types = "0.89.2"
-lspower = { version = "1.1.0", default-features = false, optional = true }
+lspower = { version = "1.1.0", default-features = false, features = ["runtime-agnostic" ] }
 serde = { version = "1.0.126", features = ["derive"] }
 serde_json = "1.0.64"
 serde_repr = "0.1.7"
 simplelog = "0.10.0"
-tower-service = { version = "0.3.1", optional = true }
+tower-service = { version = "0.3.1" }
 url = "2.2.2"
 wasm-bindgen = "0.2.74"
 wasm-bindgen-futures = "0.4.24"

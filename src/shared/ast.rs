@@ -1,10 +1,3 @@
-#[cfg(not(feature = "lsp2"))]
-use crate::cache;
-#[cfg(not(feature = "lsp2"))]
-use crate::cache::Cache;
-#[cfg(not(feature = "lsp2"))]
-use crate::shared::structs::RequestContext;
-
 use lsp_types as lsp;
 
 pub fn is_in_node(
@@ -33,48 +26,4 @@ pub fn is_in_node(
     }
 
     true
-}
-
-#[cfg(not(feature = "lsp2"))]
-pub fn create_ast_package(
-    uri: lsp::Url,
-    ctx: RequestContext,
-    cache: &Cache,
-) -> Result<flux::ast::Package, String> {
-    let values = cache
-        .get_package(uri.as_str(), ctx.support_multiple_files)?;
-
-    let pkgs = values.into_iter().map(|v: cache::CacheValue| {
-        crate::shared::conversion::create_file_node_from_text(
-            lsp::Url::parse(&v.uri).unwrap(),
-            v.contents,
-        )
-    });
-
-    let pkg =
-        pkgs.fold(None, |acc: Option<flux::ast::Package>, pkg| {
-            if let Some(mut p) = acc {
-                let mut files = pkg.files;
-                p.files.append(&mut files);
-                return Some(p);
-            }
-
-            Some(pkg)
-        });
-
-    if let Some(mut pkg) = pkg {
-        let mut files = pkg.files;
-        files.sort_by(|a, _b| {
-            if a.name == uri.as_str() {
-                std::cmp::Ordering::Greater
-            } else {
-                std::cmp::Ordering::Less
-            }
-        });
-        pkg.files = files;
-
-        return Ok(pkg);
-    }
-
-    Err("Failed to create package".to_string())
 }
