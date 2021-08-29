@@ -1,18 +1,25 @@
-mod utils;
-
-use utils::*;
-
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
+
+use flux::ast::SourceLocation;
+use flux::semantic::nodes::*;
+use flux::semantic::types::MonoType;
+use flux::semantic::walk::{Node, Visitor};
+use lsp_types as lsp;
 
 use crate::shared::signatures::get_argument_names;
 use crate::shared::Function;
 
-use flux::semantic::nodes::*;
-use flux::semantic::types::MonoType;
-use flux::semantic::walk::{Node, Visitor};
+fn defined_after(loc: &SourceLocation, pos: lsp::Position) -> bool {
+    if loc.start.line > pos.line + 1
+        || (loc.start.line == pos.line + 1
+            && loc.start.column > pos.character + 1)
+    {
+        return true;
+    }
 
-use lsp_types as lsp;
+    false
+}
 
 pub struct FunctionFinderState {
     pub functions: Vec<Function>,
