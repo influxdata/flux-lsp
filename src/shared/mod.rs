@@ -1,12 +1,14 @@
-pub mod ast;
 pub mod callbacks;
-pub mod conversion;
 pub mod signatures;
-pub mod structs;
 
 use combinations::Combinations;
+use lsp_types as lsp;
 
-pub use structs::Function;
+#[derive(Clone)]
+pub struct Function {
+    pub name: String,
+    pub params: Vec<String>,
+}
 
 pub fn all_combos<T>(l: Vec<T>) -> Vec<Vec<T>>
 where
@@ -29,6 +31,43 @@ where
 pub fn get_package_name(name: String) -> Option<String> {
     let items = name.split('/');
     items.last().map(|n| n.to_string())
+}
+
+pub fn flux_position_to_position(
+    pos: flux::ast::Position,
+) -> lsp::Position {
+    lsp::Position {
+        line: pos.line - 1,
+        character: pos.column - 1,
+    }
+}
+
+pub fn is_in_node(
+    pos: lsp::Position,
+    base: &flux::ast::BaseNode,
+) -> bool {
+    let start_line = base.location.start.line - 1;
+    let start_col = base.location.start.column - 1;
+    let end_line = base.location.end.line - 1;
+    let end_col = base.location.end.column - 1;
+
+    if pos.line < start_line {
+        return false;
+    }
+
+    if pos.line > end_line {
+        return false;
+    }
+
+    if pos.line == start_line && pos.character < start_col {
+        return false;
+    }
+
+    if pos.line == end_line && pos.character > end_col {
+        return false;
+    }
+
+    true
 }
 
 #[cfg(test)]

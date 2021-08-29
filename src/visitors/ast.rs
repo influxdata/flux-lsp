@@ -4,7 +4,7 @@ use std::rc::Rc;
 use flux::ast::walk::{self, Node, Visitor};
 use lsp_types as lsp;
 
-use crate::shared::conversion::flux_position_to_position;
+use crate::shared::flux_position_to_position;
 
 fn contains_position(
     node: Rc<walk::Node<'_>>,
