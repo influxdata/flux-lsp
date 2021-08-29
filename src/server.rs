@@ -31,10 +31,10 @@ use crate::stdlib::{
     create_function_signature, get_builtin_functions,
     get_package_functions, get_package_infos, get_stdlib_functions,
 };
-use crate::visitors::ast::package_finder::{
+use crate::visitors::ast::{
+    CallFinderVisitor, NodeFinderVisitor,
     PackageFinderVisitor, PackageInfo,
 };
-use crate::visitors::ast::{CallFinderVisitor, NodeFinderVisitor};
 use crate::visitors::semantic::NodeFinderVisitor as SemanticNodeFinderVisitor;
 use crate::visitors::semantic::{
     DefinitionFinderVisitor, FoldFinderVisitor,
