@@ -22,7 +22,7 @@ use lspower::LanguageServer;
 
 use crate::convert;
 use crate::shared::{get_package_name, is_in_node};
-use crate::shared::signatures::{
+use crate::shared::{
     get_argument_names, FunctionSignature,
 };
 use crate::shared::Function;
@@ -2740,7 +2740,7 @@ async fn find_arg_completions(
     params: lsp::CompletionParams,
     source: String,
 ) -> std::result::Result<lsp::CompletionList, Error> {
-    let callbacks = crate::shared::callbacks::Callbacks {
+    let callbacks = crate::shared::Callbacks {
         buckets: None,
         measurements: None,
         tag_keys: None,
@@ -2765,7 +2765,7 @@ async fn find_arg_completions(
 }
 
 async fn get_bucket_completions(
-    callbacks: crate::shared::callbacks::Callbacks,
+    callbacks: crate::shared::Callbacks,
     trigger: Option<String>,
 ) -> std::result::Result<lsp::CompletionList, Error> {
     let buckets = callbacks.get_buckets().await;

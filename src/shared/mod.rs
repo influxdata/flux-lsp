@@ -1,8 +1,13 @@
-pub mod callbacks;
-pub mod signatures;
+mod callbacks;
+mod signatures;
 
 use combinations::Combinations;
 use lsp_types as lsp;
+
+pub use callbacks::Callbacks;
+pub use signatures::{
+    get_argument_names, FunctionInfo, FunctionSignature,
+};
 
 #[derive(Clone)]
 pub struct Function {

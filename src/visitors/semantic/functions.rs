@@ -6,7 +6,7 @@ use flux::semantic::nodes::Expression;
 use flux::semantic::types::MonoType;
 use flux::semantic::walk::{Node, Visitor};
 
-use crate::shared::signatures::FunctionInfo;
+use crate::shared::FunctionInfo;
 
 use lsp_types as lsp;
 

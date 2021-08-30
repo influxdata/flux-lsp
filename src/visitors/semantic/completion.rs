@@ -7,7 +7,7 @@ use flux::semantic::types::MonoType;
 use flux::semantic::walk::{Node, Visitor};
 use lsp_types as lsp;
 
-use crate::shared::signatures::get_argument_names;
+use crate::shared::get_argument_names;
 use crate::shared::Function;
 
 fn defined_after(loc: &SourceLocation, pos: lsp::Position) -> bool {
