@@ -21,18 +21,16 @@ use lspower::lsp;
 use lspower::LanguageServer;
 
 use crate::convert;
-use crate::shared::{get_package_name, is_in_node};
-use crate::shared::{
-    get_argument_names, FunctionSignature,
-};
 use crate::shared::Function;
+use crate::shared::{get_argument_names, FunctionSignature};
+use crate::shared::{get_package_name, is_in_node};
 use crate::stdlib::{
     create_function_signature, get_builtin_functions,
     get_package_functions, get_package_infos, get_stdlib_functions,
 };
 use crate::visitors::ast::{
-    CallFinderVisitor, NodeFinderVisitor,
-    PackageFinderVisitor, PackageInfo,
+    CallFinderVisitor, NodeFinderVisitor, PackageFinderVisitor,
+    PackageInfo,
 };
 use crate::visitors::semantic::NodeFinderVisitor as SemanticNodeFinderVisitor;
 use crate::visitors::semantic::{
