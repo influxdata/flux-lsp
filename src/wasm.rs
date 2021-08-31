@@ -201,6 +201,140 @@ mod tests {
         let got = get_json_documentation("csv");
         assert_eq!(want, got);
     }
+    // #[wasm_bindgen_test]
+    // pub fn parse_test() {
+    //     fn pipe_expression() {
+    //         let mut p = Parser::new(r#"from() |> count()"#);
+    //         let parsed = p.parse_file("".to_string());
+    //         let loc = Locator::new(&p.source[..]);
+    //         assert_eq!(
+    //             parsed,
+    //             File {
+    //                 base: BaseNode {
+    //                     location: loc.get(1, 1, 1, 18),
+    //                     ..BaseNode::default()
+    //                 },
+    //                 name: "".to_string(),
+    //                 metadata: "parser-type=rust".to_string(),
+    //                 package: None,
+    //                 imports: vec![],
+    //                 body: vec![Statement::Expr(Box::new(ExprStmt {
+    //                     base: BaseNode {
+    //                         location: loc.get(1, 1, 1, 18),
+    //                         ..BaseNode::default()
+    //                     },
+    //                     expression: Expression::PipeExpr(Box::new(PipeExpr {
+    //                         base: BaseNode {
+    //                             location: loc.get(1, 1, 1, 18),
+    //                             ..BaseNode::default()
+    //                         },
+    //                         argument: Expression::Call(Box::new(CallExpr {
+    //                             base: BaseNode {
+    //                                 location: loc.get(1, 1, 1, 7),
+    //                                 ..BaseNode::default()
+    //                             },
+    //                             callee: Expression::Identifier(Identifier {
+    //                                 base: BaseNode {
+    //                                     location: loc.get(1, 1, 1, 5),
+    //                                     ..BaseNode::default()
+    //                                 },
+    //                                 name: "from".to_string()
+    //                             }),
+    //                             lparen: vec![],
+    //                             arguments: vec![],
+    //                             rparen: vec![],
+    //                         })),
+    //                         call: CallExpr {
+    //                             base: BaseNode {
+    //                                 location: loc.get(1, 11, 1, 18),
+    //                                 ..BaseNode::default()
+    //                             },
+    //                             callee: Expression::Identifier(Identifier {
+    //                                 base: BaseNode {
+    //                                     location: loc.get(1, 11, 1, 16),
+    //                                     ..BaseNode::default()
+    //                                 },
+    //                                 name: "count".to_string()
+    //                             }),
+    //                             lparen: vec![],
+    //                             arguments: vec![],
+    //                             rparen: vec![],
+    //                         }
+    //                     }))
+    //                 }))],
+    //                 eof: vec![],
+    //             },
+    //         )
+    //     }
+    // }
 
+    #[wasm_bindgen_test]
+    pub fn all_docs_test() {
+        let docs: Vec<PackageDoc> = serde_json::from_slice(&JsValue::into_serde(&get_all_docs()).unwrap()).unwrap();
+        let mut got: PackageDoc = PackageDoc {
+            path: String::new(),
+            name: String::new(),
+            headline: String::new(),
+            description: None,
+            members: std::collections::HashMap::new(),
+            link: String::new(),
+        };
+        for d in docs {
+            if d.path == "array" {
+                got = d;
+                break;
+            }
+        }
+        let mut exact: PackageDoc = PackageDoc {
+            path: "array".to_string(),
+            name: "array".to_string(),
+            headline: "Package array provides functions for building tables from flux arrays."
+                .to_string(),
+            description: None,
+            members: std::collections::HashMap::new(),
+            link: "https://docs.influxdata.com/influxdb/cloud/reference/flux/stdlib/array"
+                .to_string(),
+        };
+        exact.members.insert("from".to_string(), flux::semantic::bootstrap::Doc::Function(Box::new(FunctionDoc{
+            name: "from".to_string(),
+            headline: "from constructs a table from an array of records. ".to_string(),
+            description: r#"Each record in the array is converted into an output row or record. Allrecords must have the same keys and data types. ## Build an arbitrary table
+```
+import "array"
 
+rows = [
+  {foo: "bar", baz: 21.2},
+  {foo: "bar", baz: 23.8}
+]
+
+array.from(rows: rows)
+```
+
+## Union custom rows with query results
+```
+import "influxdata/influxdb/v1"
+import "array"
+
+tags = v1.tagValues(
+  bucket: "example-bucket",
+  tag: "host"
+)
+
+wildcard_tag = array.from(rows: [{_value: "*"}])
+
+union(tables: [tags, wildcard_tag])
+```
+
+"#.to_string(),
+            parameters: vec![ParameterDoc{
+                name: "rows".to_string(),
+                headline: " is the array of records to construct a table with.".to_string(),
+                description: None,
+                required: false
+            }],
+            flux_type: "(rows:[A]) => [A] where A: Record".to_string(),
+            link:"https://docs.influxdata.com/influxdb/cloud/reference/flux/stdlib/array/from".to_string(),
+        })));
+        assert_eq!(got, exact);
+    }
 }
