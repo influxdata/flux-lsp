@@ -207,70 +207,10 @@ mod tests {
     pub fn all_docs_test() {
         let docs: Vec<PackageDoc> =
             serde_json::from_slice(&docs_json().unwrap()).unwrap();
-        let mut got: PackageDoc = PackageDoc {
-            path: String::new(),
-            name: String::new(),
-            headline: String::new(),
-            description: None,
-            members: std::collections::HashMap::new(),
-            link: String::new(),
-        };
-        for d in docs {
-            if d.path == "array" {
-                got = d;
-                break;
-            }
-        }
-        let mut exact: PackageDoc = PackageDoc {
-            path: "array".to_string(),
-            name: "array".to_string(),
-            headline: "Package array provides functions for building tables from flux arrays."
-                .to_string(),
-            description: None,
-            members: std::collections::HashMap::new(),
-            link: "https://docs.influxdata.com/influxdb/cloud/reference/flux/stdlib/array"
-                .to_string(),
-        };
-        exact.members.insert("from".to_string(), flux::semantic::bootstrap::Doc::Function(Box::new(FunctionDoc{
-            name: "from".to_string(),
-            headline: "from constructs a table from an array of records. ".to_string(),
-            description: r#"Each record in the array is converted into an output row or record. Allrecords must have the same keys and data types. ## Build an arbitrary table
-```
-import "array"
+        let first = &docs[0].path;
+        assert_eq!(first.to_string(), "array");
+        let end = &docs[docs.len()-1].path;
+        assert_eq!(end.to_string(), "universe");
 
-rows = [
-  {foo: "bar", baz: 21.2},
-  {foo: "bar", baz: 23.8}
-]
-
-array.from(rows: rows)
-```
-
-## Union custom rows with query results
-```
-import "influxdata/influxdb/v1"
-import "array"
-
-tags = v1.tagValues(
-  bucket: "example-bucket",
-  tag: "host"
-)
-
-wildcard_tag = array.from(rows: [{_value: "*"}])
-
-union(tables: [tags, wildcard_tag])
-```
-
-"#.to_string(),
-            parameters: vec![ParameterDoc{
-                name: "rows".to_string(),
-                headline: " is the array of records to construct a table with.".to_string(),
-                description: None,
-                required: false
-            }],
-            flux_type: "(rows:[A]) => [A] where A: Record".to_string(),
-            link:"https://docs.influxdata.com/influxdb/cloud/reference/flux/stdlib/array/from".to_string(),
-        })));
-        assert_eq!(got, exact);
     }
 }
