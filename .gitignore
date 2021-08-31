@@ -5,3 +5,4 @@ lsp.log
 pkg*
 .vscode
 Cargo.lock
+.idea
