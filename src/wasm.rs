@@ -152,14 +152,12 @@ pub fn parse(s: &str) -> JsValue {
 /// Format a JS file.
 #[wasm_bindgen]
 pub fn format_from_js_file(js_file: JsValue) -> String {
-    let s = match js_file.into_serde::<File>() {
-        Ok(file) => match convert_to_string(&file) {
-            Ok(converted) => converted,
-            Err(e) => e.to_string(),
-        },
-        Err(e) => e.to_string(),
-    };
-    s
+    if let Ok(file) = js_file.into_serde::<File>() {
+        if let Ok(converted) = convert_to_string(&file) {
+            return converted;
+        }
+    }
+    "".to_string()
 }
 
 /// Gets json docs for the entire stdlib
