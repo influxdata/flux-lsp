@@ -156,7 +156,7 @@ pub fn format_from_js_file(js_file: JsValue) -> String {
             return converted;
         }
     }
-    "".to_string()
+    js_file.as_string().unwrap()
 }
 
 /// Gets json docs for the entire stdlib
