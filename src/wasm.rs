@@ -209,8 +209,7 @@ mod tests {
             serde_json::from_slice(&docs_json().unwrap()).unwrap();
         let first = &docs[0].path;
         assert_eq!(first.to_string(), "array");
-        let end = &docs[docs.len()-1].path;
+        let end = &docs[docs.len() - 1].path;
         assert_eq!(end.to_string(), "universe");
-
     }
 }
