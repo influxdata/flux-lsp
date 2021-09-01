@@ -14,7 +14,6 @@ use wasm_bindgen_futures::future_to_promise;
 use crate::LspServer;
 use flux::parser::Parser;
 
-
 fn wrap_message(s: String) -> String {
     let st = s.clone();
     let result = st.as_bytes();
@@ -139,7 +138,6 @@ impl Server {
     pub fn register_tag_keys_callback(&mut self, _f: Function) {}
     pub fn register_tag_values_callback(&mut self, _f: Function) {}
 }
-
 
 /// Parses a string representation of a json file and returns the corresponding JsValue representation
 #[wasm_bindgen]
