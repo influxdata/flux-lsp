@@ -2101,11 +2101,11 @@ ab = 10
     #[test]
     fn test_object_param_completion() {
         let fluxscript = r#"obj = {
-	func: (name, age) => name + age
+    func: (name, age) => name + age
 }
 
 obj.func(
-		"#;
+        "#;
         let server = create_server();
         open_file(&server, fluxscript.to_string());
 
@@ -2157,7 +2157,7 @@ obj.func(
         let fluxscript = r#"import "csv"
 
 csv.from(
-		"#;
+        "#;
         let server = create_server();
         open_file(&server, fluxscript.to_string());
 
@@ -2472,18 +2472,18 @@ impl CompletionInfo {
                                     );
 
                                     return Ok(Some(CompletionInfo {
-															completion_type:
-																CompletionType::Logical(
-																	be.operator.clone(),
-																),
-																ident: name,
-																position,
-																uri: uri.clone(),
-																imports: get_imports(
-																	uri, position, source,
-																)?,
-																package,
-														}));
+                                                            completion_type:
+                                                                CompletionType::Logical(
+                                                                    be.operator.clone(),
+                                                                ),
+                                                                ident: name,
+                                                                position,
+                                                                uri: uri.clone(),
+                                                                imports: get_imports(
+                                                                    uri, position, source,
+                                                                )?,
+                                                                package,
+                                                        }));
                                 }
                             }
                             _ => {}

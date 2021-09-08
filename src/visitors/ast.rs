@@ -34,35 +34,6 @@ fn contains_position(
     true
 }
 
-pub struct DefinitionFinderState<'a> {
-    pub name: String,
-    pub node: Option<Rc<walk::Node<'a>>>,
-}
-
-#[derive(Clone)]
-pub struct DefinitionFinderVisitor<'a> {
-    pub state: Rc<RefCell<DefinitionFinderState<'a>>>,
-}
-
-impl<'a> Visitor<'a> for DefinitionFinderVisitor<'a> {
-    fn visit(&self, node: Rc<walk::Node<'a>>) -> Option<Self> {
-        let mut state = self.state.borrow_mut();
-
-        match node.as_ref() {
-            walk::Node::VariableAssgn(v) => {
-                if v.id.name == state.name {
-                    state.node = Some(node.clone());
-                    return None;
-                }
-
-                Some(self.clone())
-            }
-            walk::Node::FunctionExpr(_) => None,
-            _ => Some(self.clone()),
-        }
-    }
-}
-
 pub struct CallFinderState<'a> {
     pub node: Option<Rc<walk::Node<'a>>>,
 }
