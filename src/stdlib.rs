@@ -1,7 +1,6 @@
-use crate::shared::get_package_name;
-use crate::shared::signatures::get_argument_names;
-use crate::shared::signatures::FunctionInfo;
-use crate::shared::Function;
+use crate::shared::{
+    get_argument_names, get_package_name, Function, FunctionInfo,
+};
 
 use flux::imports;
 use flux::prelude;

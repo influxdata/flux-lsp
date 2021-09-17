@@ -13,10 +13,18 @@ An implementation of the [Language Server Protocol](https://microsoft.github.io/
 # Installing command line server
 
 ```
-npm i -g @influxdata/flux-lsp-cli
+cargo install --git https://github.com/influxdata/flux-lsp
 ```
 
-This will allow you to run an LSP instance with the command `flux-lsp`
+NOTE: previously, `flux-lsp` was installed via `npm`. If you have installed `flux-lsp`
+with this method, please remove that version before installing this one.
+
+This will allow you to run an LSP instance with the command `flux-lsp`. Like other
+command-line lsp servers, communication with the lsp server is via stdin/stdout. To use
+this utility in your editor of choice, you'll need to use a plugin that supports
+command-line lsp servers.
+
+If you find a plugin for your editor that doesn't work with `flux-lsp`, please file a bug.
 
 # Vim setup
 
@@ -26,7 +34,7 @@ In any case, you need to recognize the `filetype`. This is done looking at the f
 
 ```vimrc
 " Flux file type
-au BufRead,BufNewFile *.flux		set filetype=flux
+au BufRead,BufNewFile *.flux        set filetype=flux
 ```
 
 ### with vim-lsp

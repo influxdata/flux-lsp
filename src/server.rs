@@ -21,20 +21,17 @@ use lspower::lsp;
 use lspower::LanguageServer;
 
 use crate::convert;
-use crate::shared::ast::is_in_node;
-use crate::shared::get_package_name;
-use crate::shared::signatures::{
-    get_argument_names, FunctionSignature,
-};
-use crate::shared::structs::Function;
+use crate::shared::Function;
+use crate::shared::{get_argument_names, FunctionSignature};
+use crate::shared::{get_package_name, is_in_node};
 use crate::stdlib::{
     create_function_signature, get_builtin_functions,
     get_package_functions, get_package_infos, get_stdlib_functions,
 };
-use crate::visitors::ast::package_finder::{
-    PackageFinderVisitor, PackageInfo,
+use crate::visitors::ast::{
+    CallFinderVisitor, NodeFinderVisitor, PackageFinderVisitor,
+    PackageInfo,
 };
-use crate::visitors::ast::{CallFinderVisitor, NodeFinderVisitor};
 use crate::visitors::semantic::NodeFinderVisitor as SemanticNodeFinderVisitor;
 use crate::visitors::semantic::{
     DefinitionFinderVisitor, FoldFinderVisitor,
@@ -2104,11 +2101,11 @@ ab = 10
     #[test]
     fn test_object_param_completion() {
         let fluxscript = r#"obj = {
-	func: (name, age) => name + age
+    func: (name, age) => name + age
 }
 
 obj.func(
-		"#;
+        "#;
         let server = create_server();
         open_file(&server, fluxscript.to_string());
 
@@ -2160,7 +2157,7 @@ obj.func(
         let fluxscript = r#"import "csv"
 
 csv.from(
-		"#;
+        "#;
         let server = create_server();
         open_file(&server, fluxscript.to_string());
 
@@ -2475,18 +2472,18 @@ impl CompletionInfo {
                                     );
 
                                     return Ok(Some(CompletionInfo {
-															completion_type:
-																CompletionType::Logical(
-																	be.operator.clone(),
-																),
-																ident: name,
-																position,
-																uri: uri.clone(),
-																imports: get_imports(
-																	uri, position, source,
-																)?,
-																package,
-														}));
+                                                            completion_type:
+                                                                CompletionType::Logical(
+                                                                    be.operator.clone(),
+                                                                ),
+                                                                ident: name,
+                                                                position,
+                                                                uri: uri.clone(),
+                                                                imports: get_imports(
+                                                                    uri, position, source,
+                                                                )?,
+                                                                package,
+                                                        }));
                                 }
                             }
                             _ => {}
@@ -2741,7 +2738,7 @@ async fn find_arg_completions(
     params: lsp::CompletionParams,
     source: String,
 ) -> std::result::Result<lsp::CompletionList, Error> {
-    let callbacks = crate::shared::callbacks::Callbacks {
+    let callbacks = crate::shared::Callbacks {
         buckets: None,
         measurements: None,
         tag_keys: None,
@@ -2766,7 +2763,7 @@ async fn find_arg_completions(
 }
 
 async fn get_bucket_completions(
-    callbacks: crate::shared::callbacks::Callbacks,
+    callbacks: crate::shared::Callbacks,
     trigger: Option<String>,
 ) -> std::result::Result<lsp::CompletionList, Error> {
     let buckets = callbacks.get_buckets().await;

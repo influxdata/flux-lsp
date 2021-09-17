@@ -11,7 +11,7 @@ use lsp_types as lsp;
 mod completion;
 mod symbols;
 
-pub mod functions;
+mod functions;
 
 pub use completion::{
     FunctionFinderVisitor, ObjectFunctionFinderVisitor,

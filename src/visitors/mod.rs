@@ -1,2 +1,2 @@
-pub mod ast;
-pub mod semantic;
+pub(crate) mod ast;
+pub(crate) mod semantic;
