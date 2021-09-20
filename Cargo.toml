@@ -31,7 +31,7 @@ async-std = { version = "1.9.0", features = ["attributes"] }
 async-trait = "0.1.50"
 clap = "2.33.3"
 combinations = "0.1.0"
-flux = { git = "https://github.com/influxdata/flux", tag = "v0.127.3" }
+flux = { git = "https://github.com/influxdata/flux", tag = "v0.131.0" }
 futures = "0.3.15"
 js-sys = "0.3.51"
 line-col = "0.2.1"
