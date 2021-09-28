@@ -188,8 +188,7 @@ pub fn get_json_documentation(flux_path: &str) -> JsValue {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use flux::semantic::bootstrap::Doc;
-    use flux::semantic::bootstrap::*;
+    use flux::semantic::doc::*;
     use wasm_bindgen_test::*;
 
     ///Retrieve full PackageDoc documentation for a single flux identifier
