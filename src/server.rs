@@ -1951,7 +1951,7 @@ errorCounts
             _ => unreachable!(),
         };
 
-        assert_eq!(117, items.len());
+        assert_eq!(120, items.len());
         assert_eq!(items.first().unwrap().label, "csv");
         assert_eq!(items.last().unwrap().label, "cool (self)");
     }
@@ -2090,7 +2090,7 @@ ab = 10
             _ => unreachable!(),
         };
 
-        assert_eq!(117, items.len());
+        assert_eq!(120, items.len());
         assert_eq!(
             items.first().unwrap().label,
             "contrib/RohanSreerama5/naiveBayesClassifier"
@@ -2275,7 +2275,7 @@ errorCounts
             _ => unreachable!(),
         };
 
-        assert_eq!(123, items.len());
+        assert_eq!(126, items.len());
         assert_eq!("task (self)", items.last().unwrap().label);
     }
 }
