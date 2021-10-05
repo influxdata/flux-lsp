@@ -16,7 +16,7 @@ use flux::semantic::walk::Node as SemanticNode;
 use flux::semantic::walk::Visitor as SemanticVisitor;
 use flux::{imports, prelude};
 use log::{debug, error, info, warn};
-use lspower::jsonrpc::Result;
+use lspower::jsonrpc::Result as RpcResult;
 use lspower::lsp;
 use lspower::LanguageServer;
 
@@ -47,7 +47,9 @@ const BUILTIN_PACKAGE: &str = "builtin";
 // is preferred at this point.
 type FileStore = Arc<Mutex<HashMap<lsp::Url, String>>>;
 
-fn parse_and_analyze(code: &str) -> flux::semantic::nodes::Package {
+fn parse_and_analyze(
+    code: &str,
+) -> Result<flux::semantic::nodes::Package, String> {
     let file = flux::parser::parse_string("", code);
     let ast_pkg = flux::ast::Package {
         base: file.base.clone(),
@@ -59,7 +61,6 @@ fn parse_and_analyze(code: &str) -> flux::semantic::nodes::Package {
         ast_pkg,
         &mut flux::semantic::fresh::Fresher::default(),
     )
-    .unwrap()
 }
 
 /// Take a lsp::Range that contains a start and end lsp::Position, find the
@@ -265,7 +266,7 @@ impl LanguageServer for LspServer {
     async fn initialize(
         &self,
         _: lsp::InitializeParams,
-    ) -> Result<lsp::InitializeResult> {
+    ) -> RpcResult<lsp::InitializeResult> {
         Ok(lsp::InitializeResult {
             capabilities: lsp::ServerCapabilities {
                 call_hierarchy_provider: None,
@@ -345,7 +346,7 @@ impl LanguageServer for LspServer {
             }),
         })
     }
-    async fn shutdown(&self) -> Result<()> {
+    async fn shutdown(&self) -> RpcResult<()> {
         Ok(())
     }
     async fn did_open(
@@ -430,7 +431,7 @@ impl LanguageServer for LspServer {
     async fn signature_help(
         &self,
         params: lsp::SignatureHelpParams,
-    ) -> Result<Option<lsp::SignatureHelp>> {
+    ) -> RpcResult<Option<lsp::SignatureHelp>> {
         let key =
             params.text_document_position_params.text_document.uri;
         let store = self.store.lock().unwrap();
@@ -448,7 +449,13 @@ impl LanguageServer for LspServer {
         let mut signatures = vec![];
         let data = store.get(&key).unwrap();
 
-        let pkg = parse_and_analyze(data);
+        let pkg = match parse_and_analyze(data) {
+            Ok(pkg) => pkg,
+            Err(err) => {
+                debug!("{}", err);
+                return Ok(None);
+            }
+        };
         let node_finder_result = find_node(
             SemanticNode::Package(&pkg),
             params.text_document_position_params.position,
@@ -491,7 +498,7 @@ impl LanguageServer for LspServer {
     async fn formatting(
         &self,
         params: lsp::DocumentFormattingParams,
-    ) -> Result<Option<Vec<lsp::TextEdit>>> {
+    ) -> RpcResult<Option<Vec<lsp::TextEdit>>> {
         let key = params.text_document.uri;
         let store = self.store.lock().unwrap();
         if !store.contains_key(&key) {
@@ -558,7 +565,7 @@ impl LanguageServer for LspServer {
     async fn folding_range(
         &self,
         params: lsp::FoldingRangeParams,
-    ) -> Result<Option<Vec<lsp::FoldingRange>>> {
+    ) -> RpcResult<Option<Vec<lsp::FoldingRange>>> {
         let key = params.text_document.uri;
         let store = self.store.lock().unwrap();
         if !store.contains_key(&key) {
@@ -571,7 +578,13 @@ impl LanguageServer for LspServer {
             ));
         }
         let contents = store.get(&key).unwrap();
-        let pkg = parse_and_analyze(contents.as_str());
+        let pkg = match parse_and_analyze(contents.as_str()) {
+            Ok(pkg) => pkg,
+            Err(err) => {
+                debug!("{}", err);
+                return Ok(None);
+            }
+        };
         let mut visitor = FoldFinderVisitor::default();
         let pkg_node = SemanticNode::Package(&pkg);
 
@@ -596,7 +609,7 @@ impl LanguageServer for LspServer {
     async fn document_symbol(
         &self,
         params: lsp::DocumentSymbolParams,
-    ) -> Result<Option<lsp::DocumentSymbolResponse>> {
+    ) -> RpcResult<Option<lsp::DocumentSymbolResponse>> {
         let key = params.text_document.uri;
         let store = self.store.lock().unwrap();
         if !store.contains_key(&key) {
@@ -610,7 +623,13 @@ impl LanguageServer for LspServer {
         }
 
         let contents = store.get(&key).unwrap();
-        let pkg = parse_and_analyze(contents);
+        let pkg = match parse_and_analyze(contents) {
+            Ok(pkg) => pkg,
+            Err(err) => {
+                debug!("{}", err);
+                return Ok(None);
+            }
+        };
         let pkg_node = SemanticNode::Package(&pkg);
         let mut visitor = SymbolsVisitor::new(key);
         walk::walk(&mut visitor, Rc::new(pkg_node));
@@ -636,7 +655,7 @@ impl LanguageServer for LspServer {
     async fn goto_definition(
         &self,
         params: lsp::GotoDefinitionParams,
-    ) -> Result<Option<lsp::GotoDefinitionResponse>> {
+    ) -> RpcResult<Option<lsp::GotoDefinitionResponse>> {
         let key =
             params.text_document_position_params.text_document.uri;
         let store = self.store.lock().unwrap();
@@ -650,7 +669,13 @@ impl LanguageServer for LspServer {
             ));
         }
         let contents = store.get(&key).unwrap();
-        let pkg = parse_and_analyze(contents);
+        let pkg = match parse_and_analyze(contents) {
+            Ok(pkg) => pkg,
+            Err(err) => {
+                debug!("{}", err);
+                return Ok(None);
+            }
+        };
         let pkg_node = SemanticNode::Package(&pkg);
         let mut visitor = SemanticNodeFinderVisitor::new(
             params.text_document_position_params.position,
@@ -728,7 +753,7 @@ impl LanguageServer for LspServer {
     async fn rename(
         &self,
         params: lsp::RenameParams,
-    ) -> Result<Option<lsp::WorkspaceEdit>> {
+    ) -> RpcResult<Option<lsp::WorkspaceEdit>> {
         let key =
             params.text_document_position.text_document.uri.clone();
         let store = self.store.lock().unwrap();
@@ -744,7 +769,13 @@ impl LanguageServer for LspServer {
                 ));
             }
         };
-        let pkg = parse_and_analyze(contents);
+        let pkg = match parse_and_analyze(contents) {
+            Ok(pkg) => pkg,
+            Err(err) => {
+                debug!("{}", err);
+                return Ok(None);
+            }
+        };
         let node = find_node(
             SemanticNode::Package(&pkg),
             params.text_document_position.position,
@@ -772,7 +803,7 @@ impl LanguageServer for LspServer {
     async fn references(
         &self,
         params: lsp::ReferenceParams,
-    ) -> Result<Option<Vec<lsp::Location>>> {
+    ) -> RpcResult<Option<Vec<lsp::Location>>> {
         let key =
             params.text_document_position.text_document.uri.clone();
         let store = self.store.lock().unwrap();
@@ -788,7 +819,13 @@ impl LanguageServer for LspServer {
                 ));
             }
         };
-        let pkg = parse_and_analyze(contents);
+        let pkg = match parse_and_analyze(contents) {
+            Ok(pkg) => pkg,
+            Err(err) => {
+                debug!("{}", err);
+                return Ok(None);
+            }
+        };
         let node = find_node(
             SemanticNode::Package(&pkg),
             params.text_document_position.position,
@@ -802,7 +839,7 @@ impl LanguageServer for LspServer {
     async fn hover(
         &self,
         _params: lsp::HoverParams,
-    ) -> Result<Option<lsp::Hover>> {
+    ) -> RpcResult<Option<lsp::Hover>> {
         Ok(None)
     }
 
@@ -812,14 +849,14 @@ impl LanguageServer for LspServer {
     async fn completion_resolve(
         &self,
         params: lsp::CompletionItem,
-    ) -> Result<lsp::CompletionItem> {
+    ) -> RpcResult<lsp::CompletionItem> {
         Ok(params)
     }
 
     async fn completion(
         &self,
         params: lsp::CompletionParams,
-    ) -> Result<Option<lsp::CompletionResponse>> {
+    ) -> RpcResult<Option<lsp::CompletionResponse>> {
         let key =
             params.text_document_position.text_document.uri.clone();
 
@@ -2278,6 +2315,150 @@ errorCounts
         assert_eq!(126, items.len());
         assert_eq!("task (self)", items.last().unwrap().label);
     }
+
+    #[test]
+    fn test_signature_help_invalid() {
+        let fluxscript = r#"bork |>"#;
+        let server = create_server();
+        open_file(&server, fluxscript.to_string());
+
+        let params = lsp::SignatureHelpParams {
+            context: None,
+            text_document_position_params:
+                lsp::TextDocumentPositionParams::new(
+                    lsp::TextDocumentIdentifier::new(
+                        lsp::Url::parse(
+                            "file:///home/user/file.flux",
+                        )
+                        .unwrap(),
+                    ),
+                    lsp::Position::new(0, 5),
+                ),
+            work_done_progress_params: lsp::WorkDoneProgressParams {
+                work_done_token: None,
+            },
+        };
+
+        let result = block_on(server.signature_help(params)).unwrap();
+
+        assert!(result.is_none())
+    }
+
+    #[test]
+    fn test_folding_range_invalid() {
+        let fluxscript = r#"bork |>"#;
+        let server = create_server();
+        open_file(&server, fluxscript.to_string());
+
+        let params = lsp::FoldingRangeParams {
+            text_document: lsp::TextDocumentIdentifier {
+                uri: lsp::Url::parse("file:///home/user/file.flux")
+                    .unwrap(),
+            },
+            work_done_progress_params: lsp::WorkDoneProgressParams {
+                work_done_token: None,
+            },
+            partial_result_params: lsp::PartialResultParams {
+                partial_result_token: None,
+            },
+        };
+
+        let result = block_on(server.folding_range(params)).unwrap();
+
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_document_symbol_invalid() {
+        let fluxscript = r#"bork |>"#;
+        let server = create_server();
+        open_file(&server, fluxscript.to_string());
+
+        let params = lsp::DocumentSymbolParams {
+            text_document: lsp::TextDocumentIdentifier {
+                uri: lsp::Url::parse("file:///home/user/file.flux")
+                    .unwrap(),
+            },
+            work_done_progress_params: lsp::WorkDoneProgressParams {
+                work_done_token: None,
+            },
+            partial_result_params: lsp::PartialResultParams {
+                partial_result_token: None,
+            },
+        };
+        let result =
+            block_on(server.document_symbol(params)).unwrap();
+
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_goto_definition_invalid() {
+        let fluxscript = r#"bork |>"#;
+        let server = create_server();
+        open_file(&server, fluxscript.to_string());
+
+        let params = lsp::GotoDefinitionParams {
+            text_document_position_params:
+                lsp::TextDocumentPositionParams::new(
+                    lsp::TextDocumentIdentifier::new(
+                        lsp::Url::parse(
+                            "file:///home/user/file.flux",
+                        )
+                        .unwrap(),
+                    ),
+                    lsp::Position::new(8, 35),
+                ),
+            work_done_progress_params: lsp::WorkDoneProgressParams {
+                work_done_token: None,
+            },
+            partial_result_params: lsp::PartialResultParams {
+                partial_result_token: None,
+            },
+        };
+
+        let result =
+            block_on(server.goto_definition(params)).unwrap();
+
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_rename_invalid() {
+        let fluxscript = r#"bork |>"#;
+        let server = create_server();
+        open_file(&server, fluxscript.to_string());
+
+        let params = lsp::ReferenceParams {
+            text_document_position: lsp::TextDocumentPositionParams {
+                text_document: lsp::TextDocumentIdentifier {
+                    uri: lsp::Url::parse(
+                        "file:///home/user/file.flux",
+                    )
+                    .unwrap(),
+                },
+                position: lsp::Position {
+                    line: 1,
+                    character: 1,
+                },
+            },
+            work_done_progress_params: lsp::WorkDoneProgressParams {
+                work_done_token: None,
+            },
+            partial_result_params: lsp::PartialResultParams {
+                partial_result_token: None,
+            },
+            context: lsp::ReferenceContext {
+                // declaration is included whether this is true or false
+                include_declaration: true,
+            },
+        };
+
+        let result =
+            block_on(server.references(params.clone())).unwrap();
+
+        assert!(result.is_none());
+    }
 }
 
 #[derive(Debug)]
@@ -2293,7 +2474,7 @@ impl From<String> for Error {
 fn find_completions(
     params: lsp::CompletionParams,
     contents: String,
-) -> std::result::Result<lsp::CompletionList, Error> {
+) -> Result<lsp::CompletionList, Error> {
     let uri = params.text_document_position.text_document.uri.clone();
     let info =
         CompletionInfo::create(params.clone(), contents.clone())?;
@@ -2380,7 +2561,7 @@ impl CompletionInfo {
     fn create(
         params: lsp::CompletionParams,
         source: String,
-    ) -> std::result::Result<Option<CompletionInfo>, String> {
+    ) -> Result<Option<CompletionInfo>, String> {
         let uri =
             params.text_document_position.text_document.uri.clone();
         let position = params.text_document_position.position;
@@ -2629,7 +2810,7 @@ fn get_imports(
     uri: lsp::Url,
     pos: lsp::Position,
     contents: String,
-) -> std::result::Result<Vec<Import>, String> {
+) -> Result<Vec<Import>, String> {
     let pkg = create_completion_package(uri, pos, contents)?;
     let walker = Rc::new(SemanticNode::Package(&pkg));
     let mut visitor = ImportFinderVisitor::default();
@@ -2645,7 +2826,7 @@ fn get_imports_removed(
     uri: lsp::Url,
     pos: lsp::Position,
     contents: String,
-) -> std::result::Result<Vec<Import>, String> {
+) -> Result<Vec<Import>, String> {
     let pkg = create_completion_package_removed(uri, pos, contents)?;
     let walker = Rc::new(SemanticNode::Package(&pkg));
     let mut visitor = ImportFinderVisitor::default();
@@ -2667,7 +2848,7 @@ fn move_back(position: lsp::Position, count: u32) -> lsp::Position {
 fn get_user_matches(
     info: CompletionInfo,
     contents: String,
-) -> std::result::Result<Vec<lsp::CompletionItem>, Error> {
+) -> Result<Vec<lsp::CompletionItem>, Error> {
     let completables = get_user_completables(
         info.uri.clone(),
         info.position,
@@ -2693,7 +2874,7 @@ fn get_trigger(params: lsp::CompletionParams) -> Option<String> {
 fn find_dot_completions(
     params: lsp::CompletionParams,
     contents: String,
-) -> std::result::Result<lsp::CompletionList, Error> {
+) -> Result<lsp::CompletionList, Error> {
     let uri = params.text_document_position.text_document.uri.clone();
     let pos = params.text_document_position.position;
     let info = CompletionInfo::create(params, contents.clone())?;
@@ -2737,7 +2918,7 @@ fn find_dot_completions(
 async fn find_arg_completions(
     params: lsp::CompletionParams,
     source: String,
-) -> std::result::Result<lsp::CompletionList, Error> {
+) -> Result<lsp::CompletionList, Error> {
     let callbacks = crate::shared::Callbacks {
         buckets: None,
         measurements: None,
@@ -2765,7 +2946,7 @@ async fn find_arg_completions(
 async fn get_bucket_completions(
     callbacks: crate::shared::Callbacks,
     trigger: Option<String>,
-) -> std::result::Result<lsp::CompletionList, Error> {
+) -> Result<lsp::CompletionList, Error> {
     let buckets = callbacks.get_buckets().await;
 
     let items: Vec<lsp::CompletionItem> = buckets
@@ -2818,7 +2999,7 @@ fn get_user_completables(
     uri: lsp::Url,
     pos: lsp::Position,
     contents: String,
-) -> std::result::Result<Vec<Arc<dyn Completable>>, Error> {
+) -> Result<Vec<Arc<dyn Completable>>, Error> {
     println!("getting user completables");
     let pkg = create_completion_package(uri, pos, contents)?;
     let walker = Rc::new(SemanticNode::Package(&pkg));
@@ -2855,7 +3036,7 @@ fn find_param_completions(
     trigger: Option<String>,
     params: lsp::CompletionParams,
     source: String,
-) -> std::result::Result<lsp::CompletionList, Error> {
+) -> Result<lsp::CompletionList, Error> {
     let uri = params.text_document_position.text_document.uri;
     let position = params.text_document_position.position;
 
@@ -2965,7 +3146,7 @@ fn get_specific_object(
     pos: lsp::Position,
     uri: lsp::Url,
     contents: String,
-) -> std::result::Result<Vec<Arc<dyn Completable>>, Error> {
+) -> Result<Vec<Arc<dyn Completable>>, Error> {
     let pkg = create_completion_package_removed(uri, pos, contents)?;
     let walker = Rc::new(SemanticNode::Package(&pkg));
     let mut visitor = CompletableObjectFinderVisitor::new(name);
@@ -3019,7 +3200,7 @@ fn get_user_functions(
     uri: lsp::Url,
     pos: lsp::Position,
     source: String,
-) -> std::result::Result<Vec<Function>, Error> {
+) -> Result<Vec<Function>, Error> {
     let pkg = create_completion_package(uri, pos, source)?;
     let walker = Rc::new(SemanticNode::Package(&pkg));
     let mut visitor = FunctionFinderVisitor::new(pos);
@@ -3040,7 +3221,7 @@ fn get_object_functions(
     pos: lsp::Position,
     object: String,
     contents: String,
-) -> std::result::Result<Vec<Function>, Error> {
+) -> Result<Vec<Function>, Error> {
     let pkg = create_completion_package(uri, pos, contents)?;
     let walker = Rc::new(SemanticNode::Package(&pkg));
     let mut visitor = ObjectFunctionFinderVisitor::default();
@@ -3550,7 +3731,7 @@ impl PackageFinderVisitor {
     fn find_package(
         uri: lsp::Url,
         contents: String,
-    ) -> std::result::Result<Option<PackageInfo>, String> {
+    ) -> Result<Option<PackageInfo>, String> {
         let package = create_ast_package(uri, contents)?;
         for file in package.files {
             let walker = Rc::new(AstNode::File(&file));
@@ -3571,7 +3752,7 @@ impl PackageFinderVisitor {
 fn create_ast_package(
     uri: lsp::Url,
     source: String,
-) -> std::result::Result<flux::ast::Package, String> {
+) -> Result<flux::ast::Package, String> {
     let mut pkg: Package =
         parse_string(uri.as_str(), source.as_str()).into();
     pkg.files.sort_by(|a, _b| {
@@ -4157,7 +4338,7 @@ fn create_completion_package_removed(
     uri: lsp::Url,
     pos: lsp::Position,
     contents: String,
-) -> std::result::Result<flux::semantic::nodes::Package, String> {
+) -> Result<flux::semantic::nodes::Package, String> {
     let mut file = parse_string("", contents.as_str());
 
     file.imports = file
@@ -4196,7 +4377,7 @@ fn create_completion_package(
     uri: lsp::Url,
     pos: lsp::Position,
     contents: String,
-) -> std::result::Result<flux::semantic::nodes::Package, String> {
+) -> Result<flux::semantic::nodes::Package, String> {
     create_filtered_package(uri, contents, |x| {
         valid_node(x.base(), pos)
     })
@@ -4213,7 +4394,7 @@ fn create_filtered_package<F>(
     uri: lsp::Url,
     contents: String,
     mut filter: F,
-) -> std::result::Result<flux::semantic::nodes::Package, String>
+) -> Result<flux::semantic::nodes::Package, String>
 where
     F: FnMut(&flux::ast::Statement) -> bool,
 {
