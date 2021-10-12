@@ -3,6 +3,8 @@ use std::fmt;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
+use anyhow::Result;
+
 use flux::analyze;
 use flux::ast::walk::walk_rc;
 use flux::ast::walk::Node as AstNode;
@@ -49,18 +51,14 @@ type FileStore = Arc<Mutex<HashMap<lsp::Url, String>>>;
 
 fn parse_and_analyze(
     code: &str,
-) -> Result<flux::semantic::nodes::Package, String> {
-    let file = flux::parser::parse_string("", code);
-    let ast_pkg = flux::ast::Package {
-        base: file.base.clone(),
-        path: "".to_string(),
-        package: "main".to_string(),
-        files: vec![file],
-    };
-    flux::semantic::convert::convert_with(
-        ast_pkg,
-        &mut flux::semantic::fresh::Fresher::default(),
-    )
+) -> Result<flux::semantic::nodes::Package> {
+    let mut analyzer = flux::new_semantic_analyzer()?;
+    let (_, sem_pkg) = analyzer.analyze_source(
+        "".to_string(),
+        "main.flux".to_string(),
+        code,
+    )?;
+    Ok(sem_pkg)
 }
 
 /// Take a lsp::Range that contains a start and end lsp::Position, find the
@@ -2567,7 +2565,7 @@ impl CompletionInfo {
         let position = params.text_document_position.position;
 
         let pkg: Package =
-            parse_string(uri.as_str(), source.as_str()).into();
+            parse_string(uri.to_string(), source.as_str()).into();
         let walker = Rc::new(AstNode::File(&pkg.files[0]));
         let visitor = NodeFinderVisitor::new(move_back(position, 1));
 
@@ -3041,7 +3039,7 @@ fn find_param_completions(
     let position = params.text_document_position.position;
 
     let pkg: Package =
-        parse_string(uri.as_str(), source.as_str()).into();
+        parse_string(uri.to_string(), source.as_str()).into();
     let walker = Rc::new(AstNode::File(&pkg.files[0]));
     let visitor = CallFinderVisitor::new(move_back(position, 1));
 
@@ -3754,7 +3752,7 @@ fn create_ast_package(
     source: String,
 ) -> Result<flux::ast::Package, String> {
     let mut pkg: Package =
-        parse_string(uri.as_str(), source.as_str()).into();
+        parse_string(uri.to_string(), source.as_str()).into();
     pkg.files.sort_by(|a, _b| {
         if a.name == uri.as_str() {
             std::cmp::Ordering::Greater
@@ -4339,7 +4337,7 @@ fn create_completion_package_removed(
     pos: lsp::Position,
     contents: String,
 ) -> Result<flux::semantic::nodes::Package, String> {
-    let mut file = parse_string("", contents.as_str());
+    let mut file = parse_string("".to_string(), contents.as_str());
 
     file.imports = file
         .imports
