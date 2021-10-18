@@ -3,6 +3,8 @@ use std::fmt;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
+use anyhow::Result;
+
 use flux::analyze;
 use flux::ast::walk::walk_rc;
 use flux::ast::walk::Node as AstNode;
@@ -39,7 +41,7 @@ use crate::visitors::semantic::{
     ImportFinderVisitor, ObjectFunctionFinderVisitor, SymbolsVisitor,
 };
 
-const BUILTIN_PACKAGE: &str = "builtin";
+const PRELUDE_PACKAGE: &str = "prelude";
 
 // The spec talks specifically about setting versions for files, but isn't
 // clear on how those versions are surfaced to the client, if ever. This
@@ -49,18 +51,21 @@ type FileStore = Arc<Mutex<HashMap<lsp::Url, String>>>;
 
 fn parse_and_analyze(
     code: &str,
-) -> Result<flux::semantic::nodes::Package, String> {
-    let file = flux::parser::parse_string("", code);
-    let ast_pkg = flux::ast::Package {
-        base: file.base.clone(),
-        path: "".to_string(),
-        package: "main".to_string(),
-        files: vec![file],
-    };
-    flux::semantic::convert::convert_with(
-        ast_pkg,
-        &mut flux::semantic::fresh::Fresher::default(),
-    )
+) -> Result<flux::semantic::nodes::Package> {
+    let mut analyzer = flux::new_semantic_analyzer(
+        flux::semantic::AnalyzerConfig {
+            // Explicitly disable the AST and Semantic checks.
+            // We do not care if the code is syntactically or semantically correct as this may be
+            // partially written code.
+            skip_checks: true,
+        },
+    )?;
+    let (_, sem_pkg) = analyzer.analyze_source(
+        "".to_string(),
+        "main.flux".to_string(),
+        code,
+    )?;
+    Ok(sem_pkg)
 }
 
 /// Take a lsp::Range that contains a start and end lsp::Position, find the
@@ -925,7 +930,7 @@ impl LanguageServer for LspServer {
 #[cfg(all(test, not(target_arch = "wasm32")))]
 #[allow(deprecated)]
 mod tests {
-    use std::collections::HashMap;
+    use std::collections::{HashMap, HashSet};
 
     use async_std::task::block_on;
     use lspower::lsp;
@@ -1988,9 +1993,60 @@ errorCounts
             _ => unreachable!(),
         };
 
-        assert_eq!(120, items.len());
-        assert_eq!(items.first().unwrap().label, "csv");
-        assert_eq!(items.last().unwrap().label, "cool (self)");
+        let got: HashSet<&str> =
+            items.iter().map(|i| i.label.as_str()).collect();
+
+        let want: HashSet<&str> = vec![
+            "buckets",
+            "cardinality",
+            "chandeMomentumOscillator",
+            "columns",
+            "contains",
+            "contrib/RohanSreerama5/naiveBayesClassifier",
+            "contrib/anaisdg/anomalydetection",
+            "contrib/bonitoo-io/tickscript",
+            "contrib/bonitoo-io/victorops",
+            "contrib/chobbs/discord",
+            "count",
+            "cov",
+            "covariance",
+            "csv",
+            "cumulativeSum",
+            "dict",
+            "difference",
+            "distinct",
+            "duplicate",
+            "experimental/csv",
+            "experimental/record",
+            "findColumn",
+            "findRecord",
+            "getColumn",
+            "getRecord",
+            "highestCurrent",
+            "hourSelection",
+            "increase",
+            "influxdata/influxdb/schema",
+            "influxdata/influxdb/secrets",
+            "logarithmicBins",
+            "lowestCurrent",
+            "reduce",
+            "slack",
+            "socket",
+            "stateCount",
+            "stateTracking",
+            "testing/expect",
+            "truncateTimeColumn",
+        ]
+        .drain(..)
+        .collect();
+
+        assert_eq!(
+            want,
+            got,
+            "\nextra:\n {:?}\n missing:\n {:?}\n",
+            got.difference(&want),
+            want.difference(&got)
+        );
     }
 
     // TODO: sean (10 Aug 2021) - This test fails unless the line reading
@@ -2127,12 +2183,102 @@ ab = 10
             _ => unreachable!(),
         };
 
-        assert_eq!(120, items.len());
+        let got: HashSet<&str> =
+            items.iter().map(|i| i.label.as_str()).collect();
+
+        let want: HashSet<&str> = vec![
+            "_window",
+            "aggregateWindow",
+            "cardinality",
+            "chandeMomentumOscillator",
+            "columns",
+            "contains",
+            "contrib/RohanSreerama5/naiveBayesClassifier",
+            "contrib/anaisdg/anomalydetection",
+            "contrib/bonitoo-io/zenoss",
+            "contrib/jsternberg/influxdb",
+            "contrib/rhajek/bigpanda",
+            "contrib/sranka/opsgenie",
+            "contrib/sranka/sensu",
+            "contrib/tomhollingworth/events",
+            "count",
+            "covariance",
+            "difference",
+            "distinct",
+            "duration",
+            "experimental",
+            "experimental/influxdb",
+            "experimental/json",
+            "exponentialMovingAverage",
+            "findColumn",
+            "findRecord",
+            "generate",
+            "getColumn",
+            "highestCurrent",
+            "histogramQuantile",
+            "holtWinters",
+            "hourSelection",
+            "increase",
+            "inf (prelude)",
+            "influxdata/influxdb",
+            "influxdata/influxdb/monitor",
+            "int",
+            "integral",
+            "internal/boolean",
+            "internal/gen",
+            "internal/influxql",
+            "interpolate",
+            "join",
+            "json",
+            "kaufmansAMA",
+            "kaufmansER",
+            "length",
+            "linearBins",
+            "logarithmicBins",
+            "lowestCurrent",
+            "lowestMin",
+            "mean",
+            "median",
+            "min",
+            "movingAverage",
+            "now",
+            "pearsonr",
+            "planner",
+            "quantile",
+            "range",
+            "relativeStrengthIndex",
+            "rename",
+            "runtime",
+            "stateCount",
+            "stateDuration",
+            "stateTracking",
+            "string",
+            "strings",
+            "tableFind",
+            "testing",
+            "timedMovingAverage",
+            "timezone",
+            "toInt",
+            "toString",
+            "toUInt",
+            "tripleExponentialDerivative",
+            "truncateTimeColumn",
+            "uint",
+            "union",
+            "unique",
+            "universe",
+            "window",
+        ]
+        .drain(..)
+        .collect();
+
         assert_eq!(
-            items.first().unwrap().label,
-            "contrib/RohanSreerama5/naiveBayesClassifier"
+            want,
+            got,
+            "\nextra:\n {:?}\n missing:\n {:?}\n",
+            got.difference(&want),
+            want.difference(&got)
         );
-        assert_eq!(items.last().unwrap().label, "now (self)");
     }
 
     #[test]
@@ -2312,8 +2458,127 @@ errorCounts
             _ => unreachable!(),
         };
 
-        assert_eq!(126, items.len());
-        assert_eq!("task (self)", items.last().unwrap().label);
+        let got: HashSet<&str> =
+            items.iter().map(|i| i.label.as_str()).collect();
+
+        let want: HashSet<&str> = vec![
+            "_fillEmpty",
+            "_highestOrLowest",
+            "_sortLimit",
+            "aggregateWindow",
+            "bottom",
+            "buckets",
+            "bytes",
+            "cardinality",
+            "chandeMomentumOscillator",
+            "contains",
+            "contrib/anaisdg/anomalydetection",
+            "contrib/anaisdg/statsmodels",
+            "contrib/bonitoo-io/alerta",
+            "contrib/bonitoo-io/tickscript",
+            "contrib/bonitoo-io/victorops",
+            "contrib/jsternberg/aggregate",
+            "contrib/jsternberg/math",
+            "contrib/sranka/teams",
+            "contrib/sranka/telegram",
+            "contrib/sranka/webexteams",
+            "contrib/tomhollingworth/events",
+            "count",
+            "cumulativeSum",
+            "date",
+            "derivative",
+            "dict",
+            "distinct",
+            "duplicate",
+            "duration",
+            "experimental",
+            "experimental/aggregate",
+            "experimental/bigtable",
+            "experimental/http",
+            "experimental/mqtt",
+            "experimental/prometheus",
+            "experimental/table",
+            "exponentialMovingAverage",
+            "filter",
+            "first",
+            "float",
+            "generate",
+            "getColumn",
+            "getRecord",
+            "highestAverage",
+            "highestCurrent",
+            "highestMax",
+            "histogram",
+            "histogramQuantile",
+            "holtWinters",
+            "hourSelection",
+            "http",
+            "influxdata/influxdb/monitor",
+            "influxdata/influxdb/secrets",
+            "influxdata/influxdb/tasks",
+            "int",
+            "integral",
+            "internal/testutil",
+            "interpolate",
+            "last",
+            "length",
+            "limit",
+            "logarithmicBins",
+            "lowestAverage",
+            "lowestCurrent",
+            "lowestMin",
+            "math",
+            "pagerduty",
+            "pivot",
+            "pushbullet",
+            "quantile",
+            "relativeStrengthIndex",
+            "runtime",
+            "sampledata",
+            "set",
+            "socket",
+            "sort",
+            "stateCount",
+            "stateDuration",
+            "stateTracking",
+            "stddev",
+            "string",
+            "strings",
+            "system",
+            "tableFind",
+            "tail",
+            "testing",
+            "testing/expect",
+            "time",
+            "timeShift",
+            "timeWeightedAvg",
+            "timedMovingAverage",
+            "timezone",
+            "to",
+            "toBool",
+            "toFloat",
+            "toInt",
+            "toString",
+            "toTime",
+            "toUInt",
+            "today",
+            "top",
+            "tripleEMA",
+            "tripleExponentialDerivative",
+            "true (prelude)",
+            "truncateTimeColumn",
+            "uint",
+        ]
+        .drain(..)
+        .collect();
+
+        assert_eq!(
+            want,
+            got,
+            "\nextra:\n {:?}\n missing:\n {:?}\n",
+            got.difference(&want),
+            want.difference(&got)
+        );
     }
 
     #[test]
@@ -2484,7 +2749,7 @@ fn find_completions(
     if let Some(info) = info {
         match info.completion_type {
             CompletionType::Generic => {
-                let mut stdlib_matches = get_stdlib_completions(
+                let mut stdlib_matches = get_stdlib_matches(
                     info.ident.clone(),
                     info.clone(),
                 );
@@ -2567,7 +2832,7 @@ impl CompletionInfo {
         let position = params.text_document_position.position;
 
         let pkg: Package =
-            parse_string(uri.as_str(), source.as_str()).into();
+            parse_string(uri.to_string(), source.as_str()).into();
         let walker = Rc::new(AstNode::File(&pkg.files[0]));
         let visitor = NodeFinderVisitor::new(move_back(position, 1));
 
@@ -2852,12 +3117,14 @@ fn get_user_matches(
     let completables = get_user_completables(
         info.uri.clone(),
         info.position,
-        contents,
+        contents.clone(),
     )?;
 
     let mut result: Vec<lsp::CompletionItem> = vec![];
     for x in completables {
-        result.push(x.completion_item(info.clone()))
+        if x.matches(contents.clone(), info.clone()) {
+            result.push(x.completion_item(info.clone()))
+        }
     }
 
     Ok(result)
@@ -3000,7 +3267,6 @@ fn get_user_completables(
     pos: lsp::Position,
     contents: String,
 ) -> Result<Vec<Arc<dyn Completable>>, Error> {
-    println!("getting user completables");
     let pkg = create_completion_package(uri, pos, contents)?;
     let walker = Rc::new(SemanticNode::Package(&pkg));
     let mut visitor = CompletableFinderVisitor::new(pos);
@@ -3016,12 +3282,12 @@ fn get_user_completables(
     })
 }
 
-fn get_stdlib_completions(
+fn get_stdlib_matches(
     name: String,
     info: CompletionInfo,
 ) -> Vec<lsp::CompletionItem> {
     let mut matches = vec![];
-    let completes = get_stdlib();
+    let completes = get_stdlib_completables();
 
     for c in completes.into_iter() {
         if c.matches(name.clone(), info.clone()) {
@@ -3041,7 +3307,7 @@ fn find_param_completions(
     let position = params.text_document_position.position;
 
     let pkg: Package =
-        parse_string(uri.as_str(), source.as_str()).into();
+        parse_string(uri.to_string(), source.as_str()).into();
     let walker = Rc::new(AstNode::File(&pkg.files[0]));
     let visitor = CallFinderVisitor::new(move_back(position, 1));
 
@@ -3394,6 +3660,16 @@ trait Completable {
     fn matches(&self, text: String, info: CompletionInfo) -> bool;
 }
 
+// Reports if the needle has a fuzzy match with the haystack.
+//
+// It is assumed that the haystack is the name of an identifier and the needle is a partial
+// identifier.
+fn fuzzy_match(haystack: &str, needle: &str) -> bool {
+    return haystack
+        .to_lowercase()
+        .contains(needle.to_lowercase().as_str());
+}
+
 impl Completable for PackageResult {
     fn completion_item(
         &self,
@@ -3439,10 +3715,6 @@ impl Completable for PackageResult {
             }
         }
 
-        println!(
-            "Calling completion_item on PackageResult with name {}",
-            self.full_name
-        );
         lsp::CompletionItem {
             label: self.full_name.clone(),
             additional_text_edits: Some(additional_text_edits),
@@ -3469,13 +3741,7 @@ impl Completable for PackageResult {
     }
 
     fn matches(&self, text: String, _info: CompletionInfo) -> bool {
-        if !text.ends_with('.') {
-            let name = self.name.to_lowercase();
-            let mtext = text.to_lowercase();
-            return name.starts_with(mtext.as_str());
-        }
-
-        false
+        fuzzy_match(self.name.as_str(), text.as_str())
     }
 }
 
@@ -3490,7 +3756,7 @@ impl Completable for FunctionResult {
         let contains_pkg =
             imports.into_iter().any(|x| self.package == x.path);
 
-        if !contains_pkg && self.package != BUILTIN_PACKAGE {
+        if !contains_pkg && self.package != PRELUDE_PACKAGE {
             additional_text_edits.push(lsp::TextEdit {
                 new_text: format!("import \"{}\"\n", self.package),
                 range: lsp::Range {
@@ -3529,7 +3795,9 @@ impl Completable for FunctionResult {
 
     fn matches(&self, text: String, info: CompletionInfo) -> bool {
         let imports = info.imports;
-        if self.package == BUILTIN_PACKAGE && !text.ends_with('.') {
+        if self.package == PRELUDE_PACKAGE
+            && fuzzy_match(self.name.as_str(), text.as_str())
+        {
             return true;
         }
 
@@ -3557,9 +3825,8 @@ impl Completable for CompletionVarResult {
         &self,
         _info: CompletionInfo,
     ) -> lsp::CompletionItem {
-        println!("Calling completion_item on CompletionVarResult with name `{}`", self.name);
         lsp::CompletionItem {
-            label: format!("{} ({})", self.name, "self".to_string()),
+            label: format!("{} (self)", self.name),
             additional_text_edits: None,
             commit_characters: None,
             deprecated: None,
@@ -3583,12 +3850,12 @@ impl Completable for CompletionVarResult {
         }
     }
 
-    fn matches(&self, _text: String, _info: CompletionInfo) -> bool {
-        true
+    fn matches(&self, text: String, _info: CompletionInfo) -> bool {
+        fuzzy_match(self.name.as_str(), text.as_str())
     }
 }
 
-fn get_stdlib() -> Vec<Box<dyn Completable>> {
+fn get_stdlib_completables() -> Vec<Box<dyn Completable>> {
     let mut list = vec![];
 
     get_packages(&mut list);
@@ -3611,7 +3878,7 @@ fn get_builtins(list: &mut Vec<Box<dyn Completable>>) {
     for (key, val) in env.values {
         match val.expr {
             MonoType::Fun(f) => list.push(Box::new(FunctionResult {
-                package: BUILTIN_PACKAGE.to_string(),
+                package: PRELUDE_PACKAGE.to_string(),
                 package_name: None,
                 name: key.clone(),
                 signature: create_function_signature((*f).clone()),
@@ -3620,61 +3887,61 @@ fn get_builtins(list: &mut Vec<Box<dyn Completable>>) {
             })),
             MonoType::String => list.push(Box::new(VarResult {
                 name: key.clone(),
-                package: BUILTIN_PACKAGE.to_string(),
+                package: PRELUDE_PACKAGE.to_string(),
                 package_name: None,
                 var_type: VarType::String,
             })),
             MonoType::Int => list.push(Box::new(VarResult {
                 name: key.clone(),
-                package: BUILTIN_PACKAGE.to_string(),
+                package: PRELUDE_PACKAGE.to_string(),
                 package_name: None,
                 var_type: VarType::Int,
             })),
             MonoType::Float => list.push(Box::new(VarResult {
                 name: key.clone(),
-                package: BUILTIN_PACKAGE.to_string(),
+                package: PRELUDE_PACKAGE.to_string(),
                 package_name: None,
                 var_type: VarType::Float,
             })),
             MonoType::Arr(_) => list.push(Box::new(VarResult {
                 name: key.clone(),
-                package: BUILTIN_PACKAGE.to_string(),
+                package: PRELUDE_PACKAGE.to_string(),
                 package_name: None,
                 var_type: VarType::Array,
             })),
             MonoType::Bool => list.push(Box::new(VarResult {
                 name: key.clone(),
-                package: BUILTIN_PACKAGE.to_string(),
+                package: PRELUDE_PACKAGE.to_string(),
                 package_name: None,
                 var_type: VarType::Bool,
             })),
             MonoType::Bytes => list.push(Box::new(VarResult {
                 name: key.clone(),
-                package: BUILTIN_PACKAGE.to_string(),
+                package: PRELUDE_PACKAGE.to_string(),
                 package_name: None,
                 var_type: VarType::Bytes,
             })),
             MonoType::Duration => list.push(Box::new(VarResult {
                 name: key.clone(),
-                package: BUILTIN_PACKAGE.to_string(),
+                package: PRELUDE_PACKAGE.to_string(),
                 package_name: None,
                 var_type: VarType::Duration,
             })),
             MonoType::Uint => list.push(Box::new(VarResult {
                 name: key.clone(),
-                package: BUILTIN_PACKAGE.to_string(),
+                package: PRELUDE_PACKAGE.to_string(),
                 package_name: None,
                 var_type: VarType::Uint,
             })),
             MonoType::Regexp => list.push(Box::new(VarResult {
                 name: key.clone(),
-                package: BUILTIN_PACKAGE.to_string(),
+                package: PRELUDE_PACKAGE.to_string(),
                 package_name: None,
                 var_type: VarType::Regexp,
             })),
             MonoType::Time => list.push(Box::new(VarResult {
                 name: key.clone(),
-                package: BUILTIN_PACKAGE.to_string(),
+                package: PRELUDE_PACKAGE.to_string(),
                 package_name: None,
                 var_type: VarType::Time,
             })),
@@ -3754,7 +4021,7 @@ fn create_ast_package(
     source: String,
 ) -> Result<flux::ast::Package, String> {
     let mut pkg: Package =
-        parse_string(uri.as_str(), source.as_str()).into();
+        parse_string(uri.to_string(), source.as_str()).into();
     pkg.files.sort_by(|a, _b| {
         if a.name == uri.as_str() {
             std::cmp::Ordering::Greater
@@ -3800,7 +4067,6 @@ impl<'a> SemanticVisitor<'a> for CompletableFinderVisitor {
             if let SemanticNode::VariableAssgn(assgn) = node.as_ref()
             {
                 let name = assgn.id.name.clone();
-                println!("VARIABLE ASSIGNMENT {}", name);
                 if let Some(var_type) = get_var_type(&assgn.init) {
                     (*state).completables.push(Arc::new(
                         CompletionVarResult {
@@ -3887,7 +4153,7 @@ impl Completable for ImportAliasResult {
         _info: CompletionInfo,
     ) -> lsp::CompletionItem {
         lsp::CompletionItem {
-            label: format!("{} ({})", self.alias, "self".to_string()),
+            label: format!("{} (self)", self.alias),
             additional_text_edits: None,
             commit_characters: None,
             deprecated: None,
@@ -3911,8 +4177,8 @@ impl Completable for ImportAliasResult {
         }
     }
 
-    fn matches(&self, _text: String, _info: CompletionInfo) -> bool {
-        true
+    fn matches(&self, text: String, _info: CompletionInfo) -> bool {
+        fuzzy_match(self.alias.as_str(), text.as_str())
     }
 }
 
@@ -4204,7 +4470,9 @@ impl Completable for VarResult {
 
     fn matches(&self, text: String, info: CompletionInfo) -> bool {
         let imports = info.imports;
-        if self.package == BUILTIN_PACKAGE && !text.ends_with('.') {
+        if self.package == PRELUDE_PACKAGE
+            && fuzzy_match(self.name.as_str(), text.as_str())
+        {
             return true;
         }
 
@@ -4339,7 +4607,7 @@ fn create_completion_package_removed(
     pos: lsp::Position,
     contents: String,
 ) -> Result<flux::semantic::nodes::Package, String> {
-    let mut file = parse_string("", contents.as_str());
+    let mut file = parse_string("".to_string(), contents.as_str());
 
     file.imports = file
         .imports
@@ -4463,7 +4731,7 @@ impl Completable for UserFunctionResult {
         _info: CompletionInfo,
     ) -> lsp::CompletionItem {
         lsp::CompletionItem {
-            label: format!("{} ({})", self.name, "self".to_string()),
+            label: format!("{} (self)", self.name),
             additional_text_edits: None,
             commit_characters: None,
             deprecated: None,
@@ -4485,7 +4753,7 @@ impl Completable for UserFunctionResult {
         }
     }
 
-    fn matches(&self, _text: String, _info: CompletionInfo) -> bool {
-        true
+    fn matches(&self, text: String, _info: CompletionInfo) -> bool {
+        fuzzy_match(self.name.as_str(), text.as_str())
     }
 }
