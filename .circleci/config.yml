@@ -30,20 +30,28 @@ jobs:
     resource_class: large
     steps:
       - checkout
-      - run: |
-          cargo build --verbose
-          cargo build --no-default-features --verbose
-          make wasm
+      - run: cargo build --verbose
+
+  wasm-build:
+    docker:
+      - image: quay.io/influxdb/wasm-build
+    resource_class: large
+    steps:
+      - checkout
+      - run: make wasm
+
 
   deploy:
     docker:
       - image: quay.io/influxdb/wasm-build
+    resource_class: large
     steps:
       - checkout
-      - run: make wasm
-      - run: echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN" > pkg-node/.npmrc
-      - run: echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN" > pkg-browser/.npmrc
-      - run: make publish
+      - run: |
+          make wasm
+          echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN" > pkg-node/.npmrc
+          echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN" > pkg-browser/.npmrc
+          make publish
 
 
 workflows:
@@ -52,6 +60,7 @@ workflows:
     jobs:
       - lint
       - build
+      - wasm-build
       - test
 
   build-and-deploy:
@@ -59,6 +68,6 @@ workflows:
       - deploy:
           filters:
             tags:
-              only: /^v.*/
+              only: /^v?([0-9]+\.)+[0-9]+$/
             branches:
               ignore: /.*/
