@@ -10,6 +10,10 @@ repository = "https://github.com/influxdata/flux-lsp"
 [package.metadata.wasm-pack.profile.release]
 wasm-opt = ["-Oz", "--enable-mutable-globals"]
 
+[profile.release]
+opt-level = "z"
+lto = true
+
 [features]
 default = ["strict"]
 strict = []
