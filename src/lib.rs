@@ -1,13 +1,10 @@
 #![cfg_attr(feature = "strict", deny(warnings))]
-extern crate clap;
-
 mod convert;
 mod server;
 mod shared;
 mod stdlib;
-mod wasm;
-
 mod visitors;
+mod wasm;
 
 pub use server::LspServer;
 
