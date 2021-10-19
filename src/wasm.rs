@@ -68,6 +68,8 @@ impl Server {
         disable_folding: bool,
         _support_multiple_files: bool,
     ) -> Self {
+        console_error_panic_hook::set_once();
+
         let (service, _messages) =
             lspower::LspService::new(|_client| {
                 let mut server = LspServer::default();
