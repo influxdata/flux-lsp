@@ -52,14 +52,12 @@ tower-service = { version = "0.3.1" }
 url = "2.2.2"
 wasm-bindgen = "0.2.74"
 wasm-bindgen-futures = "0.4.24"
-# wasm-bindgen-test isn't a dev dependency because the tests are
-# built externally.
-wasm-bindgen-test = "0.3.0"
 web-sys = { version = "0.3.51", features = ["console"] }
 
 [dev-dependencies]
-futures = "0.3.15"
 criterion = "0.3"
+futures = "0.3.15"
+wasm-bindgen-test = "0.3.0"
 
 [[bench]]
 name = "server"
