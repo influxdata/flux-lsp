@@ -140,22 +140,143 @@ impl Server {
     pub fn register_tag_values_callback(&mut self, _f: Function) {}
 }
 
-/// Parses a string representation of a json file and returns the corresponding JsValue representation
+/// Parse flux into an AST representation. The AST will be generated regardless
+/// of valid flux. As such, no error handling is needed.
 #[wasm_bindgen]
-pub fn parse(s: &str) -> JsValue {
-    let mut p = Parser::new(s);
-    let file = p.parse_file(String::from(""));
+pub fn parse(script: &str) -> JsValue {
+    let mut parser = Parser::new(script);
+    let parsed = parser.parse_file("".to_string());
 
-    JsValue::from_serde(&file).unwrap()
+    JsValue::from_serde(&parsed).unwrap()
 }
 
-/// Format a JS file.
+/// Format a flux script from AST.
+///
+/// In the event that the flux is invalid syntax, an Err will be returned,
+/// which will translate into a JavaScript exception being thrown.
 #[wasm_bindgen]
-pub fn format_from_js_file(js_file: JsValue) -> String {
-    if let Ok(file) = js_file.into_serde::<File>() {
-        if let Ok(converted) = convert_to_string(&file) {
-            return converted;
+pub fn format_from_js_file(
+    js_file: JsValue,
+) -> Result<String, JsValue> {
+    match js_file.into_serde::<File>() {
+        Ok(file) => match convert_to_string(&file) {
+            Ok(formatted) => Ok(formatted),
+            Err(e) => Err(format!("{}", e).into()),
+        },
+        Err(e) => Err(format!("{}", e).into()),
+    }
+}
+
+#[cfg(test)]
+mod test {
+    #![allow(deprecated)]
+    use wasm_bindgen_test::*;
+
+    use super::*;
+
+    /// Valid flux is parsed, and a JavaScript object is returned.
+    #[wasm_bindgen_test]
+    fn test_parse() {
+        let script = r#"option task = { name: "beetle", every: 1h }
+from(bucket: "inbucket")
+  |> range(start: -task.every)
+  |> filter(fn: (r) => r["_measurement"] == "activity")
+  |> filter(fn: (r) => r["target"] == "crumbs")"#;
+
+        let parsed = parse(&script);
+
+        assert!(parsed.is_object());
+    }
+
+    /// Invalid flux is still parsed, and a JavaScript object is returned.
+    #[wasm_bindgen_test]
+    fn test_parse_invalid() {
+        let script = r#"this isn't flux"#;
+
+        let parsed = parse(&script);
+
+        assert!(parsed.is_object());
+    }
+
+    #[wasm_bindgen_test]
+    fn test_format_from_js_file() {
+        let expected = r#"option task = {name: "beetle", every: 1h}
+
+from(bucket: "inbucket")
+    |> range(start: -task.every)
+    |> filter(fn: (r) => r["_measurement"] == "activity")"#;
+
+        let script = r#"option task={name:"beetle",every:1h} from(bucket:"inbucket")
+|>range(start:-task.every)|>filter(fn:(r)=>r["_measurement"]=="activity")"#;
+        let parsed = parse(&script);
+
+        let formatted = format_from_js_file(parsed).unwrap();
+
+        assert_eq!(expected, formatted);
+    }
+
+    #[wasm_bindgen_test]
+    fn test_format_from_js_file_invalid() {
+        let script = r#"from(bucket:this isn't flux"#;
+        let parsed = parse(&script);
+
+        if let Err(error) = format_from_js_file(parsed) {
+            assert_eq!(
+                "invalid type: map, expected a string at line 1 column 2134",
+                error.as_string().unwrap()
+            );
+        } else {
+            panic!("Formatting invalid flux did not throw an error");
         }
     }
-    js_file.as_string().unwrap()
+
+    // The following code provides helpers for converting a JsValue into the
+    // object that it originated from on this side of the wasm boundary.
+    // Please see https://github.com/rustwasm/wasm-bindgen/issues/2231 for
+    // more information.
+    use wasm_bindgen::convert::FromWasmAbi;
+
+    pub fn jsvalue_to_server_response<T: FromWasmAbi<Abi = u32>>(
+        js: JsValue,
+    ) -> Result<T, JsValue> {
+        let ctor_name = js_sys::Object::get_prototype_of(&js)
+            .constructor()
+            .name();
+        if ctor_name == "ServerResponse" {
+            let ptr =
+                js_sys::Reflect::get(&js, &JsValue::from_str("ptr"))?;
+            let ptr_u32: u32 =
+                ptr.as_f64().ok_or(JsValue::NULL)? as u32;
+            let foo = unsafe { T::from_abi(ptr_u32) };
+            Ok(foo)
+        } else {
+            Err(JsValue::NULL)
+        }
+    }
+
+    #[wasm_bindgen_test]
+    async fn test_server_initialize() {
+        let message = r#"Content-Length: 84
+
+{"method": "initialize", "params": { "capabilities": {}}, "jsonrpc": "2.0", "id": 1}"#;
+        let mut server = Server::new(true, false);
+        let promise = server.process(message.to_string());
+        let result = wasm_bindgen_futures::JsFuture::from(promise)
+            .await
+            .unwrap();
+
+        assert!(result.is_object());
+        let response: ServerResponse =
+            jsvalue_to_server_response(result).unwrap();
+
+        let error = response.get_error();
+        assert!(error.is_none());
+
+        /* We don't actually care about the _contents_ of the message, just that
+         * there is a message. There are other tests that assert the
+         * rest of this functionality.
+         */
+        let message = response.get_message();
+        assert!(message.is_some());
+    }
 }
