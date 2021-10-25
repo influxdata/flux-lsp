@@ -1,23 +1,137 @@
-#![allow(dead_code, unused_imports)]
+#![allow(dead_code)]
 use std::ops::Add;
 use std::str;
 
+#[cfg(not(feature = "api_next"))]
 use flux::ast::File;
 use flux::formatter::convert_to_string;
+use flux::parser::parse_string;
 use js_sys::{Function, Promise};
 use serde::{Deserialize, Serialize};
 use tower_service::Service;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::future_to_promise;
 
+#[cfg(feature = "api_next")]
+use crate::server::parse_and_analyze;
 use crate::LspServer;
-use flux::parser::Parser;
+
+// In a wasm_bindgen context, the Ok(_) case is the success case,
+// and any error results in a `throw`.
+#[cfg(feature = "api_next")]
+type WasmResult<T> = Result<T, JsValue>;
+
+/// Validate the flux semantically.
+///
+/// This function is more than just a parse function, because it doesn't
+/// validate identifiers, etc.
+#[cfg(feature = "api_next")]
+#[wasm_bindgen]
+pub fn flux_syntax_is_valid(script: &str) -> bool {
+    match parse_and_analyze(script) {
+        Ok(_) => true,
+        Err(_) => false,
+    }
+}
+
+#[cfg(feature = "api_next")]
+#[wasm_bindgen]
+pub fn format(script: &str) -> WasmResult<String> {
+    if flux_syntax_is_valid(script) {
+        let ast_file = parse_string("".into(), script);
+        match convert_to_string(&ast_file) {
+            Ok(formatted) => Ok(formatted),
+            Err(e) => Err(format!("{}", e).into()),
+        }
+    } else {
+        Err("Could not format flux. Please check syntax and try again".into())
+    }
+}
+
+#[cfg(feature = "api_next")]
+#[allow(non_snake_case)]
+#[wasm_bindgen]
+pub struct LSPServerOptions {
+    enableFolding: Option<bool>,
+    bucketsCallback: Option<Function>,
+    measurementsCallback: Option<Function>,
+    tagKeysCallback: Option<Function>,
+    tagValuesCallback: Option<Function>,
+}
+
+#[cfg(feature = "api_next")]
+#[wasm_bindgen]
+pub struct LSPServer {
+    service: lspower::LspService,
+}
+
+#[cfg(feature = "api_next")]
+#[wasm_bindgen]
+impl LSPServer {
+    #[wasm_bindgen(constructor)]
+    pub fn new(_options: LSPServerOptions) -> Self {
+        console_error_panic_hook::set_once();
+
+        let (service, _messages) =
+            lspower::LspService::new(|_client| {
+                let server = LspServer::default();
+                // TODO: hook in options
+                server
+            });
+
+        LSPServer { service }
+    }
+
+    pub fn send(&mut self, msg: String) -> Promise {
+        // Assert the header describes the correct length
+        let header: String = msg.lines().next().unwrap_or("").into();
+        let length = header
+            .split(' ')
+            .skip(1)
+            .collect::<String>()
+            .parse::<usize>()
+            .unwrap();
+        let json_contents: String =
+            msg.lines().skip(2).fold(String::new(), |c, l| c.add(l));
+        assert!(json_contents.as_bytes().len() == length);
+
+        let message: lspower::jsonrpc::Incoming =
+            serde_json::from_str(&json_contents).unwrap();
+        let call = self.service.call(message);
+        future_to_promise(async move {
+            match call.await {
+                Ok(result) => match result {
+                    Some(result_inner) => match result_inner {
+                        lspower::jsonrpc::Outgoing::Response(
+                            response,
+                        ) => match serde_json::to_string(&response) {
+                            Ok(value) => {
+                                Ok(wrap_message(value).into())
+                            }
+                            Err(err) => {
+                                Err(format!("{}", err).into())
+                            }
+                        },
+                        lspower::jsonrpc::Outgoing::Request(
+                            _client_request,
+                        ) => {
+                            panic!("Outgoing requests from server to client are not implemented");
+                        }
+                    },
+                    None => {
+                        // Some endpoints don't have results,
+                        // e.g. textDocument/didOpen
+                        Ok(JsValue::NULL)
+                    }
+                },
+                Err(err) => Err(format!("{}", err).into()),
+            }
+        })
+    }
+}
 
 fn wrap_message(s: String) -> String {
-    let st = s.clone();
-    let result = st.as_bytes();
-    let size = result.len();
-
+    let size = s.as_bytes().len();
     format!("Content-Length: {}\r\n\r\n{}", size, s)
 }
 
@@ -142,11 +256,10 @@ impl Server {
 
 /// Parse flux into an AST representation. The AST will be generated regardless
 /// of valid flux. As such, no error handling is needed.
+#[cfg(not(feature = "api_next"))]
 #[wasm_bindgen]
 pub fn parse(script: &str) -> JsValue {
-    let mut parser = Parser::new(script);
-    let parsed = parser.parse_file("".to_string());
-
+    let parsed = parse_string("".into(), script);
     JsValue::from_serde(&parsed).unwrap()
 }
 
@@ -154,6 +267,7 @@ pub fn parse(script: &str) -> JsValue {
 ///
 /// In the event that the flux is invalid syntax, an Err will be returned,
 /// which will translate into a JavaScript exception being thrown.
+#[cfg(not(feature = "api_next"))]
 #[wasm_bindgen]
 pub fn format_from_js_file(
     js_file: JsValue,
@@ -174,21 +288,70 @@ mod test {
 
     use super::*;
 
-    /// Valid flux is parsed, and a JavaScript object is returned.
+    /// Valid flux returns true.
+    #[cfg(feature = "api_next")]
     #[wasm_bindgen_test]
-    fn test_parse() {
+    fn test_flux_syntax_is_valid() {
         let script = r#"option task = { name: "beetle", every: 1h }
 from(bucket: "inbucket")
   |> range(start: -task.every)
   |> filter(fn: (r) => r["_measurement"] == "activity")
   |> filter(fn: (r) => r["target"] == "crumbs")"#;
 
+        assert!(flux_syntax_is_valid(&script))
+    }
+
+    /// Invalid flux returns false
+    #[cfg(feature = "api_next")]
+    #[wasm_bindgen_test]
+    fn test_flux_syntax_is_valid_bad_syntax() {
+        let script = r#"this isn't good flux"#;
+
+        assert!(!flux_syntax_is_valid(&script))
+    }
+
+    /// Valid flux is parsed, and a JavaScript object is returned.
+    #[cfg(not(feature = "api_next"))]
+    #[wasm_bindgen_test]
+    fn test_parse() {
+        let script = r#"option task = { name: "beetle", every: 1h }
+from(bucket: "inbucket")
+  |> range(start: -task.every)
+  |> filter(fn: (r) => r["_measurement"] == "activity")
+  |> filter(r["target"] == "crumbs")"#;
+
         let parsed = parse(&script);
 
         assert!(parsed.is_object());
     }
 
+    #[cfg(feature = "api_next")]
+    #[wasm_bindgen_test]
+    fn test_format() {
+        let expected = r#"option task = {name: "beetle", every: 1h}
+
+from(bucket: "inbucket")
+    |> range(start: -task.every)
+    |> filter(fn: (r) => r["_measurement"] == "activity")"#;
+
+        let script = r#"option task={name:"beetle",every:1h} from(bucket:"inbucket")
+|>range(start:-task.every)|>filter(fn:(r)=>r["_measurement"]=="activity")"#;
+        let formatted = format(&script).unwrap();
+
+        assert_eq!(expected, formatted);
+    }
+
+    #[cfg(feature = "api_next")]
+    #[wasm_bindgen_test]
+    fn test_format_invalid() {
+        let script = r#"from(bucket:this isn't flux"#;
+        let formatted = format(&script);
+
+        assert!(formatted.is_err());
+    }
+
     /// Invalid flux is still parsed, and a JavaScript object is returned.
+    #[cfg(not(feature = "api_next"))]
     #[wasm_bindgen_test]
     fn test_parse_invalid() {
         let script = r#"this isn't flux"#;
@@ -198,6 +361,7 @@ from(bucket: "inbucket")
         assert!(parsed.is_object());
     }
 
+    #[cfg(not(feature = "api_next"))]
     #[wasm_bindgen_test]
     fn test_format_from_js_file() {
         let expected = r#"option task = {name: "beetle", every: 1h}
@@ -215,6 +379,7 @@ from(bucket: "inbucket")
         assert_eq!(expected, formatted);
     }
 
+    #[cfg(not(feature = "api_next"))]
     #[wasm_bindgen_test]
     fn test_format_from_js_file_invalid() {
         let script = r#"from(bucket:this isn't flux"#;
@@ -236,7 +401,7 @@ from(bucket: "inbucket")
     // more information.
     use wasm_bindgen::convert::FromWasmAbi;
 
-    pub fn jsvalue_to_server_response<T: FromWasmAbi<Abi = u32>>(
+    fn jsvalue_to_server_response<T: FromWasmAbi<Abi = u32>>(
         js: JsValue,
     ) -> Result<T, JsValue> {
         let ctor_name = js_sys::Object::get_prototype_of(&js)
@@ -254,6 +419,7 @@ from(bucket: "inbucket")
         }
     }
 
+    #[cfg(not(feature = "api_next"))]
     #[wasm_bindgen_test]
     async fn test_server_initialize() {
         let message = r#"Content-Length: 84
@@ -278,5 +444,30 @@ from(bucket: "inbucket")
          */
         let message = response.get_message();
         assert!(message.is_some());
+    }
+
+    #[cfg(feature = "api_next")]
+    #[wasm_bindgen_test]
+    async fn test_lspserver_initialize() {
+        let expected = "Content-Length: 478\r\n\r\n{\"jsonrpc\":\"2.0\",\"result\":{\"capabilities\":{\"completionProvider\":{\"resolveProvider\":true,\"triggerCharacters\":[\".\",\":\",\"(\",\",\",\"\\\"\"]},\"definitionProvider\":true,\"documentFormattingProvider\":true,\"documentSymbolProvider\":true,\"foldingRangeProvider\":true,\"hoverProvider\":true,\"referencesProvider\":true,\"renameProvider\":true,\"signatureHelpProvider\":{\"retriggerCharacters\":[\"(\"],\"triggerCharacters\":[\"(\"]},\"textDocumentSync\":1},\"serverInfo\":{\"name\":\"flux-lsp\",\"version\":\"2.0\"}},\"id\":1}";
+
+        let message = r#"Content-Length: 84
+
+{"method": "initialize", "params": { "capabilities": {}}, "jsonrpc": "2.0", "id": 1}"#;
+        let mut server = LSPServer::new(LSPServerOptions {
+            enableFolding: None,
+            bucketsCallback: None,
+            measurementsCallback: None,
+            tagKeysCallback: None,
+            tagValuesCallback: None,
+        });
+        let promise = server.send(message.into());
+        let result = wasm_bindgen_futures::JsFuture::from(promise)
+            .await
+            .unwrap();
+
+        assert!(result.is_string());
+        let response = result.as_string().unwrap();
+        assert_eq!(expected, response);
     }
 }

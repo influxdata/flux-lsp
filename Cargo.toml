@@ -17,6 +17,7 @@ lto = true
 [features]
 default = ["strict"]
 strict = []
+api_next = []
 
 [lib]
 name = "flux_lsp"

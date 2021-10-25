@@ -29,7 +29,9 @@ jobs:
       - checkout
       - run:
           name: "run tests"
-          command: wasm-pack test --node
+          command: |
+            wasm-pack test --node
+            wasm-pack test --node --features=api_next
 
   build:
     docker:

@@ -49,7 +49,7 @@ const PRELUDE_PACKAGE: &str = "prelude";
 // is preferred at this point.
 type FileStore = Arc<Mutex<HashMap<lsp::Url, String>>>;
 
-fn parse_and_analyze(
+pub(crate) fn parse_and_analyze(
     code: &str,
 ) -> Result<flux::semantic::nodes::Package> {
     let mut analyzer = flux::new_semantic_analyzer(
@@ -2831,9 +2831,8 @@ impl CompletionInfo {
             params.text_document_position.text_document.uri.clone();
         let position = params.text_document_position.position;
 
-        let pkg: Package =
-            parse_string(uri.to_string(), source.as_str()).into();
-        let walker = Rc::new(AstNode::File(&pkg.files[0]));
+        let file = parse_string(uri.to_string(), source.as_str());
+        let walker = Rc::new(AstNode::File(&file));
         let visitor = NodeFinderVisitor::new(move_back(position, 1));
 
         walk_rc(&visitor, walker);
