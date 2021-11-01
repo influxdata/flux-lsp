@@ -52,7 +52,7 @@ fn is_before_position(
 }
 
 impl<'a> Visitor<'a> for FunctionFinderVisitor {
-    fn visit(&mut self, node: Rc<Node<'a>>) -> bool {
+    fn visit(&mut self, node: Node<'a>) -> bool {
         let loc = node.loc();
         let pos = self.pos;
 
@@ -60,7 +60,7 @@ impl<'a> Visitor<'a> for FunctionFinderVisitor {
             return true;
         }
 
-        if let Node::VariableAssgn(assgn) = node.as_ref() {
+        if let Node::VariableAssgn(assgn) = node {
             if let Some(f) = create_function_result(
                 assgn.id.name.clone(),
                 &assgn.init,

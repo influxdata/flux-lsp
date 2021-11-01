@@ -106,7 +106,7 @@ fn function_defines(
     params.iter().any(|param| param.key.name == name)
 }
 
-fn is_scope(name: &str, n: Rc<SemanticNode<'_>>) -> bool {
+fn is_scope(name: &str, n: SemanticNode<'_>) -> bool {
     let mut dvisitor = DefinitionFinderVisitor::new(name.to_string());
     walk::walk(&mut dvisitor, n.clone());
     let state = dvisitor.state.borrow();
@@ -119,7 +119,7 @@ fn find_references(
     result: NodeFinderResult,
 ) -> Vec<lsp::Location> {
     if let Some(node) = result.node {
-        let name = match node.as_ref() {
+        let name = match node {
             SemanticNode::Identifier(ident) => ident.name.as_str(),
             SemanticNode::IdentifierExpr(ident) => {
                 ident.name.as_str()
@@ -128,8 +128,8 @@ fn find_references(
         };
 
         let mut path_iter = result.path.iter().rev();
-        let scope: Rc<SemanticNode> =
-            match path_iter.find_map(|n| match n.as_ref() {
+        let scope: SemanticNode =
+            match path_iter.find_map(|n| match n {
                 SemanticNode::FunctionExpr(f)
                     if function_defines(name, &f.params) =>
                 {
@@ -467,7 +467,7 @@ impl LanguageServer for LspServer {
         );
 
         if let Some(node) = node_finder_result.node {
-            if let SemanticNode::CallExpr(call) = node.as_ref() {
+            if let SemanticNode::CallExpr(call) = node {
                 let callee = call.callee.clone();
 
                 if let flux::semantic::nodes::Expression::Member(member) = callee.clone() {
@@ -593,7 +593,7 @@ impl LanguageServer for LspServer {
         let mut visitor = FoldFinderVisitor::default();
         let pkg_node = SemanticNode::Package(&pkg);
 
-        walk::walk(&mut visitor, Rc::new(pkg_node));
+        walk::walk(&mut visitor, pkg_node);
 
         let state = visitor.state.borrow();
         let nodes = (*state).nodes.clone();
@@ -637,7 +637,7 @@ impl LanguageServer for LspServer {
         };
         let pkg_node = SemanticNode::Package(&pkg);
         let mut visitor = SymbolsVisitor::new(key);
-        walk::walk(&mut visitor, Rc::new(pkg_node));
+        walk::walk(&mut visitor, pkg_node);
 
         let state = visitor.state.borrow();
         let mut symbols = (*state).symbols.clone();
@@ -686,14 +686,14 @@ impl LanguageServer for LspServer {
             params.text_document_position_params.position,
         );
 
-        flux::semantic::walk::walk(&mut visitor, Rc::new(pkg_node));
+        flux::semantic::walk::walk(&mut visitor, pkg_node);
 
         let state = visitor.state.borrow();
         let node = (*state).node.clone();
         let path = (*state).path.clone();
 
         if let Some(node) = node {
-            let name = match node.as_ref() {
+            let name = match node {
                 SemanticNode::Identifier(ident) => {
                     Some(ident.name.clone())
                 }
@@ -706,13 +706,11 @@ impl LanguageServer for LspServer {
             if let Some(node_name) = name {
                 let path_iter = path.iter().rev();
                 for n in path_iter {
-                    match n.as_ref() {
+                    match n {
                         SemanticNode::FunctionExpr(_)
                         | SemanticNode::Package(_)
                         | SemanticNode::File(_) => {
-                            if let SemanticNode::FunctionExpr(f) =
-                                n.as_ref()
-                            {
+                            if let SemanticNode::FunctionExpr(f) = n {
                                 for param in f.params.clone() {
                                     let name = param.key.name;
                                     if name != node_name {
@@ -2496,6 +2494,7 @@ errorCounts
             "experimental",
             "experimental/aggregate",
             "experimental/bigtable",
+            "experimental/bitwise",
             "experimental/http",
             "experimental/mqtt",
             "experimental/prometheus",
@@ -3079,7 +3078,7 @@ fn get_imports(
     contents: String,
 ) -> Result<Vec<Import>, String> {
     let pkg = create_completion_package(uri, pos, contents)?;
-    let walker = Rc::new(SemanticNode::Package(&pkg));
+    let walker = SemanticNode::Package(&pkg);
     let mut visitor = ImportFinderVisitor::default();
 
     walk::walk(&mut visitor, walker);
@@ -3095,7 +3094,7 @@ fn get_imports_removed(
     contents: String,
 ) -> Result<Vec<Import>, String> {
     let pkg = create_completion_package_removed(uri, pos, contents)?;
-    let walker = Rc::new(SemanticNode::Package(&pkg));
+    let walker = SemanticNode::Package(&pkg);
     let mut visitor = ImportFinderVisitor::default();
 
     walk::walk(&mut visitor, walker);
@@ -3270,7 +3269,7 @@ fn get_user_completables(
     contents: String,
 ) -> Result<Vec<Arc<dyn Completable>>, Error> {
     let pkg = create_completion_package(uri, pos, contents)?;
-    let walker = Rc::new(SemanticNode::Package(&pkg));
+    let walker = SemanticNode::Package(&pkg);
     let mut visitor = CompletableFinderVisitor::new(pos);
 
     walk::walk(&mut visitor, walker);
@@ -3416,7 +3415,7 @@ fn get_specific_object(
     contents: String,
 ) -> Result<Vec<Arc<dyn Completable>>, Error> {
     let pkg = create_completion_package_removed(uri, pos, contents)?;
-    let walker = Rc::new(SemanticNode::Package(&pkg));
+    let walker = SemanticNode::Package(&pkg);
     let mut visitor = CompletableObjectFinderVisitor::new(name);
 
     walk::walk(&mut visitor, walker);
@@ -3470,7 +3469,7 @@ fn get_user_functions(
     source: String,
 ) -> Result<Vec<Function>, Error> {
     let pkg = create_completion_package(uri, pos, source)?;
-    let walker = Rc::new(SemanticNode::Package(&pkg));
+    let walker = SemanticNode::Package(&pkg);
     let mut visitor = FunctionFinderVisitor::new(pos);
 
     walk::walk(&mut visitor, walker);
@@ -3491,7 +3490,7 @@ fn get_object_functions(
     contents: String,
 ) -> Result<Vec<Function>, Error> {
     let pkg = create_completion_package(uri, pos, contents)?;
-    let walker = Rc::new(SemanticNode::Package(&pkg));
+    let walker = SemanticNode::Package(&pkg);
     let mut visitor = ObjectFunctionFinderVisitor::default();
 
     walk::walk(&mut visitor, walker);
@@ -4046,7 +4045,7 @@ struct CompletableFinderVisitor {
 }
 
 impl<'a> SemanticVisitor<'a> for CompletableFinderVisitor {
-    fn visit(&mut self, node: Rc<SemanticNode<'a>>) -> bool {
+    fn visit(&mut self, node: SemanticNode<'a>) -> bool {
         if let Ok(mut state) = self.state.lock() {
             let loc = node.loc();
 
@@ -4054,8 +4053,7 @@ impl<'a> SemanticVisitor<'a> for CompletableFinderVisitor {
                 return true;
             }
 
-            if let SemanticNode::ImportDeclaration(id) = node.as_ref()
-            {
+            if let SemanticNode::ImportDeclaration(id) = node {
                 if let Some(alias) = id.alias.clone() {
                     (*state).completables.push(Arc::new(
                         ImportAliasResult::new(
@@ -4066,8 +4064,7 @@ impl<'a> SemanticVisitor<'a> for CompletableFinderVisitor {
                 }
             }
 
-            if let SemanticNode::VariableAssgn(assgn) = node.as_ref()
-            {
+            if let SemanticNode::VariableAssgn(assgn) = node {
                 let name = assgn.id.name.clone();
                 if let Some(var_type) = get_var_type(&assgn.init) {
                     (*state).completables.push(Arc::new(
@@ -4085,7 +4082,7 @@ impl<'a> SemanticVisitor<'a> for CompletableFinderVisitor {
                 }
             }
 
-            if let SemanticNode::OptionStmt(opt) = node.as_ref() {
+            if let SemanticNode::OptionStmt(opt) = node {
                 if let flux::semantic::nodes::Assignment::Variable(
                     var_assign,
                 ) = &opt.assignment
@@ -4278,11 +4275,11 @@ impl CompletableObjectFinderVisitor {
 }
 
 impl<'a> SemanticVisitor<'a> for CompletableObjectFinderVisitor {
-    fn visit(&mut self, node: Rc<SemanticNode<'a>>) -> bool {
+    fn visit(&mut self, node: SemanticNode<'a>) -> bool {
         if let Ok(mut state) = self.state.lock() {
             let name = self.name.clone();
 
-            if let SemanticNode::ObjectExpr(obj) = node.as_ref() {
+            if let SemanticNode::ObjectExpr(obj) = node {
                 if let Some(ident) = &obj.with {
                     if name == ident.name {
                         for prop in obj.properties.clone() {
@@ -4310,8 +4307,7 @@ impl<'a> SemanticVisitor<'a> for CompletableObjectFinderVisitor {
                 }
             }
 
-            if let SemanticNode::VariableAssgn(assign) = node.as_ref()
-            {
+            if let SemanticNode::VariableAssgn(assign) = node {
                 if assign.id.name == name {
                     if let SemanticExpression::Object(obj) =
                         &assign.init
@@ -4345,7 +4341,7 @@ impl<'a> SemanticVisitor<'a> for CompletableObjectFinderVisitor {
                 }
             }
 
-            if let SemanticNode::OptionStmt(opt) = node.as_ref() {
+            if let SemanticNode::OptionStmt(opt) = node {
                 if let flux::semantic::nodes::Assignment::Variable(
                     assign,
                 ) = opt.assignment.clone()
@@ -4513,8 +4509,8 @@ impl CompletionVarResult {
 
 #[derive(Default, Clone)]
 struct NodeFinderResult<'a> {
-    node: Option<Rc<flux::semantic::walk::Node<'a>>>,
-    path: Vec<Rc<flux::semantic::walk::Node<'a>>>,
+    node: Option<flux::semantic::walk::Node<'a>>,
+    path: Vec<flux::semantic::walk::Node<'a>>,
 }
 
 fn find_node(
@@ -4524,7 +4520,7 @@ fn find_node(
     let mut result = NodeFinderResult::default();
     let mut visitor = SemanticNodeFinderVisitor::new(position);
 
-    flux::semantic::walk::walk(&mut visitor, Rc::new(node));
+    flux::semantic::walk::walk(&mut visitor, node);
 
     let state = visitor.state.borrow();
 

@@ -9,7 +9,7 @@ use lsp_types as lsp;
 
 fn parse_variable_assignment(
     uri: lsp::Url,
-    node: Rc<Node>,
+    node: Node,
     va: &nodes::VariableAssgn,
 ) -> Vec<lsp::SymbolInformation> {
     let mut result = vec![];
@@ -220,7 +220,7 @@ fn parse_binary_expression(
 pub struct SymbolsState<'a> {
     pub symbols: Vec<lsp::SymbolInformation>,
     pub uri: lsp::Url,
-    pub path: Vec<Rc<Node<'a>>>,
+    pub path: Vec<Node<'a>>,
 }
 
 pub struct SymbolsVisitor<'a> {
@@ -243,18 +243,18 @@ impl<'a> SymbolsVisitor<'a> {
 impl<'a> SymbolsVisitor<'a> {}
 
 impl<'a> Visitor<'a> for SymbolsVisitor<'a> {
-    fn done(&mut self, _: Rc<Node<'a>>) {
+    fn done(&mut self, _: Node<'a>) {
         let mut state = self.state.borrow_mut();
         (*state).path.pop();
     }
 
-    fn visit(&mut self, node: Rc<Node<'a>>) -> bool {
+    fn visit(&mut self, node: Node<'a>) -> bool {
         let mut state = self.state.borrow_mut();
         let uri = (*state).uri.clone();
 
         (*state).path.push(node.clone());
 
-        match node.as_ref() {
+        match node {
             Node::VariableAssgn(va) => {
                 let list =
                     parse_variable_assignment(uri, node.clone(), va);
