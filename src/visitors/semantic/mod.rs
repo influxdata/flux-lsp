@@ -18,7 +18,7 @@ pub use completion::{
 };
 pub use symbols::SymbolsVisitor;
 
-fn contains_position(node: Rc<Node<'_>>, pos: lsp::Position) -> bool {
+fn contains_position(node: Node<'_>, pos: lsp::Position) -> bool {
     let start_line = node.loc().start.line - 1;
     let start_col = node.loc().start.column - 1;
     let end_line = node.loc().end.line - 1;
@@ -44,9 +44,9 @@ fn contains_position(node: Rc<Node<'_>>, pos: lsp::Position) -> bool {
 }
 
 pub struct NodeFinderState<'a> {
-    pub node: Option<Rc<Node<'a>>>,
+    pub node: Option<Node<'a>>,
     pub position: lsp::Position,
-    pub path: Vec<Rc<Node<'a>>>,
+    pub path: Vec<Node<'a>>,
 }
 
 #[derive(Clone)]
@@ -55,7 +55,7 @@ pub struct NodeFinderVisitor<'a> {
 }
 
 impl<'a> Visitor<'a> for NodeFinderVisitor<'a> {
-    fn visit(&mut self, node: Rc<Node<'a>>) -> bool {
+    fn visit(&mut self, node: Node<'a>) -> bool {
         let mut state = self.state.borrow_mut();
 
         let contains =
@@ -84,7 +84,7 @@ impl<'a> NodeFinderVisitor<'a> {
 
 pub struct IdentFinderState<'a> {
     pub name: String,
-    pub identifiers: Vec<Rc<walk::Node<'a>>>,
+    pub identifiers: Vec<walk::Node<'a>>,
 }
 
 #[derive(Clone)]
@@ -93,9 +93,9 @@ pub struct IdentFinderVisitor<'a> {
 }
 
 impl<'a> Visitor<'a> for IdentFinderVisitor<'a> {
-    fn visit(&mut self, node: Rc<walk::Node<'a>>) -> bool {
+    fn visit(&mut self, node: walk::Node<'a>) -> bool {
         let mut state = self.state.borrow_mut();
-        match node.clone().as_ref() {
+        match node.clone() {
             walk::Node::MemberExpr(m) => {
                 if let Expression::Identifier(i) = m.object.clone() {
                     if i.name == state.name {
@@ -133,7 +133,7 @@ impl<'a> IdentFinderVisitor<'a> {
 
 pub struct DefinitionFinderState<'a> {
     pub name: String,
-    pub node: Option<Rc<Node<'a>>>,
+    pub node: Option<Node<'a>>,
 }
 
 #[derive(Clone)]
@@ -142,10 +142,10 @@ pub struct DefinitionFinderVisitor<'a> {
 }
 
 impl<'a> Visitor<'a> for DefinitionFinderVisitor<'a> {
-    fn visit(&mut self, node: Rc<Node<'a>>) -> bool {
+    fn visit(&mut self, node: Node<'a>) -> bool {
         let mut state = self.state.borrow_mut();
 
-        match node.as_ref() {
+        match node {
             walk::Node::VariableAssgn(v) => {
                 if v.id.name == state.name {
                     state.node = Some(node.clone());
@@ -173,7 +173,7 @@ impl<'a> DefinitionFinderVisitor<'a> {
 
 #[derive(Default)]
 pub struct FoldFinderState<'a> {
-    pub nodes: Vec<Rc<Node<'a>>>,
+    pub nodes: Vec<Node<'a>>,
 }
 
 #[derive(Default)]
@@ -182,10 +182,10 @@ pub struct FoldFinderVisitor<'a> {
 }
 
 impl<'a> Visitor<'a> for FoldFinderVisitor<'a> {
-    fn visit(&mut self, node: Rc<Node<'a>>) -> bool {
+    fn visit(&mut self, node: Node<'a>) -> bool {
         let mut state = self.state.borrow_mut();
 
-        if let Node::Block(_) = node.as_ref() {
+        if let Node::Block(_) = node {
             (*state).nodes.push(node.clone());
         }
 
@@ -211,10 +211,10 @@ pub struct ImportFinderVisitor {
 }
 
 impl<'a> Visitor<'a> for ImportFinderVisitor {
-    fn visit(&mut self, node: Rc<Node<'a>>) -> bool {
+    fn visit(&mut self, node: Node<'a>) -> bool {
         let mut state = self.state.borrow_mut();
 
-        if let Node::ImportDeclaration(import) = node.as_ref() {
+        if let Node::ImportDeclaration(import) = node {
             let alias = match import.alias.clone() {
                 Some(alias) => alias.name,
                 None => get_package_name(import.path.value.clone())

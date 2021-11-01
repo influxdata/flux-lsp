@@ -1,4 +1,3 @@
-use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
 use flux::ast::SourceLocation;
@@ -42,7 +41,7 @@ impl FunctionFinderVisitor {
 }
 
 impl<'a> Visitor<'a> for FunctionFinderVisitor {
-    fn visit(&mut self, node: Rc<Node<'a>>) -> bool {
+    fn visit(&mut self, node: Node<'a>) -> bool {
         if let Ok(mut state) = self.state.lock() {
             let loc = node.loc();
 
@@ -50,7 +49,7 @@ impl<'a> Visitor<'a> for FunctionFinderVisitor {
                 return true;
             }
 
-            if let Node::VariableAssgn(assgn) = node.as_ref() {
+            if let Node::VariableAssgn(assgn) = node {
                 let name = assgn.id.name.clone();
 
                 if let Expression::Function(f) = assgn.init.clone() {
@@ -67,7 +66,7 @@ impl<'a> Visitor<'a> for FunctionFinderVisitor {
                 }
             }
 
-            if let Node::OptionStmt(opt) = node.as_ref() {
+            if let Node::OptionStmt(opt) = node {
                 if let flux::semantic::nodes::Assignment::Variable(
                     assgn,
                 ) = &opt.assignment
@@ -113,8 +112,8 @@ pub struct ObjectFunctionFinderVisitor {
 }
 
 impl<'a> Visitor<'a> for ObjectFunctionFinderVisitor {
-    fn visit(&mut self, node: Rc<Node<'a>>) -> bool {
-        match node.as_ref() {
+    fn visit(&mut self, node: Node<'a>) -> bool {
+        match node {
             Node::VariableAssgn(assignment) => {
                 let object_name = assignment.id.name.clone();
 
