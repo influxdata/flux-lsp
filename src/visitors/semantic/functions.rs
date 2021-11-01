@@ -5,10 +5,9 @@ use flux::ast::SourceLocation;
 use flux::semantic::nodes::Expression;
 use flux::semantic::types::MonoType;
 use flux::semantic::walk::{Node, Visitor};
+use lspower::lsp;
 
 use crate::shared::FunctionInfo;
-
-use lsp_types as lsp;
 
 #[derive(Default)]
 pub struct FunctionFinderState {

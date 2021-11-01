@@ -4,8 +4,7 @@ use std::rc::Rc;
 
 use flux::semantic::nodes::{self, Expression};
 use flux::semantic::walk::{Node, Visitor};
-
-use lsp_types as lsp;
+use lspower::lsp;
 
 fn parse_variable_assignment(
     uri: lsp::Url,

@@ -2,7 +2,7 @@ mod callbacks;
 mod signatures;
 
 use combinations::Combinations;
-use lsp_types as lsp;
+use lspower::lsp;
 
 pub use callbacks::Callbacks;
 pub use signatures::{

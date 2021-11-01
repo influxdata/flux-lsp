@@ -1,31 +1,27 @@
 use flux::ast;
 use flux::semantic::walk::Node;
+use lspower::lsp;
 
-/// Convert a flux::ast::Position to a lsp_types::Position
+/// Convert a flux::ast::Position to a lsp::Position
 /// https://microsoft.github.io/language-server-protocol/specification#position
 // XXX: rockstar (28 Jul 2021) - This can't be implemented in a From trait
 // without some clownshoes type aliasing, so this conversion function will work.
-fn ast_to_lsp_position(
-    position: &ast::Position,
-) -> lsp_types::Position {
-    lsp_types::Position {
+fn ast_to_lsp_position(position: &ast::Position) -> lsp::Position {
+    lsp::Position {
         line: position.line - 1,
         character: position.column - 1,
     }
 }
 
-/// Convert a flux::semantic::walk::Node to a lsp_types::Location
+/// Convert a flux::semantic::walk::Node to a lsp::Location
 /// https://microsoft.github.io/language-server-protocol/specification#location
 // XXX: rockstar (28 Jul 2021) - This can't be implemented in a From trait
 // without some clownshoes type aliasing, so this conversion function will work.
-pub fn node_to_location(
-    node: &Node,
-    uri: lsp_types::Url,
-) -> lsp_types::Location {
+pub fn node_to_location(node: &Node, uri: lsp::Url) -> lsp::Location {
     let node_location = node.loc();
-    lsp_types::Location {
+    lsp::Location {
         uri,
-        range: lsp_types::Range {
+        range: lsp::Range {
             start: ast_to_lsp_position(&node_location.start),
             end: ast_to_lsp_position(&node_location.end),
         },
@@ -43,7 +39,7 @@ mod tests {
 
     #[test]
     fn test_ast_to_lsp_position() {
-        let expected = lsp_types::Position {
+        let expected = lsp::Position {
             line: 22,
             character: 7,
         };
@@ -59,15 +55,15 @@ mod tests {
 
     #[test]
     fn test_node_to_location() {
-        let expected = lsp_types::Location {
-            uri: lsp_types::Url::parse("file:///path/to/file.flux")
+        let expected = lsp::Location {
+            uri: lsp::Url::parse("file:///path/to/file.flux")
                 .unwrap(),
-            range: lsp_types::Range {
-                start: lsp_types::Position {
+            range: lsp::Range {
+                start: lsp::Position {
                     line: 22,
                     character: 7,
                 },
-                end: lsp_types::Position {
+                end: lsp::Position {
                     line: 22,
                     character: 8,
                 },
@@ -94,8 +90,7 @@ mod tests {
 
         let result = node_to_location(
             &node,
-            lsp_types::Url::parse("file:///path/to/file.flux")
-                .unwrap(),
+            lsp::Url::parse("file:///path/to/file.flux").unwrap(),
         );
 
         assert_eq!(expected, result);
