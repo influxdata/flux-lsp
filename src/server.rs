@@ -930,7 +930,7 @@ impl LanguageServer for LspServer {
 mod tests {
     use std::collections::{HashMap, HashSet};
 
-    use async_std::task::block_on;
+    use async_std::test;
     use lspower::lsp;
     use lspower::LanguageServer;
 
@@ -940,7 +940,7 @@ mod tests {
         LspServer::default()
     }
 
-    fn open_file(server: &LspServer, text: String) {
+    async fn open_file(server: &LspServer, text: String) {
         let params = lsp::DidOpenTextDocumentParams {
             text_document: lsp::TextDocumentItem::new(
                 lsp::Url::parse("file:///home/user/file.flux")
@@ -950,11 +950,11 @@ mod tests {
                 text,
             ),
         };
-        block_on(server.did_open(params));
+        server.did_open(params).await;
     }
 
     #[test]
-    fn test_initialized() {
+    async fn test_initialized() {
         let server = create_server();
 
         let params = lsp::InitializeParams {
@@ -975,7 +975,7 @@ mod tests {
             workspace_folders: None,
         };
 
-        let result = block_on(server.initialize(params)).unwrap();
+        let result = server.initialize(params).await.unwrap();
         let server_info = result.server_info.unwrap();
 
         assert_eq!(server_info.name, "flux-lsp".to_string());
@@ -983,16 +983,16 @@ mod tests {
     }
 
     #[test]
-    fn test_shutdown() {
+    async fn test_shutdown() {
         let server = create_server();
 
-        let result = block_on(server.shutdown()).unwrap();
+        let result = server.shutdown().await.unwrap();
 
         assert_eq!((), result)
     }
 
     #[test]
-    fn test_did_open() {
+    async fn test_did_open() {
         let server = create_server();
         let params = lsp::DidOpenTextDocumentParams {
             text_document: lsp::TextDocumentItem::new(
@@ -1004,7 +1004,7 @@ mod tests {
             ),
         };
 
-        block_on(server.did_open(params));
+        server.did_open(params).await;
 
         assert_eq!(
             vec![&lsp::Url::parse("file:///home/user/file.flux")
@@ -1024,12 +1024,13 @@ mod tests {
     }
 
     #[test]
-    fn test_did_change() {
+    async fn test_did_change() {
         let server = create_server();
         open_file(
             &server,
             r#"from(bucket: "bucket") |> first()"#.to_string(),
-        );
+        )
+        .await;
 
         let params = lsp::DidChangeTextDocumentParams {
             text_document: lsp::VersionedTextDocumentIdentifier {
@@ -1046,7 +1047,7 @@ mod tests {
             ],
         };
 
-        block_on(server.did_change(params));
+        server.did_change(params).await;
 
         let uri =
             lsp::Url::parse("file:///home/user/file.flux").unwrap();
@@ -1056,14 +1057,15 @@ mod tests {
     }
 
     #[test]
-    fn test_did_change_with_range() {
+    async fn test_did_change_with_range() {
         let server = create_server();
         open_file(
             &server,
             r#"from(bucket: "bucket")
 |> last()"#
                 .to_string(),
-        );
+        )
+        .await;
 
         let params = lsp::DidChangeTextDocumentParams {
             text_document: lsp::VersionedTextDocumentIdentifier {
@@ -1089,7 +1091,7 @@ mod tests {
             ],
         };
 
-        block_on(server.did_change(params));
+        server.did_change(params).await;
 
         let uri =
             lsp::Url::parse("file:///home/user/file.flux").unwrap();
@@ -1103,7 +1105,7 @@ mod tests {
     }
 
     #[test]
-    fn test_did_change_with_multiline_range() {
+    async fn test_did_change_with_multiline_range() {
         let server = create_server();
         open_file(
             &server,
@@ -1111,7 +1113,8 @@ mod tests {
 |> group()
 |> last()"#
                 .to_string(),
-        );
+        )
+        .await;
 
         let params = lsp::DidChangeTextDocumentParams {
             text_document: lsp::VersionedTextDocumentIdentifier {
@@ -1139,7 +1142,7 @@ mod tests {
             ],
         };
 
-        block_on(server.did_change(params));
+        server.did_change(params).await;
 
         let uri =
             lsp::Url::parse("file:///home/user/file.flux").unwrap();
@@ -1154,12 +1157,13 @@ mod tests {
     }
 
     #[test]
-    fn test_did_save() {
+    async fn test_did_save() {
         let server = create_server();
         open_file(
             &server,
             r#"from(bucket: "test") |> count()"#.to_string(),
-        );
+        )
+        .await;
 
         let uri =
             lsp::Url::parse("file:///home/user/file.flux").unwrap();
@@ -1170,7 +1174,7 @@ mod tests {
             ),
             text: Some(r#"from(bucket: "test2")"#.to_string()),
         };
-        block_on(server.did_save(params));
+        server.did_save(params).await;
 
         let contents =
             server.store.lock().unwrap().get(&uri).unwrap().clone();
@@ -1178,9 +1182,9 @@ mod tests {
     }
 
     #[test]
-    fn test_did_close() {
+    async fn test_did_close() {
         let server = create_server();
-        open_file(&server, "from(".to_string());
+        open_file(&server, "from(".to_string()).await;
 
         assert!(server.store.lock().unwrap().keys().next().is_some());
 
@@ -1191,14 +1195,14 @@ mod tests {
             ),
         };
 
-        block_on(server.did_close(params));
+        server.did_close(params).await;
 
         assert!(server.store.lock().unwrap().keys().next().is_none());
     }
 
     // If the file hasn't been opened on the server get, return an error.
     #[test]
-    fn test_signature_help_not_opened() {
+    async fn test_signature_help_not_opened() {
         let server = create_server();
 
         let params = lsp::SignatureHelpParams {
@@ -1218,15 +1222,15 @@ mod tests {
             },
         };
 
-        let result = block_on(server.signature_help(params));
+        let result = server.signature_help(params).await;
 
         assert!(result.is_err());
     }
 
     #[test]
-    fn test_signature_help() {
+    async fn test_signature_help() {
         let server = create_server();
-        open_file(&server, "from(".to_string());
+        open_file(&server, "from(".to_string()).await;
 
         // XXX: rockstar (13 Jul 2021) - In the lsp protocol, Position arguments
         // are indexed from 1, e.g. there is no line number 0. This references
@@ -1250,7 +1254,7 @@ mod tests {
         };
 
         let result =
-            block_on(server.signature_help(params)).unwrap().unwrap();
+            server.signature_help(params).await.unwrap().unwrap();
 
         // The signatures returned from this test are...many. This test checks
         // the length of the signatures, and that a specific
@@ -1284,7 +1288,7 @@ mod tests {
 
     // If the file hasn't been opened on the server, return an error.
     #[test]
-    fn test_formatting_not_opened() {
+    async fn test_formatting_not_opened() {
         let server = create_server();
 
         let params = lsp::DocumentFormattingParams {
@@ -1305,13 +1309,13 @@ mod tests {
                 work_done_token: None,
             },
         };
-        let result = block_on(server.formatting(params));
+        let result = server.formatting(params).await;
 
         assert!(result.is_err());
     }
 
     #[test]
-    fn test_formatting() {
+    async fn test_formatting() {
         let fluxscript = r#"
 import "strings"
 env = "prod01-us-west-2"
@@ -1329,7 +1333,7 @@ errorCounts = from(bucket:"kube-infra/monthly")
 errorCounts
     |> filter(fn: (r) => strings.containsStr(v: r.error, substr: "AppendMappedRecordWithNulls"))"#;
         let server = create_server();
-        open_file(&server, fluxscript.to_string());
+        open_file(&server, fluxscript.to_string()).await;
 
         let params = lsp::DocumentFormattingParams {
             text_document: lsp::TextDocumentIdentifier {
@@ -1350,7 +1354,7 @@ errorCounts
             },
         };
         let result =
-            block_on(server.formatting(params)).unwrap().unwrap();
+            server.formatting(params).await.unwrap().unwrap();
 
         let expected = lsp::TextEdit::new(
             lsp::Range {
@@ -1369,7 +1373,7 @@ errorCounts
     }
 
     #[test]
-    fn test_formatting_insert_final_newline() {
+    async fn test_formatting_insert_final_newline() {
         let fluxscript = r#"
 import "strings"
 env = "prod01-us-west-2"
@@ -1389,7 +1393,7 @@ errorCounts
 
 "#;
         let server = create_server();
-        open_file(&server, fluxscript.to_string());
+        open_file(&server, fluxscript.to_string()).await;
 
         let params = lsp::DocumentFormattingParams {
             text_document: lsp::TextDocumentIdentifier {
@@ -1410,7 +1414,7 @@ errorCounts
             },
         };
         let result =
-            block_on(server.formatting(params)).unwrap().unwrap();
+            server.formatting(params).await.unwrap().unwrap();
 
         let mut formatted_text =
             flux::formatter::format(&fluxscript).unwrap();
@@ -1432,7 +1436,7 @@ errorCounts
     }
 
     #[test]
-    fn test_folding_not_opened() {
+    async fn test_folding_not_opened() {
         let server = create_server();
 
         let params = lsp::FoldingRangeParams {
@@ -1448,13 +1452,13 @@ errorCounts
             },
         };
 
-        let result = block_on(server.folding_range(params));
+        let result = server.folding_range(params).await;
 
         assert!(result.is_err());
     }
 
     #[test]
-    fn test_folding() {
+    async fn test_folding() {
         let fluxscript = r#"import "strings"
 env = "prod01-us-west-2"
 
@@ -1471,7 +1475,7 @@ errorCounts = from(bucket:"kube-infra/monthly")
 errorCounts
     |> filter(fn: (r) => strings.containsStr(v: r.error, substr: "AppendMappedRecordWithNulls"))"#;
         let server = create_server();
-        open_file(&server, fluxscript.to_string());
+        open_file(&server, fluxscript.to_string()).await;
 
         let params = lsp::FoldingRangeParams {
             text_document: lsp::TextDocumentIdentifier {
@@ -1487,7 +1491,7 @@ errorCounts
         };
 
         let result =
-            block_on(server.folding_range(params)).unwrap().unwrap();
+            server.folding_range(params).await.unwrap().unwrap();
 
         let expected = vec![
             lsp::FoldingRange {
@@ -1510,7 +1514,7 @@ errorCounts
     }
 
     #[test]
-    fn test_document_symbol_not_opened() {
+    async fn test_document_symbol_not_opened() {
         let server = create_server();
 
         let params = lsp::DocumentSymbolParams {
@@ -1526,13 +1530,13 @@ errorCounts
             },
         };
 
-        let result = block_on(server.document_symbol(params));
+        let result = server.document_symbol(params).await;
 
         assert!(result.is_err());
     }
 
     #[test]
-    fn test_document_symbol() {
+    async fn test_document_symbol() {
         let fluxscript = r#"import "strings"
 env = "prod01-us-west-2"
 
@@ -1549,7 +1553,7 @@ errorCounts = from(bucket:"kube-infra/monthly")
 errorCounts
     |> filter(fn: (r) => strings.containsStr(v: r.error, substr: "AppendMappedRecordWithNulls"))"#;
         let server = create_server();
-        open_file(&server, fluxscript.to_string());
+        open_file(&server, fluxscript.to_string()).await;
 
         let params = lsp::DocumentSymbolParams {
             text_document: lsp::TextDocumentIdentifier {
@@ -1564,9 +1568,7 @@ errorCounts
             },
         };
         let symbol_response =
-            block_on(server.document_symbol(params))
-                .unwrap()
-                .unwrap();
+            server.document_symbol(params).await.unwrap().unwrap();
 
         match symbol_response {
             lsp::DocumentSymbolResponse::Flat(symbols) => {
@@ -1577,7 +1579,7 @@ errorCounts
     }
 
     #[test]
-    fn test_goto_definition_not_opened() {
+    async fn test_goto_definition_not_opened() {
         let server = create_server();
 
         let params = lsp::GotoDefinitionParams {
@@ -1599,13 +1601,13 @@ errorCounts
             },
         };
 
-        let result = block_on(server.goto_definition(params));
+        let result = server.goto_definition(params).await;
 
         assert!(result.is_err());
     }
 
     #[test]
-    fn test_goto_definition() {
+    async fn test_goto_definition() {
         let fluxscript = r#"import "strings"
 env = "prod01-us-west-2"
 
@@ -1622,7 +1624,7 @@ errorCounts = from(bucket:"kube-infra/monthly")
 errorCounts
     |> filter(fn: (r) => strings.containsStr(v: r.error, substr: "AppendMappedRecordWithNulls"))"#;
         let server = create_server();
-        open_file(&server, fluxscript.to_string());
+        open_file(&server, fluxscript.to_string()).await;
 
         let params = lsp::GotoDefinitionParams {
             text_document_position_params:
@@ -1643,7 +1645,8 @@ errorCounts
             },
         };
 
-        let result = block_on(server.goto_definition(params))
+        let result = server.goto_definition(params)
+            .await
             .unwrap()
             .unwrap();
 
@@ -1666,7 +1669,7 @@ errorCounts
         assert_eq!(expected, result);
     }
     #[test]
-    fn test_references() {
+    async fn test_references() {
         let fluxscript = r#"import "strings"
 env = "prod01-us-west-2"
 
@@ -1683,7 +1686,7 @@ errorCounts = from(bucket:"kube-infra/monthly")
 errorCounts
     |> filter(fn: (r) => strings.containsStr(v: r.error, substr: "AppendMappedRecordWithNulls"))"#;
         let server = create_server();
-        open_file(&server, fluxscript.to_string());
+        open_file(&server, fluxscript.to_string()).await;
 
         let params = lsp::RenameParams {
             text_document_position: lsp::TextDocumentPositionParams {
@@ -1704,8 +1707,7 @@ errorCounts
             },
         };
 
-        let result =
-            block_on(server.rename(params)).unwrap().unwrap();
+        let result = server.rename(params).await.unwrap().unwrap();
 
         let edits = vec![
             lsp::TextEdit {
@@ -1751,7 +1753,7 @@ errorCounts
         assert_eq!(expected, result);
     }
     #[test]
-    fn test_rename() {
+    async fn test_rename() {
         let fluxscript = r#"import "strings"
 env = "prod01-us-west-2"
 
@@ -1768,7 +1770,7 @@ errorCounts = from(bucket:"kube-infra/monthly")
 errorCounts
     |> filter(fn: (r) => strings.containsStr(v: r.error, substr: "AppendMappedRecordWithNulls"))"#;
         let server = create_server();
-        open_file(&server, fluxscript.to_string());
+        open_file(&server, fluxscript.to_string()).await;
 
         let params = lsp::ReferenceParams {
             text_document_position: lsp::TextDocumentPositionParams {
@@ -1795,9 +1797,8 @@ errorCounts
             },
         };
 
-        let result = block_on(server.references(params.clone()))
-            .unwrap()
-            .unwrap();
+        let result =
+            server.references(params.clone()).await.unwrap().unwrap();
 
         let expected = vec![
             lsp::Location {
@@ -1840,10 +1841,10 @@ errorCounts
     }
 
     #[test]
-    fn test_hover() {
+    async fn test_hover() {
         let fluxscript = r#"import "strings"#;
         let server = create_server();
-        open_file(&server, fluxscript.to_string());
+        open_file(&server, fluxscript.to_string()).await;
 
         let params = lsp::HoverParams {
             text_document_position_params:
@@ -1861,16 +1862,16 @@ errorCounts
             },
         };
 
-        let result = block_on(server.hover(params)).unwrap();
+        let result = server.hover(params).await.unwrap();
 
         assert!(result.is_none());
     }
 
     #[test]
-    fn test_completion_resolve() {
+    async fn test_completion_resolve() {
         let fluxscript = r#"import "strings"#;
         let server = create_server();
-        open_file(&server, fluxscript.to_string());
+        open_file(&server, fluxscript.to_string()).await;
 
         let params = lsp::CompletionItem::new_simple(
             "label".to_string(),
@@ -1878,18 +1879,17 @@ errorCounts
         );
 
         let result =
-            block_on(server.completion_resolve(params.clone()))
-                .unwrap();
+            server.completion_resolve(params.clone()).await.unwrap();
 
         assert_eq!(params, result);
     }
     #[test]
-    fn test_package_completion() {
+    async fn test_package_completion() {
         let fluxscript = r#"import "sql"
 
 sql."#;
         let server = create_server();
-        open_file(&server, fluxscript.to_string());
+        open_file(&server, fluxscript.to_string()).await;
 
         let params = lsp::CompletionParams {
             text_document_position: lsp::TextDocumentPositionParams {
@@ -1917,9 +1917,8 @@ sql."#;
             }),
         };
 
-        let result = block_on(server.completion(params.clone()))
-            .unwrap()
-            .unwrap();
+        let result =
+            server.completion(params.clone()).await.unwrap().unwrap();
 
         let len = match result.clone() {
             lsp::CompletionResponse::List(l) => l.items.len(),
@@ -1930,7 +1929,7 @@ sql."#;
     }
 
     #[test]
-    fn test_variable_completion() {
+    async fn test_variable_completion() {
         let fluxscript = r#"import "strings"
 import "csv"
 
@@ -1955,7 +1954,7 @@ errorCounts
     |> filter(fn: (r) => strings.containsStr(v: r.error, substr: "AppendMappedRecordWithNulls"))
 "#;
         let server = create_server();
-        open_file(&server, fluxscript.to_string());
+        open_file(&server, fluxscript.to_string()).await;
 
         let params = lsp::CompletionParams {
             text_document_position: lsp::TextDocumentPositionParams {
@@ -1982,9 +1981,8 @@ errorCounts
             }),
         };
 
-        let result = block_on(server.completion(params.clone()))
-            .unwrap()
-            .unwrap();
+        let result =
+            server.completion(params.clone()).await.unwrap().unwrap();
 
         let items = match result.clone() {
             lsp::CompletionResponse::List(l) => l.items,
@@ -2056,7 +2054,7 @@ errorCounts
     // An issue has been created for this:
     // https://github.com/influxdata/flux-lsp/issues/290
     #[test]
-    fn test_option_object_members_completion() {
+    async fn test_option_object_members_completion() {
         let fluxscript = r#"import "strings"
 import "csv"
 
@@ -2078,7 +2076,7 @@ task.
 // ab = 10
 "#;
         let server = create_server();
-        open_file(&server, fluxscript.to_string());
+        open_file(&server, fluxscript.to_string()).await;
 
         let params = lsp::CompletionParams {
             text_document_position: lsp::TextDocumentPositionParams {
@@ -2106,9 +2104,8 @@ task.
             }),
         };
 
-        let result = block_on(server.completion(params.clone()))
-            .unwrap()
-            .unwrap();
+        let result =
+            server.completion(params.clone()).await.unwrap().unwrap();
 
         let items = match result.clone() {
             lsp::CompletionResponse::List(l) => l.items,
@@ -2130,7 +2127,7 @@ task.
     }
 
     #[test]
-    fn test_option_function_completion() {
+    async fn test_option_function_completion() {
         let fluxscript = r#"import "strings"
 import "csv"
 
@@ -2146,7 +2143,7 @@ n
 ab = 10
 "#;
         let server = create_server();
-        open_file(&server, fluxscript.to_string());
+        open_file(&server, fluxscript.to_string()).await;
 
         let params = lsp::CompletionParams {
             text_document_position: lsp::TextDocumentPositionParams {
@@ -2173,9 +2170,8 @@ ab = 10
             }),
         };
 
-        let result = block_on(server.completion(params.clone()))
-            .unwrap()
-            .unwrap();
+        let result =
+            server.completion(params.clone()).await.unwrap().unwrap();
 
         let items = match result.clone() {
             lsp::CompletionResponse::List(l) => l.items,
@@ -2282,7 +2278,7 @@ ab = 10
     }
 
     #[test]
-    fn test_object_param_completion() {
+    async fn test_object_param_completion() {
         let fluxscript = r#"obj = {
     func: (name, age) => name + age
 }
@@ -2290,7 +2286,7 @@ ab = 10
 obj.func(
         "#;
         let server = create_server();
-        open_file(&server, fluxscript.to_string());
+        open_file(&server, fluxscript.to_string()).await;
 
         let params = lsp::CompletionParams {
             text_document_position: lsp::TextDocumentPositionParams {
@@ -2318,9 +2314,8 @@ obj.func(
             }),
         };
 
-        let result = block_on(server.completion(params.clone()))
-            .unwrap()
-            .unwrap();
+        let result =
+            server.completion(params.clone()).await.unwrap().unwrap();
 
         let items = match result.clone() {
             lsp::CompletionResponse::List(l) => l.items,
@@ -2336,13 +2331,13 @@ obj.func(
     }
 
     #[test]
-    fn test_param_completion() {
+    async fn test_param_completion() {
         let fluxscript = r#"import "csv"
 
 csv.from(
         "#;
         let server = create_server();
-        open_file(&server, fluxscript.to_string());
+        open_file(&server, fluxscript.to_string()).await;
 
         let params = lsp::CompletionParams {
             text_document_position: lsp::TextDocumentPositionParams {
@@ -2370,9 +2365,8 @@ csv.from(
             }),
         };
 
-        let result = block_on(server.completion(params.clone()))
-            .unwrap()
-            .unwrap();
+        let result =
+            server.completion(params.clone()).await.unwrap().unwrap();
 
         let items = match result.clone() {
             lsp::CompletionResponse::List(l) => l.items,
@@ -2388,7 +2382,7 @@ csv.from(
     }
 
     #[test]
-    fn test_options_completion() {
+    async fn test_options_completion() {
         let fluxscript = r#"import "strings"
 import "csv"
 
@@ -2422,7 +2416,7 @@ errorCounts
 
 "#;
         let server = create_server();
-        open_file(&server, fluxscript.to_string());
+        open_file(&server, fluxscript.to_string()).await;
 
         let params = lsp::CompletionParams {
             text_document_position: lsp::TextDocumentPositionParams {
@@ -2449,9 +2443,8 @@ errorCounts
             }),
         };
 
-        let result = block_on(server.completion(params.clone()))
-            .unwrap()
-            .unwrap();
+        let result =
+            server.completion(params.clone()).await.unwrap().unwrap();
 
         let items = match result.clone() {
             lsp::CompletionResponse::List(l) => l.items,
@@ -2583,10 +2576,10 @@ errorCounts
     }
 
     #[test]
-    fn test_signature_help_invalid() {
+    async fn test_signature_help_invalid() {
         let fluxscript = r#"bork |>"#;
         let server = create_server();
-        open_file(&server, fluxscript.to_string());
+        open_file(&server, fluxscript.to_string()).await;
 
         let params = lsp::SignatureHelpParams {
             context: None,
@@ -2605,16 +2598,16 @@ errorCounts
             },
         };
 
-        let result = block_on(server.signature_help(params)).unwrap();
+        let result = server.signature_help(params).await.unwrap();
 
         assert!(result.is_none())
     }
 
     #[test]
-    fn test_folding_range_invalid() {
+    async fn test_folding_range_invalid() {
         let fluxscript = r#"bork |>"#;
         let server = create_server();
-        open_file(&server, fluxscript.to_string());
+        open_file(&server, fluxscript.to_string()).await;
 
         let params = lsp::FoldingRangeParams {
             text_document: lsp::TextDocumentIdentifier {
@@ -2629,16 +2622,16 @@ errorCounts
             },
         };
 
-        let result = block_on(server.folding_range(params)).unwrap();
+        let result = server.folding_range(params).await.unwrap();
 
         assert!(result.is_none());
     }
 
     #[test]
-    fn test_document_symbol_invalid() {
+    async fn test_document_symbol_invalid() {
         let fluxscript = r#"bork |>"#;
         let server = create_server();
-        open_file(&server, fluxscript.to_string());
+        open_file(&server, fluxscript.to_string()).await;
 
         let params = lsp::DocumentSymbolParams {
             text_document: lsp::TextDocumentIdentifier {
@@ -2652,17 +2645,16 @@ errorCounts
                 partial_result_token: None,
             },
         };
-        let result =
-            block_on(server.document_symbol(params)).unwrap();
+        let result = server.document_symbol(params).await.unwrap();
 
         assert!(result.is_none());
     }
 
     #[test]
-    fn test_goto_definition_invalid() {
+    async fn test_goto_definition_invalid() {
         let fluxscript = r#"bork |>"#;
         let server = create_server();
-        open_file(&server, fluxscript.to_string());
+        open_file(&server, fluxscript.to_string()).await;
 
         let params = lsp::GotoDefinitionParams {
             text_document_position_params:
@@ -2683,17 +2675,16 @@ errorCounts
             },
         };
 
-        let result =
-            block_on(server.goto_definition(params)).unwrap();
+        let result = server.goto_definition(params).await.unwrap();
 
         assert!(result.is_none());
     }
 
     #[test]
-    fn test_rename_invalid() {
+    async fn test_rename_invalid() {
         let fluxscript = r#"bork |>"#;
         let server = create_server();
-        open_file(&server, fluxscript.to_string());
+        open_file(&server, fluxscript.to_string()).await;
 
         let params = lsp::ReferenceParams {
             text_document_position: lsp::TextDocumentPositionParams {
@@ -2720,8 +2711,7 @@ errorCounts
             },
         };
 
-        let result =
-            block_on(server.references(params.clone())).unwrap();
+        let result = server.references(params.clone()).await.unwrap();
 
         assert!(result.is_none());
     }
