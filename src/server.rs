@@ -4564,8 +4564,11 @@ fn find_node(
 struct FunctionResult {
     name: String,
     package: String,
+    #[allow(dead_code)]
     package_name: Option<String>,
+    #[allow(dead_code)]
     required_args: Vec<String>,
+    #[allow(dead_code)]
     optional_args: Vec<String>,
     signature: String,
 }
