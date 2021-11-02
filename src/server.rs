@@ -362,14 +362,22 @@ impl LanguageServer for LspServer {
         let key = params.text_document.uri;
         let value = params.text_document.text;
         let mut store = self.store.lock().unwrap();
-        if store.contains_key(&key) {
-            // The protocol spec is unclear on whether trying to open a file
-            // that is already opened is allowed, and research would indicate that
-            // there are badly behaved clients that do this. Rather than making this
-            // error, log the issue and move on.
-            warn!("textDocument/didOpen called on open file {}", key);
+        use std::collections::hash_map::Entry;
+        match store.entry(key) {
+            Entry::Vacant(entry) => {
+                entry.insert(value);
+            }
+            Entry::Occupied(entry) => {
+                // The protocol spec is unclear on whether trying to open a file
+                // that is already opened is allowed, and research would indicate that
+                // there are badly behaved clients that do this. Rather than making this
+                // error, log the issue and move on.
+                warn!(
+                    "textDocument/didOpen called on open file {}",
+                    entry.key(),
+                );
+            }
         }
-        store.insert(key, value);
     }
     async fn did_change(
         &self,
