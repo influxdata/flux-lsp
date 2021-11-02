@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::collections::HashMap;
 use std::fmt;
 use std::rc::Rc;
@@ -376,26 +377,29 @@ impl LanguageServer for LspServer {
     ) -> () {
         let key = params.text_document.uri;
         let mut store = self.store.lock().unwrap();
-        if !store.contains_key(&key) {
+        let mut contents = if let Some(contents) = store.get(&key) {
+            Cow::Borrowed(contents)
+        } else {
             error!(
                 "textDocument/didChange called on unknown file {}",
                 key
             );
             return;
-        }
+        };
         for change in params.content_changes {
-            let new_contents = if let Some(range) = change.range {
-                let contents = store.get(&key).unwrap();
-                replace_string_in_range(
-                    contents.clone(),
-                    range,
-                    change.text,
-                )
-            } else {
-                change.text
-            };
-            store.insert(key.clone(), new_contents);
+            contents =
+                Cow::Owned(if let Some(range) = change.range {
+                    replace_string_in_range(
+                        contents.into_owned(),
+                        range,
+                        change.text,
+                    )
+                } else {
+                    change.text
+                });
         }
+        let new_contents = contents.into_owned();
+        store.insert(key.clone(), new_contents);
     }
     async fn did_save(
         &self,
