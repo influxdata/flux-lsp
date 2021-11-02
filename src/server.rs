@@ -794,7 +794,7 @@ impl LanguageServer for LspServer {
             .collect::<Vec<lsp::TextEdit>>();
 
         let mut changes = HashMap::new();
-        changes.insert(key.clone(), edits);
+        changes.insert(key, edits);
 
         let response = lsp::WorkspaceEdit {
             changes: Some(changes),
