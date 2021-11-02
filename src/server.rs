@@ -384,17 +384,17 @@ impl LanguageServer for LspServer {
             return;
         }
         for change in params.content_changes {
-            if let Some(range) = change.range {
+            let new_contents = if let Some(range) = change.range {
                 let contents = store.get(&key).unwrap();
-                let new_contents = replace_string_in_range(
+                replace_string_in_range(
                     contents.clone(),
                     range,
                     change.text,
-                );
-                store.insert(key.clone(), new_contents);
+                )
             } else {
-                store.insert(key.clone(), change.text);
-            }
+                change.text
+            };
+            store.insert(key.clone(), new_contents);
         }
     }
     async fn did_save(
@@ -421,7 +421,7 @@ impl LanguageServer for LspServer {
         let key = params.text_document.uri;
 
         let mut store = self.store.lock().unwrap();
-        if !store.contains_key(&key) {
+        if store.remove(&key).is_none() {
             // The protocol spec is unclear on whether trying to close a file
             // that isn't open is allowed. To stop consistent with the
             // implementation of textDocument/didOpen, this error is logged and
@@ -431,7 +431,6 @@ impl LanguageServer for LspServer {
                 key
             );
         }
-        store.remove(&key);
     }
     async fn signature_help(
         &self,
@@ -439,28 +438,27 @@ impl LanguageServer for LspServer {
     ) -> RpcResult<Option<lsp::SignatureHelp>> {
         let key =
             params.text_document_position_params.text_document.uri;
-        let store = self.store.lock().unwrap();
-        if !store.contains_key(&key) {
-            // File isn't loaded into memory
-            error!(
-                "signature help failed: file {} not open on server",
-                key
-            );
-            return Err(lspower::jsonrpc::Error::invalid_params(
-                format!("file not opened: {}", key),
-            ));
-        }
+        let pkg = {
+            let store = self.store.lock().unwrap();
+            let data = store.get(&key).ok_or_else(|| {
+                // File isn't loaded into memory
+                error!(
+                    "signature help failed: file {} not open on server",
+                    key
+                );
+                file_not_opened(&key)
+            })?;
 
-        let mut signatures = vec![];
-        let data = store.get(&key).unwrap();
-
-        let pkg = match parse_and_analyze(data) {
-            Ok(pkg) => pkg,
-            Err(err) => {
-                debug!("{}", err);
-                return Ok(None);
+            match parse_and_analyze(data) {
+                Ok(pkg) => pkg,
+                Err(err) => {
+                    debug!("{}", err);
+                    return Ok(None);
+                }
             }
         };
+
+        let mut signatures = vec![];
         let node_finder_result = find_node(
             SemanticNode::Package(&pkg),
             params.text_document_position_params.position,
@@ -505,17 +503,15 @@ impl LanguageServer for LspServer {
         params: lsp::DocumentFormattingParams,
     ) -> RpcResult<Option<Vec<lsp::TextEdit>>> {
         let key = params.text_document.uri;
+
         let store = self.store.lock().unwrap();
-        if !store.contains_key(&key) {
+        let contents = store.get(&key).ok_or_else(|| {
             error!(
                 "formatting failed: file {} not open on server",
                 key
             );
-            return Err(lspower::jsonrpc::Error::invalid_params(
-                format!("file not opened: {}", key),
-            ));
-        }
-        let contents = store.get(&key).unwrap();
+            file_not_opened(&key)
+        })?;
         let mut formatted =
             flux::formatter::format(contents).unwrap();
         if let Some(trim_trailing_whitespace) =
@@ -572,22 +568,21 @@ impl LanguageServer for LspServer {
         params: lsp::FoldingRangeParams,
     ) -> RpcResult<Option<Vec<lsp::FoldingRange>>> {
         let key = params.text_document.uri;
-        let store = self.store.lock().unwrap();
-        if !store.contains_key(&key) {
-            error!(
-                "formatting failed: file {} not open on server",
-                key
-            );
-            return Err(lspower::jsonrpc::Error::invalid_params(
-                format!("file not opened: {}", key),
-            ));
-        }
-        let contents = store.get(&key).unwrap();
-        let pkg = match parse_and_analyze(contents.as_str()) {
-            Ok(pkg) => pkg,
-            Err(err) => {
-                debug!("{}", err);
-                return Ok(None);
+        let pkg = {
+            let store = self.store.lock().unwrap();
+            let contents = store.get(&key).ok_or_else(|| {
+                error!(
+                    "formatting failed: file {} not open on server",
+                    key
+                );
+                file_not_opened(&key)
+            })?;
+            match parse_and_analyze(contents.as_str()) {
+                Ok(pkg) => pkg,
+                Err(err) => {
+                    debug!("{}", err);
+                    return Ok(None);
+                }
             }
         };
         let mut visitor = FoldFinderVisitor::default();
@@ -616,23 +611,22 @@ impl LanguageServer for LspServer {
         params: lsp::DocumentSymbolParams,
     ) -> RpcResult<Option<lsp::DocumentSymbolResponse>> {
         let key = params.text_document.uri;
-        let store = self.store.lock().unwrap();
-        if !store.contains_key(&key) {
-            error!(
-                "documentSymbol request failed: file {} not open on server",
-                key,
-            );
-            return Err(lspower::jsonrpc::Error::invalid_params(
-                format!("file not opened: {}", key),
-            ));
-        }
+        let pkg = {
+            let store = self.store.lock().unwrap();
+            let contents = store.get(&key).ok_or_else(|| {
+                error!(
+                    "documentSymbol request failed: file {} not open on server",
+                    key,
+                );
+                file_not_opened(&key)
+            })?;
 
-        let contents = store.get(&key).unwrap();
-        let pkg = match parse_and_analyze(contents) {
-            Ok(pkg) => pkg,
-            Err(err) => {
-                debug!("{}", err);
-                return Ok(None);
+            match parse_and_analyze(contents) {
+                Ok(pkg) => pkg,
+                Err(err) => {
+                    debug!("{}", err);
+                    return Ok(None);
+                }
             }
         };
         let pkg_node = SemanticNode::Package(&pkg);
@@ -664,16 +658,13 @@ impl LanguageServer for LspServer {
         let key =
             params.text_document_position_params.text_document.uri;
         let store = self.store.lock().unwrap();
-        if !store.contains_key(&key) {
+        let contents = store.get(&key).ok_or_else(|| {
             error!(
                 "formatting failed: file {} not open on server",
                 key
             );
-            return Err(lspower::jsonrpc::Error::invalid_params(
-                format!("file not opened: {}", key),
-            ));
-        }
-        let contents = store.get(&key).unwrap();
+            file_not_opened(&key)
+        })?;
         let pkg = match parse_and_analyze(contents) {
             Ok(pkg) => pkg,
             Err(err) => {
@@ -759,24 +750,21 @@ impl LanguageServer for LspServer {
     ) -> RpcResult<Option<lsp::WorkspaceEdit>> {
         let key =
             params.text_document_position.text_document.uri.clone();
-        let store = self.store.lock().unwrap();
-        let contents = match store.get(&key) {
-            Some(v) => v,
-            None => {
+        let pkg = {
+            let store = self.store.lock().unwrap();
+            let contents = store.get(&key).ok_or_else(|| {
                 error!(
                     "textDocument/rename called on unknown file {}",
                     key
                 );
-                return Err(lspower::jsonrpc::Error::invalid_params(
-                    format!("file not opened: {}", key),
-                ));
-            }
-        };
-        let pkg = match parse_and_analyze(contents) {
-            Ok(pkg) => pkg,
-            Err(err) => {
-                debug!("{}", err);
-                return Ok(None);
+                file_not_opened(&key)
+            })?;
+            match parse_and_analyze(contents) {
+                Ok(pkg) => pkg,
+                Err(err) => {
+                    debug!("{}", err);
+                    return Ok(None);
+                }
             }
         };
         let node = find_node(
@@ -810,18 +798,13 @@ impl LanguageServer for LspServer {
         let key =
             params.text_document_position.text_document.uri.clone();
         let store = self.store.lock().unwrap();
-        let contents = match store.get(&key) {
-            Some(v) => v,
-            None => {
-                error!(
-                    "textDocument/references called on unknown file {}",
-                    key
-                );
-                return Err(lspower::jsonrpc::Error::invalid_params(
-                    format!("file not opened: {}", key),
-                ));
-            }
-        };
+        let contents = store.get(&key).ok_or_else(|| {
+            error!(
+                "textDocument/references called on unknown file {}",
+                key
+            );
+            file_not_opened(&key)
+        })?;
         let pkg = match parse_and_analyze(contents) {
             Ok(pkg) => pkg,
             Err(err) => {
@@ -863,19 +846,18 @@ impl LanguageServer for LspServer {
         let key =
             params.text_document_position.text_document.uri.clone();
 
-        // We need to clone here becase `params` is used later.
-        let store = self.store.lock().unwrap().clone();
-        let contents = match store.get(&key) {
-            Some(v) => v.to_string(),
-            None => {
-                error!(
-                    "textDocument/completion called on unknown file {}",
-                    key
-                );
-                return Err(lspower::jsonrpc::Error::invalid_params(
-                    format!("file not opened: {}", key),
-                ));
-            }
+        let contents = {
+            let store = self.store.lock().unwrap();
+            store
+                .get(&key)
+                .ok_or_else(|| {
+                    error!(
+                        "textDocument/completion called on unknown file {}",
+                        key
+                    );
+                    file_not_opened(&key)
+                })?
+                .to_string()
         };
 
         let items = if let Some(ctx) = params.context.clone() {
@@ -921,6 +903,13 @@ impl LanguageServer for LspServer {
         let response = lsp::CompletionResponse::List(items);
         Ok(Some(response))
     }
+}
+
+fn file_not_opened(key: &lsp::Url) -> lspower::jsonrpc::Error {
+    lspower::jsonrpc::Error::invalid_params(format!(
+        "file not opened: {}",
+        key
+    ))
 }
 
 // Url::to_file_path doesn't exist in wasm-unknown-unknown, for kinda
@@ -1645,10 +1634,8 @@ errorCounts
             },
         };
 
-        let result = server.goto_definition(params)
-            .await
-            .unwrap()
-            .unwrap();
+        let result =
+            server.goto_definition(params).await.unwrap().unwrap();
 
         let expected =
             lsp::GotoDefinitionResponse::Scalar(lsp::Location {
