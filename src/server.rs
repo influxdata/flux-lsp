@@ -1,5 +1,5 @@
 use std::borrow::Cow;
-use std::collections::HashMap;
+use std::collections::{hash_map::Entry, HashMap};
 use std::fmt;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
@@ -362,7 +362,6 @@ impl LanguageServer for LspServer {
         let key = params.text_document.uri;
         let value = params.text_document.text;
         let mut store = self.store.lock().unwrap();
-        use std::collections::hash_map::Entry;
         match store.entry(key) {
             Entry::Vacant(entry) => {
                 entry.insert(value);
