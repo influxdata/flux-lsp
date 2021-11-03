@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use flux::ast::walk::{self, Node, Visitor};
-use lsp_types as lsp;
+use lspower::lsp;
 
 use crate::shared::flux_position_to_position;
 

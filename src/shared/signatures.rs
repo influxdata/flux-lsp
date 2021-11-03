@@ -1,10 +1,9 @@
 use std::collections::BTreeMap;
 
 use flux::semantic::types::{Function, MonoType};
+use lspower::lsp;
 
 use crate::shared::all_combos;
-
-use lsp_types as lsp;
 
 #[allow(clippy::implicit_hasher)]
 pub fn get_argument_names(

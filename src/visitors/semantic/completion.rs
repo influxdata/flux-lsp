@@ -4,7 +4,7 @@ use flux::ast::SourceLocation;
 use flux::semantic::nodes::*;
 use flux::semantic::types::MonoType;
 use flux::semantic::walk::{Node, Visitor};
-use lsp_types as lsp;
+use lspower::lsp;
 
 use crate::shared::get_argument_names;
 use crate::shared::Function;

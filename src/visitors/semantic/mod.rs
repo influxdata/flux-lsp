@@ -5,8 +5,7 @@ use crate::shared::get_package_name;
 
 use flux::semantic::nodes::*;
 use flux::semantic::walk::{self, Node, Visitor};
-
-use lsp_types as lsp;
+use lspower::lsp;
 
 mod completion;
 mod symbols;
