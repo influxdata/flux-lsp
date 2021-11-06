@@ -361,7 +361,13 @@ impl LanguageServer for LspServer {
     ) -> () {
         let key = params.text_document.uri;
         let value = params.text_document.text;
-        let mut store = self.store.lock().unwrap();
+        let mut store = match self.store.lock() {
+            Ok(value) => value,
+            Err(err) => {
+                warn!("Could not acquire store lock. Error: {}", err);
+                return;
+            }
+        };
         match store.entry(key) {
             Entry::Vacant(entry) => {
                 entry.insert(value);
@@ -383,7 +389,13 @@ impl LanguageServer for LspServer {
         params: lsp::DidChangeTextDocumentParams,
     ) -> () {
         let key = params.text_document.uri;
-        let mut store = self.store.lock().unwrap();
+        let mut store = match self.store.lock() {
+            Ok(value) => value,
+            Err(err) => {
+                warn!("Could not acquire store lock. Error: {}", err);
+                return;
+            }
+        };
         let mut contents = if let Some(contents) = store.get(&key) {
             Cow::Borrowed(contents)
         } else {
@@ -414,7 +426,16 @@ impl LanguageServer for LspServer {
     ) -> () {
         if let Some(text) = params.text {
             let key = params.text_document.uri;
-            let mut store = self.store.lock().unwrap();
+            let mut store = match self.store.lock() {
+                Ok(value) => value,
+                Err(err) => {
+                    warn!(
+                        "Could not acquire store lock. Error: {}",
+                        err
+                    );
+                    return;
+                }
+            };
             if !store.contains_key(&key) {
                 warn!(
                     "textDocument/didSave called on unknown file {}",
@@ -431,7 +452,13 @@ impl LanguageServer for LspServer {
     ) -> () {
         let key = params.text_document.uri;
 
-        let mut store = self.store.lock().unwrap();
+        let mut store = match self.store.lock() {
+            Ok(value) => value,
+            Err(err) => {
+                warn!("Could not acquire store lock. Error: {}", err);
+                return;
+            }
+        };
         if store.remove(&key).is_none() {
             // The protocol spec is unclear on whether trying to close a file
             // that isn't open is allowed. To stop consistent with the
@@ -450,7 +477,20 @@ impl LanguageServer for LspServer {
         let key =
             params.text_document_position_params.text_document.uri;
         let pkg = {
-            let store = self.store.lock().unwrap();
+            let store = match self.store.lock() {
+                Ok(value) => value,
+                Err(err) => {
+                    return Err(lspower::jsonrpc::Error {
+                        code:
+                            lspower::jsonrpc::ErrorCode::InternalError,
+                        message: format!(
+                            "Could not acquire store lock. Error: {}",
+                            err
+                        ),
+                        data: None,
+                    });
+                }
+            };
             let data = store.get(&key).ok_or_else(|| {
                 // File isn't loaded into memory
                 error!(
@@ -515,7 +555,19 @@ impl LanguageServer for LspServer {
     ) -> RpcResult<Option<Vec<lsp::TextEdit>>> {
         let key = params.text_document.uri;
 
-        let store = self.store.lock().unwrap();
+        let store = match self.store.lock() {
+            Ok(value) => value,
+            Err(err) => {
+                return Err(lspower::jsonrpc::Error {
+                    code: lspower::jsonrpc::ErrorCode::InternalError,
+                    message: format!(
+                        "Could not acquire store lock. Error: {}",
+                        err
+                    ),
+                    data: None,
+                });
+            }
+        };
         let contents = store.get(&key).ok_or_else(|| {
             error!(
                 "formatting failed: file {} not open on server",
@@ -523,8 +575,19 @@ impl LanguageServer for LspServer {
             );
             file_not_opened(&key)
         })?;
-        let mut formatted =
-            flux::formatter::format(contents).unwrap();
+        let mut formatted = match flux::formatter::format(contents) {
+            Ok(value) => value,
+            Err(err) => {
+                return Err(lspower::jsonrpc::Error {
+                    code: lspower::jsonrpc::ErrorCode::InternalError,
+                    message: format!(
+                        "Error formatting document: {}",
+                        err
+                    ),
+                    data: None,
+                })
+            }
+        };
         if let Some(trim_trailing_whitespace) =
             params.options.trim_trailing_whitespace
         {
@@ -536,8 +599,7 @@ impl LanguageServer for LspServer {
             params.options.insert_final_newline
         {
             if insert_final_newline
-                && formatted.chars().nth(formatted.len() - 1).unwrap()
-                    != '\n'
+                && formatted.chars().last().unwrap_or(' ') != '\n'
             {
                 formatted.push('\n');
             }
@@ -546,8 +608,7 @@ impl LanguageServer for LspServer {
             params.options.trim_final_newlines
         {
             if trim_final_newlines
-                && formatted.chars().nth(formatted.len() - 1).unwrap()
-                    != '\n'
+                && formatted.chars().last().unwrap_or(' ') != '\n'
             {
                 info!("textDocument/formatting requested trimming final newlines, but the flux formatter will always trim trailing whitespace");
             }
@@ -580,7 +641,20 @@ impl LanguageServer for LspServer {
     ) -> RpcResult<Option<Vec<lsp::FoldingRange>>> {
         let key = params.text_document.uri;
         let pkg = {
-            let store = self.store.lock().unwrap();
+            let store = match self.store.lock() {
+                Ok(value) => value,
+                Err(err) => {
+                    return Err(lspower::jsonrpc::Error {
+                        code:
+                            lspower::jsonrpc::ErrorCode::InternalError,
+                        message: format!(
+                            "Could not acquire store lock. Error: {}",
+                            err
+                        ),
+                        data: None,
+                    });
+                }
+            };
             let contents = store.get(&key).ok_or_else(|| {
                 error!(
                     "formatting failed: file {} not open on server",
@@ -623,7 +697,20 @@ impl LanguageServer for LspServer {
     ) -> RpcResult<Option<lsp::DocumentSymbolResponse>> {
         let key = params.text_document.uri;
         let pkg = {
-            let store = self.store.lock().unwrap();
+            let store = match self.store.lock() {
+                Ok(value) => value,
+                Err(err) => {
+                    return Err(lspower::jsonrpc::Error {
+                        code:
+                            lspower::jsonrpc::ErrorCode::InternalError,
+                        message: format!(
+                            "Could not acquire store lock. Error: {}",
+                            err
+                        ),
+                        data: None,
+                    });
+                }
+            };
             let contents = store.get(&key).ok_or_else(|| {
                 error!(
                     "documentSymbol request failed: file {} not open on server",
@@ -668,7 +755,19 @@ impl LanguageServer for LspServer {
     ) -> RpcResult<Option<lsp::GotoDefinitionResponse>> {
         let key =
             params.text_document_position_params.text_document.uri;
-        let store = self.store.lock().unwrap();
+        let store = match self.store.lock() {
+            Ok(value) => value,
+            Err(err) => {
+                return Err(lspower::jsonrpc::Error {
+                    code: lspower::jsonrpc::ErrorCode::InternalError,
+                    message: format!(
+                        "Could not acquire store lock. Error: {}",
+                        err
+                    ),
+                    data: None,
+                });
+            }
+        };
         let contents = store.get(&key).ok_or_else(|| {
             error!(
                 "formatting failed: file {} not open on server",
@@ -762,7 +861,20 @@ impl LanguageServer for LspServer {
         let key =
             params.text_document_position.text_document.uri.clone();
         let pkg = {
-            let store = self.store.lock().unwrap();
+            let store = match self.store.lock() {
+                Ok(value) => value,
+                Err(err) => {
+                    return Err(lspower::jsonrpc::Error {
+                        code:
+                            lspower::jsonrpc::ErrorCode::InternalError,
+                        message: format!(
+                            "Could not acquire store lock. Error: {}",
+                            err
+                        ),
+                        data: None,
+                    });
+                }
+            };
             let contents = store.get(&key).ok_or_else(|| {
                 error!(
                     "textDocument/rename called on unknown file {}",
@@ -808,7 +920,19 @@ impl LanguageServer for LspServer {
     ) -> RpcResult<Option<Vec<lsp::Location>>> {
         let key =
             params.text_document_position.text_document.uri.clone();
-        let store = self.store.lock().unwrap();
+        let store = match self.store.lock() {
+            Ok(value) => value,
+            Err(err) => {
+                return Err(lspower::jsonrpc::Error {
+                    code: lspower::jsonrpc::ErrorCode::InternalError,
+                    message: format!(
+                        "Could not acquire store lock. Error: {}",
+                        err
+                    ),
+                    data: None,
+                });
+            }
+        };
         let contents = store.get(&key).ok_or_else(|| {
             error!(
                 "textDocument/references called on unknown file {}",
@@ -858,7 +982,20 @@ impl LanguageServer for LspServer {
             params.text_document_position.text_document.uri.clone();
 
         let contents = {
-            let store = self.store.lock().unwrap();
+            let store = match self.store.lock() {
+                Ok(value) => value,
+                Err(err) => {
+                    return Err(lspower::jsonrpc::Error {
+                        code:
+                            lspower::jsonrpc::ErrorCode::InternalError,
+                        message: format!(
+                            "Could not acquire store lock. Error: {}",
+                            err
+                        ),
+                        data: None,
+                    });
+                }
+            };
             store
                 .get(&key)
                 .ok_or_else(|| {
@@ -3205,13 +3342,18 @@ async fn get_bucket_completions(
 ) -> Result<lsp::CompletionList, Error> {
     let buckets = callbacks.get_buckets().await;
 
-    let items: Vec<lsp::CompletionItem> = buckets
-        .unwrap()
-        .into_iter()
-        .map(|value| {
-            new_string_arg_completion(value, trigger.clone())
-        })
-        .collect();
+    let items: Vec<lsp::CompletionItem> = match buckets {
+        Ok(value) => value
+            .into_iter()
+            .map(|value| {
+                new_string_arg_completion(value, trigger.clone())
+            })
+            .collect(),
+        Err(err) => {
+            warn!("Error in bucket callback: {}", err);
+            vec![]
+        }
+    };
 
     Ok(lsp::CompletionList {
         is_incomplete: false,
@@ -3374,22 +3516,23 @@ fn get_specific_package_functions(
     name: String,
     current_imports: Vec<Import>,
 ) {
-    let env = imports().unwrap();
-
-    if let Some(import) =
-        current_imports.into_iter().find(|x| x.alias == name)
-    {
-        for (key, val) in env.values {
-            if key == import.path {
-                walk_package(key, list, val.expr);
-            }
-        }
-    } else {
-        for (key, val) in env.values {
-            if let Some(package_name) = get_package_name(key.clone())
-            {
-                if package_name == name {
+    if let Some(env) = imports() {
+        if let Some(import) =
+            current_imports.into_iter().find(|x| x.alias == name)
+        {
+            for (key, val) in env.values {
+                if key == import.path {
                     walk_package(key, list, val.expr);
+                }
+            }
+        } else {
+            for (key, val) in env.values {
+                if let Some(package_name) =
+                    get_package_name(key.clone())
+                {
+                    if package_name == name {
+                        walk_package(key, list, val.expr);
+                    }
                 }
             }
         }
@@ -3854,87 +3997,93 @@ fn get_stdlib_completables() -> Vec<Box<dyn Completable>> {
 }
 
 fn get_packages(list: &mut Vec<Box<dyn Completable>>) {
-    let env = imports().unwrap();
-
-    for (key, _val) in env.values {
-        add_package_result(key, list);
+    if let Some(env) = imports() {
+        for (key, _val) in env.values {
+            add_package_result(key, list);
+        }
     }
 }
 
 fn get_builtins(list: &mut Vec<Box<dyn Completable>>) {
-    let env = prelude().unwrap();
-
-    for (key, val) in env.values {
-        match val.expr {
-            MonoType::Fun(f) => list.push(Box::new(FunctionResult {
-                package: PRELUDE_PACKAGE.to_string(),
-                package_name: None,
-                name: key.clone(),
-                signature: create_function_signature((*f).clone()),
-                required_args: get_argument_names(f.req),
-                optional_args: get_argument_names(f.opt),
-            })),
-            MonoType::String => list.push(Box::new(VarResult {
-                name: key.clone(),
-                package: PRELUDE_PACKAGE.to_string(),
-                package_name: None,
-                var_type: VarType::String,
-            })),
-            MonoType::Int => list.push(Box::new(VarResult {
-                name: key.clone(),
-                package: PRELUDE_PACKAGE.to_string(),
-                package_name: None,
-                var_type: VarType::Int,
-            })),
-            MonoType::Float => list.push(Box::new(VarResult {
-                name: key.clone(),
-                package: PRELUDE_PACKAGE.to_string(),
-                package_name: None,
-                var_type: VarType::Float,
-            })),
-            MonoType::Arr(_) => list.push(Box::new(VarResult {
-                name: key.clone(),
-                package: PRELUDE_PACKAGE.to_string(),
-                package_name: None,
-                var_type: VarType::Array,
-            })),
-            MonoType::Bool => list.push(Box::new(VarResult {
-                name: key.clone(),
-                package: PRELUDE_PACKAGE.to_string(),
-                package_name: None,
-                var_type: VarType::Bool,
-            })),
-            MonoType::Bytes => list.push(Box::new(VarResult {
-                name: key.clone(),
-                package: PRELUDE_PACKAGE.to_string(),
-                package_name: None,
-                var_type: VarType::Bytes,
-            })),
-            MonoType::Duration => list.push(Box::new(VarResult {
-                name: key.clone(),
-                package: PRELUDE_PACKAGE.to_string(),
-                package_name: None,
-                var_type: VarType::Duration,
-            })),
-            MonoType::Uint => list.push(Box::new(VarResult {
-                name: key.clone(),
-                package: PRELUDE_PACKAGE.to_string(),
-                package_name: None,
-                var_type: VarType::Uint,
-            })),
-            MonoType::Regexp => list.push(Box::new(VarResult {
-                name: key.clone(),
-                package: PRELUDE_PACKAGE.to_string(),
-                package_name: None,
-                var_type: VarType::Regexp,
-            })),
-            MonoType::Time => list.push(Box::new(VarResult {
-                name: key.clone(),
-                package: PRELUDE_PACKAGE.to_string(),
-                package_name: None,
-                var_type: VarType::Time,
-            })),
-            _ => {}
+    if let Some(env) = prelude() {
+        for (key, val) in env.values {
+            match val.expr {
+                MonoType::Fun(f) => {
+                    list.push(Box::new(FunctionResult {
+                        package: PRELUDE_PACKAGE.to_string(),
+                        package_name: None,
+                        name: key.clone(),
+                        signature: create_function_signature(
+                            (*f).clone(),
+                        ),
+                        required_args: get_argument_names(f.req),
+                        optional_args: get_argument_names(f.opt),
+                    }))
+                }
+                MonoType::String => list.push(Box::new(VarResult {
+                    name: key.clone(),
+                    package: PRELUDE_PACKAGE.to_string(),
+                    package_name: None,
+                    var_type: VarType::String,
+                })),
+                MonoType::Int => list.push(Box::new(VarResult {
+                    name: key.clone(),
+                    package: PRELUDE_PACKAGE.to_string(),
+                    package_name: None,
+                    var_type: VarType::Int,
+                })),
+                MonoType::Float => list.push(Box::new(VarResult {
+                    name: key.clone(),
+                    package: PRELUDE_PACKAGE.to_string(),
+                    package_name: None,
+                    var_type: VarType::Float,
+                })),
+                MonoType::Arr(_) => list.push(Box::new(VarResult {
+                    name: key.clone(),
+                    package: PRELUDE_PACKAGE.to_string(),
+                    package_name: None,
+                    var_type: VarType::Array,
+                })),
+                MonoType::Bool => list.push(Box::new(VarResult {
+                    name: key.clone(),
+                    package: PRELUDE_PACKAGE.to_string(),
+                    package_name: None,
+                    var_type: VarType::Bool,
+                })),
+                MonoType::Bytes => list.push(Box::new(VarResult {
+                    name: key.clone(),
+                    package: PRELUDE_PACKAGE.to_string(),
+                    package_name: None,
+                    var_type: VarType::Bytes,
+                })),
+                MonoType::Duration => {
+                    list.push(Box::new(VarResult {
+                        name: key.clone(),
+                        package: PRELUDE_PACKAGE.to_string(),
+                        package_name: None,
+                        var_type: VarType::Duration,
+                    }))
+                }
+                MonoType::Uint => list.push(Box::new(VarResult {
+                    name: key.clone(),
+                    package: PRELUDE_PACKAGE.to_string(),
+                    package_name: None,
+                    var_type: VarType::Uint,
+                })),
+                MonoType::Regexp => list.push(Box::new(VarResult {
+                    name: key.clone(),
+                    package: PRELUDE_PACKAGE.to_string(),
+                    package_name: None,
+                    var_type: VarType::Regexp,
+                })),
+                MonoType::Time => list.push(Box::new(VarResult {
+                    name: key.clone(),
+                    package: PRELUDE_PACKAGE.to_string(),
+                    package_name: None,
+                    var_type: VarType::Time,
+                })),
+                _ => {}
+            }
         }
     }
 }
