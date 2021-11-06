@@ -12,6 +12,7 @@ use std::str;
 
 use flux::ast::File;
 use flux::formatter::convert_to_string;
+use flux::parser::Parser;
 use futures::prelude::*;
 use js_sys::{Function, Promise};
 use serde::{Deserialize, Serialize};
@@ -20,7 +21,6 @@ use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::future_to_promise;
 
 use crate::LspServer;
-use flux::parser::Parser;
 
 fn wrap_message(s: String) -> String {
     let st = s.clone();
