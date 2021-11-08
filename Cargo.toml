@@ -37,7 +37,7 @@ async-trait = "0.1.50"
 clap = "2.33.3"
 combinations = "0.1.0"
 console_error_panic_hook = "0.1.7"
-flux = { git = "https://github.com/influxdata/flux", tag = "v0.139.0" }
+flux = { git = "https://github.com/influxdata/flux", tag = "v0.140.0" }
 futures = "0.3.15"
 js-sys = "0.3.51"
 line-col = "0.2.1"

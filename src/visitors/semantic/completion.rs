@@ -54,8 +54,10 @@ impl<'a> Visitor<'a> for FunctionFinderVisitor {
 
                 if let Expression::Function(f) = assgn.init.clone() {
                     if let MonoType::Fun(fun) = f.typ.clone() {
-                        let mut params = get_argument_names(fun.req);
-                        for opt in get_argument_names(fun.opt) {
+                        let mut params =
+                            get_argument_names(fun.req.clone());
+                        for opt in get_argument_names(fun.opt.clone())
+                        {
                             params.push(opt);
                         }
 
@@ -77,8 +79,10 @@ impl<'a> Visitor<'a> for FunctionFinderVisitor {
                     {
                         if let MonoType::Fun(fun) = f.typ.clone() {
                             let mut params =
-                                get_argument_names(fun.req);
-                            for opt in get_argument_names(fun.opt) {
+                                get_argument_names(fun.req.clone());
+                            for opt in
+                                get_argument_names(fun.opt.clone())
+                            {
                                 params.push(opt);
                             }
 
