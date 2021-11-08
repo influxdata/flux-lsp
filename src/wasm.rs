@@ -4,6 +4,7 @@ use std::str;
 
 use flux::ast::File;
 use flux::formatter::convert_to_string;
+use futures::prelude::*;
 use js_sys::{Function, Promise};
 use serde::{Deserialize, Serialize};
 use tower_service::Service;
@@ -88,7 +89,10 @@ impl Server {
 
         let message: lspower::jsonrpc::Incoming =
             serde_json::from_str(&json_contents).unwrap();
-        let call = self.service.call(message);
+        // We have to use `AssertUnwindSafe` here to allow us to catch the panic so that we do not
+        // crash wasm
+        let call =
+            std::panic::AssertUnwindSafe(self.service.call(message));
         future_to_promise(async move {
             match call.await {
                 Ok(result) => match result {
@@ -131,13 +135,25 @@ impl Server {
                     error: Some(format!("{}", err)),
                 })),
             }
-        })
+        }.catch_unwind().unwrap_or_else(|err| {
+            Err(JsValue::from(format_panic(err)))
+        }))
     }
 
     pub fn register_buckets_callback(&mut self, _f: Function) {}
     pub fn register_measurements_callback(&mut self, _f: Function) {}
     pub fn register_tag_keys_callback(&mut self, _f: Function) {}
     pub fn register_tag_values_callback(&mut self, _f: Function) {}
+}
+
+fn format_panic(err: Box<dyn std::any::Any>) -> String {
+    // Panics are usually just `String` or `&str` so try to convert to those to display their message.
+    err.downcast::<String>().map(|s| *s).unwrap_or_else(|err| {
+        err.downcast::<&str>()
+            .ok()
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| "Unknown panic occurred".to_string())
+    })
 }
 
 /// Parse flux into an AST representation. The AST will be generated regardless
