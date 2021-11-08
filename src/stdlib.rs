@@ -70,15 +70,15 @@ impl TVarMap {
     }
 }
 
-fn get_type_string(m: MonoType, map: &mut TVarMap) -> String {
-    if let MonoType::Var(t) = m {
+fn get_type_string(m: &MonoType, map: &mut TVarMap) -> String {
+    if let MonoType::Var(t) = *m {
         return map.get_letter(t);
     }
     format!("{}", m)
 }
 
 pub fn create_function_signature(
-    f: flux::semantic::types::Function,
+    f: &flux::semantic::types::Function,
 ) -> String {
     let mut mapping = TVarMap::default();
     let required = f
@@ -89,7 +89,7 @@ pub fn create_function_signature(
         .iter()
         .map(|(&k, &v)| Property {
             k: k.clone(),
-            v: get_type_string(v.clone(), &mut mapping),
+            v: get_type_string(v, &mut mapping),
         })
         .collect::<Vec<_>>();
 
@@ -101,21 +101,21 @@ pub fn create_function_signature(
         .iter()
         .map(|(&k, &v)| Property {
             k: String::from("?") + k,
-            v: get_type_string(v.clone(), &mut mapping),
+            v: get_type_string(v, &mut mapping),
         })
         .collect::<Vec<_>>();
 
-    let pipe = match f.pipe {
+    let pipe = match &f.pipe {
         Some(pipe) => {
             if pipe.k == "<-" {
                 vec![Property {
                     k: pipe.k.clone(),
-                    v: get_type_string(pipe.v, &mut mapping),
+                    v: get_type_string(&pipe.v, &mut mapping),
                 }]
             } else {
                 vec![Property {
                     k: String::from("<-") + &pipe.k,
-                    v: get_type_string(pipe.v, &mut mapping),
+                    v: get_type_string(&pipe.v, &mut mapping),
                 }]
             }
         }
@@ -129,7 +129,7 @@ pub fn create_function_signature(
             .map(|x| x.to_string())
             .collect::<Vec<_>>()
             .join(", "),
-        get_type_string(f.retn, &mut mapping)
+        get_type_string(&f.retn, &mut mapping)
     )
 }
 
@@ -166,13 +166,9 @@ fn walk_package_functions(
             if let MonoType::Fun(f) = &head.v {
                 let mut params = vec![];
 
-                for arg in get_argument_names(f.req.clone()) {
-                    params.push(arg);
-                }
+                params.extend(get_argument_names(&f.req));
 
-                for arg in get_argument_names(f.opt.clone()) {
-                    params.push(arg);
-                }
+                params.extend(get_argument_names(&f.opt));
 
                 list.push(Function {
                     params,
@@ -265,10 +261,8 @@ pub fn get_builtin_functions() -> Vec<Function> {
     if let Some(env) = prelude() {
         for (key, val) in env.values {
             if let MonoType::Fun(f) = val.expr {
-                let mut params = get_argument_names(f.req.clone());
-                for opt in get_argument_names(f.opt.clone()) {
-                    params.push(opt);
-                }
+                let mut params = get_argument_names(&f.req);
+                params.extend(get_argument_names(&f.opt));
 
                 list.push(Function {
                     name: key.to_string(),

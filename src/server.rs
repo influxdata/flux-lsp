@@ -3683,19 +3683,28 @@ fn walk_package(
 ) {
     if let MonoType::Record(record) = t {
         if let Record::Extension { head, tail } = record.as_ref() {
+            let mut push_var_result = |name: &str, var_type| {
+                list.push(Box::new(VarResult {
+                    name: name.to_owned(),
+                    var_type,
+                    package: package.clone(),
+                    package_name: get_package_name(package.clone()),
+                }));
+            };
+
             match &head.v {
                 MonoType::Fun(f) => {
                     list.push(Box::new(FunctionResult {
                         name: head.k.clone(),
                         package: package.clone(),
                         signature: create_function_signature(
-                            f.deref().clone(),
+                            f
                         ),
                         required_args: get_argument_names(
-                            f.req.clone(),
+                            &f.req,
                         ),
                         optional_args: get_argument_names(
-                            f.opt.clone(),
+                            &f.opt,
                         ),
                         package_name: get_package_name(
                             package.clone(),
@@ -3703,84 +3712,28 @@ fn walk_package(
                     }));
                 }
                 MonoType::Int => {
-                    list.push(Box::new(VarResult {
-                        name: head.k.clone(),
-                        var_type: VarType::Int,
-                        package: package.clone(),
-                        package_name: get_package_name(
-                            package.clone(),
-                        ),
-                    }));
+                    push_var_result(&head.k, VarType::Int)
                 }
                 MonoType::Float => {
-                    list.push(Box::new(VarResult {
-                        name: head.k.clone(),
-                        var_type: VarType::Float,
-                        package: package.clone(),
-                        package_name: get_package_name(
-                            package.clone(),
-                        ),
-                    }));
+                    push_var_result(&head.k, VarType::Float)
                 }
                 MonoType::Bool => {
-                    list.push(Box::new(VarResult {
-                        name: head.k.clone(),
-                        var_type: VarType::Bool,
-                        package: package.clone(),
-                        package_name: get_package_name(
-                            package.clone(),
-                        ),
-                    }));
+                    push_var_result(&head.k, VarType::Bool)
                 }
                 MonoType::Arr(_) => {
-                    list.push(Box::new(VarResult {
-                        name: head.k.clone(),
-                        var_type: VarType::Array,
-                        package: package.clone(),
-                        package_name: get_package_name(
-                            package.clone(),
-                        ),
-                    }));
+                    push_var_result(&head.k, VarType::Array)
                 }
                 MonoType::Bytes => {
-                    list.push(Box::new(VarResult {
-                        name: head.k.clone(),
-                        var_type: VarType::Bytes,
-                        package: package.clone(),
-                        package_name: get_package_name(
-                            package.clone(),
-                        ),
-                    }));
+                    push_var_result(&head.k, VarType::Bytes)
                 }
                 MonoType::Duration => {
-                    list.push(Box::new(VarResult {
-                        name: head.k.clone(),
-                        var_type: VarType::Duration,
-                        package: package.clone(),
-                        package_name: get_package_name(
-                            package.clone(),
-                        ),
-                    }));
+                    push_var_result(&head.k, VarType::Duration)
                 }
                 MonoType::Regexp => {
-                    list.push(Box::new(VarResult {
-                        name: head.k.clone(),
-                        var_type: VarType::Regexp,
-                        package: package.clone(),
-                        package_name: get_package_name(
-                            package.clone(),
-                        ),
-                    }));
+                    push_var_result(&head.k, VarType::Regexp)
                 }
                 MonoType::String => {
-                    list.push(Box::new(VarResult {
-                        name: head.k.clone(),
-                        var_type: VarType::String,
-                        package: package.clone(),
-                        package_name: get_package_name(
-                            package.clone(),
-                        ),
-                    }));
+                    push_var_result(&head.k, VarType::String)
                 }
                 _ => {}
             }
@@ -4013,85 +3966,39 @@ fn get_packages(list: &mut Vec<Box<dyn Completable>>) {
 fn get_builtins(list: &mut Vec<Box<dyn Completable>>) {
     if let Some(env) = prelude() {
         for (key, val) in env.values {
-            match val.expr {
+            let mut push_var_result = |var_type| {
+                list.push(Box::new(VarResult {
+                    name: key.to_string(),
+                    package: PRELUDE_PACKAGE.to_string(),
+                    package_name: None,
+                    var_type,
+                }));
+            };
+            match &val.expr {
                 MonoType::Fun(f) => {
                     list.push(Box::new(FunctionResult {
                         package: PRELUDE_PACKAGE.to_string(),
                         package_name: None,
                         name: key.to_string(),
                         signature: create_function_signature(
-                            (*f).clone(),
+                            &f,
                         ),
-                        required_args: get_argument_names(
-                            f.req.clone(),
-                        ),
-                        optional_args: get_argument_names(
-                            f.opt.clone(),
-                        ),
+                        required_args: get_argument_names(&f.req),
+                        optional_args: get_argument_names(&f.opt),
                     }))
                 }
-                MonoType::String => list.push(Box::new(VarResult {
-                    name: key.to_string(),
-                    package: PRELUDE_PACKAGE.to_string(),
-                    package_name: None,
-                    var_type: VarType::String,
-                })),
-                MonoType::Int => list.push(Box::new(VarResult {
-                    name: key.to_string(),
-                    package: PRELUDE_PACKAGE.to_string(),
-                    package_name: None,
-                    var_type: VarType::Int,
-                })),
-                MonoType::Float => list.push(Box::new(VarResult {
-                    name: key.to_string(),
-                    package: PRELUDE_PACKAGE.to_string(),
-                    package_name: None,
-                    var_type: VarType::Float,
-                })),
-                MonoType::Arr(_) => list.push(Box::new(VarResult {
-                    name: key.to_string(),
-                    package: PRELUDE_PACKAGE.to_string(),
-                    package_name: None,
-                    var_type: VarType::Array,
-                })),
-                MonoType::Bool => list.push(Box::new(VarResult {
-                    name: key.to_string(),
-                    package: PRELUDE_PACKAGE.to_string(),
-                    package_name: None,
-                    var_type: VarType::Bool,
-                })),
-                MonoType::Bytes => list.push(Box::new(VarResult {
-                    name: key.to_string(),
-                    package: PRELUDE_PACKAGE.to_string(),
-                    package_name: None,
-                    var_type: VarType::Bytes,
-                })),
+                MonoType::String => push_var_result(VarType::String),
+                MonoType::Int => push_var_result(VarType::Int),
+                MonoType::Float => push_var_result(VarType::Float),
+                MonoType::Arr(_) => push_var_result(VarType::Array),
+                MonoType::Bool => push_var_result(VarType::Bool),
+                MonoType::Bytes => push_var_result(VarType::Bytes),
                 MonoType::Duration => {
-                    list.push(Box::new(VarResult {
-                        name: key.to_string(),
-                        package: PRELUDE_PACKAGE.to_string(),
-                        package_name: None,
-                        var_type: VarType::Duration,
-                    }))
+                    push_var_result(VarType::Duration)
                 }
-                MonoType::Uint => list.push(Box::new(VarResult {
-                    name: key.to_string(),
-                    package: PRELUDE_PACKAGE.to_string(),
-                    package_name: None,
-                    var_type: VarType::Uint,
-                })),
-                MonoType::Regexp => list.push(Box::new(VarResult {
-                    name: key.to_string(),
-                    package: PRELUDE_PACKAGE.to_string(),
-                    package_name: None,
-                    var_type: VarType::Regexp,
-                })),
-                MonoType::Time => list.push(Box::new(VarResult {
-                    name: key.to_string(),
-                    package: PRELUDE_PACKAGE.to_string(),
-                    package_name: None,
-                    var_type: VarType::Time,
-                })),
+                MonoType::Uint => push_var_result(VarType::Uint),
+                MonoType::Regexp => push_var_result(VarType::Regexp),
+                MonoType::Time => push_var_result(VarType::Time),
                 _ => {}
             }
         }
@@ -4368,14 +4275,14 @@ fn create_function_result(
     expr: &SemanticExpression,
 ) -> Option<UserFunctionResult> {
     if let SemanticExpression::Function(f) = expr {
-        if let MonoType::Fun(fun) = f.typ.clone() {
+        if let MonoType::Fun(fun) = &f.typ {
             return Some(UserFunctionResult {
                 name,
                 package: "self".to_string(),
                 package_name: Some("self".to_string()),
-                optional_args: get_argument_names(fun.opt.clone()),
-                required_args: get_argument_names(fun.req.clone()),
-                signature: create_function_signature((*fun).clone()),
+                optional_args: get_argument_names(&fun.opt),
+                required_args: get_argument_names(&fun.req),
+                signature: create_function_signature(fun),
             });
         }
     }
