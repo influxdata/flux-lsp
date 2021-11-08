@@ -4336,17 +4336,10 @@ impl Completable for ImportAliasResult {
 fn get_var_type(
     expr: &SemanticExpression,
 ) -> Option<CompletionVarType> {
-    match expr.type_of() {
-        MonoType::Duration => {
-            return Some(CompletionVarType::Duration)
-        }
-        MonoType::Int => return Some(CompletionVarType::Int),
-        MonoType::Bool => return Some(CompletionVarType::Bool),
-        MonoType::Float => return Some(CompletionVarType::Float),
-        MonoType::String => return Some(CompletionVarType::String),
-        MonoType::Arr(_) => return Some(CompletionVarType::Array),
-        MonoType::Regexp => return Some(CompletionVarType::Regexp),
-        _ => {}
+    if let Some(typ) =
+        CompletionVarType::from_monotype(&expr.type_of())
+    {
+        return Some(typ);
     }
 
     match expr {
@@ -4356,21 +4349,14 @@ fn get_var_type(
         SemanticExpression::Call(c) => {
             let result_type = follow_function_pipes(c);
 
-            match result_type {
-                MonoType::Int => Some(CompletionVarType::Int),
-                MonoType::Float => Some(CompletionVarType::Float),
-                MonoType::Bool => Some(CompletionVarType::Bool),
-                MonoType::Arr(_) => Some(CompletionVarType::Array),
-                MonoType::Duration => {
-                    Some(CompletionVarType::Duration)
-                }
-                MonoType::Record(_) => {
-                    Some(CompletionVarType::Record)
-                }
-                MonoType::String => Some(CompletionVarType::String),
-                MonoType::Uint => Some(CompletionVarType::Uint),
-                MonoType::Time => Some(CompletionVarType::Time),
-                _ => None,
+            match CompletionVarType::from_monotype(&result_type) {
+                Some(typ) => Some(typ),
+                None => match result_type {
+                    MonoType::Record(_) => {
+                        Some(CompletionVarType::Record)
+                    }
+                    _ => None,
+                },
             }
         }
         _ => None,
@@ -4657,6 +4643,23 @@ impl CompletionVarResult {
             CompletionVarType::Time => "Time".to_string(),
             CompletionVarType::Uint => "Unsigned Integer".to_string(),
         }
+    }
+}
+
+impl CompletionVarType {
+    pub fn from_monotype(typ: &MonoType) -> Option<Self> {
+        Some(match typ {
+            MonoType::Duration => CompletionVarType::Duration,
+            MonoType::Int => CompletionVarType::Int,
+            MonoType::Bool => CompletionVarType::Bool,
+            MonoType::Float => CompletionVarType::Float,
+            MonoType::String => CompletionVarType::String,
+            MonoType::Arr(_) => CompletionVarType::Array,
+            MonoType::Regexp => CompletionVarType::Regexp,
+            MonoType::Uint => CompletionVarType::Uint,
+            MonoType::Time => CompletionVarType::Time,
+            _ => return None,
+        })
     }
 }
 
