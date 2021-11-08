@@ -9,6 +9,7 @@ use flux::semantic::types::{MonoType, Record};
 use std::collections::{BTreeMap, HashMap};
 use std::fmt;
 use std::iter::Iterator;
+use std::ops::Deref;
 
 pub const BUILTIN_PACKAGE: &str = "builtin";
 
@@ -158,25 +159,29 @@ fn walk_package_functions(
     t: MonoType,
 ) {
     if let MonoType::Record(record) = t {
-        if let Record::Extension { head, tail } = *record {
-            if let MonoType::Fun(f) = head.v {
+        if let Record::Extension { head, tail } = record.as_ref() {
+            if let MonoType::Fun(f) = &head.v {
                 let mut params = vec![];
 
-                for arg in get_argument_names(f.req) {
+                for arg in get_argument_names(f.req.clone()) {
                     params.push(arg);
                 }
 
-                for arg in get_argument_names(f.opt) {
+                for arg in get_argument_names(f.opt.clone()) {
                     params.push(arg);
                 }
 
                 list.push(Function {
                     params,
-                    name: head.k,
+                    name: head.k.clone(),
                 });
             }
 
-            walk_package_functions(package, list, tail);
+            walk_package_functions(
+                package,
+                list,
+                tail.deref().clone(),
+            );
         }
     }
 }
@@ -204,20 +209,20 @@ fn walk_functions(
     t: MonoType,
 ) {
     if let MonoType::Record(record) = t {
-        if let Record::Extension { head, tail } = *record {
-            if let MonoType::Fun(f) = head.v {
+        if let Record::Extension { head, tail } = record.as_ref() {
+            if let MonoType::Fun(f) = &head.v {
                 if let Some(package_name) =
                     get_package_name(package.clone())
                 {
                     list.push(FunctionInfo::new(
-                        head.k,
+                        head.k.clone(),
                         f.as_ref(),
                         package_name,
                     ));
                 }
             }
 
-            walk_functions(package, list, tail);
+            walk_functions(package, list, tail.deref().clone());
         }
     }
 }
@@ -252,8 +257,8 @@ pub fn get_builtin_functions() -> Vec<Function> {
     if let Some(env) = prelude() {
         for (key, val) in env.values {
             if let MonoType::Fun(f) = val.expr {
-                let mut params = get_argument_names(f.req);
-                for opt in get_argument_names(f.opt) {
+                let mut params = get_argument_names(f.req.clone());
+                for opt in get_argument_names(f.opt.clone()) {
                     params.push(opt);
                 }
 

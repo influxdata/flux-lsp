@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 use std::collections::{hash_map::Entry, HashMap};
 use std::fmt;
+use std::ops::Deref;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
@@ -3680,17 +3681,21 @@ fn walk_package(
     t: MonoType,
 ) {
     if let MonoType::Record(record) = t {
-        if let Record::Extension { head, tail } = *record {
-            match head.v {
+        if let Record::Extension { head, tail } = record.as_ref() {
+            match &head.v {
                 MonoType::Fun(f) => {
                     list.push(Box::new(FunctionResult {
-                        name: head.k,
+                        name: head.k.clone(),
                         package: package.clone(),
                         signature: create_function_signature(
-                            (*f).clone(),
+                            f.deref().clone(),
                         ),
-                        required_args: get_argument_names(f.req),
-                        optional_args: get_argument_names(f.opt),
+                        required_args: get_argument_names(
+                            f.req.clone(),
+                        ),
+                        optional_args: get_argument_names(
+                            f.opt.clone(),
+                        ),
                         package_name: get_package_name(
                             package.clone(),
                         ),
@@ -3698,7 +3703,7 @@ fn walk_package(
                 }
                 MonoType::Int => {
                     list.push(Box::new(VarResult {
-                        name: head.k,
+                        name: head.k.clone(),
                         var_type: VarType::Int,
                         package: package.clone(),
                         package_name: get_package_name(
@@ -3708,7 +3713,7 @@ fn walk_package(
                 }
                 MonoType::Float => {
                     list.push(Box::new(VarResult {
-                        name: head.k,
+                        name: head.k.clone(),
                         var_type: VarType::Float,
                         package: package.clone(),
                         package_name: get_package_name(
@@ -3718,7 +3723,7 @@ fn walk_package(
                 }
                 MonoType::Bool => {
                     list.push(Box::new(VarResult {
-                        name: head.k,
+                        name: head.k.clone(),
                         var_type: VarType::Bool,
                         package: package.clone(),
                         package_name: get_package_name(
@@ -3728,7 +3733,7 @@ fn walk_package(
                 }
                 MonoType::Arr(_) => {
                     list.push(Box::new(VarResult {
-                        name: head.k,
+                        name: head.k.clone(),
                         var_type: VarType::Array,
                         package: package.clone(),
                         package_name: get_package_name(
@@ -3738,7 +3743,7 @@ fn walk_package(
                 }
                 MonoType::Bytes => {
                     list.push(Box::new(VarResult {
-                        name: head.k,
+                        name: head.k.clone(),
                         var_type: VarType::Bytes,
                         package: package.clone(),
                         package_name: get_package_name(
@@ -3748,7 +3753,7 @@ fn walk_package(
                 }
                 MonoType::Duration => {
                     list.push(Box::new(VarResult {
-                        name: head.k,
+                        name: head.k.clone(),
                         var_type: VarType::Duration,
                         package: package.clone(),
                         package_name: get_package_name(
@@ -3758,7 +3763,7 @@ fn walk_package(
                 }
                 MonoType::Regexp => {
                     list.push(Box::new(VarResult {
-                        name: head.k,
+                        name: head.k.clone(),
                         var_type: VarType::Regexp,
                         package: package.clone(),
                         package_name: get_package_name(
@@ -3768,7 +3773,7 @@ fn walk_package(
                 }
                 MonoType::String => {
                     list.push(Box::new(VarResult {
-                        name: head.k,
+                        name: head.k.clone(),
                         var_type: VarType::String,
                         package: package.clone(),
                         package_name: get_package_name(
@@ -3779,7 +3784,7 @@ fn walk_package(
                 _ => {}
             }
 
-            walk_package(package, list, tail);
+            walk_package(package, list, tail.deref().clone());
         }
     }
 }
@@ -4016,8 +4021,12 @@ fn get_builtins(list: &mut Vec<Box<dyn Completable>>) {
                         signature: create_function_signature(
                             (*f).clone(),
                         ),
-                        required_args: get_argument_names(f.req),
-                        optional_args: get_argument_names(f.opt),
+                        required_args: get_argument_names(
+                            f.req.clone(),
+                        ),
+                        optional_args: get_argument_names(
+                            f.opt.clone(),
+                        ),
                     }))
                 }
                 MonoType::String => list.push(Box::new(VarResult {
@@ -4372,8 +4381,8 @@ fn create_function_result(
                 name,
                 package: "self".to_string(),
                 package_name: Some("self".to_string()),
-                optional_args: get_argument_names(fun.clone().opt),
-                required_args: get_argument_names(fun.clone().req),
+                optional_args: get_argument_names(fun.opt.clone()),
+                required_args: get_argument_names(fun.req.clone()),
                 signature: create_function_signature((*fun).clone()),
             });
         }
