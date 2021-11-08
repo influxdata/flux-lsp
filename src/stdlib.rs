@@ -139,12 +139,13 @@ pub struct PackageInfo {
 
 pub fn get_package_infos() -> Vec<PackageInfo> {
     let mut result: Vec<PackageInfo> = vec![];
-    let env = imports().unwrap();
 
-    for (path, _val) in env.values {
-        let name = get_package_name(path.clone());
-        if let Some(name) = name {
-            result.push(PackageInfo { name, path })
+    if let Some(env) = imports() {
+        for (path, _val) in env.values {
+            let name = get_package_name(path.clone());
+            if let Some(name) = name {
+                result.push(PackageInfo { name, path })
+            }
         }
     }
 
@@ -181,14 +182,15 @@ fn walk_package_functions(
 }
 
 pub fn get_package_functions(name: String) -> Vec<Function> {
-    let env = imports().unwrap();
-
     let mut list = vec![];
 
-    for (key, val) in env.values {
-        if let Some(package_name) = get_package_name(key.clone()) {
-            if package_name == name {
-                walk_package_functions(key, &mut list, val.expr);
+    if let Some(env) = imports() {
+        for (key, val) in env.values {
+            if let Some(package_name) = get_package_name(key.clone())
+            {
+                if package_name == name {
+                    walk_package_functions(key, &mut list, val.expr);
+                }
             }
         }
     }
@@ -222,43 +224,44 @@ fn walk_functions(
 
 pub fn get_stdlib_functions() -> Vec<FunctionInfo> {
     let mut results = vec![];
-    let env = prelude().unwrap();
 
-    for (name, val) in env.values {
-        if let MonoType::Fun(f) = val.expr {
-            results.push(FunctionInfo::new(
-                name,
-                f.as_ref(),
-                BUILTIN_PACKAGE.to_string(),
-            ));
+    if let Some(env) = prelude() {
+        for (name, val) in env.values {
+            if let MonoType::Fun(f) = val.expr {
+                results.push(FunctionInfo::new(
+                    name,
+                    f.as_ref(),
+                    BUILTIN_PACKAGE.to_string(),
+                ));
+            }
         }
     }
 
-    let impts = imports().unwrap();
-
-    for (name, val) in impts.values {
-        walk_functions(name, &mut results, val.expr);
+    if let Some(imports) = imports() {
+        for (name, val) in imports.values {
+            walk_functions(name, &mut results, val.expr);
+        }
     }
 
     results
 }
 
 pub fn get_builtin_functions() -> Vec<Function> {
-    let env = prelude().unwrap();
-
     let mut list = vec![];
 
-    for (key, val) in env.values {
-        if let MonoType::Fun(f) = val.expr {
-            let mut params = get_argument_names(f.req);
-            for opt in get_argument_names(f.opt) {
-                params.push(opt);
-            }
+    if let Some(env) = prelude() {
+        for (key, val) in env.values {
+            if let MonoType::Fun(f) = val.expr {
+                let mut params = get_argument_names(f.req);
+                for opt in get_argument_names(f.opt) {
+                    params.push(opt);
+                }
 
-            list.push(Function {
-                name: key.clone(),
-                params,
-            })
+                list.push(Function {
+                    name: key.clone(),
+                    params,
+                })
+            }
         }
     }
 

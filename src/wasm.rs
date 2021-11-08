@@ -1,4 +1,12 @@
-#![allow(dead_code, unused_imports)]
+// `rustc` incorrectly identifies the `pub` symbols as dead code, as wasm_bindgen
+// is the tool that exports the interfaces. In this case, it is not a reliable lint.
+//
+// The `wasm_bindgen` macro itself expands to use `panic`, which `clippy::panic`
+// isn't a big fan of. _This_ code should not call `panic`, but there isn't a
+// way to enforce it on the macro-generated code.
+#![allow(dead_code, clippy::panic)]
+/// Wasm functionality, including wasm exported functions.
+///
 use std::ops::Add;
 use std::str;
 
@@ -31,20 +39,16 @@ struct ResponseError {
 #[wasm_bindgen]
 #[derive(Deserialize)]
 struct ServerResponse {
-    #[allow(dead_code)]
     message: Option<String>,
-    #[allow(dead_code)]
     error: Option<String>,
 }
 
 #[wasm_bindgen]
 impl ServerResponse {
-    #[allow(dead_code)]
     pub fn get_message(&self) -> Option<String> {
         self.message.clone()
     }
 
-    #[allow(dead_code)]
     pub fn get_error(&self) -> Option<String> {
         self.error.clone()
     }
@@ -88,7 +92,18 @@ impl Server {
             msg.lines().skip(2).fold(String::new(), |c, l| c.add(l));
 
         let message: lspower::jsonrpc::Incoming =
-            serde_json::from_str(&json_contents).unwrap();
+            match serde_json::from_str(&json_contents) {
+                Ok(value) => value,
+                Err(err) => {
+                    return Promise::resolve(
+                        &ServerResponse {
+                            message: None,
+                            error: Some(format!("{}", err)),
+                        }
+                        .into(),
+                    )
+                }
+            };
         // We have to use `AssertUnwindSafe` here to allow us to catch the panic so that we do not
         // crash wasm
         let call =
@@ -118,7 +133,13 @@ impl Server {
                         lspower::jsonrpc::Outgoing::Request(
                             _client_request,
                         ) => {
-                            panic!("Outgoing requests from server to client are not implemented");
+                            // Outgoing requests from server to client are
+                            // not currently implemented. This should never be
+                            // reached.
+                            Ok(JsValue::from(ServerResponse {
+                                message: None,
+                                error: Some("Server attempted to send a request to the client.".into()),
+                            }))
                         }
                     },
                     None => {
@@ -163,7 +184,13 @@ pub fn parse(script: &str) -> JsValue {
     let mut parser = Parser::new(script);
     let parsed = parser.parse_file("".to_string());
 
-    JsValue::from_serde(&parsed).unwrap()
+    match JsValue::from_serde(&parsed) {
+        Ok(value) => value,
+        Err(err) => {
+            log::error!("{}", err);
+            JsValue::from(script)
+        }
+    }
 }
 
 /// Format a flux script from AST.
