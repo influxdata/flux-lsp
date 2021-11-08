@@ -4256,7 +4256,7 @@ fn get_var_type(
         SemanticExpression::Call(c) => {
             let result_type = follow_function_pipes(c);
 
-            match CompletionVarType::from_monotype(&result_type) {
+            match CompletionVarType::from_monotype(result_type) {
                 Some(typ) => Some(typ),
                 None => match result_type {
                     MonoType::Record(_) => {
