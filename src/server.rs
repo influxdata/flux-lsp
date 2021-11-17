@@ -3697,15 +3697,9 @@ fn walk_package(
                     list.push(Box::new(FunctionResult {
                         name: head.k.clone(),
                         package: package.clone(),
-                        signature: create_function_signature(
-                            f
-                        ),
-                        required_args: get_argument_names(
-                            &f.req,
-                        ),
-                        optional_args: get_argument_names(
-                            &f.opt,
-                        ),
+                        signature: create_function_signature(f),
+                        required_args: get_argument_names(&f.req),
+                        optional_args: get_argument_names(&f.opt),
                         package_name: get_package_name(
                             package.clone(),
                         ),
@@ -3980,9 +3974,7 @@ fn get_builtins(list: &mut Vec<Box<dyn Completable>>) {
                         package: PRELUDE_PACKAGE.to_string(),
                         package_name: None,
                         name: key.to_string(),
-                        signature: create_function_signature(
-                            &f,
-                        ),
+                        signature: create_function_signature(f),
                         required_args: get_argument_names(&f.req),
                         optional_args: get_argument_names(&f.opt),
                     }))
