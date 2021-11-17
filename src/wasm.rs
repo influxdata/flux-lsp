@@ -96,7 +96,7 @@ impl Outgoing {
                 format!(
                     "Content-Length:{}\r\n\r\n{}",
                     lines[0],
-                    body[..length].to_string()
+                    &body[..length]
                 )
             } else {
                 format!("Content-Length:{}", possible_message)

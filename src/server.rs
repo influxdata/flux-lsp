@@ -3765,13 +3765,12 @@ impl Completable for PackageResult {
         let mut insert_text = self.name.clone();
 
         if imports
-            .clone()
-            .into_iter()
-            .map(|x| x.path)
-            .any(|x| x == self.full_name)
+            .iter()
+            .map(|x| &x.path)
+            .any(|x| *x == self.full_name)
         {
             let alias =
-                find_alias_name(imports, self.name.clone(), 1);
+                find_alias_name(&imports, self.name.clone(), 1);
 
             let new_text = if let Some(alias) = alias {
                 insert_text = alias.clone();
@@ -3998,7 +3997,7 @@ fn get_builtins(list: &mut Vec<Box<dyn Completable>>) {
 }
 
 fn find_alias_name(
-    imports: Vec<Import>,
+    imports: &[Import],
     name: String,
     iteration: i32,
 ) -> Option<String> {
@@ -4009,13 +4008,13 @@ fn find_alias_name(
         format!("{}{}", name, iteration)
     };
 
-    for import in imports.clone() {
+    for import in imports {
         if import.alias == pkg_name {
             return find_alias_name(imports, name, iteration + 1);
         }
 
-        if let Some(initial_name) = import.initial_name {
-            if initial_name == pkg_name && first_iteration {
+        if let Some(initial_name) = &import.initial_name {
+            if *initial_name == pkg_name && first_iteration {
                 return find_alias_name(imports, name, iteration + 1);
             }
         }
