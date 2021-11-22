@@ -3,7 +3,7 @@ use std::rc::Rc;
 
 use crate::shared::get_package_name;
 
-use flux::semantic::nodes::*;
+use flux::semantic::nodes::Expression;
 use flux::semantic::walk::{self, Node, Visitor};
 use lspower::lsp;
 
