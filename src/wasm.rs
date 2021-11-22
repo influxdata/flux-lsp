@@ -1,325 +1,419 @@
-// `rustc` incorrectly identifies the `pub` symbols as dead code, as wasm_bindgen
-// is the tool that exports the interfaces. In this case, it is not a reliable lint.
-//
-// The `wasm_bindgen` macro itself expands to use `panic`, which `clippy::panic`
-// isn't a big fan of. _This_ code should not call `panic`, but there isn't a
-// way to enforce it on the macro-generated code.
-#![allow(dead_code, clippy::panic)]
-/// Wasm functionality, including wasm exported functions.
-///
-use std::ops::Add;
-use std::str;
+#![allow(dead_code, clippy::panic, clippy::unwrap_used)]
+use std::sync::{Arc, Mutex};
 
-use flux::ast::File;
-use flux::formatter::convert_to_string;
-use flux::parser::Parser;
 use futures::prelude::*;
-use js_sys::{Function, Promise};
-use serde::{Deserialize, Serialize};
-use tower_service::Service;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::future_to_promise;
 
 use crate::LspServer;
 
-fn wrap_message(s: String) -> String {
-    let st = s.clone();
-    let result = st.as_bytes();
-    let size = result.len();
-
-    format!("Content-Length: {}\r\n\r\n{}", size, s)
-}
-
-#[derive(Serialize)]
-struct ResponseError {
-    code: u32,
-    message: String,
-}
-
+/// Initialize logging - this requires the "console_log" feature to function,
+/// as this library adds 180k to the wasm binary being shipped.
+#[allow(non_snake_case, dead_code)]
 #[wasm_bindgen]
-#[derive(Deserialize)]
-struct ServerResponse {
-    message: Option<String>,
-    error: Option<String>,
+pub fn initLog() {
+    #[cfg(feature = "console_log")]
+    console_log::init_with_level(log::Level::Trace)
+        .expect("error initializing log");
 }
 
-#[wasm_bindgen]
-impl ServerResponse {
-    pub fn get_message(&self) -> Option<String> {
-        self.message.clone()
+struct Incoming {
+    messages: Arc<Mutex<Vec<u8>>>,
+}
+
+impl futures::io::AsyncRead for Incoming {
+    #[inline]
+    fn poll_read(
+        self: std::pin::Pin<&mut Self>,
+        _: &mut async_std::task::Context<'_>,
+        buffer: &mut [u8],
+    ) -> async_std::task::Poll<async_std::io::Result<usize>> {
+        let mut messages = self.messages.lock().unwrap();
+        if messages.is_empty() {
+            return async_std::task::Poll::Pending;
+        }
+        let mut length = messages.len();
+        if messages.len() > buffer.len() {
+            length = buffer.len();
+        }
+        buffer[..length].copy_from_slice(&messages[..length]);
+
+        messages.drain(0..length);
+        async_std::task::Poll::Ready(Ok(length))
     }
-
-    pub fn get_error(&self) -> Option<String> {
-        self.error.clone()
-    }
 }
 
-#[derive(Serialize)]
-struct ServerError {
-    id: u32,
-    error: ResponseError,
-    jsonrpc: String,
+struct Outgoing {
+    server: Arc<Lsp>,
+    buffer: Arc<Mutex<Vec<u8>>>,
 }
 
-#[wasm_bindgen]
-pub struct Server {
-    service: lspower::LspService,
-}
-
-#[wasm_bindgen]
-impl Server {
-    #[wasm_bindgen(constructor)]
-    pub fn new(
-        disable_folding: bool,
-        _support_multiple_files: bool,
-    ) -> Self {
-        console_error_panic_hook::set_once();
-
-        let (service, _messages) =
-            lspower::LspService::new(|_client| {
-                let mut server = LspServer::default();
-                if disable_folding {
-                    server = server.disable_folding();
-                }
-                server
-            });
-
-        Server { service }
-    }
-
-    pub fn process(&mut self, msg: String) -> Promise {
-        let json_contents: String =
-            msg.lines().skip(2).fold(String::new(), |c, l| c.add(l));
-
-        let message: lspower::jsonrpc::Incoming =
-            match serde_json::from_str(&json_contents) {
-                Ok(value) => value,
-                Err(err) => {
-                    return Promise::resolve(
-                        &ServerResponse {
-                            message: None,
-                            error: Some(format!("{}", err)),
-                        }
-                        .into(),
-                    )
-                }
-            };
-        // We have to use `AssertUnwindSafe` here to allow us to catch the panic so that we do not
-        // crash wasm
-        let call =
-            std::panic::AssertUnwindSafe(self.service.call(message));
-        future_to_promise(async move {
-            match call.await {
-                Ok(result) => match result {
-                    Some(result_inner) => match result_inner {
-                        lspower::jsonrpc::Outgoing::Response(
-                            response,
-                        ) => match serde_json::to_string(&response) {
-                            Ok(value) => {
-                                Ok(JsValue::from(ServerResponse {
-                                    message: Some(wrap_message(
-                                        value,
-                                    )),
-                                    error: None,
-                                }))
-                            }
-                            Err(err) => {
-                                Ok(JsValue::from(ServerResponse {
-                                    message: None,
-                                    error: Some(format!("{}", err)),
-                                }))
-                            }
-                        },
-                        lspower::jsonrpc::Outgoing::Request(
-                            _client_request,
-                        ) => {
-                            // Outgoing requests from server to client are
-                            // not currently implemented. This should never be
-                            // reached.
-                            Ok(JsValue::from(ServerResponse {
-                                message: None,
-                                error: Some("Server attempted to send a request to the client.".into()),
-                            }))
-                        }
-                    },
-                    None => {
-                        // Some endpoints don't have results,
-                        // e.g. textDocument/didOpen
-                        Ok(JsValue::from(ServerResponse {
-                            message: None,
-                            error: None,
-                        }))
-                    }
-                },
-                Err(err) => Ok(JsValue::from(ServerResponse {
-                    message: None,
-                    error: Some(format!("{}", err)),
-                })),
-            }
-        }.catch_unwind().unwrap_or_else(|err| {
-            Err(JsValue::from(format_panic(err)))
-        }))
-    }
-
-    pub fn register_buckets_callback(&mut self, _f: Function) {}
-    pub fn register_measurements_callback(&mut self, _f: Function) {}
-    pub fn register_tag_keys_callback(&mut self, _f: Function) {}
-    pub fn register_tag_values_callback(&mut self, _f: Function) {}
-}
-
-fn format_panic(err: Box<dyn std::any::Any>) -> String {
-    // Panics are usually just `String` or `&str` so try to convert to those to display their message.
-    err.downcast::<String>().map(|s| *s).unwrap_or_else(|err| {
-        err.downcast::<&str>()
-            .ok()
-            .map(|s| s.to_string())
-            .unwrap_or_else(|| "Unknown panic occurred".to_string())
-    })
-}
-
-/// Parse flux into an AST representation. The AST will be generated regardless
-/// of valid flux. As such, no error handling is needed.
-#[wasm_bindgen]
-pub fn parse(script: &str) -> JsValue {
-    let mut parser = Parser::new(script);
-    let parsed = parser.parse_file("".to_string());
-
-    match JsValue::from_serde(&parsed) {
-        Ok(value) => value,
-        Err(err) => {
-            log::error!("{}", err);
-            JsValue::from(script)
+impl Outgoing {
+    pub fn new(server: Arc<Lsp>) -> Self {
+        Outgoing {
+            server,
+            buffer: Arc::new(Mutex::new(vec![])),
         }
     }
 }
 
-/// Format a flux script from AST.
-///
-/// In the event that the flux is invalid syntax, an Err will be returned,
-/// which will translate into a JavaScript exception being thrown.
+impl Outgoing {
+    /// Convert raw bytes into a vector of messages.
+    fn buffer_to_messages(&self) -> Vec<String> {
+        // XXX: rockstar (19 Nov 2021) - There is a glaring bug here where, should
+        // the response have 'Content-Length:' in it, e.g. the content being formatted,
+        // this will get broken in a way that isn't recoverable. The fix is to make
+        // parsing stateful, but that can be done without affecting the public API,
+        // and that's what's driving this work on a deadline currently.
+        let mut byte_count = 0;
+        let mut messages = vec![];
+        let mut buffer = self.buffer.lock().unwrap();
+        let buffer_string = std::str::from_utf8(&buffer).unwrap();
+        let possible_messages =
+            buffer_string.split("Content-Length:");
+        for possible_message in
+            possible_messages.filter(|msg| !msg.is_empty())
+        {
+            let lines: Vec<&str> =
+                possible_message.split("\r\n").collect();
+            if lines.len() < 3 {
+                // Message is not complete yet.
+                continue;
+            }
+            let body: String = if lines.len() > 3 {
+                lines[2..].join("\r\n").trim_start().into()
+            } else {
+                lines[2].into()
+            };
+            // If lines[1] is not empty, is that a malformed message?
+            // Should a check be made?
+            let length = lines[0].trim().parse::<usize>().unwrap();
+            if length > body.len() {
+                // Message body is not complete
+                continue;
+            }
+            let message = if length < body.len() {
+                format!(
+                    "Content-Length:{}\r\n\r\n{}",
+                    lines[0],
+                    body[..length].to_string()
+                )
+            } else {
+                format!("Content-Length:{}", possible_message)
+            };
+            byte_count += message.len();
+            messages.push(message);
+        }
+        buffer.drain(..byte_count);
+
+        messages
+    }
+}
+
+impl async_std::io::Write for Outgoing {
+    #[inline]
+    fn poll_write(
+        self: std::pin::Pin<&mut Self>,
+        _: &mut async_std::task::Context<'_>,
+        buffer: &[u8],
+    ) -> async_std::task::Poll<async_std::io::Result<usize>> {
+        let mut internal_buffer = self.buffer.lock().unwrap();
+        internal_buffer.extend_from_slice(&buffer[..buffer.len()]);
+
+        async_std::task::Poll::Ready(Ok(buffer.len()))
+    }
+
+    #[inline]
+    fn poll_flush(
+        self: std::pin::Pin<&mut Self>,
+        _: &mut async_std::task::Context<'_>,
+    ) -> async_std::task::Poll<async_std::io::Result<()>> {
+        let messages = self.buffer_to_messages();
+        for message in messages {
+            self.server.fire(&message);
+        }
+        async_std::task::Poll::Ready(Ok(()))
+    }
+
+    #[inline]
+    fn poll_close(
+        self: std::pin::Pin<&mut Self>,
+        _: &mut async_std::task::Context<'_>,
+    ) -> async_std::task::Poll<async_std::io::Result<()>> {
+        async_std::task::Poll::Ready(Ok(()))
+    }
+}
+
+/// Lsp is the core lsp server interface.
 #[wasm_bindgen]
-pub fn format_from_js_file(
-    js_file: JsValue,
-) -> Result<String, JsValue> {
-    match js_file.into_serde::<File>() {
-        Ok(file) => match convert_to_string(&file) {
-            Ok(formatted) => Ok(formatted),
-            Err(e) => Err(format!("{}", e).into()),
-        },
-        Err(e) => Err(format!("{}", e).into()),
+pub struct Lsp {
+    message_handlers: Vec<js_sys::Function>,
+    incoming: Arc<Mutex<Vec<u8>>>,
+}
+
+impl Default for Lsp {
+    fn default() -> Self {
+        console_error_panic_hook::set_once();
+
+        let incoming = Arc::new(Mutex::new(vec![]));
+
+        Lsp {
+            message_handlers: vec![],
+            incoming,
+        }
+    }
+}
+
+#[wasm_bindgen]
+impl Lsp {
+    #[wasm_bindgen(constructor)]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Fire the message handlers with the server message.
+    pub(crate) fn fire(&self, msg: &str) {
+        for handler in self.message_handlers.iter() {
+            // Set the context to `undefined` explicitly, so the error
+            // message on `this` usage is clear.
+            log::debug!("firing");
+            if let Err(err) =
+                handler.call1(&JsValue::UNDEFINED, &msg.into())
+            {
+                log::error!("{:?}", err);
+            }
+        }
+    }
+
+    /// Attach a message handler to server messages.
+    #[allow(non_snake_case)]
+    pub fn onMessage(&mut self, func: js_sys::Function) {
+        self.message_handlers.push(func)
+    }
+
+    /// Send a message to the server.
+    pub fn send(&mut self, msg: String) -> js_sys::Promise {
+        let incoming = self.incoming.clone();
+        future_to_promise(async move {
+            let mut buffer = incoming.lock().unwrap();
+            buffer.extend_from_slice(msg.as_bytes());
+            Ok(JsValue::UNDEFINED)
+        })
+    }
+
+    /// Run the server.
+    ///
+    /// Note: this will run for the lifetime of the server. It should not be
+    /// `await`ed. However, as it returns a Promise, it's a good idea to attach
+    /// handlers for completion and error. If the promise ever resolves, the server
+    /// is no longer running, which may serve as a hint that attention is needed.
+    pub fn run(self) -> js_sys::Promise {
+        let (service, messages) =
+            lspower::LspService::new(|_client| LspServer::default());
+        let server = lspower::Server::new(
+            Incoming {
+                messages: self.incoming.clone(),
+            },
+            Outgoing::new(Arc::new(self)),
+        )
+        .interleave(messages);
+        let future =
+            std::panic::AssertUnwindSafe(server.serve(service));
+        future_to_promise(
+            async move {
+                future.await;
+                Ok(JsValue::UNDEFINED)
+            }
+            .catch_unwind()
+            .unwrap_or_else(|err| {
+                Err(JsValue::from({
+                    err.downcast::<String>()
+                        .map(|s| *s)
+                        .unwrap_or_else(|err| {
+                            err.downcast::<&str>()
+                                .ok()
+                                .map(|s| s.to_string())
+                                .unwrap_or_else(|| {
+                                    "Unknown panic occurred"
+                                        .to_string()
+                                })
+                        })
+                }))
+            }),
+        )
     }
 }
 
 #[cfg(test)]
 mod test {
-    #![allow(deprecated)]
     use wasm_bindgen_test::*;
 
     use super::*;
 
-    /// Valid flux is parsed, and a JavaScript object is returned.
     #[wasm_bindgen_test]
-    fn test_parse() {
-        let script = r#"option task = { name: "beetle", every: 1h }
-from(bucket: "inbucket")
-  |> range(start: -task.every)
-  |> filter(fn: (r) => r["_measurement"] == "activity")
-  |> filter(fn: (r) => r["target"] == "crumbs")"#;
-
-        let parsed = parse(&script);
-
-        assert!(parsed.is_object());
-    }
-
-    /// Invalid flux is still parsed, and a JavaScript object is returned.
-    #[wasm_bindgen_test]
-    fn test_parse_invalid() {
-        let script = r#"this isn't flux"#;
-
-        let parsed = parse(&script);
-
-        assert!(parsed.is_object());
-    }
-
-    #[wasm_bindgen_test]
-    fn test_format_from_js_file() {
-        let expected = r#"option task = {name: "beetle", every: 1h}
-
-from(bucket: "inbucket")
-    |> range(start: -task.every)
-    |> filter(fn: (r) => r["_measurement"] == "activity")"#;
-
-        let script = r#"option task={name:"beetle",every:1h} from(bucket:"inbucket")
-|>range(start:-task.every)|>filter(fn:(r)=>r["_measurement"]=="activity")"#;
-        let parsed = parse(&script);
-
-        let formatted = format_from_js_file(parsed).unwrap();
-
-        assert_eq!(expected, formatted);
-    }
-
-    #[wasm_bindgen_test]
-    fn test_format_from_js_file_invalid() {
-        let script = r#"from(bucket:this isn't flux"#;
-        let parsed = parse(&script);
-
-        if let Err(error) = format_from_js_file(parsed) {
-            assert_eq!(
-                "invalid type: map, expected a string at line 1 column 2134",
-                error.as_string().unwrap()
-            );
-        } else {
-            panic!("Formatting invalid flux did not throw an error");
-        }
-    }
-
-    // The following code provides helpers for converting a JsValue into the
-    // object that it originated from on this side of the wasm boundary.
-    // Please see https://github.com/rustwasm/wasm-bindgen/issues/2231 for
-    // more information.
-    use wasm_bindgen::convert::FromWasmAbi;
-
-    pub fn jsvalue_to_server_response<T: FromWasmAbi<Abi = u32>>(
-        js: JsValue,
-    ) -> Result<T, JsValue> {
-        let ctor_name = js_sys::Object::get_prototype_of(&js)
-            .constructor()
-            .name();
-        if ctor_name == "ServerResponse" {
-            let ptr =
-                js_sys::Reflect::get(&js, &JsValue::from_str("ptr"))?;
-            let ptr_u32: u32 =
-                ptr.as_f64().ok_or(JsValue::NULL)? as u32;
-            let foo = unsafe { T::from_abi(ptr_u32) };
-            Ok(foo)
-        } else {
-            Err(JsValue::NULL)
-        }
-    }
-
-    #[wasm_bindgen_test]
-    async fn test_server_initialize() {
+    async fn test_lsp() {
         let message = r#"Content-Length: 84
 
 {"method": "initialize", "params": { "capabilities": {}}, "jsonrpc": "2.0", "id": 1}"#;
-        let mut server = Server::new(true, false);
-        let promise = server.process(message.to_string());
-        let result = wasm_bindgen_futures::JsFuture::from(promise)
+
+        let mut server = Lsp::new();
+        let _ = server.send(message.into());
+
+        let promise = server.run();
+        let _result = wasm_bindgen_futures::JsFuture::from(promise)
             .await
             .unwrap();
+    }
 
-        assert!(result.is_object());
-        let response: ServerResponse =
-            jsvalue_to_server_response(result).unwrap();
+    #[test]
+    fn test_buffer_to_messages_complete_message() {
+        let message = r#"Content-Length: 84
 
-        let error = response.get_error();
-        assert!(error.is_none());
+{"method": "initialize", "params": { "capabilities": {}}, "jsonrpc": "2.0", "id": 1}"#.replace("\n", "\r\n");
+        let buffer: Vec<u8> = message.as_bytes().into();
 
-        /* We don't actually care about the _contents_ of the message, just that
-         * there is a message. There are other tests that assert the
-         * rest of this functionality.
-         */
-        let message = response.get_message();
-        assert!(message.is_some());
+        let outgoing = Outgoing {
+            server: Arc::new(Lsp::new()),
+            buffer: Arc::new(Mutex::new(buffer)),
+        };
+
+        let messages = outgoing.buffer_to_messages();
+
+        assert_eq!(messages, vec![message]);
+        assert_eq!(outgoing.buffer.lock().unwrap().len(), 0);
+    }
+
+    #[test]
+    fn test_buffer_to_messages_partial_message_one_line() {
+        let message = r#"Content-Length: 8"#;
+        let buffer: Vec<u8> = message.as_bytes().into();
+
+        let outgoing = Outgoing {
+            server: Arc::new(Lsp::new()),
+            buffer: Arc::new(Mutex::new(buffer)),
+        };
+
+        let messages = outgoing.buffer_to_messages();
+
+        assert!(messages.is_empty());
+        assert_eq!(
+            outgoing.buffer.lock().unwrap().len(),
+            message.len()
+        );
+    }
+
+    #[test]
+    fn test_buffer_to_messages_partial_message_two_lines() {
+        let message = r#"Content-Length: 84
+"#
+        .replace("\n", "\r\n");
+        let buffer: Vec<u8> = message.as_bytes().into();
+
+        let outgoing = Outgoing {
+            server: Arc::new(Lsp::new()),
+            buffer: Arc::new(Mutex::new(buffer)),
+        };
+
+        let messages = outgoing.buffer_to_messages();
+
+        assert!(messages.is_empty());
+        assert_eq!(
+            outgoing.buffer.lock().unwrap().len(),
+            message.len()
+        );
+    }
+
+    #[test]
+    fn test_buffer_to_messages_partial_message() {
+        let message = r#"Content-Length: 84
+
+{"method": "initialize", "params": { "capabilities": {}}, "jso"#
+            .replace("\n", "\r\n");
+        let buffer: Vec<u8> = message.as_bytes().into();
+
+        let outgoing = Outgoing {
+            server: Arc::new(Lsp::new()),
+            buffer: Arc::new(Mutex::new(buffer)),
+        };
+
+        let messages = outgoing.buffer_to_messages();
+
+        assert!(messages.is_empty());
+        assert_eq!(
+            outgoing.buffer.lock().unwrap().len(),
+            message.len()
+        );
+    }
+
+    /// LSP messages don't have an end message delimiter, as the Content-Length will
+    /// indicate how long the body of the message is. This test is for ensuring we
+    /// find the correct message, trim the buffer, but retain the beginning of the
+    /// next (incomplete) message.
+    #[test]
+    fn test_buffer_to_messages_additional_message() {
+        let message = r#"Content-Length: 84
+
+{"method": "initialize", "params": { "capabilities": {}}, "jsonrpc": "2.0", "id": 1}Content-Le"#.replace("\n", "\r\n");
+        let buffer: Vec<u8> = message.as_bytes().into();
+
+        let outgoing = Outgoing {
+            server: Arc::new(Lsp::new()),
+            buffer: Arc::new(Mutex::new(buffer)),
+        };
+
+        let messages = outgoing.buffer_to_messages();
+
+        assert_eq!(messages.len(), 1);
+        assert_eq!(
+            outgoing.buffer.lock().unwrap().len(),
+            "Content-Le".len()
+        );
+    }
+
+    #[test]
+    fn test_buffer_to_messages_additional_message_split() {
+        let message = r#"Content-Length: 84
+
+{"method": "initialize", "params": { "capabilities": {}}, "jsonrpc": "2.0", "id": 1}Content-Length: 1"#.replace("\n", "\r\n");
+        let buffer: Vec<u8> = message.as_bytes().into();
+
+        let outgoing = Outgoing {
+            server: Arc::new(Lsp::new()),
+            buffer: Arc::new(Mutex::new(buffer)),
+        };
+
+        let messages = outgoing.buffer_to_messages();
+
+        assert_eq!(messages.len(), 1);
+        assert_eq!(
+            outgoing.buffer.lock().unwrap().len(),
+            "Content-Length: 1".len()
+        );
+    }
+
+    #[test]
+    fn test_buffer_to_messages_additional_errant_control_characters_in_body(
+    ) {
+        let message = r#"Content-Length: 86
+
+{"method": "initialize", "params": { "capabilities": {
+}}, "jsonrpc": "2.0", "id": 1}Content-Length: 1"#
+            .replace("\n", "\r\n");
+        let buffer: Vec<u8> = message.as_bytes().into();
+
+        let outgoing = Outgoing {
+            server: Arc::new(Lsp::new()),
+            buffer: Arc::new(Mutex::new(buffer)),
+        };
+
+        let messages = outgoing.buffer_to_messages();
+
+        // We assert the contents properly in other tests. The length will suffice
+        // for the purposes of this test.
+        assert_eq!(messages.len(), 1);
+        assert_eq!(
+            outgoing.buffer.lock().unwrap().len(),
+            "Content-Length: 1".len()
+        );
     }
 }
