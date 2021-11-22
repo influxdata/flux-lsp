@@ -37,6 +37,18 @@ In any case, you need to recognize the `filetype`. This is done looking at the f
 au BufRead,BufNewFile *.flux        set filetype=flux
 ```
 
+### with neovim-lspconfig
+
+Requires [neovim-lspconfig](https://github.com/neovim/nvim-lspconfig)
+
+in your init.vim
+
+```vimrc
+require'lspconfig'.flux-lsp.setup{}
+```
+
+See [here](https://github.com/neovim/nvim-lspconfig/blob/master/doc/server_configurations.md#flux-lsp) for more details.
+
 ### with vim-lsp
 Requires [vim-lsp](https://github.com/prabirshrestha/vim-lsp)
 
