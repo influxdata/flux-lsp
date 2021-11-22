@@ -18,7 +18,7 @@ pub fn initLog() {
 }
 
 struct Incoming {
-    messages: Arc<Mutex<Vec<String>>>,
+    messages: Arc<Mutex<Vec<u8>>>,
 }
 
 impl futures::io::AsyncRead for Incoming {
@@ -32,32 +32,81 @@ impl futures::io::AsyncRead for Incoming {
         if messages.is_empty() {
             return async_std::task::Poll::Pending;
         }
-        let mut byte_count = 0;
-        for message in messages.iter() {
-            log::debug!("writing message for read: {:?}", message);
-            let length = message.len();
-            buffer[byte_count..length]
-                .copy_from_slice(&message.as_bytes()[..length]);
-            byte_count += length;
+        let mut length = messages.len();
+        if messages.len() > buffer.len() {
+            length = buffer.len();
         }
-        // Empty out messages
-        messages.retain(|_x| false);
-        assert!(messages.len() == 0);
-        async_std::task::Poll::Ready(Ok(byte_count))
+        buffer[..length].copy_from_slice(&messages[..length]);
+
+        messages.drain(0..length);
+        async_std::task::Poll::Ready(Ok(length))
     }
 }
 
 struct Outgoing {
     server: Arc<Lsp>,
-    messages: Arc<Mutex<Vec<String>>>,
+    buffer: Arc<Mutex<Vec<u8>>>,
 }
 
 impl Outgoing {
     pub fn new(server: Arc<Lsp>) -> Self {
         Outgoing {
             server,
-            messages: Arc::new(Mutex::new(vec![])),
+            buffer: Arc::new(Mutex::new(vec![])),
         }
+    }
+}
+
+impl Outgoing {
+    /// Convert raw bytes into a vector of messages.
+    fn buffer_to_messages(&self) -> Vec<String> {
+        // XXX: rockstar (19 Nov 2021) - There is a glaring bug here where, should
+        // the response have 'Content-Length:' in it, e.g. the content being formatted,
+        // this will get broken in a way that isn't recoverable. The fix is to make
+        // parsing stateful, but that can be done without affecting the public API,
+        // and that's what's driving this work on a deadline currently.
+        let mut byte_count = 0;
+        let mut messages = vec![];
+        let mut buffer = self.buffer.lock().unwrap();
+        let buffer_string = std::str::from_utf8(&buffer).unwrap();
+        let possible_messages =
+            buffer_string.split("Content-Length:");
+        for possible_message in
+            possible_messages.filter(|msg| !msg.is_empty())
+        {
+            let lines: Vec<&str> =
+                possible_message.split("\r\n").collect();
+            if lines.len() < 3 {
+                // Message is not complete yet.
+                continue;
+            }
+            let body: String = if lines.len() > 3 {
+                lines[2..].join("\r\n").trim_start().into()
+            } else {
+                lines[2].into()
+            };
+            // If lines[1] is not empty, is that a malformed message?
+            // Should a check be made?
+            let length = lines[0].trim().parse::<usize>().unwrap();
+            if length > body.len() {
+                // Message body is not complete
+                continue;
+            }
+            let message = if length < body.len() {
+                format!(
+                    "Content-Length:{}\r\n\r\n{}",
+                    lines[0],
+                    body[..length].to_string()
+                )
+            } else {
+                format!("Content-Length:{}", possible_message)
+            };
+            byte_count += message.len();
+            messages.push(message);
+        }
+        buffer.drain(..byte_count);
+
+        messages
     }
 }
 
@@ -66,19 +115,12 @@ impl async_std::io::Write for Outgoing {
     fn poll_write(
         self: std::pin::Pin<&mut Self>,
         _: &mut async_std::task::Context<'_>,
-        buf: &[u8],
+        buffer: &[u8],
     ) -> async_std::task::Poll<async_std::io::Result<usize>> {
-        let string = std::str::from_utf8(buf).unwrap();
-        log::debug!("string: \"{}\"", string);
-        let parts = string.split("Content-Length:");
-        let mut byte_count = 0;
-        for part in parts.filter(|msg| !msg.is_empty()) {
-            let message = format!("Content-Length:{}", part);
-            byte_count += message.len();
-            self.server.fire(&message);
-        }
+        let mut internal_buffer = self.buffer.lock().unwrap();
+        internal_buffer.extend_from_slice(&buffer[..buffer.len()]);
 
-        async_std::task::Poll::Ready(Ok(byte_count))
+        async_std::task::Poll::Ready(Ok(buffer.len()))
     }
 
     #[inline]
@@ -86,6 +128,10 @@ impl async_std::io::Write for Outgoing {
         self: std::pin::Pin<&mut Self>,
         _: &mut async_std::task::Context<'_>,
     ) -> async_std::task::Poll<async_std::io::Result<()>> {
+        let messages = self.buffer_to_messages();
+        for message in messages {
+            self.server.fire(&message);
+        }
         async_std::task::Poll::Ready(Ok(()))
     }
 
@@ -102,7 +148,7 @@ impl async_std::io::Write for Outgoing {
 #[wasm_bindgen]
 pub struct Lsp {
     message_handlers: Vec<js_sys::Function>,
-    incoming: Arc<Mutex<Vec<String>>>,
+    incoming: Arc<Mutex<Vec<u8>>>,
 }
 
 impl Default for Lsp {
@@ -149,8 +195,8 @@ impl Lsp {
     pub fn send(&mut self, msg: String) -> js_sys::Promise {
         let incoming = self.incoming.clone();
         future_to_promise(async move {
-            let mut messages = incoming.lock().unwrap();
-            messages.push(msg);
+            let mut buffer = incoming.lock().unwrap();
+            buffer.extend_from_slice(msg.as_bytes());
             Ok(JsValue::UNDEFINED)
         })
     }
@@ -217,5 +263,157 @@ mod test {
         let _result = wasm_bindgen_futures::JsFuture::from(promise)
             .await
             .unwrap();
+    }
+
+    #[test]
+    fn test_buffer_to_messages_complete_message() {
+        let message = r#"Content-Length: 84
+
+{"method": "initialize", "params": { "capabilities": {}}, "jsonrpc": "2.0", "id": 1}"#.replace("\n", "\r\n");
+        let buffer: Vec<u8> = message.as_bytes().into();
+
+        let outgoing = Outgoing {
+            server: Arc::new(Lsp::new()),
+            buffer: Arc::new(Mutex::new(buffer)),
+        };
+
+        let messages = outgoing.buffer_to_messages();
+
+        assert_eq!(messages, vec![message]);
+        assert_eq!(outgoing.buffer.lock().unwrap().len(), 0);
+    }
+
+    #[test]
+    fn test_buffer_to_messages_partial_message_one_line() {
+        let message = r#"Content-Length: 8"#;
+        let buffer: Vec<u8> = message.as_bytes().into();
+
+        let outgoing = Outgoing {
+            server: Arc::new(Lsp::new()),
+            buffer: Arc::new(Mutex::new(buffer)),
+        };
+
+        let messages = outgoing.buffer_to_messages();
+
+        assert!(messages.is_empty());
+        assert_eq!(
+            outgoing.buffer.lock().unwrap().len(),
+            message.len()
+        );
+    }
+
+    #[test]
+    fn test_buffer_to_messages_partial_message_two_lines() {
+        let message = r#"Content-Length: 84
+"#
+        .replace("\n", "\r\n");
+        let buffer: Vec<u8> = message.as_bytes().into();
+
+        let outgoing = Outgoing {
+            server: Arc::new(Lsp::new()),
+            buffer: Arc::new(Mutex::new(buffer)),
+        };
+
+        let messages = outgoing.buffer_to_messages();
+
+        assert!(messages.is_empty());
+        assert_eq!(
+            outgoing.buffer.lock().unwrap().len(),
+            message.len()
+        );
+    }
+
+    #[test]
+    fn test_buffer_to_messages_partial_message() {
+        let message = r#"Content-Length: 84
+
+{"method": "initialize", "params": { "capabilities": {}}, "jso"#
+            .replace("\n", "\r\n");
+        let buffer: Vec<u8> = message.as_bytes().into();
+
+        let outgoing = Outgoing {
+            server: Arc::new(Lsp::new()),
+            buffer: Arc::new(Mutex::new(buffer)),
+        };
+
+        let messages = outgoing.buffer_to_messages();
+
+        assert!(messages.is_empty());
+        assert_eq!(
+            outgoing.buffer.lock().unwrap().len(),
+            message.len()
+        );
+    }
+
+    /// LSP messages don't have an end message delimiter, as the Content-Length will
+    /// indicate how long the body of the message is. This test is for ensuring we
+    /// find the correct message, trim the buffer, but retain the beginning of the
+    /// next (incomplete) message.
+    #[test]
+    fn test_buffer_to_messages_additional_message() {
+        let message = r#"Content-Length: 84
+
+{"method": "initialize", "params": { "capabilities": {}}, "jsonrpc": "2.0", "id": 1}Content-Le"#.replace("\n", "\r\n");
+        let buffer: Vec<u8> = message.as_bytes().into();
+
+        let outgoing = Outgoing {
+            server: Arc::new(Lsp::new()),
+            buffer: Arc::new(Mutex::new(buffer)),
+        };
+
+        let messages = outgoing.buffer_to_messages();
+
+        assert_eq!(messages.len(), 1);
+        assert_eq!(
+            outgoing.buffer.lock().unwrap().len(),
+            "Content-Le".len()
+        );
+    }
+
+    #[test]
+    fn test_buffer_to_messages_additional_message_split() {
+        let message = r#"Content-Length: 84
+
+{"method": "initialize", "params": { "capabilities": {}}, "jsonrpc": "2.0", "id": 1}Content-Length: 1"#.replace("\n", "\r\n");
+        let buffer: Vec<u8> = message.as_bytes().into();
+
+        let outgoing = Outgoing {
+            server: Arc::new(Lsp::new()),
+            buffer: Arc::new(Mutex::new(buffer)),
+        };
+
+        let messages = outgoing.buffer_to_messages();
+
+        assert_eq!(messages.len(), 1);
+        assert_eq!(
+            outgoing.buffer.lock().unwrap().len(),
+            "Content-Length: 1".len()
+        );
+    }
+
+    #[test]
+    fn test_buffer_to_messages_additional_errant_control_characters_in_body(
+    ) {
+        let message = r#"Content-Length: 86
+
+{"method": "initialize", "params": { "capabilities": {
+}}, "jsonrpc": "2.0", "id": 1}Content-Length: 1"#
+            .replace("\n", "\r\n");
+        let buffer: Vec<u8> = message.as_bytes().into();
+
+        let outgoing = Outgoing {
+            server: Arc::new(Lsp::new()),
+            buffer: Arc::new(Mutex::new(buffer)),
+        };
+
+        let messages = outgoing.buffer_to_messages();
+
+        // We assert the contents properly in other tests. The length will suffice
+        // for the purposes of this test.
+        assert_eq!(messages.len(), 1);
+        assert_eq!(
+            outgoing.buffer.lock().unwrap().len(),
+            "Content-Length: 1".len()
+        );
     }
 }

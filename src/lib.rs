@@ -1,5 +1,10 @@
 #![cfg_attr(feature = "strict", deny(warnings))]
-#![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#![deny(
+    clippy::expect_used,
+    clippy::panic,
+    clippy::unwrap_used,
+    clippy::wildcard_imports
+)]
 mod convert;
 mod server;
 mod shared;
