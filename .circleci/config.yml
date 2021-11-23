@@ -11,7 +11,7 @@ jobs:
           command: cargo fmt --all -- --check
       - run:
           name: "run lint"
-          command: cargo clippy --all --features=wasm_next -- -Dclippy::all
+          command: cargo clippy --all -- -Dclippy::all
 
   test:
     docker:
@@ -37,7 +37,7 @@ jobs:
     resource_class: large
     steps:
       - checkout
-      - run: cargo build --verbose --features=wasm_next
+      - run: cargo build --verbose
 
   wasm-build:
     docker:
