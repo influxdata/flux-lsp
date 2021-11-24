@@ -97,19 +97,19 @@ impl<'a> Visitor<'a> for IdentFinderVisitor<'a> {
         match node.clone() {
             walk::Node::MemberExpr(m) => {
                 if let Expression::Identifier(i) = m.object.clone() {
-                    if i.name == state.name {
+                    if *i.name == state.name {
                         return true;
                     }
                 }
                 return false;
             }
             walk::Node::Identifier(n) => {
-                if n.name == state.name {
+                if *n.name == state.name {
                     state.identifiers.push(node.clone());
                 }
             }
             walk::Node::IdentifierExpr(n) => {
-                if n.name == state.name {
+                if *n.name == state.name {
                     state.identifiers.push(node.clone());
                 }
             }
@@ -146,7 +146,7 @@ impl<'a> Visitor<'a> for DefinitionFinderVisitor<'a> {
 
         match node {
             walk::Node::VariableAssgn(v) => {
-                if v.id.name == state.name {
+                if *v.id.name == state.name {
                     state.node = Some(node.clone());
                     return false;
                 }
@@ -215,7 +215,7 @@ impl<'a> Visitor<'a> for ImportFinderVisitor {
 
         if let Node::ImportDeclaration(import) = node {
             let alias = match import.alias.clone() {
-                Some(alias) => alias.name,
+                Some(alias) => alias.name.to_string(),
                 None => get_package_name(import.path.value.clone())
                     .unwrap_or_else(|| "".to_string()),
             };

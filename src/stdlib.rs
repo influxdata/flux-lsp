@@ -143,9 +143,12 @@ pub fn get_package_infos() -> Vec<PackageInfo> {
 
     if let Some(env) = imports() {
         for (path, _val) in env.values {
-            let name = get_package_name(path.clone());
+            let name = get_package_name(path.to_string());
             if let Some(name) = name {
-                result.push(PackageInfo { name, path })
+                result.push(PackageInfo {
+                    name,
+                    path: path.to_string(),
+                })
             }
         }
     }
@@ -191,10 +194,15 @@ pub fn get_package_functions(name: String) -> Vec<Function> {
 
     if let Some(env) = imports() {
         for (key, val) in env.values {
-            if let Some(package_name) = get_package_name(key.clone())
+            if let Some(package_name) =
+                get_package_name(key.to_string())
             {
                 if package_name == name {
-                    walk_package_functions(key, &mut list, val.expr);
+                    walk_package_functions(
+                        key.to_string(),
+                        &mut list,
+                        val.expr,
+                    );
                 }
             }
         }
@@ -234,7 +242,7 @@ pub fn get_stdlib_functions() -> Vec<FunctionInfo> {
         for (name, val) in env.values {
             if let MonoType::Fun(f) = val.expr {
                 results.push(FunctionInfo::new(
-                    name,
+                    name.to_string(),
                     f.as_ref(),
                     BUILTIN_PACKAGE.to_string(),
                 ));
@@ -244,7 +252,7 @@ pub fn get_stdlib_functions() -> Vec<FunctionInfo> {
 
     if let Some(imports) = imports() {
         for (name, val) in imports.values {
-            walk_functions(name, &mut results, val.expr);
+            walk_functions(name.to_string(), &mut results, val.expr);
         }
     }
 
@@ -263,7 +271,7 @@ pub fn get_builtin_functions() -> Vec<Function> {
                 }
 
                 list.push(Function {
-                    name: key.clone(),
+                    name: key.to_string(),
                     params,
                 })
             }

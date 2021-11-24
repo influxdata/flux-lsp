@@ -16,7 +16,7 @@ fn parse_variable_assignment(
     if let Expression::Function(f) = va.init.clone() {
         result.push(lsp::SymbolInformation {
             kind: lsp::SymbolKind::Function,
-            name: va.id.name.clone(),
+            name: va.id.name.to_string(),
             location: lsp::Location {
                 uri: uri.clone(),
                 range: lsp::Range {
@@ -38,7 +38,7 @@ fn parse_variable_assignment(
         for param in f.params {
             result.push(lsp::SymbolInformation {
                 kind: lsp::SymbolKind::Variable,
-                name: param.key.name,
+                name: param.key.name.to_string(),
                 location: lsp::Location {
                     uri: uri.clone(),
                     range: lsp::Range {
@@ -60,7 +60,7 @@ fn parse_variable_assignment(
     } else {
         result.push(lsp::SymbolInformation {
             kind: lsp::SymbolKind::Variable,
-            name: va.id.name.clone(),
+            name: va.id.name.to_string(),
             location: lsp::Location {
                 uri,
                 range: lsp::Range {
@@ -92,7 +92,7 @@ fn parse_call_expression(
     if let Expression::Identifier(ident) = c.callee.clone() {
         result.push(lsp::SymbolInformation {
             kind: lsp::SymbolKind::Function,
-            name: ident.name,
+            name: ident.name.to_string(),
             location: lsp::Location {
                 uri: uri.clone(),
                 range: lsp::Range {
@@ -116,7 +116,7 @@ fn parse_call_expression(
         if let Expression::Function(_) = arg.value {
             result.push(lsp::SymbolInformation {
                 kind: lsp::SymbolKind::Function,
-                name: arg.key.name.clone(),
+                name: arg.key.name.to_string(),
                 location: lsp::Location {
                     uri: uri.clone(),
                     range: lsp::Range {
@@ -137,7 +137,7 @@ fn parse_call_expression(
         } else {
             result.push(lsp::SymbolInformation {
                 kind: lsp::SymbolKind::Variable,
-                name: arg.key.name.clone(),
+                name: arg.key.name.to_string(),
                 location: lsp::Location {
                     uri: uri.clone(),
                     range: lsp::Range {
@@ -170,7 +170,7 @@ fn parse_binary_expression(
     if let Expression::Identifier(ident) = be.left.clone() {
         result.push(lsp::SymbolInformation {
             kind: lsp::SymbolKind::Variable,
-            name: ident.name.clone(),
+            name: ident.name.to_string(),
             location: lsp::Location {
                 uri: uri.clone(),
                 range: lsp::Range {
@@ -193,7 +193,7 @@ fn parse_binary_expression(
     if let Expression::Identifier(ident) = be.right.clone() {
         result.push(lsp::SymbolInformation {
             kind: lsp::SymbolKind::Variable,
-            name: ident.name.clone(),
+            name: ident.name.to_string(),
             location: lsp::Location {
                 uri,
                 range: lsp::Range {
