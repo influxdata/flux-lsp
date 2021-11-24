@@ -61,9 +61,10 @@ impl<'a> Visitor<'a> for FunctionFinderVisitor {
                             params.push(opt);
                         }
 
-                        state
-                            .functions
-                            .push(Function { name, params })
+                        state.functions.push(Function {
+                            name: name.to_string(),
+                            params,
+                        })
                     }
                 }
             }
@@ -86,9 +87,10 @@ impl<'a> Visitor<'a> for FunctionFinderVisitor {
                                 params.push(opt);
                             }
 
-                            state
-                                .functions
-                                .push(Function { name, params })
+                            state.functions.push(Function {
+                                name: name.to_string(),
+                                params,
+                            })
                         }
                     }
                 }
@@ -132,14 +134,14 @@ impl<'a> Visitor<'a> for ObjectFunctionFinderVisitor {
                             let params = fun
                                 .params
                                 .into_iter()
-                                .map(|p| p.key.name)
+                                .map(|p| p.key.name.to_string())
                                 .collect::<Vec<String>>();
 
                             if let Ok(mut state) = self.state.lock() {
                                 state.results.push(ObjectFunction {
-                                    object: object_name,
+                                    object: object_name.to_string(),
                                     function: Function {
-                                        name: func_name,
+                                        name: func_name.to_string(),
                                         params,
                                     },
                                 });
@@ -166,7 +168,7 @@ impl<'a> Visitor<'a> for ObjectFunctionFinderVisitor {
                                 let params = fun
                                     .params
                                     .into_iter()
-                                    .map(|p| p.key.name)
+                                    .map(|p| p.key.name.to_string())
                                     .collect::<Vec<String>>();
 
                                 if let Ok(mut state) =
@@ -174,9 +176,11 @@ impl<'a> Visitor<'a> for ObjectFunctionFinderVisitor {
                                 {
                                     state.results.push(
                                         ObjectFunction {
-                                            object: object_name,
+                                            object: object_name
+                                                .to_string(),
                                             function: Function {
-                                                name: func_name,
+                                                name: func_name
+                                                    .to_string(),
                                                 params,
                                             },
                                         },

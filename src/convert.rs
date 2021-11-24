@@ -84,7 +84,7 @@ mod tests {
                 source: None,
             },
             typ: MonoType::String,
-            name: "a".to_string(),
+            name: "a".into(),
         };
         let node = Node::IdentifierExpr(&expr);
 

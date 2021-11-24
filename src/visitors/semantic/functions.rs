@@ -61,7 +61,7 @@ impl<'a> Visitor<'a> for FunctionFinderVisitor {
 
         if let Node::VariableAssgn(assgn) = node {
             if let Some(f) = create_function_result(
-                assgn.id.name.clone(),
+                assgn.id.name.to_string(),
                 &assgn.init,
             ) {
                 let mut state = self.state.borrow_mut();

@@ -523,11 +523,11 @@ impl LanguageServer for LspServer {
                 if let flux::semantic::nodes::Expression::Member(member) = callee.clone() {
                     let name = member.property.clone();
                     if let flux::semantic::nodes::Expression::Identifier(ident) = member.object.clone() {
-                        signatures.extend(find_stdlib_signatures(name, ident.name));
+                        signatures.extend(find_stdlib_signatures(name, ident.name.to_string()));
                     }
                 } else if let flux::semantic::nodes::Expression::Identifier(ident) = callee {
                     signatures.extend(find_stdlib_signatures(
-                            ident.name,
+                            ident.name.to_string(),
                             "builtin".to_string()));
                     // XXX: rockstar (13 Jul 2021) - Add support for user defined
                     // signatures.
@@ -827,7 +827,7 @@ impl LanguageServer for LspServer {
                             }
 
                             let mut definition_visitor: DefinitionFinderVisitor =
-                                DefinitionFinderVisitor::new(node_name.clone());
+                                DefinitionFinderVisitor::new(node_name.to_string());
 
                             flux::semantic::walk::walk(
                                 &mut definition_visitor,
@@ -2697,6 +2697,7 @@ errorCounts
             "tripleExponentialDerivative",
             "true (prelude)",
             "truncateTimeColumn",
+            "types",
             "uint",
         ]
         .drain(..)
@@ -3522,17 +3523,17 @@ fn get_specific_package_functions(
             current_imports.into_iter().find(|x| x.alias == name)
         {
             for (key, val) in env.values {
-                if key == import.path {
-                    walk_package(key, list, val.expr);
+                if *key == import.path {
+                    walk_package(key.to_string(), list, val.expr);
                 }
             }
         } else {
             for (key, val) in env.values {
                 if let Some(package_name) =
-                    get_package_name(key.clone())
+                    get_package_name(key.to_string())
                 {
                     if package_name == name {
-                        walk_package(key, list, val.expr);
+                        walk_package(key.to_string(), list, val.expr);
                     }
                 }
             }
@@ -4004,7 +4005,7 @@ fn get_stdlib_completables() -> Vec<Box<dyn Completable>> {
 fn get_packages(list: &mut Vec<Box<dyn Completable>>) {
     if let Some(env) = imports() {
         for (key, _val) in env.values {
-            add_package_result(key, list);
+            add_package_result(key.to_string(), list);
         }
     }
 }
@@ -4017,7 +4018,7 @@ fn get_builtins(list: &mut Vec<Box<dyn Completable>>) {
                     list.push(Box::new(FunctionResult {
                         package: PRELUDE_PACKAGE.to_string(),
                         package_name: None,
-                        name: key.clone(),
+                        name: key.to_string(),
                         signature: create_function_signature(
                             (*f).clone(),
                         ),
@@ -4030,63 +4031,63 @@ fn get_builtins(list: &mut Vec<Box<dyn Completable>>) {
                     }))
                 }
                 MonoType::String => list.push(Box::new(VarResult {
-                    name: key.clone(),
+                    name: key.to_string(),
                     package: PRELUDE_PACKAGE.to_string(),
                     package_name: None,
                     var_type: VarType::String,
                 })),
                 MonoType::Int => list.push(Box::new(VarResult {
-                    name: key.clone(),
+                    name: key.to_string(),
                     package: PRELUDE_PACKAGE.to_string(),
                     package_name: None,
                     var_type: VarType::Int,
                 })),
                 MonoType::Float => list.push(Box::new(VarResult {
-                    name: key.clone(),
+                    name: key.to_string(),
                     package: PRELUDE_PACKAGE.to_string(),
                     package_name: None,
                     var_type: VarType::Float,
                 })),
                 MonoType::Arr(_) => list.push(Box::new(VarResult {
-                    name: key.clone(),
+                    name: key.to_string(),
                     package: PRELUDE_PACKAGE.to_string(),
                     package_name: None,
                     var_type: VarType::Array,
                 })),
                 MonoType::Bool => list.push(Box::new(VarResult {
-                    name: key.clone(),
+                    name: key.to_string(),
                     package: PRELUDE_PACKAGE.to_string(),
                     package_name: None,
                     var_type: VarType::Bool,
                 })),
                 MonoType::Bytes => list.push(Box::new(VarResult {
-                    name: key.clone(),
+                    name: key.to_string(),
                     package: PRELUDE_PACKAGE.to_string(),
                     package_name: None,
                     var_type: VarType::Bytes,
                 })),
                 MonoType::Duration => {
                     list.push(Box::new(VarResult {
-                        name: key.clone(),
+                        name: key.to_string(),
                         package: PRELUDE_PACKAGE.to_string(),
                         package_name: None,
                         var_type: VarType::Duration,
                     }))
                 }
                 MonoType::Uint => list.push(Box::new(VarResult {
-                    name: key.clone(),
+                    name: key.to_string(),
                     package: PRELUDE_PACKAGE.to_string(),
                     package_name: None,
                     var_type: VarType::Uint,
                 })),
                 MonoType::Regexp => list.push(Box::new(VarResult {
-                    name: key.clone(),
+                    name: key.to_string(),
                     package: PRELUDE_PACKAGE.to_string(),
                     package_name: None,
                     var_type: VarType::Regexp,
                 })),
                 MonoType::Time => list.push(Box::new(VarResult {
-                    name: key.clone(),
+                    name: key.to_string(),
                     package: PRELUDE_PACKAGE.to_string(),
                     package_name: None,
                     var_type: VarType::Time,
@@ -4204,7 +4205,7 @@ impl<'a> SemanticVisitor<'a> for CompletableFinderVisitor {
                     (*state).completables.push(Arc::new(
                         ImportAliasResult::new(
                             id.path.value.clone(),
-                            alias.name,
+                            alias.name.to_string(),
                         ),
                     ));
                 }
@@ -4216,14 +4217,15 @@ impl<'a> SemanticVisitor<'a> for CompletableFinderVisitor {
                     (*state).completables.push(Arc::new(
                         CompletionVarResult {
                             var_type,
-                            name: name.clone(),
+                            name: name.to_string(),
                         },
                     ));
                 }
 
-                if let Some(fun) =
-                    create_function_result(name, &assgn.init)
-                {
+                if let Some(fun) = create_function_result(
+                    name.to_string(),
+                    &assgn.init,
+                ) {
                     (*state).completables.push(Arc::new(fun));
                 }
             }
@@ -4238,15 +4240,19 @@ impl<'a> SemanticVisitor<'a> for CompletableFinderVisitor {
                         get_var_type(&var_assign.init)
                     {
                         (*state).completables.push(Arc::new(
-                            CompletionVarResult { name, var_type },
+                            CompletionVarResult {
+                                name: name.to_string(),
+                                var_type,
+                            },
                         ));
 
                         return false;
                     }
 
-                    if let Some(fun) =
-                        create_function_result(name, &var_assign.init)
-                    {
+                    if let Some(fun) = create_function_result(
+                        name.to_string(),
+                        &var_assign.init,
+                    ) {
                         (*state).completables.push(Arc::new(fun));
                         return false;
                     }
@@ -4427,7 +4433,7 @@ impl<'a> SemanticVisitor<'a> for CompletableObjectFinderVisitor {
 
             if let SemanticNode::ObjectExpr(obj) = node {
                 if let Some(ident) = &obj.with {
-                    if name == ident.name {
+                    if name == *ident.name {
                         for prop in obj.properties.clone() {
                             let name = prop.key.name;
                             if let Some(var_type) =
@@ -4436,12 +4442,12 @@ impl<'a> SemanticVisitor<'a> for CompletableObjectFinderVisitor {
                                 (*state).completables.push(Arc::new(
                                     CompletionVarResult {
                                         var_type,
-                                        name: name.clone(),
+                                        name: name.to_string(),
                                     },
                                 ));
                             }
                             if let Some(fun) = create_function_result(
-                                name,
+                                name.to_string(),
                                 &prop.value,
                             ) {
                                 (*state)
@@ -4454,7 +4460,7 @@ impl<'a> SemanticVisitor<'a> for CompletableObjectFinderVisitor {
             }
 
             if let SemanticNode::VariableAssgn(assign) = node {
-                if assign.id.name == name {
+                if *assign.id.name == name {
                     if let SemanticExpression::Object(obj) =
                         &assign.init
                     {
@@ -4467,13 +4473,13 @@ impl<'a> SemanticVisitor<'a> for CompletableObjectFinderVisitor {
                                 (*state).completables.push(Arc::new(
                                     CompletionVarResult {
                                         var_type,
-                                        name: name.clone(),
+                                        name: name.to_string(),
                                     },
                                 ));
                             }
 
                             if let Some(fun) = create_function_result(
-                                name,
+                                name.to_string(),
                                 &prop.value,
                             ) {
                                 (*state)
@@ -4492,7 +4498,7 @@ impl<'a> SemanticVisitor<'a> for CompletableObjectFinderVisitor {
                     assign,
                 ) = opt.assignment.clone()
                 {
-                    if assign.id.name == name {
+                    if *assign.id.name == name {
                         if let SemanticExpression::Object(obj) =
                             assign.init
                         {
@@ -4505,14 +4511,15 @@ impl<'a> SemanticVisitor<'a> for CompletableObjectFinderVisitor {
                                         Arc::new(
                                             CompletionVarResult {
                                                 var_type,
-                                                name: name.clone(),
+                                                name: name
+                                                    .to_string(),
                                             },
                                         ),
                                     );
                                 }
                                 if let Some(fun) =
                                     create_function_result(
-                                        name,
+                                        name.to_string(),
                                         &prop.value,
                                     )
                                 {
