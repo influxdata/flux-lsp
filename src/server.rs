@@ -213,6 +213,82 @@ impl LspServer {
             options,
         }
     }
+
+    // Get the client from out of its arc and mutex.
+    // Note the lspower::Client has a cheap clone method to make it easy
+    // to pass around many instances of the client.
+    //
+    // We leverage that here so we do not have to keep a lock or
+    // an extra reference to the client.
+    fn get_client(&self) -> Option<Client> {
+        match self.client.lock() {
+            Ok(client) => (*client).clone(),
+            Err(err) => {
+                log::error!("failed to get lock on client: {}", err);
+                None
+            }
+        }
+    }
+    // Publish any diagnostics to the client
+    async fn publish_diagnostics(&self, key: &lsp::Url, text: &str) {
+        // If we have a client back to the editor report any diagnostics found in the document
+        if let Some(client) = self.get_client() {
+            match self.compute_diagnostics(key, text) {
+                Ok(diagnostics) => {
+                    client
+                        .publish_diagnostics(
+                            key.clone(),
+                            diagnostics,
+                            None,
+                        )
+                        .await
+                }
+                // TODO(nathanielc): Report errors creating the analyzer to the client
+                Err(e) => log::error!(
+                    "failed to compute diagnostics: {}",
+                    e
+                ),
+            };
+        };
+    }
+    fn compute_diagnostics(
+        &self,
+        key: &lsp::Url,
+        text: &str,
+    ) -> Result<Vec<lsp::Diagnostic>> {
+        match flux::new_semantic_analyzer(
+            flux::semantic::AnalyzerConfig::default(),
+        ) {
+            Ok(mut analyzer) => {
+                match analyzer.analyze_source(
+                    "".to_string(),
+                    key.to_string(),
+                    text,
+                ) {
+                    // Send back empty list of diagnostics,
+                    // this is important as the client needs to
+                    // explicitly know that all previous diagnostics
+                    // are no longer relevant.
+                    Ok(_) => Ok(Vec::new()),
+                    Err(errors) => Ok(errors
+                        .iter()
+                        .map(|e| lsp::Diagnostic {
+                            range: convert::ast_to_lsp_range(
+                                &e.location,
+                            ),
+                            severity: Some(
+                                lsp::DiagnosticSeverity::ERROR,
+                            ),
+                            source: Some("flux".to_string()),
+                            message: e.error.to_string(),
+                            ..lsp::Diagnostic::default()
+                        })
+                        .collect()),
+                }
+            }
+            Err(e) => Err(e),
+        }
+    }
 }
 
 #[lspower::async_trait]
@@ -324,6 +400,7 @@ impl LanguageServer for LspServer {
     ) -> () {
         let key = params.text_document.uri;
         let value = params.text_document.text;
+        self.publish_diagnostics(&key, value.as_str()).await;
         // Add document to the store
         let mut store = match self.store.lock() {
             Ok(value) => value,
@@ -356,46 +433,7 @@ impl LanguageServer for LspServer {
         params: lsp::DidChangeTextDocumentParams,
     ) -> () {
         let key = params.text_document.uri;
-        let mut store = match self.store.lock() {
-            Ok(value) => value,
-            Err(err) => {
-                log::warn!(
-                    "Could not acquire store lock. Error: {}",
-                    err
-                );
-                return;
-            }
-        };
-        let mut contents = if let Some(contents) = store.get(&key) {
-            Cow::Borrowed(contents)
-        } else {
-            log::error!(
-                "textDocument/didChange called on unknown file {}",
-                key
-            );
-            return;
-        };
-        for change in params.content_changes {
-            contents =
-                Cow::Owned(if let Some(range) = change.range {
-                    replace_string_in_range(
-                        contents.into_owned(),
-                        range,
-                        change.text,
-                    )
-                } else {
-                    change.text
-                });
-        }
-        let new_contents = contents.into_owned();
-        store.insert(key.clone(), new_contents);
-    }
-    async fn did_save(
-        &self,
-        params: lsp::DidSaveTextDocumentParams,
-    ) -> () {
-        if let Some(text) = params.text {
-            let key = params.text_document.uri;
+        let contents = {
             let mut store = match self.store.lock() {
                 Ok(value) => value,
                 Err(err) => {
@@ -406,14 +444,64 @@ impl LanguageServer for LspServer {
                     return;
                 }
             };
-            if !store.contains_key(&key) {
-                log::warn!(
+            let mut contents = if let Some(contents) = store.get(&key)
+            {
+                Cow::Borrowed(contents)
+            } else {
+                log::error!(
+                "textDocument/didChange called on unknown file {}",
+                key
+            );
+                return;
+            };
+            for change in params.content_changes {
+                contents =
+                    Cow::Owned(if let Some(range) = change.range {
+                        replace_string_in_range(
+                            contents.into_owned(),
+                            range,
+                            change.text,
+                        )
+                    } else {
+                        change.text
+                    });
+            }
+            let new_contents = contents.into_owned();
+            let c = new_contents.clone();
+            store.insert(key.clone(), new_contents);
+            c
+        };
+        self.publish_diagnostics(&key, contents.as_str()).await;
+    }
+    async fn did_save(
+        &self,
+        params: lsp::DidSaveTextDocumentParams,
+    ) -> () {
+        if let Some(text) = params.text {
+            let key = params.text_document.uri;
+            let k = key.clone();
+            let c = text.clone();
+            {
+                let mut store = match self.store.lock() {
+                    Ok(value) => value,
+                    Err(err) => {
+                        log::warn!(
+                            "Could not acquire store lock. Error: {}",
+                            err
+                        );
+                        return;
+                    }
+                };
+                if !store.contains_key(&key) {
+                    log::warn!(
                     "textDocument/didSave called on unknown file {}",
                     key
                 );
-                return;
+                    return;
+                }
+                store.insert(key, text);
             }
-            store.insert(key, text);
+            self.publish_diagnostics(&k, c.as_str()).await;
         }
     }
     async fn did_close(

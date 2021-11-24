@@ -95,8 +95,23 @@ describe('LSP Server', () => {
         // If the test runs without a timeout then it passed.
         const runner = server.run();
         await init(server);
+        await shutdown(server, runner);
+    });
+
+    it('sends diagnostics', async () => {
+        const callback = jest.fn((message) => {
+            console.log('callback', message);
+        });
+        server.onMessage(callback);
+        const runner = server.run();
+        await init(server);
+
+        const openRequest = '{"jsonrpc": "2.0", "id": 2, "method": "textDocument/didOpen", "params": { "textDocument": {"uri":"file:///main.flux","languageId":"flux","version":1,"text":"x ="}}}';
+        await server.send(openRequest)
 
         await shutdown(server, runner);
+
+        expect(callback).toHaveBeenCalled();
     });
 });
 describe('module', () => {
