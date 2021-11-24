@@ -6,15 +6,17 @@ use anyhow::Result;
 
 use flux::semantic::nodes::FunctionParameter;
 use flux::semantic::walk;
-use lspower::jsonrpc::Result as RpcResult;
 use lspower::lsp;
 use lspower::LanguageServer;
+use lspower::{
+    jsonrpc::Error as RpcError, jsonrpc::ErrorCode as RpcErrorCode,
+    jsonrpc::Result as RpcResult, Client,
+};
 
-use crate::completion;
-use crate::convert;
 use crate::shared::FunctionSignature;
 use crate::stdlib;
 use crate::visitors::semantic;
+use crate::{completion, convert};
 
 // The spec talks specifically about setting versions for files, but isn't
 // clear on how those versions are surfaced to the client, if ever. This
@@ -164,7 +166,6 @@ pub fn find_stdlib_signatures(
         })
 }
 
-#[allow(dead_code)]
 #[derive(Clone)]
 struct LspServerOptions {
     folding: bool,
@@ -174,7 +175,6 @@ pub struct LspServerBuilder {
     options: LspServerOptions,
 }
 
-#[allow(dead_code)]
 impl LspServerBuilder {
     pub fn disable_folding(self) -> Self {
         Self {
@@ -182,8 +182,8 @@ impl LspServerBuilder {
         }
     }
 
-    pub fn build(&self) -> LspServer {
-        LspServer::new(self.options.clone())
+    pub fn build(&self, client: Option<Client>) -> LspServer {
+        LspServer::new(client, self.options.clone())
     }
 }
 
@@ -197,13 +197,18 @@ impl Default for LspServerBuilder {
 
 #[allow(dead_code)]
 pub struct LspServer {
+    client: Arc<Mutex<Option<Client>>>,
     store: FileStore,
     options: LspServerOptions,
 }
 
 impl LspServer {
-    fn new(options: LspServerOptions) -> Self {
+    fn new(
+        client: Option<Client>,
+        options: LspServerOptions,
+    ) -> Self {
         Self {
+            client: Arc::new(Mutex::new(client)),
             store: Arc::new(Mutex::new(HashMap::new())),
             options,
         }
@@ -296,6 +301,21 @@ impl LanguageServer for LspServer {
         })
     }
     async fn shutdown(&self) -> RpcResult<()> {
+        let mut client = match self.client.lock() {
+            Ok(client) => client,
+            Err(err) => {
+                return RpcResult::Err(RpcError {
+                    code: RpcErrorCode::InternalError,
+                    message: format!("{}", err),
+                    data: None,
+                })
+            }
+        };
+        // XXX(nathanielc): Replace the original client with None causing the original to be dropped.
+        // Dropping the client will close its channel allowing the receiving end
+        // to observe the end of the stream.
+        // See PR for simple change to lspower that will simplify this logic https://github.com/silvanshade/lspower/pull/20
+        *client = None;
         Ok(())
     }
     async fn did_open(
@@ -304,6 +324,7 @@ impl LanguageServer for LspServer {
     ) -> () {
         let key = params.text_document.uri;
         let value = params.text_document.text;
+        // Add document to the store
         let mut store = match self.store.lock() {
             Ok(value) => value,
             Err(err) => {
@@ -1059,7 +1080,7 @@ mod tests {
     use super::*;
 
     fn create_server() -> LspServer {
-        LspServerBuilder::default().build()
+        LspServerBuilder::default().build(None)
     }
 
     async fn open_file(server: &LspServer, text: String) {
