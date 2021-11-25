@@ -5,6 +5,7 @@
     clippy::unwrap_used,
     clippy::wildcard_imports
 )]
+mod completion;
 mod convert;
 mod server;
 mod shared;
