@@ -604,10 +604,11 @@ fn get_stdlib_matches(
     let mut matches = vec![];
     let completes = get_stdlib_completables();
 
-    for c in completes.into_iter() {
-        if c.matches(name.clone(), info.clone()) {
-            matches.push(c.completion_item(info.clone()));
-        }
+    for c in completes
+        .into_iter()
+        .filter(|x| x.matches(name.clone(), info.clone()))
+    {
+        matches.push(c.completion_item(info.clone()));
     }
 
     matches
@@ -1197,6 +1198,10 @@ fn get_packages(list: &mut Vec<Box<dyn Completable>>) {
 fn get_builtins(list: &mut Vec<Box<dyn Completable>>) {
     if let Some(env) = prelude() {
         for (key, val) in env.values {
+            if key.starts_with('_') {
+                // Don't allow users to "discover" private-ish functionality.
+                continue;
+            }
             match val.expr {
                 MonoType::Fun(f) => {
                     list.push(Box::new(FunctionResult {
