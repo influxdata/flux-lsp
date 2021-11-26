@@ -12,4 +12,4 @@ mod stdlib;
 mod visitors;
 mod wasm;
 
-pub use server::LspServer;
+pub use server::LspServerBuilder;

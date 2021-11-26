@@ -194,11 +194,34 @@ pub fn find_stdlib_signatures(
 }
 
 #[allow(dead_code)]
+#[derive(Clone)]
 struct LspServerOptions {
     folding: bool,
-    influxdb_url: Option<String>,
-    token: Option<String>,
-    org: Option<String>,
+}
+
+pub struct LspServerBuilder {
+    options: LspServerOptions,
+}
+
+#[allow(dead_code)]
+impl LspServerBuilder {
+    pub fn disable_folding(self) -> Self {
+        Self {
+            options: LspServerOptions { folding: false },
+        }
+    }
+
+    pub fn build(&self) -> LspServer {
+        LspServer::new(self.options.clone())
+    }
+}
+
+impl Default for LspServerBuilder {
+    fn default() -> Self {
+        LspServerBuilder {
+            options: LspServerOptions { folding: true },
+        }
+    }
 }
 
 #[allow(dead_code)]
@@ -208,62 +231,10 @@ pub struct LspServer {
 }
 
 impl LspServer {
-    pub fn disable_folding(self) -> Self {
-        Self {
-            store: self.store,
-            options: LspServerOptions {
-                folding: false,
-                influxdb_url: self.options.influxdb_url,
-                token: self.options.token,
-                org: self.options.org,
-            },
-        }
-    }
-    pub fn with_influxdb_url(self, influxdb_url: String) -> Self {
-        Self {
-            store: self.store,
-            options: LspServerOptions {
-                folding: self.options.folding,
-                influxdb_url: Some(influxdb_url),
-                token: self.options.token,
-                org: self.options.org,
-            },
-        }
-    }
-    pub fn with_token(self, token: String) -> Self {
-        Self {
-            store: self.store,
-            options: LspServerOptions {
-                folding: self.options.folding,
-                influxdb_url: self.options.influxdb_url,
-                token: Some(token),
-                org: self.options.org,
-            },
-        }
-    }
-    pub fn with_org(self, org: String) -> Self {
-        Self {
-            store: self.store,
-            options: LspServerOptions {
-                folding: self.options.folding,
-                influxdb_url: self.options.influxdb_url,
-                token: self.options.token,
-                org: Some(org),
-            },
-        }
-    }
-}
-
-impl Default for LspServer {
-    fn default() -> Self {
+    fn new(options: LspServerOptions) -> Self {
         Self {
             store: Arc::new(Mutex::new(HashMap::new())),
-            options: LspServerOptions {
-                folding: true,
-                influxdb_url: None,
-                token: None,
-                org: None,
-            },
+            options,
         }
     }
 }
@@ -1072,10 +1043,10 @@ mod tests {
     use lspower::lsp;
     use lspower::LanguageServer;
 
-    use super::LspServer;
+    use super::*;
 
     fn create_server() -> LspServer {
-        LspServer::default()
+        LspServerBuilder::default().build()
     }
 
     async fn open_file(server: &LspServer, text: String) {
