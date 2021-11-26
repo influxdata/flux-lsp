@@ -1407,34 +1407,83 @@ mod tests {
         let result =
             server.signature_help(params).await.unwrap().unwrap();
 
-        // The signatures returned from this test are...many. This test checks
-        // the length of the signatures, and that a specific
-        // `lsp::SignatureInformation` is contained within.
-        let expected_signature_information =
-            lsp::SignatureInformation {
-                label: "from(bucket: $bucket)".to_string(),
-                documentation: None,
-                parameters: Some(vec![lsp::ParameterInformation {
-                    label: lsp::ParameterLabel::Simple(
-                        "$bucket".to_string(),
-                    ),
-                    documentation: None,
-                }]),
-                active_parameter: None,
-            };
+        let expected_signature_labels: Vec<String> = vec![
+            "from()",
+            "from(bucket: $bucket)",
+            "from(bucketID: $bucketID)",
+            "from(host: $host)",
+            "from(org: $org)",
+            "from(orgID: $orgID)",
+            "from(token: $token)",
+            "from(bucket: $bucket , bucketID: $bucketID)",
+            "from(bucket: $bucket , host: $host)",
+            "from(bucket: $bucket , org: $org)",
+            "from(bucket: $bucket , orgID: $orgID)",
+            "from(bucket: $bucket , token: $token)",
+            "from(bucketID: $bucketID , host: $host)",
+            "from(bucketID: $bucketID , org: $org)",
+            "from(bucketID: $bucketID , orgID: $orgID)",
+            "from(bucketID: $bucketID , token: $token)",
+            "from(host: $host , org: $org)",
+            "from(host: $host , orgID: $orgID)",
+            "from(host: $host , token: $token)",
+            "from(org: $org , orgID: $orgID)",
+            "from(org: $org , token: $token)",
+            "from(orgID: $orgID , token: $token)",
+            "from(bucket: $bucket , bucketID: $bucketID , host: $host)",
+            "from(bucket: $bucket , bucketID: $bucketID , org: $org)",
+            "from(bucket: $bucket , bucketID: $bucketID , orgID: $orgID)",
+            "from(bucket: $bucket , bucketID: $bucketID , token: $token)",
+            "from(bucket: $bucket , host: $host , org: $org)",
+            "from(bucket: $bucket , host: $host , orgID: $orgID)",
+            "from(bucket: $bucket , host: $host , token: $token)",
+            "from(bucket: $bucket , org: $org , orgID: $orgID)",
+            "from(bucket: $bucket , org: $org , token: $token)",
+            "from(bucket: $bucket , orgID: $orgID , token: $token)",
+            "from(bucketID: $bucketID , host: $host , org: $org)",
+            "from(bucketID: $bucketID , host: $host , orgID: $orgID)",
+            "from(bucketID: $bucketID , host: $host , token: $token)",
+            "from(bucketID: $bucketID , org: $org , orgID: $orgID)",
+            "from(bucketID: $bucketID , org: $org , token: $token)",
+            "from(bucketID: $bucketID , orgID: $orgID , token: $token)",
+            "from(host: $host , org: $org , orgID: $orgID)",
+            "from(host: $host , org: $org , token: $token)",
+            "from(host: $host , orgID: $orgID , token: $token)",
+            "from(org: $org , orgID: $orgID , token: $token)",
+            "from(bucket: $bucket , bucketID: $bucketID , host: $host , org: $org)",
+            "from(bucket: $bucket , bucketID: $bucketID , host: $host , orgID: $orgID)",
+            "from(bucket: $bucket , bucketID: $bucketID , host: $host , token: $token)",
+            "from(bucket: $bucket , bucketID: $bucketID , org: $org , orgID: $orgID)",
+            "from(bucket: $bucket , bucketID: $bucketID , org: $org , token: $token)",
+            "from(bucket: $bucket , bucketID: $bucketID , orgID: $orgID , token: $token)",
+            "from(bucket: $bucket , host: $host , org: $org , orgID: $orgID)",
+            "from(bucket: $bucket , host: $host , org: $org , token: $token)",
+            "from(bucket: $bucket , host: $host , orgID: $orgID , token: $token)",
+            "from(bucket: $bucket , org: $org , orgID: $orgID , token: $token)",
+            "from(bucketID: $bucketID , host: $host , org: $org , orgID: $orgID)",
+            "from(bucketID: $bucketID , host: $host , org: $org , token: $token)",
+            "from(bucketID: $bucketID , host: $host , orgID: $orgID , token: $token)",
+            "from(bucketID: $bucketID , org: $org , orgID: $orgID , token: $token)",
+            "from(host: $host , org: $org , orgID: $orgID , token: $token)",
+            "from(bucket: $bucket , bucketID: $bucketID , host: $host , org: $org , orgID: $orgID)",
+            "from(bucket: $bucket , bucketID: $bucketID , host: $host , org: $org , token: $token)",
+            "from(bucket: $bucket , bucketID: $bucketID , host: $host , orgID: $orgID , token: $token)",
+            "from(bucket: $bucket , bucketID: $bucketID , org: $org , orgID: $orgID , token: $token)",
+            "from(bucket: $bucket , host: $host , org: $org , orgID: $orgID , token: $token)",
+            "from(bucketID: $bucketID , host: $host , org: $org , orgID: $orgID , token: $token)",
+            "from(bucket: $bucket , bucketID: $bucketID , host: $host , org: $org , orgID: $orgID , token: $token)",
+        ].into_iter().map(|x| x.into()).collect::<Vec<String>>();
 
-        assert_eq!(64, result.signatures.len());
-        assert_eq!(None, result.active_signature);
-        assert_eq!(None, result.active_parameter);
         assert_eq!(
-            1,
+            expected_signature_labels,
             result
                 .signatures
-                .into_iter()
-                .filter(|x| *x == expected_signature_information)
-                .collect::<Vec<lsp::SignatureInformation>>()
-                .len()
+                .iter()
+                .map(|x| x.label.clone())
+                .collect::<Vec<String>>()
         );
+        assert_eq!(None, result.active_signature);
+        assert_eq!(None, result.active_parameter);
     }
 
     // If the file hasn't been opened on the server, return an error.
@@ -1688,6 +1737,50 @@ errorCounts
 
     #[test]
     async fn test_document_symbol() {
+        let expected_symbol_names: Vec<String> = vec![
+            "strings",
+            "env",
+            "prod01-us-west-2",
+            "errorCounts",
+            "from",
+            "bucket",
+            "kube-infra/monthly",
+            "range",
+            "start",
+            "filter",
+            "fn",
+            "r._measurement",
+            "query_log",
+            "r.error",
+            "",
+            "r._field",
+            "responseSize",
+            "r.env",
+            "env",
+            "group",
+            "columns",
+            "[]",
+            "env",
+            "error",
+            "count",
+            "group",
+            "columns",
+            "[]",
+            "env",
+            "_stop",
+            "_start",
+            "filter",
+            "fn",
+            "strings.containsStr",
+            "v",
+            "r.error",
+            "substr",
+            "AppendMappedRecordWithNulls",
+        ]
+        .into_iter()
+        .map(|x| x.into())
+        .collect::<Vec<String>>();
+
         let fluxscript = r#"import "strings"
 env = "prod01-us-west-2"
 
@@ -1723,7 +1816,13 @@ errorCounts
 
         match symbol_response {
             lsp::DocumentSymbolResponse::Flat(symbols) => {
-                assert_eq!(symbols.len(), 38)
+                assert_eq!(
+                    expected_symbol_names,
+                    symbols
+                        .iter()
+                        .map(|x| x.name.clone())
+                        .collect::<Vec<String>>()
+                );
             }
             _ => unreachable!(),
         }
@@ -2069,12 +2168,23 @@ sql."#;
         let result =
             server.completion(params.clone()).await.unwrap().unwrap();
 
-        let len = match result.clone() {
-            lsp::CompletionResponse::List(l) => l.items.len(),
+        let expected_labels: Vec<String> = vec!["to", "from"]
+            .into_iter()
+            .map(|x| x.into())
+            .collect::<Vec<String>>();
+
+        match result.clone() {
+            lsp::CompletionResponse::List(l) => {
+                assert_eq!(
+                    expected_labels,
+                    l.items
+                        .iter()
+                        .map(|x| x.label.clone())
+                        .collect::<Vec<String>>()
+                );
+            }
             _ => unreachable!(),
         };
-
-        assert_eq!(2, len);
     }
 
     #[test]
