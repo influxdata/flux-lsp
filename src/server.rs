@@ -311,7 +311,7 @@ impl LanguageServer for LspServer {
                 ),
                 text_document_sync: Some(
                     lsp::TextDocumentSyncCapability::Kind(
-                        lsp::TextDocumentSyncKind::Full,
+                        lsp::TextDocumentSyncKind::FULL,
                     ),
                 ),
                 type_definition_provider: None,
@@ -992,7 +992,7 @@ impl LanguageServer for LspServer {
         let items = if let Some(ctx) = params.context.clone() {
             match (ctx.trigger_kind, ctx.trigger_character) {
                 (
-                    lsp::CompletionTriggerKind::TriggerCharacter,
+                    lsp::CompletionTriggerKind::TRIGGER_CHARACTER,
                     Some(c),
                 ) => match c.as_str() {
                     "." => completion::find_dot_completions(
@@ -2061,7 +2061,7 @@ sql."#;
             },
             context: Some(lsp::CompletionContext {
                 trigger_kind:
-                    lsp::CompletionTriggerKind::TriggerCharacter,
+                    lsp::CompletionTriggerKind::TRIGGER_CHARACTER,
                 trigger_character: Some(".".to_string()),
             }),
         };
@@ -2125,7 +2125,7 @@ errorCounts
                 partial_result_token: None,
             },
             context: Some(lsp::CompletionContext {
-                trigger_kind: lsp::CompletionTriggerKind::Invoked,
+                trigger_kind: lsp::CompletionTriggerKind::INVOKED,
                 trigger_character: None,
             }),
         };
@@ -2248,7 +2248,7 @@ task.
             },
             context: Some(lsp::CompletionContext {
                 trigger_kind:
-                    lsp::CompletionTriggerKind::TriggerCharacter,
+                    lsp::CompletionTriggerKind::TRIGGER_CHARACTER,
                 trigger_character: Some(".".to_string()),
             }),
         };
@@ -2314,7 +2314,7 @@ ab = 10
                 partial_result_token: None,
             },
             context: Some(lsp::CompletionContext {
-                trigger_kind: lsp::CompletionTriggerKind::Invoked,
+                trigger_kind: lsp::CompletionTriggerKind::INVOKED,
                 trigger_character: None,
             }),
         };
@@ -2458,7 +2458,7 @@ obj.func(
             },
             context: Some(lsp::CompletionContext {
                 trigger_kind:
-                    lsp::CompletionTriggerKind::TriggerCharacter,
+                    lsp::CompletionTriggerKind::TRIGGER_CHARACTER,
                 trigger_character: Some("(".to_string()),
             }),
         };
@@ -2509,7 +2509,7 @@ csv.from(
             },
             context: Some(lsp::CompletionContext {
                 trigger_kind:
-                    lsp::CompletionTriggerKind::TriggerCharacter,
+                    lsp::CompletionTriggerKind::TRIGGER_CHARACTER,
                 trigger_character: Some("(".to_string()),
             }),
         };
@@ -2587,7 +2587,7 @@ errorCounts
                 partial_result_token: None,
             },
             context: Some(lsp::CompletionContext {
-                trigger_kind: lsp::CompletionTriggerKind::Invoked,
+                trigger_kind: lsp::CompletionTriggerKind::INVOKED,
                 trigger_character: None,
             }),
         };

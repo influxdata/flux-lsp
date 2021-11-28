@@ -15,7 +15,7 @@ fn parse_variable_assignment(
 
     if let Expression::Function(f) = va.init.clone() {
         result.push(lsp::SymbolInformation {
-            kind: lsp::SymbolKind::Function,
+            kind: lsp::SymbolKind::FUNCTION,
             name: va.id.name.to_string(),
             location: lsp::Location {
                 uri: uri.clone(),
@@ -37,7 +37,7 @@ fn parse_variable_assignment(
 
         for param in f.params {
             result.push(lsp::SymbolInformation {
-                kind: lsp::SymbolKind::Variable,
+                kind: lsp::SymbolKind::VARIABLE,
                 name: param.key.name.to_string(),
                 location: lsp::Location {
                     uri: uri.clone(),
@@ -59,7 +59,7 @@ fn parse_variable_assignment(
         }
     } else {
         result.push(lsp::SymbolInformation {
-            kind: lsp::SymbolKind::Variable,
+            kind: lsp::SymbolKind::VARIABLE,
             name: va.id.name.to_string(),
             location: lsp::Location {
                 uri,
@@ -91,7 +91,7 @@ fn parse_call_expression(
 
     if let Expression::Identifier(ident) = c.callee.clone() {
         result.push(lsp::SymbolInformation {
-            kind: lsp::SymbolKind::Function,
+            kind: lsp::SymbolKind::FUNCTION,
             name: ident.name.to_string(),
             location: lsp::Location {
                 uri: uri.clone(),
@@ -115,7 +115,7 @@ fn parse_call_expression(
     for arg in c.arguments.clone() {
         if let Expression::Function(_) = arg.value {
             result.push(lsp::SymbolInformation {
-                kind: lsp::SymbolKind::Function,
+                kind: lsp::SymbolKind::FUNCTION,
                 name: arg.key.name.to_string(),
                 location: lsp::Location {
                     uri: uri.clone(),
@@ -136,7 +136,7 @@ fn parse_call_expression(
             });
         } else {
             result.push(lsp::SymbolInformation {
-                kind: lsp::SymbolKind::Variable,
+                kind: lsp::SymbolKind::VARIABLE,
                 name: arg.key.name.to_string(),
                 location: lsp::Location {
                     uri: uri.clone(),
@@ -169,7 +169,7 @@ fn parse_binary_expression(
 
     if let Expression::Identifier(ident) = be.left.clone() {
         result.push(lsp::SymbolInformation {
-            kind: lsp::SymbolKind::Variable,
+            kind: lsp::SymbolKind::VARIABLE,
             name: ident.name.to_string(),
             location: lsp::Location {
                 uri: uri.clone(),
@@ -192,7 +192,7 @@ fn parse_binary_expression(
 
     if let Expression::Identifier(ident) = be.right.clone() {
         result.push(lsp::SymbolInformation {
-            kind: lsp::SymbolKind::Variable,
+            kind: lsp::SymbolKind::VARIABLE,
             name: ident.name.to_string(),
             location: lsp::Location {
                 uri,
@@ -279,7 +279,7 @@ impl<'a> Visitor<'a> for SymbolsVisitor<'a> {
             Node::MemberExpr(me) => {
                 if let Some(source) = me.loc.source.clone() {
                     (*state).symbols.push(lsp::SymbolInformation {
-                        kind: lsp::SymbolKind::Object,
+                        kind: lsp::SymbolKind::OBJECT,
                         name: source,
                         location: lsp::Location {
                             uri,
@@ -303,7 +303,7 @@ impl<'a> Visitor<'a> for SymbolsVisitor<'a> {
             }
             Node::FloatLit(num) => {
                 (*state).symbols.push(lsp::SymbolInformation {
-                    kind: lsp::SymbolKind::Number,
+                    kind: lsp::SymbolKind::NUMBER,
                     name: num.value.to_string(),
                     location: lsp::Location {
                         uri,
@@ -326,7 +326,7 @@ impl<'a> Visitor<'a> for SymbolsVisitor<'a> {
             }
             Node::IntegerLit(num) => {
                 (*state).symbols.push(lsp::SymbolInformation {
-                    kind: lsp::SymbolKind::Number,
+                    kind: lsp::SymbolKind::NUMBER,
                     name: num.value.to_string(),
                     location: lsp::Location {
                         uri,
@@ -349,7 +349,7 @@ impl<'a> Visitor<'a> for SymbolsVisitor<'a> {
             }
             Node::DateTimeLit(d) => {
                 (*state).symbols.push(lsp::SymbolInformation {
-                    kind: lsp::SymbolKind::Constant,
+                    kind: lsp::SymbolKind::CONSTANT,
                     name: d.value.to_string(),
                     location: lsp::Location {
                         uri,
@@ -372,7 +372,7 @@ impl<'a> Visitor<'a> for SymbolsVisitor<'a> {
             }
             Node::BooleanLit(b) => {
                 (*state).symbols.push(lsp::SymbolInformation {
-                    kind: lsp::SymbolKind::Boolean,
+                    kind: lsp::SymbolKind::BOOLEAN,
                     name: b.value.to_string(),
                     location: lsp::Location {
                         uri,
@@ -395,7 +395,7 @@ impl<'a> Visitor<'a> for SymbolsVisitor<'a> {
             }
             Node::StringLit(s) => {
                 (*state).symbols.push(lsp::SymbolInformation {
-                    kind: lsp::SymbolKind::String,
+                    kind: lsp::SymbolKind::STRING,
                     name: s.value.clone(),
                     location: lsp::Location {
                         uri,
@@ -418,7 +418,7 @@ impl<'a> Visitor<'a> for SymbolsVisitor<'a> {
             }
             Node::ArrayExpr(a) => {
                 (*state).symbols.push(lsp::SymbolInformation {
-                    kind: lsp::SymbolKind::Array,
+                    kind: lsp::SymbolKind::ARRAY,
                     name: String::from("[]"),
                     location: lsp::Location {
                         uri,
