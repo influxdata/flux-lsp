@@ -490,60 +490,6 @@ pub fn find_dot_completions(
         items: vec![],
     })
 }
-// XXX: sean (10 Aug 2021) - This function is a no-op, since the new server
-// does not yet support completion callbacks
-pub async fn find_arg_completions(
-    params: lsp::CompletionParams,
-    source: String,
-) -> Result<lsp::CompletionList, Error> {
-    let callbacks = crate::shared::Callbacks {
-        buckets: None,
-        measurements: None,
-        tag_keys: None,
-        tag_values: None,
-    };
-    let info = CompletionInfo::create(params.clone(), source)?;
-
-    if let Some(info) = info {
-        if info.ident == "bucket" {
-            return get_bucket_completions(
-                callbacks,
-                get_trigger(params),
-            )
-            .await;
-        }
-    }
-
-    Ok(lsp::CompletionList {
-        is_incomplete: false,
-        items: vec![],
-    })
-}
-
-async fn get_bucket_completions(
-    callbacks: crate::shared::Callbacks,
-    trigger: Option<String>,
-) -> Result<lsp::CompletionList, Error> {
-    let buckets = callbacks.get_buckets().await;
-
-    let items: Vec<lsp::CompletionItem> = match buckets {
-        Ok(value) => value
-            .into_iter()
-            .map(|value| {
-                new_string_arg_completion(value, trigger.clone())
-            })
-            .collect(),
-        Err(err) => {
-            log::warn!("Error in bucket callback: {}", err);
-            vec![]
-        }
-    };
-
-    Ok(lsp::CompletionList {
-        is_incomplete: false,
-        items,
-    })
-}
 
 fn new_string_arg_completion(
     value: String,
