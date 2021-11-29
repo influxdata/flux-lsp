@@ -998,15 +998,15 @@ impl LanguageServer for LspServer {
                     "." => completion::find_dot_completions(
                         params, contents,
                     ),
-                    // XXX: sean (10 Aug 2021) - All `find_arg_completions` does is
-                    // look for bucket names if the parameter name is "bucket". Since
-                    // we don't currently support bucket completions, this match arm
-                    // is a no-op.
                     ":" => {
-                        completion::find_arg_completions(
-                            params, contents,
-                        )
-                        .await
+                        // XXX: rockstar (29 Nov 2021) - This is where argument
+                        // completion will live, e.g. buckets, measurements and
+                        // tag keys/values. There are multiple issues open to support
+                        // this functionality open currently.
+                        Ok(lsp::CompletionList {
+                            is_incomplete: false,
+                            items: vec![],
+                        })
                     }
                     "(" | "," => completion::find_param_completions(
                         Some(c),

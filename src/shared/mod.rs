@@ -1,10 +1,8 @@
-mod callbacks;
 mod signatures;
 
 use combinations::Combinations;
 use lspower::lsp;
 
-pub use callbacks::Callbacks;
 pub use signatures::{
     get_argument_names, FunctionInfo, FunctionSignature,
 };
