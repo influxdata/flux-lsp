@@ -2,11 +2,10 @@
 use std::fs::OpenOptions;
 
 use clap::{App, Arg};
-use log::{debug, warn};
 use lspower::{LspService, Server};
 use simplelog::{CombinedLogger, Config, LevelFilter, WriteLogger};
 
-use flux_lsp::LspServer;
+use flux_lsp::LspServerBuilder;
 
 #[async_std::main]
 async fn main() {
@@ -25,24 +24,6 @@ async fn main() {
             .long("log-file")
             .help("Path to write a debug log file")
             .takes_value(true))
-        .arg(
-            Arg::with_name("url")
-            .short("u")
-            .long("url")
-            .help("Base url for influxdb instance")
-            .takes_value(true))
-        .arg(
-            Arg::with_name("token")
-            .short("t")
-            .long("token")
-            .help("Token for influxdb instance")
-            .takes_value(true))
-        .arg(
-            Arg::with_name("org")
-            .short("o")
-            .long("org")
-            .help("Organization for influxdb instance")
-            .takes_value(true))
         .get_matches();
 
     if matches.is_present("log_file") {
@@ -60,47 +41,17 @@ async fn main() {
     }
 
     let disable_folding = matches.is_present("disable_folding");
-    let influxdb_url = match matches.value_of("url") {
-        Some(value) => {
-            warn!("url parameter specified but currently unused");
-            Some(String::from(value))
-        }
-        None => None,
-    };
-    let token = match matches.value_of("token") {
-        Some(value) => {
-            warn!("token parameter specified but currently unused");
-            Some(String::from(value))
-        }
-        None => None,
-    };
-    let org = match matches.value_of("org") {
-        Some(value) => {
-            warn!("org parameter specified but currently unused");
-            Some(String::from(value))
-        }
-        None => None,
-    };
 
-    debug!("Starting lsp client");
+    log::debug!("Starting lsp client");
     let stdin = async_std::io::stdin();
     let stdout = async_std::io::stdout();
 
     let (service, messages) = LspService::new(|_client| {
-        let mut server = LspServer::default();
+        let mut builder = LspServerBuilder::default();
         if disable_folding {
-            server = server.disable_folding();
+            builder = builder.disable_folding();
         }
-        if let Some(value) = influxdb_url {
-            server = server.with_influxdb_url(value);
-        }
-        if let Some(value) = token {
-            server = server.with_token(value);
-        }
-        if let Some(value) = org {
-            server = server.with_org(value);
-        }
-        server
+        builder.build()
     });
     Server::new(stdin, stdout)
         .interleave(messages)

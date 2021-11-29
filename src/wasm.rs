@@ -5,7 +5,7 @@ use futures::prelude::*;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::future_to_promise;
 
-use crate::LspServer;
+use crate::server::LspServerBuilder;
 
 /// Initialize logging - this requires the "console_log" feature to function,
 /// as this library adds 180k to the wasm binary being shipped.
@@ -209,7 +209,9 @@ impl Lsp {
     /// is no longer running, which may serve as a hint that attention is needed.
     pub fn run(self) -> js_sys::Promise {
         let (service, messages) =
-            lspower::LspService::new(|_client| LspServer::default());
+            lspower::LspService::new(|_client| {
+                LspServerBuilder::default().build()
+            });
         let server = lspower::Server::new(
             Incoming {
                 messages: self.incoming.clone(),
