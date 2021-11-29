@@ -2441,7 +2441,6 @@ ab = 10
             items.iter().map(|i| i.label.as_str()).collect();
 
         let want: HashSet<&str> = vec![
-            "_window",
             "aggregateWindow",
             "cardinality",
             "chandeMomentumOscillator",
@@ -2714,9 +2713,6 @@ errorCounts
             items.iter().map(|i| i.label.as_str()).collect();
 
         let want: HashSet<&str> = vec![
-            "_fillEmpty",
-            "_highestOrLowest",
-            "_sortLimit",
             "aggregateWindow",
             "bottom",
             "buckets",
