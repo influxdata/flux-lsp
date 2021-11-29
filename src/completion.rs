@@ -432,7 +432,7 @@ fn get_user_matches(
 
     let mut result: Vec<lsp::CompletionItem> = vec![];
     for x in completables {
-        if x.matches(contents.clone(), info.clone()) {
+        if x.matches(&contents, &info) {
             result.push(x.completion_item(info.clone()))
         }
     }
@@ -604,9 +604,7 @@ fn get_stdlib_matches(
     let mut matches = vec![];
     let completes = get_stdlib_completables();
 
-    for c in completes
-        .into_iter()
-        .filter(|x| x.matches(name.clone(), info.clone()))
+    for c in completes.into_iter().filter(|x| x.matches(&name, &info))
     {
         matches.push(c.completion_item(info.clone()));
     }
@@ -980,7 +978,7 @@ trait Completable {
         &self,
         info: CompletionInfo,
     ) -> lsp::CompletionItem;
-    fn matches(&self, text: String, info: CompletionInfo) -> bool;
+    fn matches(&self, text: &str, info: &CompletionInfo) -> bool;
 }
 
 // Reports if the needle has a fuzzy match with the haystack.
@@ -1063,8 +1061,8 @@ impl Completable for stdlib::PackageResult {
         }
     }
 
-    fn matches(&self, text: String, _info: CompletionInfo) -> bool {
-        fuzzy_match(self.name.as_str(), text.as_str())
+    fn matches(&self, text: &str, _info: &CompletionInfo) -> bool {
+        fuzzy_match(self.name.as_str(), text)
     }
 }
 
@@ -1116,26 +1114,21 @@ impl Completable for FunctionResult {
         }
     }
 
-    fn matches(&self, text: String, info: CompletionInfo) -> bool {
-        let imports = info.imports;
+    fn matches(&self, text: &str, info: &CompletionInfo) -> bool {
         if self.package == PRELUDE_PACKAGE
-            && fuzzy_match(self.name.as_str(), text.as_str())
+            && fuzzy_match(self.name.as_str(), text)
         {
             return true;
         }
 
-        if !imports
-            .clone()
-            .into_iter()
-            .any(|x| self.package == x.path)
-        {
+        if !info.imports.iter().any(|x| self.package == x.path) {
             return false;
         }
 
-        if text.ends_with('.') {
-            let mtext = text[..text.len() - 1].to_string();
-            return imports
-                .into_iter()
+        if let Some(mtext) = text.strip_suffix('.') {
+            return info
+                .imports
+                .iter()
                 .any(|import| import.alias == mtext);
         }
 
@@ -1173,8 +1166,8 @@ impl Completable for CompletionVarResult {
         }
     }
 
-    fn matches(&self, text: String, _info: CompletionInfo) -> bool {
-        fuzzy_match(self.name.as_str(), text.as_str())
+    fn matches(&self, text: &str, _info: &CompletionInfo) -> bool {
+        fuzzy_match(self.name.as_str(), text)
     }
 }
 
@@ -1525,8 +1518,8 @@ impl Completable for ImportAliasResult {
         }
     }
 
-    fn matches(&self, text: String, _info: CompletionInfo) -> bool {
-        fuzzy_match(self.alias.as_str(), text.as_str())
+    fn matches(&self, text: &str, _info: &CompletionInfo) -> bool {
+        fuzzy_match(self.alias.as_str(), text)
     }
 }
 
@@ -1825,21 +1818,19 @@ impl Completable for VarResult {
         }
     }
 
-    fn matches(&self, text: String, info: CompletionInfo) -> bool {
-        let imports = info.imports;
+    fn matches(&self, text: &str, info: &CompletionInfo) -> bool {
         if self.package == PRELUDE_PACKAGE
-            && fuzzy_match(self.name.as_str(), text.as_str())
+            && fuzzy_match(self.name.as_str(), text)
         {
             return true;
         }
 
-        if !imports.into_iter().any(|x| self.package == x.path) {
+        if !info.imports.iter().any(|x| self.package == x.path) {
             return false;
         }
 
-        if text.ends_with('.') {
-            let mtext = text[..text.len() - 1].to_string();
-            return Some(mtext) == self.package_name;
+        if let Some(mtext) = text.strip_suffix('.') {
+            return Some(mtext.into()) == self.package_name;
         }
 
         false
@@ -2074,7 +2065,7 @@ impl Completable for UserFunctionResult {
         }
     }
 
-    fn matches(&self, text: String, _info: CompletionInfo) -> bool {
-        fuzzy_match(self.name.as_str(), text.as_str())
+    fn matches(&self, text: &str, _info: &CompletionInfo) -> bool {
+        fuzzy_match(self.name.as_str(), text)
     }
 }
