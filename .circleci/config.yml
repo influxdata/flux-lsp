@@ -19,7 +19,7 @@ jobs:
     steps:
       - checkout
       - run:
-          name: "run tests"
+          name: "run cargo tests"
           command: cargo test --locked
 
   wasm-test:
@@ -30,6 +30,9 @@ jobs:
       - run:
           name: "run tests"
           command: wasm-pack test --node -- --locked
+      - run:
+          name: "run node integration tests"
+          command: cd integration && BUILD_MODE=release npm run test
 
   build:
     docker:
@@ -45,7 +48,7 @@ jobs:
     resource_class: large
     steps:
       - checkout
-      - run: make wasm
+      - run: BUILD_MODE=release make wasm
 
 
   deploy:
@@ -55,7 +58,7 @@ jobs:
     steps:
       - checkout
       - run: |
-          make wasm
+          BUILD_MODE=release make wasm
           echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN" > pkg-node/.npmrc
           echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN" > pkg-browser/.npmrc
           make publish

@@ -46,12 +46,12 @@ async fn main() {
     let stdin = async_std::io::stdin();
     let stdout = async_std::io::stdout();
 
-    let (service, messages) = LspService::new(|_client| {
+    let (service, messages) = LspService::new(|client| {
         let mut builder = LspServerBuilder::default();
         if disable_folding {
             builder = builder.disable_folding();
         }
-        builder.build()
+        builder.build(Some(client))
     });
     Server::new(stdin, stdout)
         .interleave(messages)
