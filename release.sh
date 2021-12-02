@@ -11,12 +11,15 @@
 set -e
 
 if [[ ! $(command -v hub) ]]; then
-	echo "Please install the hub tool and re-run."
-	exit 1
+    echo "Please install the hub tool and re-run."
+    exit 1
 fi
-
+if [[ ! -f $HOME/.config/hub ]]; then
+    echo "Please authenticate your hub command. See https://github.com/github/hub/issues/2655#issuecomment-735836048"
+    exit 1
+fi
 if [[ ! $(cargo bump -v) ]]; then
-    echo "Please install cargo bump and re-run"
+    echo "Please install cargo bump and re-run: `cargo install cargo-bump`"
     exit 1
 fi
 
@@ -26,10 +29,21 @@ cd $TEMPDIR
 git clone git@github.com:influxdata/flux-lsp.git > /dev/null 2>&1
 cd $TEMPDIR/flux-lsp
 
-cargo bump patch --git-tag
+# Bump version
+cargo bump patch
+cargo check
+new_version=$(cargo pkgid | cut -d# -f2 | cut -d: -f2)
+
+# Commit and tag release
+git add Cargo.toml
+git add Cargo.lock
+# Note: Using an annotated tag (-a) is important so that we can reliably find
+# the previous version tag.
+git tag -a -m "$new_version" "$new_version"
+git commit -m "$new_version"
 git push
 
-new_version=`grep "^version" Cargo.toml | awk '{print $3}' | awk -F'"' '{print $2}'`
+
 previous_version=`git describe --abbrev=0 ${new_version}^`
 commits=`git log --pretty=oneline ${previous_version}...${new_version} | tail -n +2 | awk '{$1="-"; print }'`
 hub release create $new_version -m "Release $new_version
