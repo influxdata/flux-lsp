@@ -7,7 +7,7 @@ use crate::shared::all_combos;
 
 #[allow(clippy::implicit_hasher)]
 pub fn get_argument_names(
-    args: BTreeMap<String, MonoType>,
+    args: &BTreeMap<String, MonoType>,
 ) -> Vec<String> {
     args.keys().map(String::from).collect()
 }
@@ -62,8 +62,8 @@ impl FunctionInfo {
         FunctionInfo {
             name,
             package_name,
-            required_args: get_argument_names(f.req.clone()),
-            optional_args: get_argument_names(f.opt.clone()),
+            required_args: get_argument_names(&f.req),
+            optional_args: get_argument_names(&f.opt),
         }
     }
 

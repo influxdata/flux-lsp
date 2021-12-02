@@ -216,7 +216,7 @@ impl<'a> Visitor<'a> for ImportFinderVisitor {
         if let Node::ImportDeclaration(import) = node {
             let alias = match import.alias.clone() {
                 Some(alias) => alias.name.to_string(),
-                None => get_package_name(import.path.value.clone())
+                None => get_package_name(import.path.value.as_str())
                     .unwrap_or_else(|| "".to_string()),
             };
 
@@ -224,7 +224,7 @@ impl<'a> Visitor<'a> for ImportFinderVisitor {
                 path: import.path.value.clone(),
                 alias,
                 initial_name: get_package_name(
-                    import.path.value.clone(),
+                    import.path.value.as_str(),
                 ),
             });
         }

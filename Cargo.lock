@@ -654,13 +654,13 @@ dependencies = [
 [[package]]
 name = "flux"
 version = "0.5.1"
-source = "git+https://github.com/influxdata/flux?tag=v0.143.1#b15224a579e4c0aacdef6def3abc81ffada88d0a"
+source = "git+https://github.com/influxdata/flux?tag=v0.144.0#eb10cfb089b18e702dd81e3f64a660425c7c6b82"
 dependencies = [
  "anyhow",
  "flatbuffers",
  "flux-core",
  "getrandom",
- "lazy_static",
+ "once_cell",
  "serde",
  "serde-aux",
  "serde_derive",
@@ -671,7 +671,7 @@ dependencies = [
 [[package]]
 name = "flux-core"
 version = "0.4.0"
-source = "git+https://github.com/influxdata/flux?tag=v0.143.1#b15224a579e4c0aacdef6def3abc81ffada88d0a"
+source = "git+https://github.com/influxdata/flux?tag=v0.144.0#eb10cfb089b18e702dd81e3f64a660425c7c6b82"
 dependencies = [
  "anyhow",
  "chrono",
@@ -683,10 +683,10 @@ dependencies = [
  "env_logger",
  "flatbuffers",
  "fnv",
- "lazy_static",
  "libflate",
  "log",
  "maplit",
+ "once_cell",
  "pad",
  "pulldown-cmark",
  "regex",
