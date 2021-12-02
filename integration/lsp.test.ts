@@ -22,6 +22,7 @@ describe('LSP Server', () => {
         const exit = '{"jsonrpc": "2.0", "method": "exit"}';
         await server.send(shutdown)
         await server.send(exit)
+        await runner
     }
 
     it('responds to initialize request', async () => {
