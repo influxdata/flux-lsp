@@ -99,3 +99,26 @@ describe('LSP Server', () => {
         await shutdown(server, runner);
     });
 });
+describe('module', () => {
+
+    it('can parse Flux source' , async () => {
+        const { parse } = await import('@influxdata/flux-lsp-node');
+        const ast = parse('x = 1');
+        // expect some basic parts of this ast
+        expect(ast).toBeDefined();
+        expect(ast).toHaveProperty('type', 'File');
+        expect(ast).toHaveProperty('location.source', 'x = 1');
+        expect(ast).toHaveProperty('metadata', 'parser-type=rust');
+        expect(ast).toHaveProperty('body');
+    })
+
+    it('can format Flux source' , async () => {
+        const { parse, format_from_js_file } = await import('@influxdata/flux-lsp-node');
+        const ast = parse('x = 1');
+        // Change AST
+        ast.body[0].init.value = '2';
+        // Format into new source
+        const src = format_from_js_file(ast);
+        expect(src).toBe('x = 2');
+    })
+})
