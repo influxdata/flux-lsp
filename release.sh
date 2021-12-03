@@ -10,6 +10,17 @@
 # execution before running it.
 set -e
 
+# Controls how the version is bumped.
+# Set INCREMENT to one of: major, minor or patch
+# Defaults to patch if unset.
+INCREMENT=${INCREMENT:-patch}
+
+if [[ ! $INCREMENT =~ (patch)|(minor)|(major) ]]
+then
+    echo "Increment must be one of major, minor or patch"
+    exit 1
+fi
+
 if [[ ! $(command -v hub) ]]; then
     echo "Please install the hub tool and re-run."
     exit 1
@@ -30,7 +41,7 @@ git clone git@github.com:influxdata/flux-lsp.git > /dev/null 2>&1
 cd $TEMPDIR/flux-lsp
 
 # Bump version
-cargo bump patch
+cargo bump $INCREMENT
 cargo check
 new_version=$(cargo pkgid | cut -d# -f2 | cut -d: -f2)
 
