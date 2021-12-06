@@ -12,6 +12,13 @@ fn ast_to_lsp_position(position: &ast::Position) -> lsp::Position {
         character: position.column - 1,
     }
 }
+/// Convert a flux::ast::SourceLocation to a lsp::Range.
+pub fn ast_to_lsp_range(loc: &ast::SourceLocation) -> lsp::Range {
+    lsp::Range {
+        start: ast_to_lsp_position(&loc.start),
+        end: ast_to_lsp_position(&loc.end),
+    }
+}
 
 /// Convert a flux::semantic::walk::Node to a lsp::Location
 /// https://microsoft.github.io/language-server-protocol/specification#location
