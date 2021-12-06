@@ -1,4 +1,3 @@
-use std::ops::Deref;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
@@ -651,18 +650,16 @@ fn get_specific_package_functions(
         if let Some(import) =
             current_imports.into_iter().find(|x| x.alias == name)
         {
-            for (key, val) in env.values {
+            for (key, val) in env.iter() {
                 if *key == import.path {
-                    walk_package(key.to_string(), list, val.expr);
+                    walk_package(key, list, &val.expr);
                 }
             }
         } else {
-            for (key, val) in env.values {
-                if let Some(package_name) =
-                    get_package_name(key.to_string())
-                {
+            for (key, val) in env.iter() {
+                if let Some(package_name) = get_package_name(key) {
                     if package_name == name {
-                        walk_package(key.to_string(), list, val.expr);
+                        walk_package(key, list, &val.expr);
                     }
                 }
             }
@@ -806,9 +803,9 @@ fn new_param_completion(
 }
 
 fn walk_package(
-    package: String,
+    package: &str,
     list: &mut Vec<Box<dyn Completable>>,
-    t: MonoType,
+    t: &MonoType,
 ) {
     if let MonoType::Record(record) = t {
         if let Record::Extension { head, tail } = record.as_ref() {
@@ -816,105 +813,83 @@ fn walk_package(
                 MonoType::Fun(f) => {
                     list.push(Box::new(FunctionResult {
                         name: head.k.clone(),
-                        package: package.clone(),
+                        package: package.to_string(),
                         signature: stdlib::create_function_signature(
-                            f.deref().clone(),
+                            f,
                         ),
-                        required_args: get_argument_names(
-                            f.req.clone(),
-                        ),
-                        optional_args: get_argument_names(
-                            f.opt.clone(),
-                        ),
-                        package_name: get_package_name(
-                            package.clone(),
-                        ),
+                        required_args: get_argument_names(&f.req),
+                        optional_args: get_argument_names(&f.opt),
+                        package_name: get_package_name(package),
                     }));
                 }
                 MonoType::Int => {
                     list.push(Box::new(VarResult {
                         name: head.k.clone(),
                         var_type: VarType::Int,
-                        package: package.clone(),
-                        package_name: get_package_name(
-                            package.clone(),
-                        ),
+                        package: package.to_string(),
+                        package_name: get_package_name(package),
                     }));
                 }
                 MonoType::Float => {
                     list.push(Box::new(VarResult {
                         name: head.k.clone(),
                         var_type: VarType::Float,
-                        package: package.clone(),
-                        package_name: get_package_name(
-                            package.clone(),
-                        ),
+                        package: package.to_string(),
+                        package_name: get_package_name(package),
                     }));
                 }
                 MonoType::Bool => {
                     list.push(Box::new(VarResult {
                         name: head.k.clone(),
                         var_type: VarType::Bool,
-                        package: package.clone(),
-                        package_name: get_package_name(
-                            package.clone(),
-                        ),
+                        package: package.to_string(),
+                        package_name: get_package_name(package),
                     }));
                 }
                 MonoType::Arr(_) => {
                     list.push(Box::new(VarResult {
                         name: head.k.clone(),
                         var_type: VarType::Array,
-                        package: package.clone(),
-                        package_name: get_package_name(
-                            package.clone(),
-                        ),
+                        package: package.to_string(),
+                        package_name: get_package_name(package),
                     }));
                 }
                 MonoType::Bytes => {
                     list.push(Box::new(VarResult {
                         name: head.k.clone(),
                         var_type: VarType::Bytes,
-                        package: package.clone(),
-                        package_name: get_package_name(
-                            package.clone(),
-                        ),
+                        package: package.to_string(),
+                        package_name: get_package_name(package),
                     }));
                 }
                 MonoType::Duration => {
                     list.push(Box::new(VarResult {
                         name: head.k.clone(),
                         var_type: VarType::Duration,
-                        package: package.clone(),
-                        package_name: get_package_name(
-                            package.clone(),
-                        ),
+                        package: package.to_string(),
+                        package_name: get_package_name(package),
                     }));
                 }
                 MonoType::Regexp => {
                     list.push(Box::new(VarResult {
                         name: head.k.clone(),
                         var_type: VarType::Regexp,
-                        package: package.clone(),
-                        package_name: get_package_name(
-                            package.clone(),
-                        ),
+                        package: package.to_string(),
+                        package_name: get_package_name(package),
                     }));
                 }
                 MonoType::String => {
                     list.push(Box::new(VarResult {
                         name: head.k.clone(),
                         var_type: VarType::String,
-                        package: package.clone(),
-                        package_name: get_package_name(
-                            package.clone(),
-                        ),
+                        package: package.to_string(),
+                        package_name: get_package_name(package),
                     }));
                 }
                 _ => {}
             }
 
-            walk_package(package, list, tail.deref().clone());
+            walk_package(package, list, tail);
         }
     }
 }
@@ -1128,7 +1103,7 @@ fn get_stdlib_completables() -> Vec<Box<dyn Completable>> {
 
 fn get_packages(list: &mut Vec<Box<dyn Completable>>) {
     if let Some(env) = imports() {
-        for (key, _val) in env.values {
+        for (key, _val) in env.iter() {
             add_package_result(key.to_string(), list);
         }
     }
@@ -1136,26 +1111,22 @@ fn get_packages(list: &mut Vec<Box<dyn Completable>>) {
 
 fn get_builtins(list: &mut Vec<Box<dyn Completable>>) {
     if let Some(env) = prelude() {
-        for (key, val) in env.values {
+        for (key, val) in env.iter() {
             if key.starts_with('_') {
                 // Don't allow users to "discover" private-ish functionality.
                 continue;
             }
-            match val.expr {
+            match &val.expr {
                 MonoType::Fun(f) => {
                     list.push(Box::new(FunctionResult {
                         package: PRELUDE_PACKAGE.to_string(),
                         package_name: None,
                         name: key.to_string(),
                         signature: stdlib::create_function_signature(
-                            (*f).clone(),
+                            f,
                         ),
-                        required_args: get_argument_names(
-                            f.req.clone(),
-                        ),
-                        optional_args: get_argument_names(
-                            f.opt.clone(),
-                        ),
+                        required_args: get_argument_names(&f.req),
+                        optional_args: get_argument_names(&f.opt),
                     }))
                 }
                 MonoType::String => list.push(Box::new(VarResult {
@@ -1261,7 +1232,7 @@ fn add_package_result(
     name: String,
     list: &mut Vec<Box<dyn Completable>>,
 ) {
-    let package_name = get_package_name(name.clone());
+    let package_name = get_package_name(name.as_str());
     if let Some(package_name) = package_name {
         list.push(Box::new(stdlib::PackageResult {
             name: package_name,
@@ -1523,11 +1494,9 @@ fn create_function_result(
                 name,
                 package: "self".to_string(),
                 package_name: Some("self".to_string()),
-                optional_args: get_argument_names(fun.opt.clone()),
-                required_args: get_argument_names(fun.req.clone()),
-                signature: stdlib::create_function_signature(
-                    (*fun).clone(),
-                ),
+                optional_args: get_argument_names(&fun.opt),
+                required_args: get_argument_names(&fun.req),
+                signature: stdlib::create_function_signature(&fun),
             });
         }
     }

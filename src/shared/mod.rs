@@ -31,7 +31,7 @@ where
     result
 }
 
-pub fn get_package_name(name: String) -> Option<String> {
+pub fn get_package_name(name: &str) -> Option<String> {
     let items = name.split('/');
     items.last().map(|n| n.to_string())
 }
