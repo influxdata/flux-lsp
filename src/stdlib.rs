@@ -165,13 +165,8 @@ fn walk_package_functions(
             if let MonoType::Fun(f) = &head.v {
                 let mut params = vec![];
 
-                for arg in get_argument_names(&f.req) {
-                    params.push(arg);
-                }
-
-                for arg in get_argument_names(&f.opt) {
-                    params.push(arg);
-                }
+                params.extend(get_argument_names(&f.req));
+                params.extend(get_argument_names(&f.opt));
 
                 list.push(Function {
                     params,
@@ -259,9 +254,7 @@ pub fn get_builtin_functions() -> Vec<Function> {
         for (key, val) in env.iter() {
             if let MonoType::Fun(f) = &val.expr {
                 let mut params = get_argument_names(&f.req);
-                for opt in get_argument_names(&f.opt) {
-                    params.push(opt);
-                }
+                params.extend(get_argument_names(&f.opt));
 
                 list.push(Function {
                     name: key.to_string(),

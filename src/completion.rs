@@ -809,6 +809,15 @@ fn walk_package(
 ) {
     if let MonoType::Record(record) = t {
         if let Record::Extension { head, tail } = record.as_ref() {
+            let mut push_var_result = |name: &str, var_type| {
+                list.push(Box::new(VarResult {
+                    name: name.to_owned(),
+                    var_type,
+                    package: package.into(),
+                    package_name: get_package_name(package),
+                }));
+            };
+
             match &head.v {
                 MonoType::Fun(f) => {
                     list.push(Box::new(FunctionResult {
@@ -823,68 +832,28 @@ fn walk_package(
                     }));
                 }
                 MonoType::Int => {
-                    list.push(Box::new(VarResult {
-                        name: head.k.clone(),
-                        var_type: VarType::Int,
-                        package: package.to_string(),
-                        package_name: get_package_name(package),
-                    }));
+                    push_var_result(&head.k, VarType::Int)
                 }
                 MonoType::Float => {
-                    list.push(Box::new(VarResult {
-                        name: head.k.clone(),
-                        var_type: VarType::Float,
-                        package: package.to_string(),
-                        package_name: get_package_name(package),
-                    }));
+                    push_var_result(&head.k, VarType::Float)
                 }
                 MonoType::Bool => {
-                    list.push(Box::new(VarResult {
-                        name: head.k.clone(),
-                        var_type: VarType::Bool,
-                        package: package.to_string(),
-                        package_name: get_package_name(package),
-                    }));
+                    push_var_result(&head.k, VarType::Bool)
                 }
                 MonoType::Arr(_) => {
-                    list.push(Box::new(VarResult {
-                        name: head.k.clone(),
-                        var_type: VarType::Array,
-                        package: package.to_string(),
-                        package_name: get_package_name(package),
-                    }));
+                    push_var_result(&head.k, VarType::Array)
                 }
                 MonoType::Bytes => {
-                    list.push(Box::new(VarResult {
-                        name: head.k.clone(),
-                        var_type: VarType::Bytes,
-                        package: package.to_string(),
-                        package_name: get_package_name(package),
-                    }));
+                    push_var_result(&head.k, VarType::Bytes)
                 }
                 MonoType::Duration => {
-                    list.push(Box::new(VarResult {
-                        name: head.k.clone(),
-                        var_type: VarType::Duration,
-                        package: package.to_string(),
-                        package_name: get_package_name(package),
-                    }));
+                    push_var_result(&head.k, VarType::Duration)
                 }
                 MonoType::Regexp => {
-                    list.push(Box::new(VarResult {
-                        name: head.k.clone(),
-                        var_type: VarType::Regexp,
-                        package: package.to_string(),
-                        package_name: get_package_name(package),
-                    }));
+                    push_var_result(&head.k, VarType::Regexp)
                 }
                 MonoType::String => {
-                    list.push(Box::new(VarResult {
-                        name: head.k.clone(),
-                        var_type: VarType::String,
-                        package: package.to_string(),
-                        package_name: get_package_name(package),
-                    }));
+                    push_var_result(&head.k, VarType::String)
                 }
                 _ => {}
             }
@@ -922,13 +891,12 @@ impl Completable for stdlib::PackageResult {
         let mut insert_text = self.name.clone();
 
         if imports
-            .clone()
-            .into_iter()
-            .map(|x| x.path)
-            .any(|x| x == self.full_name)
+            .iter()
+            .map(|x| &x.path)
+            .any(|x| *x == self.full_name)
         {
             let alias =
-                find_alias_name(imports, self.name.clone(), 1);
+                find_alias_name(&imports, self.name.clone(), 1);
 
             let new_text = if let Some(alias) = alias {
                 insert_text = alias.clone();
@@ -1116,6 +1084,14 @@ fn get_builtins(list: &mut Vec<Box<dyn Completable>>) {
                 // Don't allow users to "discover" private-ish functionality.
                 continue;
             }
+            let mut push_var_result = |var_type| {
+                list.push(Box::new(VarResult {
+                    name: key.to_string(),
+                    package: PRELUDE_PACKAGE.to_string(),
+                    package_name: None,
+                    var_type,
+                }));
+            };
             match &val.expr {
                 MonoType::Fun(f) => {
                     list.push(Box::new(FunctionResult {
@@ -1129,68 +1105,18 @@ fn get_builtins(list: &mut Vec<Box<dyn Completable>>) {
                         optional_args: get_argument_names(&f.opt),
                     }))
                 }
-                MonoType::String => list.push(Box::new(VarResult {
-                    name: key.to_string(),
-                    package: PRELUDE_PACKAGE.to_string(),
-                    package_name: None,
-                    var_type: VarType::String,
-                })),
-                MonoType::Int => list.push(Box::new(VarResult {
-                    name: key.to_string(),
-                    package: PRELUDE_PACKAGE.to_string(),
-                    package_name: None,
-                    var_type: VarType::Int,
-                })),
-                MonoType::Float => list.push(Box::new(VarResult {
-                    name: key.to_string(),
-                    package: PRELUDE_PACKAGE.to_string(),
-                    package_name: None,
-                    var_type: VarType::Float,
-                })),
-                MonoType::Arr(_) => list.push(Box::new(VarResult {
-                    name: key.to_string(),
-                    package: PRELUDE_PACKAGE.to_string(),
-                    package_name: None,
-                    var_type: VarType::Array,
-                })),
-                MonoType::Bool => list.push(Box::new(VarResult {
-                    name: key.to_string(),
-                    package: PRELUDE_PACKAGE.to_string(),
-                    package_name: None,
-                    var_type: VarType::Bool,
-                })),
-                MonoType::Bytes => list.push(Box::new(VarResult {
-                    name: key.to_string(),
-                    package: PRELUDE_PACKAGE.to_string(),
-                    package_name: None,
-                    var_type: VarType::Bytes,
-                })),
+                MonoType::String => push_var_result(VarType::String),
+                MonoType::Int => push_var_result(VarType::Int),
+                MonoType::Float => push_var_result(VarType::Float),
+                MonoType::Arr(_) => push_var_result(VarType::Array),
+                MonoType::Bool => push_var_result(VarType::Bool),
+                MonoType::Bytes => push_var_result(VarType::Bytes),
                 MonoType::Duration => {
-                    list.push(Box::new(VarResult {
-                        name: key.to_string(),
-                        package: PRELUDE_PACKAGE.to_string(),
-                        package_name: None,
-                        var_type: VarType::Duration,
-                    }))
+                    push_var_result(VarType::Duration)
                 }
-                MonoType::Uint => list.push(Box::new(VarResult {
-                    name: key.to_string(),
-                    package: PRELUDE_PACKAGE.to_string(),
-                    package_name: None,
-                    var_type: VarType::Uint,
-                })),
-                MonoType::Regexp => list.push(Box::new(VarResult {
-                    name: key.to_string(),
-                    package: PRELUDE_PACKAGE.to_string(),
-                    package_name: None,
-                    var_type: VarType::Regexp,
-                })),
-                MonoType::Time => list.push(Box::new(VarResult {
-                    name: key.to_string(),
-                    package: PRELUDE_PACKAGE.to_string(),
-                    package_name: None,
-                    var_type: VarType::Time,
-                })),
+                MonoType::Uint => push_var_result(VarType::Uint),
+                MonoType::Regexp => push_var_result(VarType::Regexp),
+                MonoType::Time => push_var_result(VarType::Time),
                 _ => {}
             }
         }
@@ -1198,7 +1124,7 @@ fn get_builtins(list: &mut Vec<Box<dyn Completable>>) {
 }
 
 fn find_alias_name(
-    imports: Vec<Import>,
+    imports: &[Import],
     name: String,
     iteration: i32,
 ) -> Option<String> {
@@ -1209,13 +1135,13 @@ fn find_alias_name(
         format!("{}{}", name, iteration)
     };
 
-    for import in imports.clone() {
+    for import in imports {
         if import.alias == pkg_name {
             return find_alias_name(imports, name, iteration + 1);
         }
 
-        if let Some(initial_name) = import.initial_name {
-            if initial_name == pkg_name && first_iteration {
+        if let Some(initial_name) = &import.initial_name {
+            if *initial_name == pkg_name && first_iteration {
                 return find_alias_name(imports, name, iteration + 1);
             }
         }
@@ -1443,17 +1369,10 @@ impl Completable for ImportAliasResult {
 fn get_var_type(
     expr: &SemanticExpression,
 ) -> Option<CompletionVarType> {
-    match expr.type_of() {
-        MonoType::Duration => {
-            return Some(CompletionVarType::Duration)
-        }
-        MonoType::Int => return Some(CompletionVarType::Int),
-        MonoType::Bool => return Some(CompletionVarType::Bool),
-        MonoType::Float => return Some(CompletionVarType::Float),
-        MonoType::String => return Some(CompletionVarType::String),
-        MonoType::Arr(_) => return Some(CompletionVarType::Array),
-        MonoType::Regexp => return Some(CompletionVarType::Regexp),
-        _ => {}
+    if let Some(typ) =
+        CompletionVarType::from_monotype(&expr.type_of())
+    {
+        return Some(typ);
     }
 
     match expr {
@@ -1463,21 +1382,14 @@ fn get_var_type(
         SemanticExpression::Call(c) => {
             let result_type = follow_function_pipes(c);
 
-            match result_type {
-                MonoType::Int => Some(CompletionVarType::Int),
-                MonoType::Float => Some(CompletionVarType::Float),
-                MonoType::Bool => Some(CompletionVarType::Bool),
-                MonoType::Arr(_) => Some(CompletionVarType::Array),
-                MonoType::Duration => {
-                    Some(CompletionVarType::Duration)
-                }
-                MonoType::Record(_) => {
-                    Some(CompletionVarType::Record)
-                }
-                MonoType::String => Some(CompletionVarType::String),
-                MonoType::Uint => Some(CompletionVarType::Uint),
-                MonoType::Time => Some(CompletionVarType::Time),
-                _ => None,
+            match CompletionVarType::from_monotype(result_type) {
+                Some(typ) => Some(typ),
+                None => match result_type {
+                    MonoType::Record(_) => {
+                        Some(CompletionVarType::Record)
+                    }
+                    _ => None,
+                },
             }
         }
         _ => None,
@@ -1672,6 +1584,23 @@ enum CompletionVarType {
     Record,
     Uint,
     Time,
+}
+
+impl CompletionVarType {
+    pub fn from_monotype(typ: &MonoType) -> Option<Self> {
+        Some(match typ {
+            MonoType::Duration => CompletionVarType::Duration,
+            MonoType::Int => CompletionVarType::Int,
+            MonoType::Bool => CompletionVarType::Bool,
+            MonoType::Float => CompletionVarType::Float,
+            MonoType::String => CompletionVarType::String,
+            MonoType::Arr(_) => CompletionVarType::Array,
+            MonoType::Regexp => CompletionVarType::Regexp,
+            MonoType::Uint => CompletionVarType::Uint,
+            MonoType::Time => CompletionVarType::Time,
+            _ => return None,
+        })
+    }
 }
 
 #[derive(Clone)]
