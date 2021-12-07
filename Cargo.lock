@@ -703,7 +703,7 @@ dependencies = [
 
 [[package]]
 name = "flux-lsp"
-version = "0.7.4"
+version = "0.8.0"
 dependencies = [
  "anyhow",
  "async-std",
