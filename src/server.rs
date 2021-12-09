@@ -229,6 +229,26 @@ impl LspServer {
             }
         }
     }
+    fn get_document(&self, key: &lsp::Url) -> RpcResult<String> {
+        let store = match self.store.lock() {
+            Ok(value) => value,
+            Err(err) => {
+                return Err(lspower::jsonrpc::Error {
+                    code: lspower::jsonrpc::ErrorCode::InternalError,
+                    message: format!(
+                        "Could not acquire store lock. Error: {}",
+                        err
+                    ),
+                    data: None,
+                });
+            }
+        };
+        if let Some(contents) = store.get(key) {
+            Ok(contents.clone())
+        } else {
+            Err(file_not_opened(key))
+        }
+    }
     // Publish any diagnostics to the client
     async fn publish_diagnostics(&self, key: &lsp::Url, text: &str) {
         // If we have a client back to the editor report any diagnostics found in the document
@@ -538,30 +558,8 @@ impl LanguageServer for LspServer {
         let key =
             params.text_document_position_params.text_document.uri;
         let pkg = {
-            let store = match self.store.lock() {
-                Ok(value) => value,
-                Err(err) => {
-                    return Err(lspower::jsonrpc::Error {
-                        code:
-                            lspower::jsonrpc::ErrorCode::InternalError,
-                        message: format!(
-                            "Could not acquire store lock. Error: {}",
-                            err
-                        ),
-                        data: None,
-                    });
-                }
-            };
-            let data = store.get(&key).ok_or_else(|| {
-                // File isn't loaded into memory
-                log::error!(
-                    "signature help failed: file {} not open on server",
-                    key
-                );
-                file_not_opened(&key)
-            })?;
-
-            match parse_and_analyze(data) {
+            let data = self.get_document(&key)?;
+            match parse_and_analyze(data.as_str()) {
                 Ok(pkg) => pkg,
                 Err(err) => {
                     log::debug!("{}", err);
@@ -1015,13 +1013,40 @@ impl LanguageServer for LspServer {
 
         Ok(Some(find_references(key, node)))
     }
-    // XXX: rockstar (9 Aug 2021) - This implementation exists here *solely* for
-    // compatibility with the previous server. This behavior is identical to it,
-    // although very clearly kinda useless.
     async fn hover(
         &self,
-        _params: lsp::HoverParams,
+        params: lsp::HoverParams,
     ) -> RpcResult<Option<lsp::Hover>> {
+        let key =
+            params.text_document_position_params.text_document.uri;
+        let pkg = {
+            let data = self.get_document(&key)?;
+            match parse_and_analyze(data.as_str()) {
+                Ok(pkg) => pkg,
+                Err(err) => {
+                    log::debug!("{}", err);
+                    return Ok(None);
+                }
+            }
+        };
+
+        let node_finder_result = find_node(
+            walk::Node::Package(&pkg),
+            params.text_document_position_params.position,
+        );
+        if let Some(node) = node_finder_result.node {
+            if let Some(typ) = node.type_of() {
+                return Ok(Some(lsp::Hover {
+                    contents: lsp::HoverContents::Scalar(
+                        lsp::MarkedString::String(format!(
+                            "type: {}",
+                            typ
+                        )),
+                    ),
+                    range: None,
+                }));
+            }
+        }
         Ok(None)
     }
 
@@ -2170,7 +2195,9 @@ errorCounts
 
     #[test]
     async fn test_hover() {
-        let fluxscript = r#"import "strings"#;
+        let fluxscript = r#"x = 1
+x + 1
+"#;
         let server = create_server();
         open_file(&server, fluxscript.to_string()).await;
 
@@ -2192,7 +2219,17 @@ errorCounts
 
         let result = server.hover(params).await.unwrap();
 
-        assert!(result.is_none());
+        assert_eq!(
+            result,
+            Some(lsp::Hover {
+                contents: lsp::HoverContents::Scalar(
+                    lsp::MarkedString::String(
+                        "type: int".to_string()
+                    )
+                ),
+                range: None,
+            })
+        );
     }
 
     #[test]
