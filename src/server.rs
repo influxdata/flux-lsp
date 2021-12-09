@@ -1064,35 +1064,9 @@ impl LanguageServer for LspServer {
         &self,
         params: lsp::CompletionParams,
     ) -> RpcResult<Option<lsp::CompletionResponse>> {
-        let key =
-            params.text_document_position.text_document.uri.clone();
+        let key = &params.text_document_position.text_document.uri;
 
-        let contents = {
-            let store = match self.store.lock() {
-                Ok(value) => value,
-                Err(err) => {
-                    return Err(lspower::jsonrpc::Error {
-                        code:
-                            lspower::jsonrpc::ErrorCode::InternalError,
-                        message: format!(
-                            "Could not acquire store lock. Error: {}",
-                            err
-                        ),
-                        data: None,
-                    });
-                }
-            };
-            store
-                .get(&key)
-                .ok_or_else(|| {
-                    log::error!(
-                        "textDocument/completion called on unknown file {}",
-                        key
-                    );
-                    file_not_opened(&key)
-                })?
-                .to_string()
-        };
+        let contents = self.get_document(key)?;
 
         let items = if let Some(ctx) = params.context.clone() {
             match (ctx.trigger_kind, ctx.trigger_character) {
@@ -1101,7 +1075,7 @@ impl LanguageServer for LspServer {
                     Some(c),
                 ) => match c.as_str() {
                     "." => completion::find_dot_completions(
-                        params, contents,
+                        params, &contents,
                     ),
                     ":" => {
                         // XXX: rockstar (29 Nov 2021) - This is where argument
@@ -1116,16 +1090,20 @@ impl LanguageServer for LspServer {
                     "(" | "," => completion::find_param_completions(
                         Some(c),
                         params,
-                        contents,
+                        contents.as_str(),
                     ),
-                    _ => {
-                        completion::find_completions(params, contents)
-                    }
+                    _ => completion::find_completions(
+                        params,
+                        contents.as_str(),
+                    ),
                 },
-                _ => completion::find_completions(params, contents),
+                _ => completion::find_completions(
+                    params,
+                    contents.as_str(),
+                ),
             }
         } else {
-            completion::find_completions(params, contents)
+            completion::find_completions(params, contents.as_str())
         };
 
         let items = match items {
