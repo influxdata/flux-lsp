@@ -39,7 +39,7 @@ clap = "2.33.3"
 combinations = "0.1.0"
 console_error_panic_hook = "0.1.7"
 console_log = { version = "0.2", optional = true }
-flux = { git = "https://github.com/influxdata/flux", tag = "v0.145.0" }
+flux = { git = "https://github.com/influxdata/flux", tag = "v0.146.0" }
 futures = "0.3.15"
 js-sys = "0.3.51"
 line-col = "0.2.1"
