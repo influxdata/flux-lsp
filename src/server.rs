@@ -1,15 +1,11 @@
-use std::{
-    borrow::Cow,
-    collections::{hash_map::Entry, HashMap},
-    sync::{Arc, Mutex},
-};
+use std::borrow::Cow;
+use std::collections::{hash_map::Entry, HashMap};
+use std::sync::{Arc, Mutex};
 
 use anyhow::Result;
-
 use flux::semantic::{
     nodes::FunctionParameter, nodes::Symbol, types::MonoType, walk,
 };
-
 use lspower::{
     jsonrpc::Error as RpcError, jsonrpc::ErrorCode as RpcErrorCode,
     jsonrpc::Result as RpcResult, lsp, Client, LanguageServer,
@@ -398,7 +394,25 @@ impl LanguageServer for LspServer {
                 references_provider: Some(lsp::OneOf::Left(true)),
                 rename_provider: Some(lsp::OneOf::Left(true)),
                 selection_range_provider: None,
-                semantic_tokens_provider: None,
+                semantic_tokens_provider: Some(lsp::SemanticTokensServerCapabilities::SemanticTokensOptions(lsp::SemanticTokensOptions{
+                    work_done_progress_options: lsp::WorkDoneProgressOptions {
+                        work_done_progress: None
+                    },
+                    legend: lsp::SemanticTokensLegend {
+                        // STOP! Are you adding more token types? Add them
+                        // at the end of this vector, and make sure to add
+                        // a corresponding constant for the token type. For
+                        // more information, see https://microsoft.github.io/language-server-protocol/specifications/specification-3-17/#semanticTokensLegend
+                        token_types: vec![
+                            lsp::SemanticTokenType::KEYWORD,
+                            lsp::SemanticTokenType::NUMBER,
+                            lsp::SemanticTokenType::STRING,
+                        ],
+                        token_modifiers: vec![],
+                    },
+                    range: None,
+                    full: None,
+                })),
                 signature_help_provider: Some(
                     lsp::SignatureHelpOptions {
                         trigger_characters: Some(vec![
@@ -1065,6 +1079,31 @@ impl LanguageServer for LspServer {
         let response = lsp::CompletionResponse::List(items);
         Ok(Some(response))
     }
+
+    async fn semantic_tokens_full(
+        &self,
+        params: lsp::SemanticTokensParams,
+    ) -> RpcResult<Option<lsp::SemanticTokensResult>> {
+        let key = params.text_document.uri;
+
+        let contents = self.get_document(&key)?;
+        let pkg: flux::ast::Package =
+            flux::parser::parse_string("".into(), contents.as_str())
+                .into();
+        let root_node = flux::ast::walk::Node::File(&pkg.files[0]);
+
+        let mut visitor =
+            crate::visitors::ast::SemanticTokenVisitor::default();
+
+        flux::ast::walk::walk(&mut visitor, root_node);
+
+        Ok(Some(lsp::SemanticTokensResult::Tokens(
+            lsp::SemanticTokens {
+                result_id: None,
+                data: visitor.tokens.clone(),
+            },
+        )))
+    }
 }
 
 #[derive(Default, Clone)]
@@ -1091,7 +1130,7 @@ fn find_node(
 // Url::to_file_path doesn't exist in wasm-unknown-unknown, for kinda
 // obvious reasons. Ignore these tests when executing against that target.
 #[cfg(all(test, not(target_arch = "wasm32")))]
-#[allow(deprecated)]
+#[allow(deprecated, clippy::panic, clippy::unwrap_used)]
 mod tests {
     use std::collections::{BTreeSet, HashMap};
 
@@ -3462,5 +3501,120 @@ sql"#;
               ]
             }"#]]
         .assert_eq(&serde_json::to_string_pretty(&result).unwrap());
+    }
+
+    use crate::visitors::ast::{
+        SEMANTIC_TOKEN_KEYWORD, SEMANTIC_TOKEN_NUMBER,
+        SEMANTIC_TOKEN_STRING,
+    };
+
+    #[test]
+    async fn test_semantic_tokens_full() {
+        let fluxscript = r#"package "my-package"
+import "csv"
+
+myVar = from(bucket: "my-bucket")
+    |> range(start: 30m)
+
+csv.from(file: "my.csv")
+    |> filter(fn: (row) => row.field == 0.9)
+"#;
+        let server = create_server();
+        open_file(&server, fluxscript.to_string()).await;
+
+        let params = lsp::SemanticTokensParams {
+            text_document: lsp::TextDocumentIdentifier {
+                uri: lsp::Url::parse("file:///home/user/file.flux")
+                    .unwrap(),
+            },
+            work_done_progress_params: lsp::WorkDoneProgressParams {
+                work_done_token: None,
+            },
+            partial_result_params: lsp::PartialResultParams {
+                partial_result_token: None,
+            },
+        };
+
+        let result =
+            server.semantic_tokens_full(params).await.unwrap();
+        assert!(result.is_some());
+
+        let token_result = result.unwrap();
+        if let lsp::SemanticTokensResult::Tokens(tokens) =
+            token_result
+        {
+            let expected = lsp::SemanticTokens {
+                result_id: None,
+                data: vec![
+                    // package
+                    lsp::SemanticToken {
+                        delta_line: 1,
+                        delta_start: 1,
+                        length: 7,
+                        token_type: SEMANTIC_TOKEN_KEYWORD,
+                        token_modifiers_bitset: 0,
+                    },
+                    // "my-package"
+                    lsp::SemanticToken {
+                        delta_line: 1,
+                        delta_start: 9,
+                        length: 12,
+                        token_type: SEMANTIC_TOKEN_STRING,
+                        token_modifiers_bitset: 0,
+                    },
+                    // import
+                    lsp::SemanticToken {
+                        delta_line: 2,
+                        delta_start: 1,
+                        length: 6,
+                        token_type: SEMANTIC_TOKEN_KEYWORD,
+                        token_modifiers_bitset: 0,
+                    },
+                    // "csv"
+                    lsp::SemanticToken {
+                        delta_line: 2,
+                        delta_start: 8,
+                        length: 5,
+                        token_type: SEMANTIC_TOKEN_STRING,
+                        token_modifiers_bitset: 0,
+                    },
+                    // "my-bucket"
+                    lsp::SemanticToken {
+                        delta_line: 4,
+                        delta_start: 22,
+                        length: 11,
+                        token_type: SEMANTIC_TOKEN_STRING,
+                        token_modifiers_bitset: 0,
+                    },
+                    // 30m
+                    lsp::SemanticToken {
+                        delta_line: 5,
+                        delta_start: 21,
+                        length: 3,
+                        token_type: SEMANTIC_TOKEN_NUMBER,
+                        token_modifiers_bitset: 0,
+                    },
+                    // my.csv
+                    lsp::SemanticToken {
+                        delta_line: 7,
+                        delta_start: 16,
+                        length: 8,
+                        token_type: SEMANTIC_TOKEN_STRING,
+                        token_modifiers_bitset: 0,
+                    },
+                    // 0.9
+                    lsp::SemanticToken {
+                        delta_line: 8,
+                        delta_start: 41,
+                        length: 3,
+                        token_type: SEMANTIC_TOKEN_NUMBER,
+                        token_modifiers_bitset: 0,
+                    },
+                ],
+            };
+            assert_eq!(expected, tokens)
+        } else {
+            panic!("Result was not a token result");
+        }
     }
 }
