@@ -893,7 +893,7 @@ impl Completable for stdlib::PackageResult {
         if imports
             .iter()
             .map(|x| &x.path)
-            .any(|x| *x == self.full_name)
+            .all(|x| *x != self.full_name)
         {
             let alias =
                 find_alias_name(&imports, self.name.clone(), 1);
