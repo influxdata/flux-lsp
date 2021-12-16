@@ -343,7 +343,9 @@ impl LanguageServer for LspServer {
                 document_formatting_provider: Some(lsp::OneOf::Left(
                     true,
                 )),
-                document_highlight_provider: None,
+                document_highlight_provider: Some(lsp::OneOf::Left(
+                    true,
+                )),
                 document_link_provider: None,
                 document_on_type_formatting_provider: None,
                 document_range_formatting_provider: None,
@@ -973,33 +975,43 @@ impl LanguageServer for LspServer {
         };
         Ok(Some(response))
     }
+    async fn document_highlight(
+        &self,
+        params: lsp::DocumentHighlightParams,
+    ) -> RpcResult<Option<Vec<lsp::DocumentHighlight>>> {
+        let key =
+            params.text_document_position_params.text_document.uri;
+        let contents = self.get_document(&key)?;
+        let pkg = match parse_and_analyze(&contents) {
+            Ok(pkg) => pkg,
+            Err(err) => {
+                log::debug!("{}", err);
+                return Ok(None);
+            }
+        };
+        let node = find_node(
+            walk::Node::Package(&pkg),
+            params.text_document_position_params.position,
+        );
+
+        let refs = find_references(key, node);
+        Ok(Some(
+            refs.iter()
+                .map(|r| lsp::DocumentHighlight {
+                    kind: Some(lsp::DocumentHighlightKind::TEXT),
+
+                    range: r.range,
+                })
+                .collect(),
+        ))
+    }
     async fn references(
         &self,
         params: lsp::ReferenceParams,
     ) -> RpcResult<Option<Vec<lsp::Location>>> {
-        let key =
-            params.text_document_position.text_document.uri.clone();
-        let store = match self.store.lock() {
-            Ok(value) => value,
-            Err(err) => {
-                return Err(lspower::jsonrpc::Error {
-                    code: lspower::jsonrpc::ErrorCode::InternalError,
-                    message: format!(
-                        "Could not acquire store lock. Error: {}",
-                        err
-                    ),
-                    data: None,
-                });
-            }
-        };
-        let contents = store.get(&key).ok_or_else(|| {
-            log::error!(
-                "textDocument/references called on unknown file {}",
-                key
-            );
-            file_not_opened(&key)
-        })?;
-        let pkg = match parse_and_analyze(contents) {
+        let key = params.text_document_position.text_document.uri;
+        let contents = self.get_document(&key)?;
+        let pkg = match parse_and_analyze(&contents) {
             Ok(pkg) => pkg,
             Err(err) => {
                 log::debug!("{}", err);
@@ -2000,7 +2012,7 @@ errorCounts
         assert_eq!(expected, result);
     }
     #[test]
-    async fn test_references() {
+    async fn test_rename() {
         let fluxscript = r#"import "strings"
 env = "prod01-us-west-2"
 
@@ -2084,7 +2096,7 @@ errorCounts
         assert_eq!(expected, result);
     }
     #[test]
-    async fn test_rename() {
+    async fn test_references() {
         let fluxscript = r#"import "strings"
 env = "prod01-us-west-2"
 
@@ -2155,6 +2167,85 @@ errorCounts
                     .text_document
                     .uri
                     .clone(),
+                range: lsp::Range {
+                    start: lsp::Position {
+                        line: 8,
+                        character: 34,
+                    },
+                    end: lsp::Position {
+                        line: 8,
+                        character: 37,
+                    },
+                },
+            },
+        ];
+
+        assert_eq!(expected, result);
+    }
+    #[test]
+    async fn test_document_highlight() {
+        let fluxscript = r#"import "strings"
+env = "prod01-us-west-2"
+
+errorCounts = from(bucket:"kube-infra/monthly")
+    |> range(start: -3d)
+    |> filter(fn: (r) => r._measurement == "query_log" and
+                         r.error != "" and
+                         r._field == "responseSize" and
+                         r.env == env)
+    |> group(columns:["env", "error"])
+    |> count()
+    |> group(columns:["env", "_stop", "_start"])
+
+errorCounts
+    |> filter(fn: (r) => strings.containsStr(v: r.error, substr: "AppendMappedRecordWithNulls"))"#;
+        let server = create_server();
+        open_file(&server, fluxscript.to_string()).await;
+
+        let params = lsp::DocumentHighlightParams {
+            text_document_position_params:
+                lsp::TextDocumentPositionParams {
+                    text_document: lsp::TextDocumentIdentifier {
+                        uri: lsp::Url::parse(
+                            "file:///home/user/file.flux",
+                        )
+                        .unwrap(),
+                    },
+                    position: lsp::Position {
+                        line: 1,
+                        character: 1,
+                    },
+                },
+            work_done_progress_params: lsp::WorkDoneProgressParams {
+                work_done_token: None,
+            },
+            partial_result_params: lsp::PartialResultParams {
+                partial_result_token: None,
+            },
+        };
+
+        let result = server
+            .document_highlight(params.clone())
+            .await
+            .unwrap()
+            .unwrap();
+
+        let expected = vec![
+            lsp::DocumentHighlight {
+                kind: Some(lsp::DocumentHighlightKind::TEXT),
+                range: lsp::Range {
+                    start: lsp::Position {
+                        line: 1,
+                        character: 0,
+                    },
+                    end: lsp::Position {
+                        line: 1,
+                        character: 3,
+                    },
+                },
+            },
+            lsp::DocumentHighlight {
+                kind: Some(lsp::DocumentHighlightKind::TEXT),
                 range: lsp::Range {
                     start: lsp::Position {
                         line: 8,
