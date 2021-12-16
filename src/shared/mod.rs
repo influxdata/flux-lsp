@@ -37,11 +37,15 @@ pub fn get_package_name(name: &str) -> Option<String> {
 }
 
 pub fn flux_position_to_position(
-    pos: flux::ast::Position,
+    pos: &flux::ast::Position,
 ) -> lsp::Position {
-    lsp::Position {
-        line: pos.line - 1,
-        character: pos.column - 1,
+    if pos.line == 0 || pos.column == 0 {
+        lsp::Position::default()
+    } else {
+        lsp::Position {
+            line: pos.line - 1,
+            character: pos.column - 1,
+        }
     }
 }
 
