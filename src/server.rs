@@ -1046,6 +1046,9 @@ impl LanguageServer for LspServer {
                         walk::Node::MemberAssgn(var) => {
                             Some(var.init.type_of())
                         }
+                        walk::Node::BuiltinStmt(builtin) => {
+                            Some(builtin.typ_expr.expr.clone())
+                        }
                         walk::Node::FunctionParameter(_) => {
                             let func = path.get(path.len() - 3)?;
                             match func {
@@ -2277,14 +2280,17 @@ x + 1
     #[test]
     async fn test_hover_binding() {
         let fluxscript = r#"x = "asd"
+builtin builtin_ : (v: int) => int
+option option_ = 123
 1
 "#;
         let server = create_server();
         open_file(&server, fluxscript.to_string()).await;
 
-        let params = hover_params(lsp::Position::new(0, 1));
-
-        let result = server.hover(params).await.unwrap();
+        let result = server
+            .hover(hover_params(lsp::Position::new(0, 1)))
+            .await
+            .unwrap();
 
         assert_eq!(
             result,
@@ -2292,6 +2298,40 @@ x + 1
                 contents: lsp::HoverContents::Scalar(
                     lsp::MarkedString::String(
                         "type: string".to_string()
+                    )
+                ),
+                range: None,
+            })
+        );
+
+        let result = server
+            .hover(hover_params(lsp::Position::new(1, 12)))
+            .await
+            .unwrap();
+
+        assert_eq!(
+            result,
+            Some(lsp::Hover {
+                contents: lsp::HoverContents::Scalar(
+                    lsp::MarkedString::String(
+                        "type: (v:int) => int".to_string()
+                    )
+                ),
+                range: None,
+            })
+        );
+
+        let result = server
+            .hover(hover_params(lsp::Position::new(2, 10)))
+            .await
+            .unwrap();
+
+        assert_eq!(
+            result,
+            Some(lsp::Hover {
+                contents: lsp::HoverContents::Scalar(
+                    lsp::MarkedString::String(
+                        "type: int".to_string()
                     )
                 ),
                 range: None,
