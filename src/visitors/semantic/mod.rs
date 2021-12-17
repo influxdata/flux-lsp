@@ -1,6 +1,3 @@
-use std::cell::RefCell;
-use std::rc::Rc;
-
 use crate::shared::get_package_name;
 
 use flux::semantic::nodes::Expression;
@@ -42,27 +39,19 @@ fn contains_position(node: Node<'_>, pos: lsp::Position) -> bool {
     true
 }
 
-pub struct NodeFinderState<'a> {
+pub struct NodeFinderVisitor<'a> {
     pub node: Option<Node<'a>>,
     pub position: lsp::Position,
     pub path: Vec<Node<'a>>,
 }
 
-#[derive(Clone)]
-pub struct NodeFinderVisitor<'a> {
-    pub state: Rc<RefCell<NodeFinderState<'a>>>,
-}
-
 impl<'a> Visitor<'a> for NodeFinderVisitor<'a> {
     fn visit(&mut self, node: Node<'a>) -> bool {
-        let mut state = self.state.borrow_mut();
-
-        let contains =
-            contains_position(node.clone(), (*state).position);
+        let contains = contains_position(node.clone(), self.position);
 
         if contains {
-            (*state).path.push(node.clone());
-            (*state).node = Some(node.clone());
+            self.path.push(node.clone());
+            self.node = Some(node.clone());
         }
 
         true
@@ -72,45 +61,37 @@ impl<'a> Visitor<'a> for NodeFinderVisitor<'a> {
 impl<'a> NodeFinderVisitor<'a> {
     pub fn new(pos: lsp::Position) -> NodeFinderVisitor<'a> {
         NodeFinderVisitor {
-            state: Rc::new(RefCell::new(NodeFinderState {
-                node: None,
-                position: pos,
-                path: vec![],
-            })),
+            node: None,
+            position: pos,
+            path: vec![],
         }
     }
 }
 
-pub struct IdentFinderState<'a> {
+pub struct IdentFinderVisitor<'a> {
     pub name: String,
     pub identifiers: Vec<walk::Node<'a>>,
 }
 
-#[derive(Clone)]
-pub struct IdentFinderVisitor<'a> {
-    pub state: Rc<RefCell<IdentFinderState<'a>>>,
-}
-
 impl<'a> Visitor<'a> for IdentFinderVisitor<'a> {
     fn visit(&mut self, node: walk::Node<'a>) -> bool {
-        let mut state = self.state.borrow_mut();
         match node.clone() {
             walk::Node::MemberExpr(m) => {
                 if let Expression::Identifier(i) = m.object.clone() {
-                    if *i.name == state.name {
+                    if *i.name == self.name {
                         return true;
                     }
                 }
                 return false;
             }
             walk::Node::Identifier(n) => {
-                if *n.name == state.name {
-                    state.identifiers.push(node.clone());
+                if *n.name == self.name {
+                    self.identifiers.push(node.clone());
                 }
             }
             walk::Node::IdentifierExpr(n) => {
-                if *n.name == state.name {
-                    state.identifiers.push(node.clone());
+                if *n.name == self.name {
+                    self.identifiers.push(node.clone());
                 }
             }
             _ => {}
@@ -122,32 +103,23 @@ impl<'a> Visitor<'a> for IdentFinderVisitor<'a> {
 impl<'a> IdentFinderVisitor<'a> {
     pub fn new(name: String) -> IdentFinderVisitor<'a> {
         IdentFinderVisitor {
-            state: Rc::new(RefCell::new(IdentFinderState {
-                name,
-                identifiers: vec![],
-            })),
+            name,
+            identifiers: vec![],
         }
     }
 }
 
-pub struct DefinitionFinderState<'a> {
+pub struct DefinitionFinderVisitor<'a> {
     pub name: String,
     pub node: Option<Node<'a>>,
 }
 
-#[derive(Clone)]
-pub struct DefinitionFinderVisitor<'a> {
-    pub state: Rc<RefCell<DefinitionFinderState<'a>>>,
-}
-
 impl<'a> Visitor<'a> for DefinitionFinderVisitor<'a> {
     fn visit(&mut self, node: Node<'a>) -> bool {
-        let mut state = self.state.borrow_mut();
-
         match node {
             walk::Node::VariableAssgn(v) => {
-                if *v.id.name == state.name {
-                    state.node = Some(node.clone());
+                if *v.id.name == self.name {
+                    self.node = Some(node.clone());
                     return false;
                 }
 
@@ -161,31 +133,19 @@ impl<'a> Visitor<'a> for DefinitionFinderVisitor<'a> {
 
 impl<'a> DefinitionFinderVisitor<'a> {
     pub fn new(name: String) -> DefinitionFinderVisitor<'a> {
-        DefinitionFinderVisitor {
-            state: Rc::new(RefCell::new(DefinitionFinderState {
-                name,
-                node: None,
-            })),
-        }
+        DefinitionFinderVisitor { name, node: None }
     }
 }
 
 #[derive(Default)]
-pub struct FoldFinderState<'a> {
-    pub nodes: Vec<Node<'a>>,
-}
-
-#[derive(Default)]
 pub struct FoldFinderVisitor<'a> {
-    pub state: Rc<RefCell<FoldFinderState<'a>>>,
+    pub nodes: Vec<Node<'a>>,
 }
 
 impl<'a> Visitor<'a> for FoldFinderVisitor<'a> {
     fn visit(&mut self, node: Node<'a>) -> bool {
-        let mut state = self.state.borrow_mut();
-
         if let Node::Block(_) = node {
-            (*state).nodes.push(node.clone());
+            self.nodes.push(node.clone());
         }
 
         true
@@ -200,19 +160,12 @@ pub struct Import {
 }
 
 #[derive(Default)]
-pub struct ImportFinderState {
-    pub imports: Vec<Import>,
-}
-
-#[derive(Default)]
 pub struct ImportFinderVisitor {
-    pub state: Rc<RefCell<ImportFinderState>>,
+    pub imports: Vec<Import>,
 }
 
 impl<'a> Visitor<'a> for ImportFinderVisitor {
     fn visit(&mut self, node: Node<'a>) -> bool {
-        let mut state = self.state.borrow_mut();
-
         if let Node::ImportDeclaration(import) = node {
             let alias = match import.alias.clone() {
                 Some(alias) => alias.name.to_string(),
@@ -220,7 +173,7 @@ impl<'a> Visitor<'a> for ImportFinderVisitor {
                     .unwrap_or_else(|| "".to_string()),
             };
 
-            (*state).imports.push(Import {
+            self.imports.push(Import {
                 path: import.path.value.clone(),
                 alias,
                 initial_name: get_package_name(

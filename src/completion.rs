@@ -391,9 +391,7 @@ fn get_imports(
 
     flux::semantic::walk::walk(&mut visitor, walker);
 
-    let state = visitor.state.borrow();
-
-    Ok((*state).imports.clone())
+    Ok(visitor.imports)
 }
 
 fn get_imports_removed(
@@ -407,9 +405,7 @@ fn get_imports_removed(
 
     flux::semantic::walk::walk(&mut visitor, walker);
 
-    let state = visitor.state.borrow();
-
-    Ok((*state).imports.clone())
+    Ok(visitor.imports)
 }
 
 fn move_back(position: lsp::Position, count: u32) -> lsp::Position {
