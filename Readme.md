@@ -44,10 +44,10 @@ Requires [neovim-lspconfig](https://github.com/neovim/nvim-lspconfig)
 in your init.vim
 
 ```vimrc
-require'lspconfig'.flux-lsp.setup{}
+require'lspconfig'.flux_lsp.setup{}
 ```
 
-See [here](https://github.com/neovim/nvim-lspconfig/blob/master/doc/server_configurations.md#flux-lsp) for more details.
+See [here](https://github.com/neovim/nvim-lspconfig/blob/master/doc/server_configurations.md#flux_lsp) for more details.
 
 ### with vim-lsp
 Requires [vim-lsp](https://github.com/prabirshrestha/vim-lsp)
