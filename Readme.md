@@ -114,15 +114,17 @@ Also ensure that the wasm file is not being parsed by any file loader plugins, a
 
 # Supported LSP features
 
+- completionItem/resolve
 - initialize
 - shutdown
+- textDocument/completion
 - textDocument/definition
 - textDocument/didChange
 - textDocument/didOpen
 - textDocument/didSave
+- textDocument/documentHighlight
+- textDocument/documentSymbol
 - textDocument/foldingRange
+- textDocument/hover
 - textDocument/references
 - textDocument/rename
-- textDocument/completion
-- textDocument/documentSymbol
-- completionItem/resolve

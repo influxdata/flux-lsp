@@ -229,6 +229,7 @@ impl LspServer {
             }
         }
     }
+
     fn get_document(&self, key: &lsp::Url) -> RpcResult<String> {
         let store = match self.store.lock() {
             Ok(value) => value,
@@ -246,9 +247,28 @@ impl LspServer {
         if let Some(contents) = store.get(key) {
             Ok(contents.clone())
         } else {
-            Err(file_not_opened(key))
+            Err(lspower::jsonrpc::Error::invalid_params(format!(
+                "file not opened: {}",
+                key
+            )))
         }
     }
+
+    fn parse_analyze_document(
+        &self,
+        key: &lsp::Url,
+    ) -> RpcResult<flux::semantic::nodes::Package> {
+        let contents = self.get_document(key)?;
+        match parse_and_analyze(&contents) {
+            Ok(pkg) => Ok(pkg),
+            Err(err) => RpcResult::Err(RpcError {
+                code: RpcErrorCode::InternalError,
+                message: format!("{}", err),
+                data: None,
+            }),
+        }
+    }
+
     // Publish any diagnostics to the client
     async fn publish_diagnostics(&self, key: &lsp::Url, text: &str) {
         // If we have a client back to the editor report any diagnostics found in the document
@@ -271,6 +291,7 @@ impl LspServer {
             };
         };
     }
+
     fn compute_diagnostics(
         &self,
         key: &lsp::Url,
@@ -343,7 +364,9 @@ impl LanguageServer for LspServer {
                 document_formatting_provider: Some(lsp::OneOf::Left(
                     true,
                 )),
-                document_highlight_provider: None,
+                document_highlight_provider: Some(lsp::OneOf::Left(
+                    true,
+                )),
                 document_link_provider: None,
                 document_on_type_formatting_provider: None,
                 document_range_formatting_provider: None,
@@ -396,6 +419,7 @@ impl LanguageServer for LspServer {
             }),
         })
     }
+
     async fn shutdown(&self) -> RpcResult<()> {
         let mut client = match self.client.lock() {
             Ok(client) => client,
@@ -414,6 +438,7 @@ impl LanguageServer for LspServer {
         *client = None;
         Ok(())
     }
+
     async fn did_open(
         &self,
         params: lsp::DidOpenTextDocumentParams,
@@ -448,6 +473,7 @@ impl LanguageServer for LspServer {
             }
         }
     }
+
     async fn did_change(
         &self,
         params: lsp::DidChangeTextDocumentParams,
@@ -493,6 +519,7 @@ impl LanguageServer for LspServer {
         };
         self.publish_diagnostics(&key, contents.as_str()).await;
     }
+
     async fn did_save(
         &self,
         params: lsp::DidSaveTextDocumentParams,
@@ -524,6 +551,7 @@ impl LanguageServer for LspServer {
             self.publish_diagnostics(&k, c.as_str()).await;
         }
     }
+
     async fn did_close(
         &self,
         params: lsp::DidCloseTextDocumentParams,
@@ -551,22 +579,14 @@ impl LanguageServer for LspServer {
             );
         }
     }
+
     async fn signature_help(
         &self,
         params: lsp::SignatureHelpParams,
     ) -> RpcResult<Option<lsp::SignatureHelp>> {
         let key =
             params.text_document_position_params.text_document.uri;
-        let pkg = {
-            let data = self.get_document(&key)?;
-            match parse_and_analyze(data.as_str()) {
-                Ok(pkg) => pkg,
-                Err(err) => {
-                    log::debug!("{}", err);
-                    return Ok(None);
-                }
-            }
-        };
+        let pkg = self.parse_analyze_document(&key)?;
 
         let mut signatures = vec![];
         let node_finder_result = find_node(
@@ -608,33 +628,15 @@ impl LanguageServer for LspServer {
         };
         Ok(Some(response))
     }
+
     async fn formatting(
         &self,
         params: lsp::DocumentFormattingParams,
     ) -> RpcResult<Option<Vec<lsp::TextEdit>>> {
         let key = params.text_document.uri;
 
-        let store = match self.store.lock() {
-            Ok(value) => value,
-            Err(err) => {
-                return Err(lspower::jsonrpc::Error {
-                    code: lspower::jsonrpc::ErrorCode::InternalError,
-                    message: format!(
-                        "Could not acquire store lock. Error: {}",
-                        err
-                    ),
-                    data: None,
-                });
-            }
-        };
-        let contents = store.get(&key).ok_or_else(|| {
-            log::error!(
-                "formatting failed: file {} not open on server",
-                key
-            );
-            file_not_opened(&key)
-        })?;
-        let mut formatted = match flux::formatter::format(contents) {
+        let contents = self.get_document(&key)?;
+        let mut formatted = match flux::formatter::format(&contents) {
             Ok(value) => value,
             Err(err) => {
                 return Err(lspower::jsonrpc::Error {
@@ -694,41 +696,13 @@ impl LanguageServer for LspServer {
 
         Ok(Some(vec![edit]))
     }
+
     async fn folding_range(
         &self,
         params: lsp::FoldingRangeParams,
     ) -> RpcResult<Option<Vec<lsp::FoldingRange>>> {
         let key = params.text_document.uri;
-        let pkg = {
-            let store = match self.store.lock() {
-                Ok(value) => value,
-                Err(err) => {
-                    return Err(lspower::jsonrpc::Error {
-                        code:
-                            lspower::jsonrpc::ErrorCode::InternalError,
-                        message: format!(
-                            "Could not acquire store lock. Error: {}",
-                            err
-                        ),
-                        data: None,
-                    });
-                }
-            };
-            let contents = store.get(&key).ok_or_else(|| {
-                log::error!(
-                    "formatting failed: file {} not open on server",
-                    key
-                );
-                file_not_opened(&key)
-            })?;
-            match parse_and_analyze(contents.as_str()) {
-                Ok(pkg) => pkg,
-                Err(err) => {
-                    log::debug!("{}", err);
-                    return Ok(None);
-                }
-            }
-        };
+        let pkg = self.parse_analyze_document(&key)?;
         let mut visitor = semantic::FoldFinderVisitor::default();
         let pkg_node = walk::Node::Package(&pkg);
 
@@ -750,42 +724,13 @@ impl LanguageServer for LspServer {
 
         Ok(Some(results))
     }
+
     async fn document_symbol(
         &self,
         params: lsp::DocumentSymbolParams,
     ) -> RpcResult<Option<lsp::DocumentSymbolResponse>> {
         let key = params.text_document.uri;
-        let pkg = {
-            let store = match self.store.lock() {
-                Ok(value) => value,
-                Err(err) => {
-                    return Err(lspower::jsonrpc::Error {
-                        code:
-                            lspower::jsonrpc::ErrorCode::InternalError,
-                        message: format!(
-                            "Could not acquire store lock. Error: {}",
-                            err
-                        ),
-                        data: None,
-                    });
-                }
-            };
-            let contents = store.get(&key).ok_or_else(|| {
-                log::error!(
-                    "documentSymbol request failed: file {} not open on server",
-                    key,
-                );
-                file_not_opened(&key)
-            })?;
-
-            match parse_and_analyze(contents) {
-                Ok(pkg) => pkg,
-                Err(err) => {
-                    log::debug!("{}", err);
-                    return Ok(None);
-                }
-            }
-        };
+        let pkg = self.parse_analyze_document(&key)?;
         let pkg_node = walk::Node::Package(&pkg);
         let mut visitor = semantic::SymbolsVisitor::new(key);
         walk::walk(&mut visitor, pkg_node);
@@ -808,39 +753,14 @@ impl LanguageServer for LspServer {
 
         Ok(Some(response))
     }
+
     async fn goto_definition(
         &self,
         params: lsp::GotoDefinitionParams,
     ) -> RpcResult<Option<lsp::GotoDefinitionResponse>> {
         let key =
             params.text_document_position_params.text_document.uri;
-        let store = match self.store.lock() {
-            Ok(value) => value,
-            Err(err) => {
-                return Err(lspower::jsonrpc::Error {
-                    code: lspower::jsonrpc::ErrorCode::InternalError,
-                    message: format!(
-                        "Could not acquire store lock. Error: {}",
-                        err
-                    ),
-                    data: None,
-                });
-            }
-        };
-        let contents = store.get(&key).ok_or_else(|| {
-            log::error!(
-                "formatting failed: file {} not open on server",
-                key
-            );
-            file_not_opened(&key)
-        })?;
-        let pkg = match parse_and_analyze(contents) {
-            Ok(pkg) => pkg,
-            Err(err) => {
-                log::debug!("{}", err);
-                return Ok(None);
-            }
-        };
+        let pkg = self.parse_analyze_document(&key)?;
         let pkg_node = walk::Node::Package(&pkg);
         let mut visitor = semantic::NodeFinderVisitor::new(
             params.text_document_position_params.position,
@@ -913,42 +833,14 @@ impl LanguageServer for LspServer {
         }
         Ok(None)
     }
+
     async fn rename(
         &self,
         params: lsp::RenameParams,
     ) -> RpcResult<Option<lsp::WorkspaceEdit>> {
         let key =
             params.text_document_position.text_document.uri.clone();
-        let pkg = {
-            let store = match self.store.lock() {
-                Ok(value) => value,
-                Err(err) => {
-                    return Err(lspower::jsonrpc::Error {
-                        code:
-                            lspower::jsonrpc::ErrorCode::InternalError,
-                        message: format!(
-                            "Could not acquire store lock. Error: {}",
-                            err
-                        ),
-                        data: None,
-                    });
-                }
-            };
-            let contents = store.get(&key).ok_or_else(|| {
-                log::error!(
-                    "textDocument/rename called on unknown file {}",
-                    key
-                );
-                file_not_opened(&key)
-            })?;
-            match parse_and_analyze(contents) {
-                Ok(pkg) => pkg,
-                Err(err) => {
-                    log::debug!("{}", err);
-                    return Ok(None);
-                }
-            }
-        };
+        let pkg = self.parse_analyze_document(&key)?;
         let node = find_node(
             walk::Node::Package(&pkg),
             params.text_document_position.position,
@@ -973,39 +865,37 @@ impl LanguageServer for LspServer {
         };
         Ok(Some(response))
     }
+
+    async fn document_highlight(
+        &self,
+        params: lsp::DocumentHighlightParams,
+    ) -> RpcResult<Option<Vec<lsp::DocumentHighlight>>> {
+        let key =
+            params.text_document_position_params.text_document.uri;
+        let pkg = self.parse_analyze_document(&key)?;
+        let node = find_node(
+            walk::Node::Package(&pkg),
+            params.text_document_position_params.position,
+        );
+
+        let refs = find_references(key, node);
+        Ok(Some(
+            refs.iter()
+                .map(|r| lsp::DocumentHighlight {
+                    kind: Some(lsp::DocumentHighlightKind::TEXT),
+
+                    range: r.range,
+                })
+                .collect(),
+        ))
+    }
+
     async fn references(
         &self,
         params: lsp::ReferenceParams,
     ) -> RpcResult<Option<Vec<lsp::Location>>> {
-        let key =
-            params.text_document_position.text_document.uri.clone();
-        let store = match self.store.lock() {
-            Ok(value) => value,
-            Err(err) => {
-                return Err(lspower::jsonrpc::Error {
-                    code: lspower::jsonrpc::ErrorCode::InternalError,
-                    message: format!(
-                        "Could not acquire store lock. Error: {}",
-                        err
-                    ),
-                    data: None,
-                });
-            }
-        };
-        let contents = store.get(&key).ok_or_else(|| {
-            log::error!(
-                "textDocument/references called on unknown file {}",
-                key
-            );
-            file_not_opened(&key)
-        })?;
-        let pkg = match parse_and_analyze(contents) {
-            Ok(pkg) => pkg,
-            Err(err) => {
-                log::debug!("{}", err);
-                return Ok(None);
-            }
-        };
+        let key = params.text_document_position.text_document.uri;
+        let pkg = self.parse_analyze_document(&key)?;
         let node = find_node(
             walk::Node::Package(&pkg),
             params.text_document_position.position,
@@ -1013,22 +903,14 @@ impl LanguageServer for LspServer {
 
         Ok(Some(find_references(key, node)))
     }
+
     async fn hover(
         &self,
         params: lsp::HoverParams,
     ) -> RpcResult<Option<lsp::Hover>> {
         let key =
             params.text_document_position_params.text_document.uri;
-        let pkg = {
-            let data = self.get_document(&key)?;
-            match parse_and_analyze(data.as_str()) {
-                Ok(pkg) => pkg,
-                Err(err) => {
-                    log::debug!("{}", err);
-                    return Ok(None);
-                }
-            }
-        };
+        let pkg = self.parse_analyze_document(&key)?;
 
         let node_finder_result = find_node(
             walk::Node::Package(&pkg),
@@ -1125,13 +1007,6 @@ impl LanguageServer for LspServer {
         let response = lsp::CompletionResponse::List(items);
         Ok(Some(response))
     }
-}
-
-fn file_not_opened(key: &lsp::Url) -> lspower::jsonrpc::Error {
-    lspower::jsonrpc::Error::invalid_params(format!(
-        "file not opened: {}",
-        key
-    ))
 }
 
 #[derive(Default, Clone)]
@@ -2000,7 +1875,7 @@ errorCounts
         assert_eq!(expected, result);
     }
     #[test]
-    async fn test_references() {
+    async fn test_rename() {
         let fluxscript = r#"import "strings"
 env = "prod01-us-west-2"
 
@@ -2084,7 +1959,7 @@ errorCounts
         assert_eq!(expected, result);
     }
     #[test]
-    async fn test_rename() {
+    async fn test_references() {
         let fluxscript = r#"import "strings"
 env = "prod01-us-west-2"
 
@@ -2155,6 +2030,85 @@ errorCounts
                     .text_document
                     .uri
                     .clone(),
+                range: lsp::Range {
+                    start: lsp::Position {
+                        line: 8,
+                        character: 34,
+                    },
+                    end: lsp::Position {
+                        line: 8,
+                        character: 37,
+                    },
+                },
+            },
+        ];
+
+        assert_eq!(expected, result);
+    }
+    #[test]
+    async fn test_document_highlight() {
+        let fluxscript = r#"import "strings"
+env = "prod01-us-west-2"
+
+errorCounts = from(bucket:"kube-infra/monthly")
+    |> range(start: -3d)
+    |> filter(fn: (r) => r._measurement == "query_log" and
+                         r.error != "" and
+                         r._field == "responseSize" and
+                         r.env == env)
+    |> group(columns:["env", "error"])
+    |> count()
+    |> group(columns:["env", "_stop", "_start"])
+
+errorCounts
+    |> filter(fn: (r) => strings.containsStr(v: r.error, substr: "AppendMappedRecordWithNulls"))"#;
+        let server = create_server();
+        open_file(&server, fluxscript.to_string()).await;
+
+        let params = lsp::DocumentHighlightParams {
+            text_document_position_params:
+                lsp::TextDocumentPositionParams {
+                    text_document: lsp::TextDocumentIdentifier {
+                        uri: lsp::Url::parse(
+                            "file:///home/user/file.flux",
+                        )
+                        .unwrap(),
+                    },
+                    position: lsp::Position {
+                        line: 1,
+                        character: 1,
+                    },
+                },
+            work_done_progress_params: lsp::WorkDoneProgressParams {
+                work_done_token: None,
+            },
+            partial_result_params: lsp::PartialResultParams {
+                partial_result_token: None,
+            },
+        };
+
+        let result = server
+            .document_highlight(params.clone())
+            .await
+            .unwrap()
+            .unwrap();
+
+        let expected = vec![
+            lsp::DocumentHighlight {
+                kind: Some(lsp::DocumentHighlightKind::TEXT),
+                range: lsp::Range {
+                    start: lsp::Position {
+                        line: 1,
+                        character: 0,
+                    },
+                    end: lsp::Position {
+                        line: 1,
+                        character: 3,
+                    },
+                },
+            },
+            lsp::DocumentHighlight {
+                kind: Some(lsp::DocumentHighlightKind::TEXT),
                 range: lsp::Range {
                     start: lsp::Position {
                         line: 8,
@@ -2949,9 +2903,9 @@ errorCounts
             },
         };
 
-        let result = server.signature_help(params).await.unwrap();
+        let result = server.signature_help(params).await;
 
-        assert!(result.is_none())
+        assert!(result.is_err())
     }
 
     #[test]
@@ -2973,9 +2927,9 @@ errorCounts
             },
         };
 
-        let result = server.folding_range(params).await.unwrap();
+        let result = server.folding_range(params).await;
 
-        assert!(result.is_none());
+        assert!(result.is_err());
     }
 
     #[test]
@@ -2996,9 +2950,9 @@ errorCounts
                 partial_result_token: None,
             },
         };
-        let result = server.document_symbol(params).await.unwrap();
+        let result = server.document_symbol(params).await;
 
-        assert!(result.is_none());
+        assert!(result.is_err());
     }
 
     #[test]
@@ -3026,9 +2980,9 @@ errorCounts
             },
         };
 
-        let result = server.goto_definition(params).await.unwrap();
+        let result = server.goto_definition(params).await;
 
-        assert!(result.is_none());
+        assert!(result.is_err());
     }
 
     #[test]
@@ -3062,8 +3016,8 @@ errorCounts
             },
         };
 
-        let result = server.references(params.clone()).await.unwrap();
+        let result = server.references(params.clone()).await;
 
-        assert!(result.is_none());
+        assert!(result.is_err());
     }
 }
