@@ -1038,8 +1038,11 @@ impl LanguageServer for LspServer {
             let path = &node_finder_result.path;
             let hover_type = node.type_of().or_else(|| match node {
                 walk::Node::Identifier(ident) => {
+                    // We hovered over an identifier without an attached type, try to figure
+                    // it out from its context
                     let parent = path.get(path.len() - 2)?;
                     match parent {
+                        // The type of assigned variables is the type of the right hand side
                         walk::Node::VariableAssgn(var) => {
                             Some(var.init.type_of())
                         }
@@ -1049,6 +1052,9 @@ impl LanguageServer for LspServer {
                         walk::Node::BuiltinStmt(builtin) => {
                             Some(builtin.typ_expr.expr.clone())
                         }
+
+                        // The type Function parameters can be derived from the function type
+                        // stored in the function expression
                         walk::Node::FunctionParameter(_) => {
                             let func = path.get(path.len() - 3)?;
                             match func {
