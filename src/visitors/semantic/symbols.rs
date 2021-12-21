@@ -1,6 +1,4 @@
 #![allow(deprecated)]
-use std::cell::RefCell;
-use std::rc::Rc;
 
 use flux::semantic::nodes::{self, Expression};
 use flux::semantic::walk::{Node, Visitor};
@@ -216,25 +214,18 @@ fn parse_binary_expression(
     result
 }
 
-pub struct SymbolsState<'a> {
+pub struct SymbolsVisitor<'a> {
     pub symbols: Vec<lsp::SymbolInformation>,
     pub uri: lsp::Url,
     pub path: Vec<Node<'a>>,
 }
 
-pub struct SymbolsVisitor<'a> {
-    pub state: Rc<RefCell<SymbolsState<'a>>>,
-}
-
 impl<'a> SymbolsVisitor<'a> {
     pub fn new(uri: lsp::Url) -> SymbolsVisitor<'a> {
-        let state = SymbolsState {
+        SymbolsVisitor {
             path: vec![],
             symbols: vec![],
             uri,
-        };
-        SymbolsVisitor {
-            state: Rc::new(RefCell::new(state)),
         }
     }
 }
@@ -243,15 +234,13 @@ impl<'a> SymbolsVisitor<'a> {}
 
 impl<'a> Visitor<'a> for SymbolsVisitor<'a> {
     fn done(&mut self, _: Node<'a>) {
-        let mut state = self.state.borrow_mut();
-        (*state).path.pop();
+        self.path.pop();
     }
 
     fn visit(&mut self, node: Node<'a>) -> bool {
-        let mut state = self.state.borrow_mut();
-        let uri = (*state).uri.clone();
+        let uri = self.uri.clone();
 
-        (*state).path.push(node.clone());
+        self.path.push(node.clone());
 
         match node {
             Node::VariableAssgn(va) => {
@@ -259,26 +248,26 @@ impl<'a> Visitor<'a> for SymbolsVisitor<'a> {
                     parse_variable_assignment(uri, node.clone(), va);
 
                 for si in list {
-                    (*state).symbols.push(si);
+                    self.symbols.push(si);
                 }
             }
             Node::CallExpr(c) => {
                 let list = parse_call_expression(uri, c);
 
                 for si in list {
-                    (*state).symbols.push(si);
+                    self.symbols.push(si);
                 }
             }
             Node::BinaryExpr(be) => {
                 let list = parse_binary_expression(uri, be);
 
                 for si in list {
-                    (*state).symbols.push(si);
+                    self.symbols.push(si);
                 }
             }
             Node::MemberExpr(me) => {
                 if let Some(source) = me.loc.source.clone() {
-                    (*state).symbols.push(lsp::SymbolInformation {
+                    self.symbols.push(lsp::SymbolInformation {
                         kind: lsp::SymbolKind::OBJECT,
                         name: source,
                         location: lsp::Location {
@@ -302,7 +291,7 @@ impl<'a> Visitor<'a> for SymbolsVisitor<'a> {
                 }
             }
             Node::FloatLit(num) => {
-                (*state).symbols.push(lsp::SymbolInformation {
+                self.symbols.push(lsp::SymbolInformation {
                     kind: lsp::SymbolKind::NUMBER,
                     name: num.value.to_string(),
                     location: lsp::Location {
@@ -325,7 +314,7 @@ impl<'a> Visitor<'a> for SymbolsVisitor<'a> {
                 return false;
             }
             Node::IntegerLit(num) => {
-                (*state).symbols.push(lsp::SymbolInformation {
+                self.symbols.push(lsp::SymbolInformation {
                     kind: lsp::SymbolKind::NUMBER,
                     name: num.value.to_string(),
                     location: lsp::Location {
@@ -348,7 +337,7 @@ impl<'a> Visitor<'a> for SymbolsVisitor<'a> {
                 return false;
             }
             Node::DateTimeLit(d) => {
-                (*state).symbols.push(lsp::SymbolInformation {
+                self.symbols.push(lsp::SymbolInformation {
                     kind: lsp::SymbolKind::CONSTANT,
                     name: d.value.to_string(),
                     location: lsp::Location {
@@ -371,7 +360,7 @@ impl<'a> Visitor<'a> for SymbolsVisitor<'a> {
                 return false;
             }
             Node::BooleanLit(b) => {
-                (*state).symbols.push(lsp::SymbolInformation {
+                self.symbols.push(lsp::SymbolInformation {
                     kind: lsp::SymbolKind::BOOLEAN,
                     name: b.value.to_string(),
                     location: lsp::Location {
@@ -394,7 +383,7 @@ impl<'a> Visitor<'a> for SymbolsVisitor<'a> {
                 return false;
             }
             Node::StringLit(s) => {
-                (*state).symbols.push(lsp::SymbolInformation {
+                self.symbols.push(lsp::SymbolInformation {
                     kind: lsp::SymbolKind::STRING,
                     name: s.value.clone(),
                     location: lsp::Location {
@@ -417,7 +406,7 @@ impl<'a> Visitor<'a> for SymbolsVisitor<'a> {
                 return false;
             }
             Node::ArrayExpr(a) => {
-                (*state).symbols.push(lsp::SymbolInformation {
+                self.symbols.push(lsp::SymbolInformation {
                     kind: lsp::SymbolKind::ARRAY,
                     name: String::from("[]"),
                     location: lsp::Location {

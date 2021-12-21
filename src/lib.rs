@@ -13,4 +13,8 @@ mod stdlib;
 mod visitors;
 mod wasm;
 
+#[cfg(test)]
+#[macro_use]
+extern crate pretty_assertions;
+
 pub use server::LspServerBuilder;

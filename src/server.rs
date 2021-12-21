@@ -85,9 +85,8 @@ fn is_scope(name: &str, n: walk::Node<'_>) -> bool {
     let mut dvisitor =
         semantic::DefinitionFinderVisitor::new(name.to_string());
     walk::walk(&mut dvisitor, n.clone());
-    let state = dvisitor.state.borrow();
 
-    state.node.is_some()
+    dvisitor.node.is_some()
 }
 
 fn find_references(
@@ -124,9 +123,7 @@ fn find_references(
             semantic::IdentFinderVisitor::new(name.to_string());
         walk::walk(&mut visitor, scope);
 
-        let state = visitor.state.borrow();
-
-        let locations: Vec<lsp::Location> = (*state)
+        let locations: Vec<lsp::Location> = visitor
             .identifiers
             .iter()
             .map(|node| convert::node_to_location(node, uri.clone()))
@@ -708,8 +705,7 @@ impl LanguageServer for LspServer {
 
         walk::walk(&mut visitor, pkg_node);
 
-        let state = visitor.state.borrow();
-        let nodes = (*state).nodes.clone();
+        let nodes = visitor.nodes;
 
         let mut results = vec![];
         for node in nodes {
@@ -735,8 +731,7 @@ impl LanguageServer for LspServer {
         let mut visitor = semantic::SymbolsVisitor::new(key);
         walk::walk(&mut visitor, pkg_node);
 
-        let state = visitor.state.borrow();
-        let mut symbols = (*state).symbols.clone();
+        let mut symbols = visitor.symbols;
 
         symbols.sort_by(|a, b| {
             let a_start = a.location.range.start;
@@ -768,9 +763,8 @@ impl LanguageServer for LspServer {
 
         flux::semantic::walk::walk(&mut visitor, pkg_node);
 
-        let state = visitor.state.borrow();
-        let node = (*state).node.clone();
-        let path = (*state).path.clone();
+        let node = visitor.node.clone();
+        let path = visitor.path;
 
         if let Some(node) = node {
             let name = match node {
@@ -812,9 +806,9 @@ impl LanguageServer for LspServer {
                                 n.clone(),
                             );
 
-                            let state =
-                                definition_visitor.state.borrow();
-                            if let Some(node) = state.node.clone() {
+                            if let Some(node) =
+                                definition_visitor.node.clone()
+                            {
                                 let location =
                                     convert::node_to_location(
                                         &node, key,
@@ -1024,10 +1018,8 @@ fn find_node(
 
     flux::semantic::walk::walk(&mut visitor, node);
 
-    let state = visitor.state.borrow();
-
-    result.node = (*state).node.clone();
-    result.path = (*state).path.clone();
+    result.node = visitor.node;
+    result.path = visitor.path;
 
     result
 }
