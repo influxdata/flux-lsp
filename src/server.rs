@@ -4,8 +4,8 @@ use std::sync::{Arc, Mutex};
 
 use anyhow::Result;
 
-use flux::semantic::nodes::FunctionParameter;
 use flux::semantic::walk;
+use flux::semantic::{nodes::FunctionParameter, types::MonoType};
 use lspower::lsp;
 use lspower::LanguageServer;
 use lspower::{
@@ -911,7 +911,54 @@ impl LanguageServer for LspServer {
             params.text_document_position_params.position,
         );
         if let Some(node) = node_finder_result.node {
-            if let Some(typ) = node.type_of() {
+            let path = &node_finder_result.path;
+            let hover_type = node.type_of().or_else(|| match node {
+                walk::Node::Identifier(ident) => {
+                    // We hovered over an identifier without an attached type, try to figure
+                    // it out from its context
+                    let parent = path.get(path.len() - 2)?;
+                    match parent {
+                        // The type of assigned variables is the type of the right hand side
+                        walk::Node::VariableAssgn(var) => {
+                            Some(var.init.type_of())
+                        }
+                        walk::Node::MemberAssgn(var) => {
+                            Some(var.init.type_of())
+                        }
+                        walk::Node::BuiltinStmt(builtin) => {
+                            Some(builtin.typ_expr.expr.clone())
+                        }
+
+                        // The type Function parameters can be derived from the function type
+                        // stored in the function expression
+                        walk::Node::FunctionParameter(_) => {
+                            let func = path.get(path.len() - 3)?;
+                            match func {
+                                walk::Node::FunctionExpr(func) => {
+
+                                    // TODO Use MonoType::parameter directly
+                                    let field = ident.name.as_str();
+                                    match &func.typ {
+                                        MonoType::Fun(f) => f.req.get(field).or_else(|| f.opt.get(field)).or_else(|| {
+                                            f.pipe
+                                                .as_ref()
+                                                .and_then(|pipe| if pipe.k == field { Some(&pipe.v) } else { None })
+                                        })
+
+                                                .cloned()
+                                        ,
+                                        _ => None,
+                                    }
+                                }
+                                _ => None
+                            }
+                        }
+                        _ => None,
+                    }
+                },
+                _ => None,
+            });
+            if let Some(typ) = hover_type {
                 return Ok(Some(lsp::Hover {
                     contents: lsp::HoverContents::Scalar(
                         lsp::MarkedString::String(format!(
@@ -2116,15 +2163,8 @@ errorCounts
         assert_eq!(expected, result);
     }
 
-    #[test]
-    async fn test_hover() {
-        let fluxscript = r#"x = 1
-x + 1
-"#;
-        let server = create_server();
-        open_file(&server, fluxscript.to_string()).await;
-
-        let params = lsp::HoverParams {
+    fn hover_params(pos: lsp::Position) -> lsp::HoverParams {
+        lsp::HoverParams {
             text_document_position_params:
                 lsp::TextDocumentPositionParams::new(
                     lsp::TextDocumentIdentifier::new(
@@ -2133,12 +2173,110 @@ x + 1
                         )
                         .unwrap(),
                     ),
-                    lsp::Position::new(1, 1),
+                    pos,
                 ),
             work_done_progress_params: lsp::WorkDoneProgressParams {
                 work_done_token: None,
             },
-        };
+        }
+    }
+
+    #[test]
+    async fn test_hover() {
+        let fluxscript = r#"x = 1
+x + 1
+"#;
+        let server = create_server();
+        open_file(&server, fluxscript.to_string()).await;
+
+        let params = hover_params(lsp::Position::new(1, 1));
+
+        let result = server.hover(params).await.unwrap();
+
+        assert_eq!(
+            result,
+            Some(lsp::Hover {
+                contents: lsp::HoverContents::Scalar(
+                    lsp::MarkedString::String(
+                        "type: int".to_string()
+                    )
+                ),
+                range: None,
+            })
+        );
+    }
+
+    #[test]
+    async fn test_hover_binding() {
+        let fluxscript = r#"x = "asd"
+builtin builtin_ : (v: int) => int
+option option_ = 123
+1
+"#;
+        let server = create_server();
+        open_file(&server, fluxscript.to_string()).await;
+
+        let result = server
+            .hover(hover_params(lsp::Position::new(0, 1)))
+            .await
+            .unwrap();
+
+        assert_eq!(
+            result,
+            Some(lsp::Hover {
+                contents: lsp::HoverContents::Scalar(
+                    lsp::MarkedString::String(
+                        "type: string".to_string()
+                    )
+                ),
+                range: None,
+            })
+        );
+
+        let result = server
+            .hover(hover_params(lsp::Position::new(1, 12)))
+            .await
+            .unwrap();
+
+        assert_eq!(
+            result,
+            Some(lsp::Hover {
+                contents: lsp::HoverContents::Scalar(
+                    lsp::MarkedString::String(
+                        "type: (v:int) => int".to_string()
+                    )
+                ),
+                range: None,
+            })
+        );
+
+        let result = server
+            .hover(hover_params(lsp::Position::new(2, 10)))
+            .await
+            .unwrap();
+
+        assert_eq!(
+            result,
+            Some(lsp::Hover {
+                contents: lsp::HoverContents::Scalar(
+                    lsp::MarkedString::String(
+                        "type: int".to_string()
+                    )
+                ),
+                range: None,
+            })
+        );
+    }
+
+    #[test]
+    async fn test_hover_argument() {
+        let fluxscript = r#"
+(x) => x + 1
+"#;
+        let server = create_server();
+        open_file(&server, fluxscript.to_string()).await;
+
+        let params = hover_params(lsp::Position::new(1, 1));
 
         let result = server.hover(params).await.unwrap();
 
