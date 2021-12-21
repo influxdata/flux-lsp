@@ -1032,8 +1032,7 @@ mod tests {
     use std::collections::{HashMap, HashSet};
 
     use async_std::test;
-    use lspower::lsp;
-    use lspower::LanguageServer;
+    use lspower::{lsp, LanguageServer};
 
     use super::*;
 
@@ -3011,5 +3010,62 @@ errorCounts
         let result = server.references(params.clone()).await;
 
         assert!(result.is_err());
+    }
+
+    #[test]
+    async fn test_package_completion_when_it_is_imported() {
+        let fluxscript = r#"import "sql"
+
+sql"#;
+        let server = create_server();
+        open_file(&server, fluxscript.to_string()).await;
+
+        let params = lsp::CompletionParams {
+            text_document_position: lsp::TextDocumentPositionParams {
+                text_document: lsp::TextDocumentIdentifier {
+                    uri: lsp::Url::parse(
+                        "file:///home/user/file.flux",
+                    )
+                    .unwrap(),
+                },
+                position: lsp::Position {
+                    line: 2,
+                    character: 2,
+                },
+            },
+            work_done_progress_params: lsp::WorkDoneProgressParams {
+                work_done_token: None,
+            },
+            partial_result_params: lsp::PartialResultParams {
+                partial_result_token: None,
+            },
+            context: Some(lsp::CompletionContext {
+                trigger_kind: lsp::CompletionTriggerKind::INVOKED,
+                trigger_character: None,
+            }),
+        };
+
+        let result =
+            server.completion(params.clone()).await.unwrap().unwrap();
+
+        // We should not try to insert the `sql` import again
+        expect_test::expect![[r#"
+            {
+              "isIncomplete": false,
+              "items": [
+                {
+                  "label": "sql",
+                  "kind": 9,
+                  "detail": "Package",
+                  "documentation": "sql",
+                  "sortText": "sql",
+                  "filterText": "sql",
+                  "insertText": "sql",
+                  "insertTextFormat": 1,
+                  "additionalTextEdits": []
+                }
+              ]
+            }"#]]
+        .assert_eq(&serde_json::to_string_pretty(&result).unwrap());
     }
 }
