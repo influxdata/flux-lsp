@@ -2,7 +2,7 @@
 name = "flux-lsp"
 version = "0.8.0"
 authors = ["Flux Developers <flux-developers@influxdata.com>"]
-edition = "2018"
+edition = "2021"
 license = "MIT"
 description = "LSP support for the flux language"
 repository = "https://github.com/influxdata/flux-lsp"
