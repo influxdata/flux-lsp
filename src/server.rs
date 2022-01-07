@@ -3082,8 +3082,7 @@ errorCounts
         };
 
         let result = server.signature_help(params).await;
-
-        assert!(result.is_err())
+        assert!(matches!(result, Ok(None)));
     }
 
     #[test]
@@ -3106,8 +3105,7 @@ errorCounts
         };
 
         let result = server.folding_range(params).await;
-
-        assert!(result.is_err());
+        assert!(matches!(result, Ok(None)));
     }
 
     #[test]
@@ -3130,7 +3128,7 @@ errorCounts
         };
         let result = server.document_symbol(params).await;
 
-        assert!(result.is_err());
+        assert!(matches!(result, Ok(None)));
     }
 
     #[test]
@@ -3159,8 +3157,7 @@ errorCounts
         };
 
         let result = server.goto_definition(params).await;
-
-        assert!(result.is_err());
+        assert!(matches!(result, Ok(None)));
     }
 
     #[test]
@@ -3196,7 +3193,7 @@ errorCounts
 
         let result = server.references(params.clone()).await;
 
-        assert!(result.is_err());
+        assert!(matches!(result, Ok(None)));
     }
 
     #[test]
