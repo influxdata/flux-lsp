@@ -24,9 +24,10 @@ use crate::{completion, convert};
 // is preferred at this point.
 type FileStore = Arc<Mutex<HashMap<lsp::Url, String>>>;
 
+/// Returns `None` when the flux source fails analysis.
 fn parse_and_analyze(
     code: &str,
-) -> Result<flux::semantic::nodes::Package> {
+) -> Result<Option<flux::semantic::nodes::Package>> {
     let mut analyzer = flux::new_semantic_analyzer(
         flux::semantic::AnalyzerConfig {
             // Explicitly disable the AST and Semantic checks.
@@ -35,12 +36,18 @@ fn parse_and_analyze(
             skip_checks: true,
         },
     )?;
-    let (_, sem_pkg) = analyzer.analyze_source(
+    let (_, sem_pkg) = match analyzer.analyze_source(
         "".to_string(),
         "main.flux".to_string(),
         code,
-    )?;
-    Ok(sem_pkg)
+    ) {
+        Ok(res) => res,
+        Err(e) => {
+            log::debug!("Unable to parse source: {:?}", e);
+            return Ok(None);
+        }
+    };
+    Ok(Some(sem_pkg))
 }
 
 /// Take a lsp::Range that contains a start and end lsp::Position, find the
@@ -251,13 +258,14 @@ impl LspServer {
         }
     }
 
+    /// Returns `None` when the flux source couldn't be analyzed.
     fn parse_analyze_document(
         &self,
         key: &lsp::Url,
-    ) -> RpcResult<flux::semantic::nodes::Package> {
+    ) -> RpcResult<Option<flux::semantic::nodes::Package>> {
         let contents = self.get_document(key)?;
         match parse_and_analyze(&contents) {
-            Ok(pkg) => Ok(pkg),
+            Ok(maybe_pkg) => Ok(maybe_pkg),
             Err(err) => RpcResult::Err(RpcError {
                 code: RpcErrorCode::InternalError,
                 message: format!("{}", err),
@@ -583,7 +591,12 @@ impl LanguageServer for LspServer {
     ) -> RpcResult<Option<lsp::SignatureHelp>> {
         let key =
             params.text_document_position_params.text_document.uri;
-        let pkg = self.parse_analyze_document(&key)?;
+        let maybe_pkg = self.parse_analyze_document(&key)?;
+        let pkg = match maybe_pkg {
+            Some(pkg) => pkg,
+            // Short circuit if the flux source couldn't be analyzed
+            None => return Ok(None),
+        };
 
         let mut signatures = vec![];
         let node_finder_result = find_node(
@@ -699,7 +712,13 @@ impl LanguageServer for LspServer {
         params: lsp::FoldingRangeParams,
     ) -> RpcResult<Option<Vec<lsp::FoldingRange>>> {
         let key = params.text_document.uri;
-        let pkg = self.parse_analyze_document(&key)?;
+        let maybe_pkg = self.parse_analyze_document(&key)?;
+        let pkg = match maybe_pkg {
+            Some(pkg) => pkg,
+            // Short circuit if the flux source couldn't be analyzed
+            None => return Ok(None),
+        };
+
         let mut visitor = semantic::FoldFinderVisitor::default();
         let pkg_node = walk::Node::Package(&pkg);
 
@@ -726,7 +745,13 @@ impl LanguageServer for LspServer {
         params: lsp::DocumentSymbolParams,
     ) -> RpcResult<Option<lsp::DocumentSymbolResponse>> {
         let key = params.text_document.uri;
-        let pkg = self.parse_analyze_document(&key)?;
+        let maybe_pkg = self.parse_analyze_document(&key)?;
+        let pkg = match maybe_pkg {
+            Some(pkg) => pkg,
+            // Short circuit if the flux source couldn't be analyzed
+            None => return Ok(None),
+        };
+
         let pkg_node = walk::Node::Package(&pkg);
         let mut visitor = semantic::SymbolsVisitor::new(key);
         walk::walk(&mut visitor, pkg_node);
@@ -755,7 +780,13 @@ impl LanguageServer for LspServer {
     ) -> RpcResult<Option<lsp::GotoDefinitionResponse>> {
         let key =
             params.text_document_position_params.text_document.uri;
-        let pkg = self.parse_analyze_document(&key)?;
+        let maybe_pkg = self.parse_analyze_document(&key)?;
+        let pkg = match maybe_pkg {
+            Some(pkg) => pkg,
+            // Short circuit if the flux source couldn't be analyzed
+            None => return Ok(None),
+        };
+
         let pkg_node = walk::Node::Package(&pkg);
         let mut visitor = semantic::NodeFinderVisitor::new(
             params.text_document_position_params.position,
@@ -834,7 +865,13 @@ impl LanguageServer for LspServer {
     ) -> RpcResult<Option<lsp::WorkspaceEdit>> {
         let key =
             params.text_document_position.text_document.uri.clone();
-        let pkg = self.parse_analyze_document(&key)?;
+        let maybe_pkg = self.parse_analyze_document(&key)?;
+        let pkg = match maybe_pkg {
+            Some(pkg) => pkg,
+            // Short circuit if the flux source couldn't be analyzed
+            None => return Ok(None),
+        };
+
         let node = find_node(
             walk::Node::Package(&pkg),
             params.text_document_position.position,
@@ -866,7 +903,13 @@ impl LanguageServer for LspServer {
     ) -> RpcResult<Option<Vec<lsp::DocumentHighlight>>> {
         let key =
             params.text_document_position_params.text_document.uri;
-        let pkg = self.parse_analyze_document(&key)?;
+        let maybe_pkg = self.parse_analyze_document(&key)?;
+        let pkg = match maybe_pkg {
+            Some(pkg) => pkg,
+            // Short circuit if the flux source couldn't be analyzed
+            None => return Ok(None),
+        };
+
         let node = find_node(
             walk::Node::Package(&pkg),
             params.text_document_position_params.position,
@@ -889,7 +932,13 @@ impl LanguageServer for LspServer {
         params: lsp::ReferenceParams,
     ) -> RpcResult<Option<Vec<lsp::Location>>> {
         let key = params.text_document_position.text_document.uri;
-        let pkg = self.parse_analyze_document(&key)?;
+        let maybe_pkg = self.parse_analyze_document(&key)?;
+        let pkg = match maybe_pkg {
+            Some(pkg) => pkg,
+            // Short circuit if the flux source couldn't be analyzed
+            None => return Ok(None),
+        };
+
         let node = find_node(
             walk::Node::Package(&pkg),
             params.text_document_position.position,
@@ -904,7 +953,12 @@ impl LanguageServer for LspServer {
     ) -> RpcResult<Option<lsp::Hover>> {
         let key =
             params.text_document_position_params.text_document.uri;
-        let pkg = self.parse_analyze_document(&key)?;
+        let maybe_pkg = self.parse_analyze_document(&key)?;
+        let pkg = match maybe_pkg {
+            Some(pkg) => pkg,
+            // Short circuit if the flux source couldn't be analyzed
+            None => return Ok(None),
+        };
 
         let node_finder_result = find_node(
             walk::Node::Package(&pkg),
