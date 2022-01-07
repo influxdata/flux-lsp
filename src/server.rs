@@ -1086,16 +1086,11 @@ impl LanguageServer for LspServer {
         let items = match items {
             Ok(items) => items,
             Err(e) => {
-                log::error!(
-                    "error getting completion items: {}",
+                log::warn!(
+                    "failed to get completion items: {}",
                     e.msg
                 );
-                return Err(lspower::jsonrpc::Error::invalid_params(
-                    format!(
-                        "error getting completion items: {}",
-                        e.msg
-                    ),
-                ));
+                return Ok(None);
             }
         };
 
