@@ -568,59 +568,54 @@ pub fn find_param_completions(
     let node = visitor.state.node.clone();
     let mut items: Vec<String> = vec![];
 
-    if let Some(node) = node {
-        if let AstNode::CallExpr(call) = node {
-            let provided = get_provided_arguments(call);
+    if let Some(AstNode::CallExpr(call)) = node {
+        let provided = get_provided_arguments(call);
 
-            if let Expression::Identifier(ident) = call.callee.clone()
+        if let Expression::Identifier(ident) = call.callee.clone() {
+            items.extend(get_function_params(
+                ident.name.as_str(),
+                stdlib::get_builtin_functions(),
+                provided.clone(),
+            ));
+
+            if let Ok(user_functions) =
+                get_user_functions(uri.clone(), position, source)
             {
                 items.extend(get_function_params(
                     ident.name.as_str(),
-                    stdlib::get_builtin_functions(),
+                    user_functions,
+                    provided.clone(),
+                ));
+            }
+        }
+        if let Expression::Member(me) = call.callee.clone() {
+            if let Expression::Identifier(ident) = me.object {
+                let package_functions =
+                    stdlib::get_package_functions(ident.name.clone());
+
+                let object_functions = get_object_functions(
+                    uri,
+                    position,
+                    ident.name.as_str(),
+                    source,
+                )?;
+
+                let key = match me.property {
+                    PropertyKey::Identifier(i) => i.name,
+                    PropertyKey::StringLit(l) => l.value,
+                };
+
+                items.extend(get_function_params(
+                    key.as_str(),
+                    package_functions,
                     provided.clone(),
                 ));
 
-                if let Ok(user_functions) =
-                    get_user_functions(uri.clone(), position, source)
-                {
-                    items.extend(get_function_params(
-                        ident.name.as_str(),
-                        user_functions,
-                        provided.clone(),
-                    ));
-                }
-            }
-            if let Expression::Member(me) = call.callee.clone() {
-                if let Expression::Identifier(ident) = me.object {
-                    let package_functions =
-                        stdlib::get_package_functions(
-                            ident.name.clone(),
-                        );
-
-                    let object_functions = get_object_functions(
-                        uri,
-                        position,
-                        ident.name.as_str(),
-                        source,
-                    )?;
-
-                    let key = match me.property {
-                        PropertyKey::Identifier(i) => i.name,
-                        PropertyKey::StringLit(l) => l.value,
-                    };
-
-                    items.extend(get_function_params(
-                        key.as_str(),
-                        package_functions,
-                        provided.clone(),
-                    ));
-
-                    items.extend(get_function_params(
-                        key.as_str(),
-                        object_functions,
-                        provided,
-                    ));
-                }
+                items.extend(get_function_params(
+                    key.as_str(),
+                    object_functions,
+                    provided,
+                ));
             }
         }
     }
