@@ -102,8 +102,8 @@ fn find_references(
 ) -> Vec<lsp::Location> {
     if let Some(node) = result.node {
         let name = match node {
-            walk::Node::Identifier(ident) => ident.name.as_str(),
-            walk::Node::IdentifierExpr(ident) => ident.name.as_str(),
+            walk::Node::Identifier(ident) => &ident.name,
+            walk::Node::IdentifierExpr(ident) => &ident.name,
             _ => return Vec::new(),
         };
 
@@ -127,7 +127,7 @@ fn find_references(
             };
 
         let mut visitor =
-            semantic::IdentFinderVisitor::new(name.to_string());
+            semantic::IdentFinderVisitor::new(name.clone());
         walk::walk(&mut visitor, scope);
 
         let locations: Vec<lsp::Location> = visitor
@@ -1122,9 +1122,20 @@ mod tests {
     use std::collections::{HashMap, BTreeSet};
 
     use async_std::test;
+    use expect_test::expect;
     use lspower::{lsp, LanguageServer};
 
     use super::*;
+
+    fn position_of(s: &str) -> lsp::Position {
+        s.lines().enumerate().find_map(|(line, line_str)| {
+            line_str.find("// ^").map(|j| lsp::Position {
+                // The marker is on the line after the position we indicate
+                line: line as u32 - 1,
+                character: (line_str[..j].chars().count() + "// ^".len()) as u32,
+            })
+        }).unwrap_or_else(|| panic!("Could not find the position marker `// ^` in `{}`", s))
+    }
 
     fn create_server() -> LspServer {
         LspServerBuilder::default().build(None)
@@ -2039,6 +2050,7 @@ errorCounts
 
         assert_eq!(expected, result);
     }
+
     #[test]
     async fn test_references() {
         let fluxscript = r#"import "strings"
@@ -2126,6 +2138,74 @@ errorCounts
 
         assert_eq!(expected, result);
     }
+
+    #[test]
+    async fn test_references_duplicates() {
+        let fluxscript = r#"
+t = (x) => {
+    x = 1
+    return x
+        // ^
+}"#;
+        let server = create_server();
+        open_file(&server, fluxscript.to_string()).await;
+
+        let params = lsp::ReferenceParams {
+            text_document_position: lsp::TextDocumentPositionParams {
+                text_document: lsp::TextDocumentIdentifier {
+                    uri: lsp::Url::parse(
+                        "file:///home/user/file.flux",
+                    )
+                    .unwrap(),
+                },
+                position: position_of(fluxscript),
+            },
+            work_done_progress_params: lsp::WorkDoneProgressParams {
+                work_done_token: None,
+            },
+            partial_result_params: lsp::PartialResultParams {
+                partial_result_token: None,
+            },
+            context: lsp::ReferenceContext {
+                // declaration is included whether this is true or false
+                include_declaration: true,
+            },
+        };
+
+        let result =
+            server.references(params.clone()).await.unwrap().unwrap();
+
+        expect![[r#"
+            [
+              {
+                "uri": "file:///home/user/file.flux",
+                "range": {
+                  "start": {
+                    "line": 2,
+                    "character": 4
+                  },
+                  "end": {
+                    "line": 2,
+                    "character": 5
+                  }
+                }
+              },
+              {
+                "uri": "file:///home/user/file.flux",
+                "range": {
+                  "start": {
+                    "line": 3,
+                    "character": 11
+                  },
+                  "end": {
+                    "line": 3,
+                    "character": 12
+                  }
+                }
+              }
+            ]"#]].assert_eq(&serde_json::to_string_pretty(&result).unwrap());
+    }
+
     #[test]
     async fn test_document_highlight() {
         let fluxscript = r#"import "strings"
