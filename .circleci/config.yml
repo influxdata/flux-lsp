@@ -25,6 +25,7 @@ jobs:
   wasm-test:
     docker:
       - image: quay.io/influxdb/wasm-build
+    resource_class: large
     steps:
       - checkout
       - run:
