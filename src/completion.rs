@@ -7,7 +7,7 @@ use flux::ast::{Expression, Package, PropertyKey, SourceLocation};
 use flux::parser::parse_string;
 use flux::semantic::nodes::CallExpr;
 use flux::semantic::nodes::Expression as SemanticExpression;
-use flux::semantic::types::{MonoType, Record};
+use flux::semantic::types::{BuiltinType, MonoType, Record};
 use flux::semantic::walk::Visitor as SemanticVisitor;
 use flux::{imports, prelude};
 use lspower::lsp;
@@ -824,38 +824,42 @@ fn walk_package(
                         package_name: get_package_name(package),
                     }));
                 }
-                &MonoType::INT => push_var_result(
-                    &head.k.clone().into(),
-                    VarType::Int,
-                ),
-                &MonoType::FLOAT => push_var_result(
-                    &head.k.clone().into(),
-                    VarType::Float,
-                ),
-                &MonoType::BOOL => push_var_result(
-                    &head.k.clone().into(),
-                    VarType::Bool,
-                ),
                 MonoType::Arr(_) => push_var_result(
                     &head.k.clone().into(),
                     VarType::Array,
                 ),
-                &MonoType::BYTES => push_var_result(
-                    &head.k.clone().into(),
-                    VarType::Bytes,
-                ),
-                &MonoType::DURATION => push_var_result(
-                    &head.k.clone().into(),
-                    VarType::Duration,
-                ),
-                &MonoType::REGEXP => push_var_result(
-                    &head.k.clone().into(),
-                    VarType::Regexp,
-                ),
-                &MonoType::STRING => push_var_result(
-                    &head.k.clone().into(),
-                    VarType::String,
-                ),
+                MonoType::Builtin(b) => match b {
+                    BuiltinType::Int => push_var_result(
+                        &head.k.clone().into(),
+                        VarType::Int,
+                    ),
+                    BuiltinType::Float => push_var_result(
+                        &head.k.clone().into(),
+                        VarType::Float,
+                    ),
+                    BuiltinType::Bool => push_var_result(
+                        &head.k.clone().into(),
+                        VarType::Bool,
+                    ),
+                    BuiltinType::Bytes => push_var_result(
+                        &head.k.clone().into(),
+                        VarType::Bytes,
+                    ),
+                    BuiltinType::Duration => push_var_result(
+                        &head.k.clone().into(),
+                        VarType::Duration,
+                    ),
+                    BuiltinType::Regexp => push_var_result(
+                        &head.k.clone().into(),
+                        VarType::Regexp,
+                    ),
+                    BuiltinType::String => push_var_result(
+                        &head.k.clone().into(),
+                        VarType::String,
+                    ),
+                    _ => (),
+                },
+                _ => (),
             }
 
             walk_package(package, list, tail);
@@ -1104,18 +1108,35 @@ fn get_builtins(list: &mut Vec<Box<dyn Completable>>) {
                         optional_args: get_argument_names(&f.opt),
                     }))
                 }
-                &MonoType::STRING => push_var_result(VarType::String),
-                &MonoType::INT => push_var_result(VarType::Int),
-                &MonoType::FLOAT => push_var_result(VarType::Float),
                 MonoType::Arr(_) => push_var_result(VarType::Array),
-                &MonoType::BOOL => push_var_result(VarType::Bool),
-                &MonoType::BYTES => push_var_result(VarType::Bytes),
-                &MonoType::DURATION => {
-                    push_var_result(VarType::Duration)
-                }
-                &MonoType::UINT => push_var_result(VarType::Uint),
-                &MonoType::REGEXP => push_var_result(VarType::Regexp),
-                &MonoType::TIME => push_var_result(VarType::Time),
+                MonoType::Builtin(b) => match b {
+                    BuiltinType::String => {
+                        push_var_result(VarType::String)
+                    }
+                    BuiltinType::Int => push_var_result(VarType::Int),
+                    BuiltinType::Float => {
+                        push_var_result(VarType::Float)
+                    }
+                    BuiltinType::Bool => {
+                        push_var_result(VarType::Bool)
+                    }
+                    BuiltinType::Bytes => {
+                        push_var_result(VarType::Bytes)
+                    }
+                    BuiltinType::Duration => {
+                        push_var_result(VarType::Duration)
+                    }
+                    BuiltinType::Uint => {
+                        push_var_result(VarType::Uint)
+                    }
+                    BuiltinType::Regexp => {
+                        push_var_result(VarType::Regexp)
+                    }
+                    BuiltinType::Time => {
+                        push_var_result(VarType::Time)
+                    }
+                },
+                _ => (),
             }
         }
     }
@@ -1548,15 +1569,19 @@ enum CompletionVarType {
 impl CompletionVarType {
     pub fn from_monotype(typ: &MonoType) -> Option<Self> {
         Some(match typ {
-            &MonoType::DURATION => CompletionVarType::Duration,
-            &MonoType::INT => CompletionVarType::Int,
-            &MonoType::BOOL => CompletionVarType::Bool,
-            &MonoType::FLOAT => CompletionVarType::Float,
-            &MonoType::STRING => CompletionVarType::String,
             MonoType::Arr(_) => CompletionVarType::Array,
-            &MonoType::REGEXP => CompletionVarType::Regexp,
-            &MonoType::UINT => CompletionVarType::Uint,
-            &MonoType::TIME => CompletionVarType::Time,
+            MonoType::Builtin(b) => match b {
+                BuiltinType::Duration => CompletionVarType::Duration,
+                BuiltinType::Int => CompletionVarType::Int,
+                BuiltinType::Bool => CompletionVarType::Bool,
+                BuiltinType::Float => CompletionVarType::Float,
+                BuiltinType::String => CompletionVarType::String,
+                BuiltinType::Regexp => CompletionVarType::Regexp,
+                BuiltinType::Uint => CompletionVarType::Uint,
+                BuiltinType::Time => CompletionVarType::Time,
+                _ => return None,
+            },
+            _ => return None,
         })
     }
 }
