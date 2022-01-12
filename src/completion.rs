@@ -148,7 +148,7 @@ impl CompletionInfo {
 
         let package = PackageInfo::from(&pkg);
 
-        if let Some(finder_node) = visitor.state.node {
+        if let Some(finder_node) = visitor.node {
             if let Some(parent) = finder_node.parent {
                 match parent.node {
                     AstNode::MemberExpr(me) => {
@@ -557,10 +557,9 @@ pub fn find_param_completions(
 
     walk(&mut visitor, walker);
 
-    let node = visitor.state.node;
     let mut items: Vec<String> = vec![];
 
-    if let Some(AstNode::CallExpr(call)) = node {
+    if let Some(AstNode::CallExpr(call)) = visitor.node {
         let provided = get_provided_arguments(call);
 
         if let Expression::Identifier(ident) = &call.callee {
@@ -659,11 +658,7 @@ fn get_specific_object(
 
     flux::semantic::walk::walk(&mut visitor, walker);
 
-    if let Ok(state) = visitor.state.lock() {
-        return Ok(state.completables.clone());
-    }
-
-    Ok(vec![])
+    Ok(visitor.completables.clone())
 }
 
 fn get_provided_arguments(call: &flux::ast::CallExpr) -> Vec<String> {
@@ -710,13 +705,7 @@ fn get_user_functions(
 
     flux::semantic::walk::walk(&mut visitor, walker);
 
-    if let Ok(state) = visitor.state.lock() {
-        return Ok((*state).functions.clone());
-    }
-
-    Err(Error {
-        msg: "failed to get completables".to_string(),
-    })
+    Ok(visitor.functions.clone())
 }
 
 fn get_object_functions(
@@ -731,17 +720,12 @@ fn get_object_functions(
 
     flux::semantic::walk::walk(&mut visitor, walker);
 
-    if let Ok(state) = visitor.state.lock() {
-        return Ok(state
-            .results
-            .clone()
-            .into_iter()
-            .filter(|obj| obj.object == object)
-            .map(|obj| obj.function)
-            .collect());
-    }
-
-    Ok(vec![])
+    Ok(visitor
+        .results
+        .into_iter()
+        .filter(|obj| obj.object == object)
+        .map(|obj| obj.function)
+        .collect())
 }
 
 fn new_param_completion(
@@ -1388,22 +1372,15 @@ fn follow_function_pipes(c: &CallExpr) -> &MonoType {
     &c.typ
 }
 
-#[derive(Default)]
-struct CompletableObjectFinderState {
-    completables: Vec<Arc<dyn Completable>>,
-}
-
 struct CompletableObjectFinderVisitor {
     name: String,
-    state: Arc<Mutex<CompletableObjectFinderState>>,
+    completables: Vec<Arc<dyn Completable>>,
 }
 
 impl CompletableObjectFinderVisitor {
     fn new(name: String) -> Self {
         CompletableObjectFinderVisitor {
-            state: Arc::new(Mutex::new(
-                CompletableObjectFinderState::default(),
-            )),
+            completables: Vec::new(),
             name,
         }
     }
@@ -1414,112 +1391,96 @@ impl<'a> SemanticVisitor<'a> for CompletableObjectFinderVisitor {
         &mut self,
         node: flux::semantic::walk::Node<'a>,
     ) -> bool {
-        if let Ok(mut state) = self.state.lock() {
-            let name = self.name.clone();
+        let name = self.name.clone();
 
-            if let flux::semantic::walk::Node::ObjectExpr(obj) = node
-            {
-                if let Some(ident) = &obj.with {
-                    if name == *ident.name {
-                        for prop in obj.properties.clone() {
-                            let name = prop.key.name;
-                            if let Some(var_type) =
-                                get_var_type(&prop.value)
-                            {
-                                (*state).completables.push(Arc::new(
-                                    CompletionVarResult {
-                                        var_type,
-                                        name: name.to_string(),
-                                    },
-                                ));
-                            }
-                            if let Some(fun) = create_function_result(
-                                name.to_string(),
-                                &prop.value,
-                            ) {
-                                (*state)
-                                    .completables
-                                    .push(Arc::new(fun));
-                            }
+        if let flux::semantic::walk::Node::ObjectExpr(obj) = node {
+            if let Some(ident) = &obj.with {
+                if name == *ident.name {
+                    for prop in obj.properties.clone() {
+                        let name = prop.key.name;
+                        if let Some(var_type) =
+                            get_var_type(&prop.value)
+                        {
+                            self.completables.push(Arc::new(
+                                CompletionVarResult {
+                                    var_type,
+                                    name: name.to_string(),
+                                },
+                            ));
+                        }
+                        if let Some(fun) = create_function_result(
+                            name.to_string(),
+                            &prop.value,
+                        ) {
+                            self.completables.push(Arc::new(fun));
                         }
                     }
                 }
             }
+        }
 
-            if let flux::semantic::walk::Node::VariableAssgn(assign) =
-                node
+        if let flux::semantic::walk::Node::VariableAssgn(assign) =
+            node
+        {
+            if *assign.id.name == name {
+                if let SemanticExpression::Object(obj) = &assign.init
+                {
+                    for prop in obj.properties.clone() {
+                        let name = prop.key.name;
+
+                        if let Some(var_type) =
+                            get_var_type(&prop.value)
+                        {
+                            self.completables.push(Arc::new(
+                                CompletionVarResult {
+                                    var_type,
+                                    name: name.to_string(),
+                                },
+                            ));
+                        }
+
+                        if let Some(fun) = create_function_result(
+                            name.to_string(),
+                            &prop.value,
+                        ) {
+                            self.completables.push(Arc::new(fun));
+                        }
+                    }
+
+                    return false;
+                }
+            }
+        }
+
+        if let flux::semantic::walk::Node::OptionStmt(opt) = node {
+            if let flux::semantic::nodes::Assignment::Variable(
+                assign,
+            ) = opt.assignment.clone()
             {
                 if *assign.id.name == name {
                     if let SemanticExpression::Object(obj) =
-                        &assign.init
+                        assign.init
                     {
                         for prop in obj.properties.clone() {
                             let name = prop.key.name;
-
                             if let Some(var_type) =
                                 get_var_type(&prop.value)
                             {
-                                (*state).completables.push(Arc::new(
+                                self.completables.push(Arc::new(
                                     CompletionVarResult {
                                         var_type,
                                         name: name.to_string(),
                                     },
                                 ));
                             }
-
                             if let Some(fun) = create_function_result(
                                 name.to_string(),
                                 &prop.value,
                             ) {
-                                (*state)
-                                    .completables
-                                    .push(Arc::new(fun));
+                                self.completables.push(Arc::new(fun));
                             }
                         }
-
                         return false;
-                    }
-                }
-            }
-
-            if let flux::semantic::walk::Node::OptionStmt(opt) = node
-            {
-                if let flux::semantic::nodes::Assignment::Variable(
-                    assign,
-                ) = opt.assignment.clone()
-                {
-                    if *assign.id.name == name {
-                        if let SemanticExpression::Object(obj) =
-                            assign.init
-                        {
-                            for prop in obj.properties.clone() {
-                                let name = prop.key.name;
-                                if let Some(var_type) =
-                                    get_var_type(&prop.value)
-                                {
-                                    (*state).completables.push(
-                                        Arc::new(
-                                            CompletionVarResult {
-                                                var_type,
-                                                name: name
-                                                    .to_string(),
-                                            },
-                                        ),
-                                    );
-                                }
-                                if let Some(fun) =
-                                    create_function_result(
-                                        name.to_string(),
-                                        &prop.value,
-                                    )
-                                {
-                                    (*state)
-                                        .completables
-                                        .push(Arc::new(fun));
-                                }
-                            }
-                            return false;
-                        }
                     }
                 }
             }

@@ -798,9 +798,7 @@ impl LanguageServer for LspServer {
 
         if let Some(node) = visitor.node {
             let name = match node {
-                walk::Node::Identifier(ident) => {
-                    Some(&ident.name)
-                }
+                walk::Node::Identifier(ident) => Some(&ident.name),
                 walk::Node::IdentifierExpr(ident) => {
                     Some(&ident.name)
                 }
@@ -860,8 +858,7 @@ impl LanguageServer for LspServer {
         &self,
         params: lsp::RenameParams,
     ) -> RpcResult<Option<lsp::WorkspaceEdit>> {
-        let key =
-            params.text_document_position.text_document.uri;
+        let key = params.text_document_position.text_document.uri;
         let maybe_pkg = self.parse_analyze_document(&key)?;
         let pkg = match maybe_pkg {
             Some(pkg) => pkg,
