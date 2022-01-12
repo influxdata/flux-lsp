@@ -1,6 +1,3 @@
-use std::cell::RefCell;
-use std::rc::Rc;
-
 use flux::ast::{
     walk::{self, Visitor},
     Package,
@@ -10,7 +7,7 @@ use lspower::lsp;
 use crate::shared::flux_position_to_position;
 
 fn contains_position(
-    node: Rc<walk::Node<'_>>,
+    node: walk::Node<'_>,
     pos: lsp::Position,
 ) -> bool {
     let start_line = node.base().location.start.line - 1;
@@ -37,130 +34,122 @@ fn contains_position(
     true
 }
 
+#[derive(Clone)]
 pub struct CallFinderState<'a> {
-    pub node: Option<Rc<walk::Node<'a>>>,
+    pub node: Option<walk::Node<'a>>,
 }
 
 #[derive(Clone)]
 pub struct CallFinderVisitor<'a> {
-    pub state: Rc<RefCell<CallFinderState<'a>>>,
+    pub state: CallFinderState<'a>,
     pub position: lsp::Position,
 }
 
 impl<'a> CallFinderVisitor<'a> {
     pub fn new(position: lsp::Position) -> Self {
         CallFinderVisitor {
-            state: Rc::new(RefCell::new(CallFinderState {
-                node: None,
-            })),
+            state: CallFinderState { node: None },
             position,
         }
     }
 }
 
 impl<'a> Visitor<'a> for CallFinderVisitor<'a> {
-    fn visit(&self, node: Rc<walk::Node<'a>>) -> Option<Self> {
-        let mut state = self.state.borrow_mut();
-
+    fn visit(&mut self, node: walk::Node<'a>) -> bool {
         let contains = contains_position(node.clone(), self.position);
 
         if contains {
-            if let walk::Node::CallExpr(_) = node.as_ref() {
-                (*state).node = Some(node.clone())
+            if let walk::Node::CallExpr(_) = node {
+                self.state.node = Some(node.clone())
             }
         }
 
-        Some(self.clone())
+        true
     }
 }
 
 #[derive(Clone)]
 pub struct NodeFinderNode<'a> {
-    pub node: Rc<walk::Node<'a>>,
+    pub node: walk::Node<'a>,
     pub parent: Option<Box<NodeFinderNode<'a>>>,
 }
 
+#[derive(Clone)]
 pub struct NodeFinderState<'a> {
     pub node: Option<NodeFinderNode<'a>>,
     pub position: lsp::Position,
 }
 
-impl<'a> NodeFinderState<'a> {}
-
 #[derive(Clone)]
 pub struct NodeFinderVisitor<'a> {
-    pub state: Rc<RefCell<NodeFinderState<'a>>>,
+    pub state: NodeFinderState<'a>,
 }
 
 impl<'a> NodeFinderVisitor<'a> {
     pub fn new(position: lsp::Position) -> Self {
         NodeFinderVisitor {
-            state: Rc::new(RefCell::new(NodeFinderState {
+            state: NodeFinderState {
                 node: None,
                 position,
-            })),
+            },
         }
     }
 }
 
 impl<'a> Visitor<'a> for NodeFinderVisitor<'a> {
-    fn visit(&self, node: Rc<walk::Node<'a>>) -> Option<Self> {
-        let mut state = self.state.borrow_mut();
-
+    fn visit(&mut self, node: walk::Node<'a>) -> bool {
         let contains =
-            contains_position(node.clone(), (*state).position);
+            contains_position(node.clone(), self.state.position);
 
         if contains {
-            let parent = (*state).node.clone();
+            let parent = self.state.node.clone();
             if let Some(parent) = parent {
-                (*state).node = Some(NodeFinderNode {
+                self.state.node = Some(NodeFinderNode {
                     node: node.clone(),
                     parent: Some(Box::new(parent)),
                 });
             } else {
-                (*state).node = Some(NodeFinderNode {
-                    node: node.clone(),
-                    parent: None,
-                });
+                self.state.node =
+                    Some(NodeFinderNode { node, parent: None });
             }
         }
 
-        Some(self.clone())
+        true
     }
 }
 
+#[derive(Clone)]
 pub struct IdentFinderState<'a> {
     pub name: String,
-    pub identifiers: Vec<Rc<walk::Node<'a>>>,
+    pub identifiers: Vec<walk::Node<'a>>,
 }
 
 #[derive(Clone)]
 pub struct IdentFinderVisitor<'a> {
-    pub state: Rc<RefCell<IdentFinderState<'a>>>,
+    pub state: IdentFinderState<'a>,
 }
 
 impl<'a> Visitor<'a> for IdentFinderVisitor<'a> {
-    fn visit(&self, node: Rc<walk::Node<'a>>) -> Option<Self> {
-        let mut state = self.state.borrow_mut();
-        match node.clone().as_ref() {
+    fn visit(&mut self, node: walk::Node<'a>) -> bool {
+        match node {
             walk::Node::MemberExpr(m) => {
                 if let flux::ast::Expression::Identifier(i) =
                     m.object.clone()
                 {
-                    if i.name == state.name {
-                        return Some(self.clone());
+                    if i.name == self.state.name {
+                        return true;
                     }
                 }
-                return None;
+                return false;
             }
             walk::Node::Identifier(n) => {
-                if n.name == state.name {
-                    state.identifiers.push(node.clone());
+                if n.name == self.state.name {
+                    self.state.identifiers.push(node);
                 }
             }
             _ => {}
         }
-        Some(self.clone())
+        true
     }
 }
 

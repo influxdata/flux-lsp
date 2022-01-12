@@ -1,14 +1,13 @@
-use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
 use flux::analyze;
-use flux::ast::walk::walk_rc;
+use flux::ast::walk::walk;
 use flux::ast::walk::Node as AstNode;
 use flux::ast::{Expression, Package, PropertyKey, SourceLocation};
 use flux::parser::parse_string;
 use flux::semantic::nodes::CallExpr;
 use flux::semantic::nodes::Expression as SemanticExpression;
-use flux::semantic::types::{MonoType, Record};
+use flux::semantic::types::{BuiltinType, MonoType, Record};
 use flux::semantic::walk::Visitor as SemanticVisitor;
 use flux::{imports, prelude};
 use lspower::lsp;
@@ -140,19 +139,19 @@ impl CompletionInfo {
 
         let pkg: Package =
             parse_string(uri.to_string(), source).into();
-        let walker = Rc::new(AstNode::File(&pkg.files[0]));
-        let visitor = NodeFinderVisitor::new(move_back(position, 1));
+        let walker = AstNode::File(&pkg.files[0]);
+        let mut visitor =
+            NodeFinderVisitor::new(move_back(position, 1));
 
-        walk_rc(&visitor, walker);
+        walk(&mut visitor, walker);
 
         let package = PackageInfo::from(&pkg);
 
-        let state = visitor.state.borrow();
-        let finder_node = (*state).node.clone();
+        let finder_node = visitor.state.node.clone();
 
         if let Some(finder_node) = finder_node {
             if let Some(parent) = finder_node.parent {
-                match parent.node.as_ref() {
+                match parent.node {
                     AstNode::MemberExpr(me) => {
                         if let Expression::Identifier(obj) =
                             me.object.clone()
@@ -250,9 +249,9 @@ impl CompletionInfo {
                             AstNode::ObjectExpr(_),
                             AstNode::CallExpr(call),
                         ) = (
-                            parent.node.as_ref(),
-                            grandparent.node.as_ref(),
-                            greatgrandparent.node.as_ref(),
+                            parent.node,
+                            grandparent.node,
+                            greatgrandparent.node,
                         ) {
                             let name = match prop.key.clone() {
                                 PropertyKey::Identifier(ident) => {
@@ -284,7 +283,7 @@ impl CompletionInfo {
                     }
                 }
 
-                match finder_node.node.as_ref() {
+                match finder_node.node {
                     AstNode::BinaryExpr(be) => {
                         if let Expression::Identifier(left) =
                             be.left.clone()
@@ -561,68 +560,62 @@ pub fn find_param_completions(
     let position = params.text_document_position.position;
 
     let pkg: Package = parse_string(uri.to_string(), source).into();
-    let walker = Rc::new(AstNode::File(&pkg.files[0]));
-    let visitor = CallFinderVisitor::new(move_back(position, 1));
+    let walker = AstNode::File(&pkg.files[0]);
+    let mut visitor = CallFinderVisitor::new(move_back(position, 1));
 
-    walk_rc(&visitor, walker);
+    walk(&mut visitor, walker);
 
-    let state = visitor.state.borrow();
-    let node = (*state).node.clone();
+    let node = visitor.state.node.clone();
     let mut items: Vec<String> = vec![];
 
-    if let Some(node) = node {
-        if let AstNode::CallExpr(call) = node.as_ref() {
-            let provided = get_provided_arguments(call);
+    if let Some(AstNode::CallExpr(call)) = node {
+        let provided = get_provided_arguments(call);
 
-            if let Expression::Identifier(ident) = call.callee.clone()
+        if let Expression::Identifier(ident) = call.callee.clone() {
+            items.extend(get_function_params(
+                ident.name.as_str(),
+                stdlib::get_builtin_functions(),
+                provided.clone(),
+            ));
+
+            if let Ok(user_functions) =
+                get_user_functions(uri.clone(), position, source)
             {
                 items.extend(get_function_params(
                     ident.name.as_str(),
-                    stdlib::get_builtin_functions(),
+                    user_functions,
+                    provided.clone(),
+                ));
+            }
+        }
+        if let Expression::Member(me) = call.callee.clone() {
+            if let Expression::Identifier(ident) = me.object {
+                let package_functions =
+                    stdlib::get_package_functions(ident.name.clone());
+
+                let object_functions = get_object_functions(
+                    uri,
+                    position,
+                    ident.name.as_str(),
+                    source,
+                )?;
+
+                let key = match me.property {
+                    PropertyKey::Identifier(i) => i.name,
+                    PropertyKey::StringLit(l) => l.value,
+                };
+
+                items.extend(get_function_params(
+                    key.as_str(),
+                    package_functions,
                     provided.clone(),
                 ));
 
-                if let Ok(user_functions) =
-                    get_user_functions(uri.clone(), position, source)
-                {
-                    items.extend(get_function_params(
-                        ident.name.as_str(),
-                        user_functions,
-                        provided.clone(),
-                    ));
-                }
-            }
-            if let Expression::Member(me) = call.callee.clone() {
-                if let Expression::Identifier(ident) = me.object {
-                    let package_functions =
-                        stdlib::get_package_functions(
-                            ident.name.clone(),
-                        );
-
-                    let object_functions = get_object_functions(
-                        uri,
-                        position,
-                        ident.name.as_str(),
-                        source,
-                    )?;
-
-                    let key = match me.property {
-                        PropertyKey::Identifier(i) => i.name,
-                        PropertyKey::StringLit(l) => l.value,
-                    };
-
-                    items.extend(get_function_params(
-                        key.as_str(),
-                        package_functions,
-                        provided.clone(),
-                    ));
-
-                    items.extend(get_function_params(
-                        key.as_str(),
-                        object_functions,
-                        provided,
-                    ));
-                }
+                items.extend(get_function_params(
+                    key.as_str(),
+                    object_functions,
+                    provided,
+                ));
             }
         }
     }
@@ -647,14 +640,14 @@ fn get_specific_package_functions(
         {
             for (key, val) in env.iter() {
                 if *key == import.path {
-                    walk_package(key, list, &val.expr);
+                    walk_package(key, list, &val.typ().expr);
                 }
             }
         } else {
             for (key, val) in env.iter() {
                 if let Some(package_name) = get_package_name(key) {
                     if package_name == name {
-                        walk_package(key, list, &val.expr);
+                        walk_package(key, list, &val.typ().expr);
                     }
                 }
             }
@@ -804,7 +797,7 @@ fn walk_package(
 ) {
     if let MonoType::Record(record) = t {
         if let Record::Extension { head, tail } = record.as_ref() {
-            let mut push_var_result = |name: &str, var_type| {
+            let mut push_var_result = |name: &String, var_type| {
                 list.push(Box::new(VarResult {
                     name: name.to_owned(),
                     var_type,
@@ -816,7 +809,7 @@ fn walk_package(
             match &head.v {
                 MonoType::Fun(f) => {
                     list.push(Box::new(FunctionResult {
-                        name: head.k.clone(),
+                        name: head.k.clone().into(),
                         package: package.to_string(),
                         signature: stdlib::create_function_signature(
                             f,
@@ -826,31 +819,42 @@ fn walk_package(
                         package_name: get_package_name(package),
                     }));
                 }
-                MonoType::Int => {
-                    push_var_result(&head.k, VarType::Int)
-                }
-                MonoType::Float => {
-                    push_var_result(&head.k, VarType::Float)
-                }
-                MonoType::Bool => {
-                    push_var_result(&head.k, VarType::Bool)
-                }
-                MonoType::Arr(_) => {
-                    push_var_result(&head.k, VarType::Array)
-                }
-                MonoType::Bytes => {
-                    push_var_result(&head.k, VarType::Bytes)
-                }
-                MonoType::Duration => {
-                    push_var_result(&head.k, VarType::Duration)
-                }
-                MonoType::Regexp => {
-                    push_var_result(&head.k, VarType::Regexp)
-                }
-                MonoType::String => {
-                    push_var_result(&head.k, VarType::String)
-                }
-                _ => {}
+                MonoType::Arr(_) => push_var_result(
+                    &head.k.clone().into(),
+                    VarType::Array,
+                ),
+                MonoType::Builtin(b) => match b {
+                    BuiltinType::Int => push_var_result(
+                        &head.k.clone().into(),
+                        VarType::Int,
+                    ),
+                    BuiltinType::Float => push_var_result(
+                        &head.k.clone().into(),
+                        VarType::Float,
+                    ),
+                    BuiltinType::Bool => push_var_result(
+                        &head.k.clone().into(),
+                        VarType::Bool,
+                    ),
+                    BuiltinType::Bytes => push_var_result(
+                        &head.k.clone().into(),
+                        VarType::Bytes,
+                    ),
+                    BuiltinType::Duration => push_var_result(
+                        &head.k.clone().into(),
+                        VarType::Duration,
+                    ),
+                    BuiltinType::Regexp => push_var_result(
+                        &head.k.clone().into(),
+                        VarType::Regexp,
+                    ),
+                    BuiltinType::String => push_var_result(
+                        &head.k.clone().into(),
+                        VarType::String,
+                    ),
+                    _ => (),
+                },
+                _ => (),
             }
 
             walk_package(package, list, tail);
@@ -1099,19 +1103,35 @@ fn get_builtins(list: &mut Vec<Box<dyn Completable>>) {
                         optional_args: get_argument_names(&f.opt),
                     }))
                 }
-                MonoType::String => push_var_result(VarType::String),
-                MonoType::Int => push_var_result(VarType::Int),
-                MonoType::Float => push_var_result(VarType::Float),
                 MonoType::Arr(_) => push_var_result(VarType::Array),
-                MonoType::Bool => push_var_result(VarType::Bool),
-                MonoType::Bytes => push_var_result(VarType::Bytes),
-                MonoType::Duration => {
-                    push_var_result(VarType::Duration)
-                }
-                MonoType::Uint => push_var_result(VarType::Uint),
-                MonoType::Regexp => push_var_result(VarType::Regexp),
-                MonoType::Time => push_var_result(VarType::Time),
-                _ => {}
+                MonoType::Builtin(b) => match b {
+                    BuiltinType::String => {
+                        push_var_result(VarType::String)
+                    }
+                    BuiltinType::Int => push_var_result(VarType::Int),
+                    BuiltinType::Float => {
+                        push_var_result(VarType::Float)
+                    }
+                    BuiltinType::Bool => {
+                        push_var_result(VarType::Bool)
+                    }
+                    BuiltinType::Bytes => {
+                        push_var_result(VarType::Bytes)
+                    }
+                    BuiltinType::Duration => {
+                        push_var_result(VarType::Duration)
+                    }
+                    BuiltinType::Uint => {
+                        push_var_result(VarType::Uint)
+                    }
+                    BuiltinType::Regexp => {
+                        push_var_result(VarType::Regexp)
+                    }
+                    BuiltinType::Time => {
+                        push_var_result(VarType::Time)
+                    }
+                },
+                _ => (),
             }
         }
     }
@@ -1544,15 +1564,18 @@ enum CompletionVarType {
 impl CompletionVarType {
     pub fn from_monotype(typ: &MonoType) -> Option<Self> {
         Some(match typ {
-            MonoType::Duration => CompletionVarType::Duration,
-            MonoType::Int => CompletionVarType::Int,
-            MonoType::Bool => CompletionVarType::Bool,
-            MonoType::Float => CompletionVarType::Float,
-            MonoType::String => CompletionVarType::String,
             MonoType::Arr(_) => CompletionVarType::Array,
-            MonoType::Regexp => CompletionVarType::Regexp,
-            MonoType::Uint => CompletionVarType::Uint,
-            MonoType::Time => CompletionVarType::Time,
+            MonoType::Builtin(b) => match b {
+                BuiltinType::Duration => CompletionVarType::Duration,
+                BuiltinType::Int => CompletionVarType::Int,
+                BuiltinType::Bool => CompletionVarType::Bool,
+                BuiltinType::Float => CompletionVarType::Float,
+                BuiltinType::String => CompletionVarType::String,
+                BuiltinType::Regexp => CompletionVarType::Regexp,
+                BuiltinType::Uint => CompletionVarType::Uint,
+                BuiltinType::Time => CompletionVarType::Time,
+                _ => return None,
+            },
             _ => return None,
         })
     }
