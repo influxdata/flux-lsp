@@ -35,20 +35,15 @@ fn contains_position(
 }
 
 #[derive(Clone)]
-pub struct CallFinderState<'a> {
-    pub node: Option<walk::Node<'a>>,
-}
-
-#[derive(Clone)]
 pub struct CallFinderVisitor<'a> {
-    pub state: CallFinderState<'a>,
+    pub node: Option<walk::Node<'a>>,
     pub position: lsp::Position,
 }
 
 impl<'a> CallFinderVisitor<'a> {
     pub fn new(position: lsp::Position) -> Self {
         CallFinderVisitor {
-            state: CallFinderState { node: None },
+            node: None,
             position,
         }
     }
@@ -60,7 +55,7 @@ impl<'a> Visitor<'a> for CallFinderVisitor<'a> {
 
         if contains {
             if let walk::Node::CallExpr(_) = node {
-                self.state.node = Some(node.clone())
+                self.node = Some(node.clone())
             }
         }
 
@@ -75,80 +70,37 @@ pub struct NodeFinderNode<'a> {
 }
 
 #[derive(Clone)]
-pub struct NodeFinderState<'a> {
+pub struct NodeFinderVisitor<'a> {
     pub node: Option<NodeFinderNode<'a>>,
     pub position: lsp::Position,
-}
-
-#[derive(Clone)]
-pub struct NodeFinderVisitor<'a> {
-    pub state: NodeFinderState<'a>,
 }
 
 impl<'a> NodeFinderVisitor<'a> {
     pub fn new(position: lsp::Position) -> Self {
         NodeFinderVisitor {
-            state: NodeFinderState {
-                node: None,
-                position,
-            },
+            node: None,
+            position,
         }
     }
 }
 
 impl<'a> Visitor<'a> for NodeFinderVisitor<'a> {
     fn visit(&mut self, node: walk::Node<'a>) -> bool {
-        let contains =
-            contains_position(node.clone(), self.state.position);
+        let contains = contains_position(node.clone(), self.position);
 
         if contains {
-            let parent = self.state.node.clone();
+            let parent = self.node.clone();
             if let Some(parent) = parent {
-                self.state.node = Some(NodeFinderNode {
+                self.node = Some(NodeFinderNode {
                     node: node.clone(),
                     parent: Some(Box::new(parent)),
                 });
             } else {
-                self.state.node =
+                self.node =
                     Some(NodeFinderNode { node, parent: None });
             }
         }
 
-        true
-    }
-}
-
-#[derive(Clone)]
-pub struct IdentFinderState<'a> {
-    pub name: String,
-    pub identifiers: Vec<walk::Node<'a>>,
-}
-
-#[derive(Clone)]
-pub struct IdentFinderVisitor<'a> {
-    pub state: IdentFinderState<'a>,
-}
-
-impl<'a> Visitor<'a> for IdentFinderVisitor<'a> {
-    fn visit(&mut self, node: walk::Node<'a>) -> bool {
-        match node {
-            walk::Node::MemberExpr(m) => {
-                if let flux::ast::Expression::Identifier(i) =
-                    m.object.clone()
-                {
-                    if i.name == self.state.name {
-                        return true;
-                    }
-                }
-                return false;
-            }
-            walk::Node::Identifier(n) => {
-                if n.name == self.state.name {
-                    self.state.identifiers.push(node);
-                }
-            }
-            _ => {}
-        }
         true
     }
 }

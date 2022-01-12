@@ -1,5 +1,3 @@
-use std::sync::{Arc, Mutex};
-
 use flux::ast::SourceLocation;
 use flux::semantic::nodes::Expression;
 use flux::semantic::types::MonoType;
@@ -20,74 +18,63 @@ fn defined_after(loc: &SourceLocation, pos: lsp::Position) -> bool {
     false
 }
 
-pub struct FunctionFinderState {
-    pub functions: Vec<Function>,
-}
-
 pub struct FunctionFinderVisitor {
     pub pos: lsp::Position,
-    pub state: Arc<Mutex<FunctionFinderState>>,
+    pub functions: Vec<Function>,
 }
 
 impl FunctionFinderVisitor {
     pub fn new(pos: lsp::Position) -> Self {
         FunctionFinderVisitor {
             pos,
-            state: Arc::new(Mutex::new(FunctionFinderState {
-                functions: vec![],
-            })),
+            functions: vec![],
         }
     }
 }
 
 impl<'a> Visitor<'a> for FunctionFinderVisitor {
     fn visit(&mut self, node: Node<'a>) -> bool {
-        if let Ok(mut state) = self.state.lock() {
-            let loc = node.loc();
+        let loc = node.loc();
 
-            if defined_after(loc, self.pos) {
-                return true;
+        if defined_after(loc, self.pos) {
+            return true;
+        }
+
+        if let Node::VariableAssgn(assgn) = node {
+            let name = &assgn.id.name;
+
+            if let Expression::Function(f) = &assgn.init {
+                if let MonoType::Fun(fun) = &f.typ {
+                    let mut params = get_argument_names(&fun.req);
+                    for opt in get_argument_names(&fun.opt) {
+                        params.push(opt);
+                    }
+
+                    self.functions.push(Function {
+                        name: name.to_string(),
+                        params,
+                    })
+                }
             }
+        }
 
-            if let Node::VariableAssgn(assgn) = node {
-                let name = assgn.id.name.clone();
-
-                if let Expression::Function(f) = assgn.init.clone() {
-                    if let MonoType::Fun(fun) = f.typ.clone() {
+        if let Node::OptionStmt(opt) = node {
+            if let flux::semantic::nodes::Assignment::Variable(
+                assgn,
+            ) = &opt.assignment
+            {
+                let name = &assgn.id.name;
+                if let Expression::Function(f) = &assgn.init {
+                    if let MonoType::Fun(fun) = &f.typ {
                         let mut params = get_argument_names(&fun.req);
                         for opt in get_argument_names(&fun.opt) {
                             params.push(opt);
                         }
 
-                        state.functions.push(Function {
+                        self.functions.push(Function {
                             name: name.to_string(),
                             params,
                         })
-                    }
-                }
-            }
-
-            if let Node::OptionStmt(opt) = node {
-                if let flux::semantic::nodes::Assignment::Variable(
-                    assgn,
-                ) = &opt.assignment
-                {
-                    let name = assgn.id.name.clone();
-                    if let Expression::Function(f) =
-                        assgn.init.clone()
-                    {
-                        if let MonoType::Fun(fun) = f.typ.clone() {
-                            let mut params =
-                                get_argument_names(&fun.req);
-                            for opt in get_argument_names(&fun.opt) {
-                                params.push(opt);
-                            }
-
-                            state.functions.push(Function {
-                                name: name.to_string(),
-                                params,
-                            })
-                        }
                     }
                 }
             }
@@ -104,37 +91,62 @@ pub struct ObjectFunction {
 }
 
 #[derive(Default)]
-pub struct ObjectFunctionFinderState {
-    pub results: Vec<ObjectFunction>,
-}
-
-#[derive(Default)]
 pub struct ObjectFunctionFinderVisitor {
-    pub state: Arc<Mutex<ObjectFunctionFinderState>>,
+    pub results: Vec<ObjectFunction>,
 }
 
 impl<'a> Visitor<'a> for ObjectFunctionFinderVisitor {
     fn visit(&mut self, node: Node<'a>) -> bool {
         match node {
             Node::VariableAssgn(assignment) => {
-                let object_name = assignment.id.name.clone();
+                let object_name = &assignment.id.name;
 
-                if let Expression::Object(obj) =
-                    assignment.init.clone()
-                {
-                    for prop in obj.properties.clone() {
-                        let func_name = prop.key.name;
+                if let Expression::Object(obj) = &assignment.init {
+                    for prop in &obj.properties {
+                        let func_name = &prop.key.name;
 
-                        if let Expression::Function(fun) = prop.value
+                        if let Expression::Function(fun) = &prop.value
                         {
                             let params = fun
                                 .params
-                                .into_iter()
+                                .iter()
                                 .map(|p| p.key.name.to_string())
                                 .collect::<Vec<String>>();
 
-                            if let Ok(mut state) = self.state.lock() {
-                                state.results.push(ObjectFunction {
+                            self.results.push(ObjectFunction {
+                                object: object_name.to_string(),
+                                function: Function {
+                                    name: func_name.to_string(),
+                                    params,
+                                },
+                            });
+
+                            return false;
+                        }
+                    }
+                }
+            }
+            Node::OptionStmt(opt) => {
+                if let flux::semantic::nodes::Assignment::Variable(
+                    assignment,
+                ) = &opt.assignment
+                {
+                    let object_name = &assignment.id.name;
+                    if let Expression::Object(obj) = &assignment.init
+                    {
+                        for prop in &obj.properties {
+                            let func_name = &prop.key.name;
+
+                            if let Expression::Function(fun) =
+                                &prop.value
+                            {
+                                let params = fun
+                                    .params
+                                    .iter()
+                                    .map(|p| p.key.name.to_string())
+                                    .collect::<Vec<String>>();
+
+                                self.results.push(ObjectFunction {
                                     object: object_name.to_string(),
                                     function: Function {
                                         name: func_name.to_string(),
@@ -143,47 +155,6 @@ impl<'a> Visitor<'a> for ObjectFunctionFinderVisitor {
                                 });
 
                                 return false;
-                            }
-                        }
-                    }
-                }
-            }
-            Node::OptionStmt(opt) => {
-                if let flux::semantic::nodes::Assignment::Variable(
-                    assignment,
-                ) = opt.assignment.clone()
-                {
-                    let object_name = assignment.id.name;
-                    if let Expression::Object(obj) = assignment.init {
-                        for prop in obj.properties.clone() {
-                            let func_name = prop.key.name;
-
-                            if let Expression::Function(fun) =
-                                prop.value
-                            {
-                                let params = fun
-                                    .params
-                                    .into_iter()
-                                    .map(|p| p.key.name.to_string())
-                                    .collect::<Vec<String>>();
-
-                                if let Ok(mut state) =
-                                    self.state.lock()
-                                {
-                                    state.results.push(
-                                        ObjectFunction {
-                                            object: object_name
-                                                .to_string(),
-                                            function: Function {
-                                                name: func_name
-                                                    .to_string(),
-                                                params,
-                                            },
-                                        },
-                                    );
-
-                                    return false;
-                                }
                             }
                         }
                     }

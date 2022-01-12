@@ -1,4 +1,3 @@
-use std::cell::RefCell;
 use std::rc::Rc;
 
 use flux::ast::SourceLocation;
@@ -9,14 +8,9 @@ use lspower::lsp;
 
 use crate::shared::FunctionInfo;
 
-#[derive(Default)]
-pub struct FunctionFinderState {
-    pub functions: Vec<Rc<FunctionInfo>>,
-}
-
 pub struct FunctionFinderVisitor {
     pub pos: lsp::Position,
-    pub state: Rc<RefCell<FunctionFinderState>>,
+    pub functions: Vec<Rc<FunctionInfo>>,
 }
 
 fn create_function_result(
@@ -64,8 +58,7 @@ impl<'a> Visitor<'a> for FunctionFinderVisitor {
                 assgn.id.name.to_string(),
                 &assgn.init,
             ) {
-                let mut state = self.state.borrow_mut();
-                (*state).functions.push(Rc::new(f));
+                self.functions.push(Rc::new(f));
             }
         }
         true

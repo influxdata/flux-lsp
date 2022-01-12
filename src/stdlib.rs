@@ -179,7 +179,7 @@ fn walk_package_functions(
     }
 }
 
-pub fn get_package_functions(name: String) -> Vec<Function> {
+pub fn get_package_functions(name: &str) -> Vec<Function> {
     let mut list = vec![];
 
     if let Some(env) = imports() {
