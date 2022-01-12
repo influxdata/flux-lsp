@@ -109,10 +109,8 @@ impl<'a> Visitor<'a> for NodeFinderVisitor<'a> {
                     parent: Some(Box::new(parent)),
                 });
             } else {
-                self.state.node = Some(NodeFinderNode {
-                    node: node,
-                    parent: None,
-                });
+                self.state.node =
+                    Some(NodeFinderNode { node, parent: None });
             }
         }
 
