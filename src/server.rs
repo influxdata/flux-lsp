@@ -91,13 +91,13 @@ fn function_defines(
 fn is_scope(name: &str, n: walk::Node<'_>) -> bool {
     let mut dvisitor =
         semantic::DefinitionFinderVisitor::new(name.to_string());
-    walk::walk(&mut dvisitor, n.clone());
+    walk::walk(&mut dvisitor, n);
 
     dvisitor.node.is_some()
 }
 
 fn find_references(
-    uri: lsp::Url,
+    uri: &lsp::Url,
     result: NodeFinderResult,
 ) -> Vec<lsp::Location> {
     if let Some(node) = result.node {
@@ -153,8 +153,8 @@ fn create_signature_information(
 }
 
 pub fn find_stdlib_signatures(
-    name: String,
-    package: String,
+    name: &str,
+    package: &str,
 ) -> Vec<lsp::SignatureInformation> {
     stdlib::get_stdlib_functions()
         .into_iter()
@@ -186,8 +186,8 @@ impl LspServerBuilder {
         }
     }
 
-    pub fn build(&self, client: Option<Client>) -> LspServer {
-        LspServer::new(client, self.options.clone())
+    pub fn build(self, client: Option<Client>) -> LspServer {
+        LspServer::new(client, self.options)
     }
 }
 
@@ -532,8 +532,6 @@ impl LanguageServer for LspServer {
     ) -> () {
         if let Some(text) = params.text {
             let key = params.text_document.uri;
-            let k = key.clone();
-            let c = text.clone();
             {
                 let mut store = match self.store.lock() {
                     Ok(value) => value,
@@ -552,9 +550,9 @@ impl LanguageServer for LspServer {
                 );
                     return;
                 }
-                store.insert(key, text);
+                store.insert(key.clone(), text.clone());
             }
-            self.publish_diagnostics(&k, c.as_str()).await;
+            self.publish_diagnostics(&key, text.as_str()).await;
         }
     }
 
@@ -612,15 +610,13 @@ impl LanguageServer for LspServer {
                 if let flux::semantic::nodes::Expression::Member(member) = callee.clone() {
                     let name = member.property.clone();
                     if let flux::semantic::nodes::Expression::Identifier(ident) = member.object.clone() {
-                        // XXX: rockstar (11 Jan 2022) - Symbol should be able to
-                        // be .into() String. When that happens, this `format!`
-                        // can go away.
-                        signatures.extend(find_stdlib_signatures(format!("{}", name), ident.name.to_string()));
+                        signatures.extend(find_stdlib_signatures(&name, &ident.name));
                     }
                 } else if let flux::semantic::nodes::Expression::Identifier(ident) = callee {
                     signatures.extend(find_stdlib_signatures(
-                            ident.name.to_string(),
-                            "builtin".to_string()));
+                        &ident.name,
+                        "builtin",
+                    ));
                     // XXX: rockstar (13 Jul 2021) - Add support for user defined
                     // signatures.
                 } else {
@@ -798,31 +794,28 @@ impl LanguageServer for LspServer {
 
         flux::semantic::walk::walk(&mut visitor, pkg_node);
 
-        let node = visitor.node.clone();
         let path = visitor.path;
 
-        if let Some(node) = node {
+        if let Some(node) = visitor.node {
             let name = match node {
                 walk::Node::Identifier(ident) => {
-                    Some(ident.name.clone())
+                    Some(&ident.name)
                 }
                 walk::Node::IdentifierExpr(ident) => {
-                    Some(ident.name.clone())
+                    Some(&ident.name)
                 }
                 _ => return Ok(None),
             };
 
             if let Some(node_name) = name {
-                let path_iter = path.iter().rev();
-                for n in path_iter {
+                for n in path.iter().rev() {
                     match n {
                         walk::Node::FunctionExpr(_)
                         | walk::Node::Package(_)
                         | walk::Node::File(_) => {
                             if let walk::Node::FunctionExpr(f) = n {
-                                for param in f.params.clone() {
-                                    let name = param.key.name;
-                                    if name != node_name {
+                                for param in &f.params {
+                                    if param.key.name != *node_name {
                                         continue;
                                     }
                                     let location =
@@ -842,7 +835,7 @@ impl LanguageServer for LspServer {
                             );
 
                             if let Some(node) =
-                                definition_visitor.node.clone()
+                                definition_visitor.node
                             {
                                 let location =
                                     convert::node_to_location(
@@ -868,7 +861,7 @@ impl LanguageServer for LspServer {
         params: lsp::RenameParams,
     ) -> RpcResult<Option<lsp::WorkspaceEdit>> {
         let key =
-            params.text_document_position.text_document.uri.clone();
+            params.text_document_position.text_document.uri;
         let maybe_pkg = self.parse_analyze_document(&key)?;
         let pkg = match maybe_pkg {
             Some(pkg) => pkg,
@@ -881,7 +874,7 @@ impl LanguageServer for LspServer {
             params.text_document_position.position,
         );
 
-        let locations = find_references(key.clone(), node);
+        let locations = find_references(&key, node);
         let edits = locations
             .iter()
             .map(|location| lsp::TextEdit {
@@ -919,7 +912,7 @@ impl LanguageServer for LspServer {
             params.text_document_position_params.position,
         );
 
-        let refs = find_references(key, node);
+        let refs = find_references(&key, node);
         Ok(Some(
             refs.iter()
                 .map(|r| lsp::DocumentHighlight {
@@ -948,7 +941,7 @@ impl LanguageServer for LspServer {
             params.text_document_position.position,
         );
 
-        Ok(Some(find_references(key, node)))
+        Ok(Some(find_references(&key, node)))
     }
 
     async fn hover(
@@ -1049,8 +1042,8 @@ impl LanguageServer for LspServer {
 
         let contents = self.get_document(key)?;
 
-        let items = if let Some(ctx) = params.context.clone() {
-            match (ctx.trigger_kind, ctx.trigger_character) {
+        let items = if let Some(ctx) = &params.context {
+            match (ctx.trigger_kind, &ctx.trigger_character) {
                 (
                     lsp::CompletionTriggerKind::TRIGGER_CHARACTER,
                     Some(c),
@@ -1070,7 +1063,7 @@ impl LanguageServer for LspServer {
                     }
                     "(" | "," => completion::find_param_completions(
                         Some(c),
-                        params,
+                        &params,
                         contents.as_str(),
                     ),
                     _ => completion::find_completions(

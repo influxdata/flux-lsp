@@ -50,10 +50,10 @@ impl<'a> Visitor<'a> for FunctionFinderVisitor {
             }
 
             if let Node::VariableAssgn(assgn) = node {
-                let name = assgn.id.name.clone();
+                let name = &assgn.id.name;
 
-                if let Expression::Function(f) = assgn.init.clone() {
-                    if let MonoType::Fun(fun) = f.typ.clone() {
+                if let Expression::Function(f) = &assgn.init {
+                    if let MonoType::Fun(fun) = &f.typ {
                         let mut params = get_argument_names(&fun.req);
                         for opt in get_argument_names(&fun.opt) {
                             params.push(opt);
@@ -72,11 +72,9 @@ impl<'a> Visitor<'a> for FunctionFinderVisitor {
                     assgn,
                 ) = &opt.assignment
                 {
-                    let name = assgn.id.name.clone();
-                    if let Expression::Function(f) =
-                        assgn.init.clone()
-                    {
-                        if let MonoType::Fun(fun) = f.typ.clone() {
+                    let name = &assgn.id.name;
+                    if let Expression::Function(f) = &assgn.init {
+                        if let MonoType::Fun(fun) = &f.typ {
                             let mut params =
                                 get_argument_names(&fun.req);
                             for opt in get_argument_names(&fun.opt) {
@@ -117,19 +115,17 @@ impl<'a> Visitor<'a> for ObjectFunctionFinderVisitor {
     fn visit(&mut self, node: Node<'a>) -> bool {
         match node {
             Node::VariableAssgn(assignment) => {
-                let object_name = assignment.id.name.clone();
+                let object_name = &assignment.id.name;
 
-                if let Expression::Object(obj) =
-                    assignment.init.clone()
-                {
-                    for prop in obj.properties.clone() {
-                        let func_name = prop.key.name;
+                if let Expression::Object(obj) = &assignment.init {
+                    for prop in &obj.properties {
+                        let func_name = &prop.key.name;
 
-                        if let Expression::Function(fun) = prop.value
+                        if let Expression::Function(fun) = &prop.value
                         {
                             let params = fun
                                 .params
-                                .into_iter()
+                                .iter()
                                 .map(|p| p.key.name.to_string())
                                 .collect::<Vec<String>>();
 
@@ -151,19 +147,20 @@ impl<'a> Visitor<'a> for ObjectFunctionFinderVisitor {
             Node::OptionStmt(opt) => {
                 if let flux::semantic::nodes::Assignment::Variable(
                     assignment,
-                ) = opt.assignment.clone()
+                ) = &opt.assignment
                 {
-                    let object_name = assignment.id.name;
-                    if let Expression::Object(obj) = assignment.init {
-                        for prop in obj.properties.clone() {
-                            let func_name = prop.key.name;
+                    let object_name = &assignment.id.name;
+                    if let Expression::Object(obj) = &assignment.init
+                    {
+                        for prop in &obj.properties {
+                            let func_name = &prop.key.name;
 
                             if let Expression::Function(fun) =
-                                prop.value
+                                &prop.value
                             {
                                 let params = fun
                                     .params
-                                    .into_iter()
+                                    .iter()
                                     .map(|p| p.key.name.to_string())
                                     .collect::<Vec<String>>();
 
