@@ -796,37 +796,10 @@ fn walk_package(
                     &head.k.clone().into(),
                     VarType::Array,
                 ),
-                MonoType::Builtin(b) => match b {
-                    BuiltinType::Int => push_var_result(
-                        &head.k.clone().into(),
-                        VarType::Int,
-                    ),
-                    BuiltinType::Float => push_var_result(
-                        &head.k.clone().into(),
-                        VarType::Float,
-                    ),
-                    BuiltinType::Bool => push_var_result(
-                        &head.k.clone().into(),
-                        VarType::Bool,
-                    ),
-                    BuiltinType::Bytes => push_var_result(
-                        &head.k.clone().into(),
-                        VarType::Bytes,
-                    ),
-                    BuiltinType::Duration => push_var_result(
-                        &head.k.clone().into(),
-                        VarType::Duration,
-                    ),
-                    BuiltinType::Regexp => push_var_result(
-                        &head.k.clone().into(),
-                        VarType::Regexp,
-                    ),
-                    BuiltinType::String => push_var_result(
-                        &head.k.clone().into(),
-                        VarType::String,
-                    ),
-                    _ => (),
-                },
+                MonoType::Builtin(b) => push_var_result(
+                    &head.k.clone().into(),
+                    VarType::from(*b),
+                ),
                 _ => (),
             }
 
@@ -1077,33 +1050,9 @@ fn get_builtins(list: &mut Vec<Box<dyn Completable>>) {
                     }))
                 }
                 MonoType::Arr(_) => push_var_result(VarType::Array),
-                MonoType::Builtin(b) => match b {
-                    BuiltinType::String => {
-                        push_var_result(VarType::String)
-                    }
-                    BuiltinType::Int => push_var_result(VarType::Int),
-                    BuiltinType::Float => {
-                        push_var_result(VarType::Float)
-                    }
-                    BuiltinType::Bool => {
-                        push_var_result(VarType::Bool)
-                    }
-                    BuiltinType::Bytes => {
-                        push_var_result(VarType::Bytes)
-                    }
-                    BuiltinType::Duration => {
-                        push_var_result(VarType::Duration)
-                    }
-                    BuiltinType::Uint => {
-                        push_var_result(VarType::Uint)
-                    }
-                    BuiltinType::Regexp => {
-                        push_var_result(VarType::Regexp)
-                    }
-                    BuiltinType::Time => {
-                        push_var_result(VarType::Time)
-                    }
-                },
+                MonoType::Builtin(b) => {
+                    push_var_result(VarType::from(*b))
+                }
                 _ => (),
             }
         }
@@ -1653,6 +1602,22 @@ enum VarType {
     Regexp,
     Uint,
     Time,
+}
+
+impl From<BuiltinType> for VarType {
+    fn from(b: BuiltinType) -> Self {
+        match b {
+            BuiltinType::String => VarType::String,
+            BuiltinType::Int => VarType::Int,
+            BuiltinType::Float => VarType::Float,
+            BuiltinType::Bool => VarType::Bool,
+            BuiltinType::Bytes => VarType::Bytes,
+            BuiltinType::Duration => VarType::Duration,
+            BuiltinType::Uint => VarType::Uint,
+            BuiltinType::Regexp => VarType::Regexp,
+            BuiltinType::Time => VarType::Time,
+        }
+    }
 }
 
 fn create_completion_package_removed(
