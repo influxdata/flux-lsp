@@ -170,7 +170,7 @@ fn walk_package_functions(
 
                 list.push(Function {
                     params,
-                    name: head.k.clone(),
+                    name: head.k.clone().into(),
                 });
             }
 
@@ -189,7 +189,7 @@ pub fn get_package_functions(name: String) -> Vec<Function> {
                     walk_package_functions(
                         key.to_string(),
                         &mut list,
-                        &val.expr,
+                        &val.typ().expr,
                     );
                 }
             }
@@ -211,7 +211,7 @@ fn walk_functions(
                     get_package_name(package.as_str())
                 {
                     list.push(FunctionInfo::new(
-                        head.k.clone(),
+                        head.k.clone().into(),
                         f.as_ref(),
                         package_name,
                     ));
@@ -240,7 +240,11 @@ pub fn get_stdlib_functions() -> Vec<FunctionInfo> {
 
     if let Some(imports) = imports() {
         for (name, val) in imports.iter() {
-            walk_functions(name.to_string(), &mut results, &val.expr);
+            walk_functions(
+                name.to_string(),
+                &mut results,
+                &val.typ().expr,
+            );
         }
     }
 

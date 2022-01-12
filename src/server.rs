@@ -317,6 +317,7 @@ impl LspServer {
                     // are no longer relevant.
                     Ok(_) => Ok(Vec::new()),
                     Err(errors) => Ok(errors
+                        .errors
                         .iter()
                         .map(|e| lsp::Diagnostic {
                             range: convert::ast_to_lsp_range(
@@ -332,7 +333,7 @@ impl LspServer {
                         .collect()),
                 }
             }
-            Err(e) => Err(e),
+            Err(e) => Err(e.into()),
         }
     }
 }
@@ -611,7 +612,10 @@ impl LanguageServer for LspServer {
                 if let flux::semantic::nodes::Expression::Member(member) = callee.clone() {
                     let name = member.property.clone();
                     if let flux::semantic::nodes::Expression::Identifier(ident) = member.object.clone() {
-                        signatures.extend(find_stdlib_signatures(name, ident.name.to_string()));
+                        // XXX: rockstar (11 Jan 2022) - Symbol should be able to
+                        // be .into() String. When that happens, this `format!`
+                        // can go away.
+                        signatures.extend(find_stdlib_signatures(format!("{}", name), ident.name.to_string()));
                     }
                 } else if let flux::semantic::nodes::Expression::Identifier(ident) = callee {
                     signatures.extend(find_stdlib_signatures(

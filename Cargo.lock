@@ -356,6 +356,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "codespan-reporting"
+version = "0.11.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3538270d33cc669650c4b093848450d380def10c331d38c768e34cac80576e6e"
+dependencies = [
+ "termcolor",
+ "unicode-width",
+]
+
+[[package]]
 name = "combinations"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -682,7 +692,7 @@ dependencies = [
 [[package]]
 name = "flux"
 version = "0.5.1"
-source = "git+https://github.com/influxdata/flux?tag=v0.147.0#8c648bac49c8d9f74cec6ca86995b1c31b387e51"
+source = "git+https://github.com/influxdata/flux?tag=v0.148.0#5b80111fa0eecb5454156f88a1e4463d55c47fdb"
 dependencies = [
  "anyhow",
  "flatbuffers",
@@ -693,16 +703,18 @@ dependencies = [
  "serde-aux",
  "serde_derive",
  "serde_json",
+ "thiserror",
  "walkdir",
 ]
 
 [[package]]
 name = "flux-core"
 version = "0.4.0"
-source = "git+https://github.com/influxdata/flux?tag=v0.147.0#8c648bac49c8d9f74cec6ca86995b1c31b387e51"
+source = "git+https://github.com/influxdata/flux?tag=v0.148.0#5b80111fa0eecb5454156f88a1e4463d55c47fdb"
 dependencies = [
  "anyhow",
  "chrono",
+ "codespan-reporting",
  "comrak",
  "csv",
  "derivative",
