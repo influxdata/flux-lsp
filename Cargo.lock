@@ -754,6 +754,7 @@ dependencies = [
  "console_error_panic_hook",
  "console_log",
  "criterion",
+ "env_logger",
  "expect-test",
  "flux",
  "futures",

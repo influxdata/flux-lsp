@@ -41,6 +41,7 @@ fn contains_position(node: Node<'_>, pos: lsp::Position) -> bool {
     true
 }
 
+#[derive(Debug)]
 pub struct NodeFinderVisitor<'a> {
     pub node: Option<Node<'a>>,
     pub position: lsp::Position,
@@ -112,7 +113,7 @@ impl<'a> IdentFinderVisitor<'a> {
 }
 
 pub struct DefinitionFinderVisitor<'a> {
-    pub name: String,
+    pub name: Symbol,
     pub node: Option<Node<'a>>,
 }
 
@@ -120,21 +121,28 @@ impl<'a> Visitor<'a> for DefinitionFinderVisitor<'a> {
     fn visit(&mut self, node: Node<'a>) -> bool {
         match node {
             walk::Node::VariableAssgn(v) => {
-                if *v.id.name == self.name {
-                    self.node = Some(node.clone());
+                if v.id.name == self.name {
+                    self.node = Some(node);
                     return false;
                 }
 
                 true
             }
-            walk::Node::FunctionExpr(_) => false,
+            walk::Node::FunctionParameter(param) => {
+                if param.key.name == self.name {
+                    self.node = Some(node);
+                    return false;
+                }
+
+                true
+            }
             _ => true,
         }
     }
 }
 
 impl<'a> DefinitionFinderVisitor<'a> {
-    pub fn new(name: String) -> DefinitionFinderVisitor<'a> {
+    pub fn new(name: Symbol) -> DefinitionFinderVisitor<'a> {
         DefinitionFinderVisitor { name, node: None }
     }
 }

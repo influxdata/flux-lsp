@@ -1,22 +1,24 @@
-use std::borrow::Cow;
-use std::collections::{hash_map::Entry, HashMap};
-use std::sync::{Arc, Mutex};
+use std::{
+    borrow::Cow,
+    collections::{hash_map::Entry, HashMap},
+    sync::{Arc, Mutex},
+};
 
 use anyhow::Result;
 
-use flux::semantic::walk;
-use flux::semantic::{nodes::FunctionParameter, types::MonoType};
-use lspower::lsp;
-use lspower::LanguageServer;
-use lspower::{
-    jsonrpc::Error as RpcError, jsonrpc::ErrorCode as RpcErrorCode,
-    jsonrpc::Result as RpcResult, Client,
+use flux::semantic::{
+    nodes::FunctionParameter, nodes::Symbol, types::MonoType, walk,
 };
 
-use crate::shared::FunctionSignature;
-use crate::stdlib;
-use crate::visitors::semantic;
-use crate::{completion, convert};
+use lspower::{
+    jsonrpc::Error as RpcError, jsonrpc::ErrorCode as RpcErrorCode,
+    jsonrpc::Result as RpcResult, lsp, Client, LanguageServer,
+};
+
+use crate::{
+    completion, convert, shared::FunctionSignature, stdlib,
+    visitors::semantic,
+};
 
 // The spec talks specifically about setting versions for files, but isn't
 // clear on how those versions are surfaced to the client, if ever. This
@@ -43,7 +45,7 @@ fn parse_and_analyze(
     ) {
         Ok(res) => res,
         Err(e) => {
-            log::debug!("Unable to parse source: {:?}", e);
+            log::debug!("Unable to parse source: {}", e);
             return Ok(None);
         }
     };
@@ -88,9 +90,9 @@ fn function_defines(
     params.iter().any(|param| param.key.name == name)
 }
 
-fn is_scope(name: &str, n: walk::Node<'_>) -> bool {
+fn is_scope(name: &Symbol, n: walk::Node<'_>) -> bool {
     let mut dvisitor =
-        semantic::DefinitionFinderVisitor::new(name.to_string());
+        semantic::DefinitionFinderVisitor::new(name.clone());
     walk::walk(&mut dvisitor, n);
 
     dvisitor.node.is_some()
@@ -792,9 +794,7 @@ impl LanguageServer for LspServer {
             params.text_document_position_params.position,
         );
 
-        flux::semantic::walk::walk(&mut visitor, pkg_node);
-
-        let path = visitor.path;
+        flux::semantic::walk::walk(&mut visitor, pkg_node.clone());
 
         if let Some(node) = visitor.node {
             let name = match node {
@@ -806,48 +806,21 @@ impl LanguageServer for LspServer {
             };
 
             if let Some(node_name) = name {
-                for n in path.iter().rev() {
-                    match n {
-                        walk::Node::FunctionExpr(_)
-                        | walk::Node::Package(_)
-                        | walk::Node::File(_) => {
-                            if let walk::Node::FunctionExpr(f) = n {
-                                for param in &f.params {
-                                    if param.key.name != *node_name {
-                                        continue;
-                                    }
-                                    let location =
-                                        convert::node_to_location(
-                                            &node, key,
-                                        );
-                                    return Ok(Some(lsp::GotoDefinitionResponse::from(location)));
-                                }
-                            }
+                let mut definition_visitor =
+                    semantic::DefinitionFinderVisitor::new(
+                        node_name.clone(),
+                    );
+                flux::semantic::walk::walk(
+                    &mut definition_visitor,
+                    pkg_node,
+                );
 
-                            let mut definition_visitor: semantic::DefinitionFinderVisitor =
-                                semantic::DefinitionFinderVisitor::new(node_name.to_string());
-
-                            flux::semantic::walk::walk(
-                                &mut definition_visitor,
-                                n.clone(),
-                            );
-
-                            if let Some(node) =
-                                definition_visitor.node
-                            {
-                                let location =
-                                    convert::node_to_location(
-                                        &node, key,
-                                    );
-                                return Ok(Some(
-                                    lsp::GotoDefinitionResponse::from(
-                                        location,
-                                    ),
-                                ));
-                            }
-                        }
-                        _ => (),
-                    }
+                if let Some(node) = definition_visitor.node {
+                    let location =
+                        convert::node_to_location(&node, key);
+                    return Ok(Some(
+                        lsp::GotoDefinitionResponse::from(location),
+                    ));
                 }
             }
         }
@@ -1119,7 +1092,7 @@ fn find_node(
 #[cfg(all(test, not(target_arch = "wasm32")))]
 #[allow(deprecated)]
 mod tests {
-    use std::collections::{HashMap, BTreeSet};
+    use std::collections::{BTreeSet, HashMap};
 
     use async_std::test;
     use expect_test::expect;
@@ -1138,6 +1111,7 @@ mod tests {
     }
 
     fn create_server() -> LspServer {
+        let _ = env_logger::try_init();
         LspServerBuilder::default().build(None)
     }
 
@@ -1917,6 +1891,7 @@ errorCounts = from(bucket:"kube-infra/monthly")
                          r.error != "" and
                          r._field == "responseSize" and
                          r.env == env)
+                                // ^
     |> group(columns:["env", "error"])
     |> count()
     |> group(columns:["env", "_stop", "_start"])
@@ -1935,7 +1910,7 @@ errorCounts
                         )
                         .unwrap(),
                     ),
-                    lsp::Position::new(8, 35),
+                    position_of(fluxscript),
                 ),
             work_done_progress_params: lsp::WorkDoneProgressParams {
                 work_done_token: None,
@@ -1966,6 +1941,58 @@ errorCounts
 
         assert_eq!(expected, result);
     }
+
+    #[test]
+    async fn test_goto_definition_shadowed() {
+        let fluxscript = r#"
+env = "prod01-us-west-2"
+
+f = (env) => {
+    return env
+        // ^
+}
+"#;
+        let server = create_server();
+        open_file(&server, fluxscript.to_string()).await;
+
+        let params = lsp::GotoDefinitionParams {
+            text_document_position_params:
+                lsp::TextDocumentPositionParams::new(
+                    lsp::TextDocumentIdentifier::new(
+                        lsp::Url::parse(
+                            "file:///home/user/file.flux",
+                        )
+                        .unwrap(),
+                    ),
+                    position_of(fluxscript),
+                ),
+            work_done_progress_params: lsp::WorkDoneProgressParams {
+                work_done_token: None,
+            },
+            partial_result_params: lsp::PartialResultParams {
+                partial_result_token: None,
+            },
+        };
+
+        let result = server.goto_definition(params).await.unwrap();
+
+        expect![[r#"
+            {
+              "uri": "file:///home/user/file.flux",
+              "range": {
+                "start": {
+                  "line": 3,
+                  "character": 5
+                },
+                "end": {
+                  "line": 3,
+                  "character": 8
+                }
+              }
+            }"#]]
+        .assert_eq(&serde_json::to_string_pretty(&result).unwrap());
+    }
+
     #[test]
     async fn test_rename() {
         let fluxscript = r#"import "strings"
@@ -2203,7 +2230,8 @@ t = (x) => {
                   }
                 }
               }
-            ]"#]].assert_eq(&serde_json::to_string_pretty(&result).unwrap());
+            ]"#]]
+        .assert_eq(&serde_json::to_string_pretty(&result).unwrap());
     }
 
     #[test]
