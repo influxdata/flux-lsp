@@ -1100,14 +1100,16 @@ mod tests {
 
     use super::*;
 
-    fn position_of(s: &str) -> lsp::Position {
-        s.lines().enumerate().find_map(|(line, line_str)| {
+    /// Finds a `// ^` comment in `source` and returns the `lsp::Position` that the comment points
+    /// at
+    fn position_of(source: &str) -> lsp::Position {
+        source.lines().enumerate().find_map(|(line, line_str)| {
             line_str.find("// ^").map(|j| lsp::Position {
                 // The marker is on the line after the position we indicate
                 line: line as u32 - 1,
                 character: (line_str[..j].chars().count() + "// ^".len()) as u32,
             })
-        }).unwrap_or_else(|| panic!("Could not find the position marker `// ^` in `{}`", s))
+        }).unwrap_or_else(|| panic!("Could not find the position marker `// ^` in `{}`", source))
     }
 
     fn create_server() -> LspServer {
