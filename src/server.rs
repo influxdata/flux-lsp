@@ -1119,7 +1119,7 @@ fn find_node(
 #[cfg(all(test, not(target_arch = "wasm32")))]
 #[allow(deprecated)]
 mod tests {
-    use std::collections::{HashMap, HashSet};
+    use std::collections::{BTreeSet, HashMap};
 
     use async_std::test;
     use lspower::{lsp, LanguageServer};
@@ -2469,10 +2469,10 @@ errorCounts
             _ => unreachable!(),
         };
 
-        let got: HashSet<&str> =
+        let got: BTreeSet<&str> =
             items.iter().map(|i| i.label.as_str()).collect();
 
-        let want: HashSet<&str> = vec![
+        let want: BTreeSet<&str> = vec![
             "buckets",
             "cardinality",
             "chandeMomentumOscillator",
@@ -2504,6 +2504,7 @@ errorCounts
             "increase",
             "influxdata/influxdb/schema",
             "influxdata/influxdb/secrets",
+            "internal/location",
             "logarithmicBins",
             "lowestCurrent",
             "reduce",
@@ -2658,10 +2659,10 @@ ab = 10
             _ => unreachable!(),
         };
 
-        let got: HashSet<&str> =
+        let got: BTreeSet<&str> =
             items.iter().map(|i| i.label.as_str()).collect();
 
-        let want: HashSet<&str> = vec![
+        let want: BTreeSet<&str> = vec![
             "aggregateWindow",
             "cardinality",
             "chandeMomentumOscillator",
@@ -2702,6 +2703,7 @@ ab = 10
             "internal/boolean",
             "internal/gen",
             "internal/influxql",
+            "internal/location",
             "interpolate",
             "join",
             "json",
@@ -2930,10 +2932,10 @@ errorCounts
             _ => unreachable!(),
         };
 
-        let got: HashSet<&str> =
+        let got: BTreeSet<&str> =
             items.iter().map(|i| i.label.as_str()).collect();
 
-        let want: HashSet<&str> = vec![
+        let want: BTreeSet<&str> = vec![
             "aggregateWindow",
             "bottom",
             "buckets",
@@ -2989,6 +2991,7 @@ errorCounts
             "int",
             "integral",
             "internal/testutil",
+            "internal/location",
             "interpolate",
             "last",
             "length",
