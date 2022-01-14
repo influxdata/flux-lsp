@@ -1,7 +1,9 @@
 use crate::shared::get_package_name;
 
-use flux::semantic::nodes::Expression;
-use flux::semantic::walk::{self, Node, Visitor};
+use flux::semantic::{
+    nodes::{Expression, Symbol},
+    walk::{self, Node, Visitor},
+};
 use lspower::lsp;
 
 mod completion;
@@ -39,6 +41,7 @@ fn contains_position(node: Node<'_>, pos: lsp::Position) -> bool {
     true
 }
 
+#[derive(Debug)]
 pub struct NodeFinderVisitor<'a> {
     pub node: Option<Node<'a>>,
     pub position: lsp::Position,
@@ -69,7 +72,7 @@ impl<'a> NodeFinderVisitor<'a> {
 }
 
 pub struct IdentFinderVisitor<'a> {
-    pub name: String,
+    pub name: Symbol,
     pub identifiers: Vec<walk::Node<'a>>,
 }
 
@@ -77,20 +80,20 @@ impl<'a> Visitor<'a> for IdentFinderVisitor<'a> {
     fn visit(&mut self, node: walk::Node<'a>) -> bool {
         match node.clone() {
             walk::Node::MemberExpr(m) => {
-                if let Expression::Identifier(i) = m.object.clone() {
-                    if *i.name == self.name {
+                if let Expression::Identifier(i) = &m.object {
+                    if i.name == self.name {
                         return true;
                     }
                 }
                 return false;
             }
             walk::Node::Identifier(n) => {
-                if *n.name == self.name {
+                if n.name == self.name {
                     self.identifiers.push(node.clone());
                 }
             }
             walk::Node::IdentifierExpr(n) => {
-                if *n.name == self.name {
+                if n.name == self.name {
                     self.identifiers.push(node.clone());
                 }
             }
@@ -101,7 +104,7 @@ impl<'a> Visitor<'a> for IdentFinderVisitor<'a> {
 }
 
 impl<'a> IdentFinderVisitor<'a> {
-    pub fn new(name: String) -> IdentFinderVisitor<'a> {
+    pub fn new(name: Symbol) -> IdentFinderVisitor<'a> {
         IdentFinderVisitor {
             name,
             identifiers: vec![],
@@ -110,7 +113,7 @@ impl<'a> IdentFinderVisitor<'a> {
 }
 
 pub struct DefinitionFinderVisitor<'a> {
-    pub name: String,
+    pub name: Symbol,
     pub node: Option<Node<'a>>,
 }
 
@@ -118,21 +121,28 @@ impl<'a> Visitor<'a> for DefinitionFinderVisitor<'a> {
     fn visit(&mut self, node: Node<'a>) -> bool {
         match node {
             walk::Node::VariableAssgn(v) => {
-                if *v.id.name == self.name {
-                    self.node = Some(node.clone());
+                if v.id.name == self.name {
+                    self.node = Some(node);
                     return false;
                 }
 
                 true
             }
-            walk::Node::FunctionExpr(_) => false,
+            walk::Node::FunctionParameter(param) => {
+                if param.key.name == self.name {
+                    self.node = Some(node);
+                    return false;
+                }
+
+                true
+            }
             _ => true,
         }
     }
 }
 
 impl<'a> DefinitionFinderVisitor<'a> {
-    pub fn new(name: String) -> DefinitionFinderVisitor<'a> {
+    pub fn new(name: Symbol) -> DefinitionFinderVisitor<'a> {
         DefinitionFinderVisitor { name, node: None }
     }
 }
