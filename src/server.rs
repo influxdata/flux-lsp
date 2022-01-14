@@ -1119,7 +1119,7 @@ fn find_node(
 #[cfg(all(test, not(target_arch = "wasm32")))]
 #[allow(deprecated)]
 mod tests {
-    use std::collections::{HashMap, BTreeSet};
+    use std::collections::{BTreeSet, HashMap};
 
     use async_std::test;
     use lspower::{lsp, LanguageServer};
