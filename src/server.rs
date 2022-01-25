@@ -2339,15 +2339,12 @@ errorCounts
         }
     }
 
-    #[test]
-    async fn test_hover() {
-        let fluxscript = r#"x = 1
-x + 1
-"#;
+    #[track_caller]
+    async fn test_hover(fluxscript: &str, expected: &str) {
         let server = create_server();
         open_file(&server, fluxscript.to_string()).await;
 
-        let params = hover_params(lsp::Position::new(1, 1));
+        let params = hover_params(position_of(fluxscript));
 
         let result = server.hover(params).await.unwrap();
 
@@ -2355,9 +2352,7 @@ x + 1
             result,
             Some(lsp::Hover {
                 contents: lsp::HoverContents::Scalar(
-                    lsp::MarkedString::String(
-                        "type: int".to_string()
-                    )
+                    lsp::MarkedString::String(expected.to_string())
                 ),
                 range: None,
             })
@@ -2365,143 +2360,82 @@ x + 1
     }
 
     #[test]
-    async fn test_hover_binding() {
-        let fluxscript = r#"x = "asd"
+    async fn test_hover_simple() {
+        test_hover(
+            r#"xyzw = 1
+xyzw + 1
+// ^
+"#,
+            "type: int",
+        )
+        .await;
+    }
+
+    #[test]
+    async fn test_hover_binding_1() {
+        test_hover(
+            r#"
+xyzw = "asd"
+// ^
+"#,
+            "type: string",
+        )
+        .await;
+
+        test_hover(
+            r#"
 builtin builtin_ : (v: int) => int
+        // ^
+"#,
+            "type: (v:int) => int",
+        )
+        .await;
+
+        test_hover(
+            r#"
 option option_ = 123
-1
-"#;
-        let server = create_server();
-        open_file(&server, fluxscript.to_string()).await;
-
-        let result = server
-            .hover(hover_params(lsp::Position::new(0, 1)))
-            .await
-            .unwrap();
-
-        assert_eq!(
-            result,
-            Some(lsp::Hover {
-                contents: lsp::HoverContents::Scalar(
-                    lsp::MarkedString::String(
-                        "type: string".to_string()
-                    )
-                ),
-                range: None,
-            })
-        );
-
-        let result = server
-            .hover(hover_params(lsp::Position::new(1, 12)))
-            .await
-            .unwrap();
-
-        assert_eq!(
-            result,
-            Some(lsp::Hover {
-                contents: lsp::HoverContents::Scalar(
-                    lsp::MarkedString::String(
-                        "type: (v:int) => int".to_string()
-                    )
-                ),
-                range: None,
-            })
-        );
-
-        let result = server
-            .hover(hover_params(lsp::Position::new(2, 10)))
-            .await
-            .unwrap();
-
-        assert_eq!(
-            result,
-            Some(lsp::Hover {
-                contents: lsp::HoverContents::Scalar(
-                    lsp::MarkedString::String(
-                        "type: int".to_string()
-                    )
-                ),
-                range: None,
-            })
-        );
+      // ^
+"#,
+            "type: int",
+        )
+        .await;
     }
 
     #[test]
     async fn test_hover_argument() {
-        let fluxscript = r#"
-(x) => x + 1
-"#;
-        let server = create_server();
-        open_file(&server, fluxscript.to_string()).await;
-
-        let params = hover_params(lsp::Position::new(1, 1));
-
-        let result = server.hover(params).await.unwrap();
-
-        assert_eq!(
-            result,
-            Some(lsp::Hover {
-                contents: lsp::HoverContents::Scalar(
-                    lsp::MarkedString::String(
-                        "type: int".to_string()
-                    )
-                ),
-                range: None,
-            })
-        );
+        test_hover(
+            r#"
+f = (x) => x + 1
+  // ^
+"#,
+            "type: int",
+        )
+        .await;
     }
 
     #[test]
     async fn test_hover_call_property() {
-        let fluxscript = r#"
+        test_hover(
+            r#"
 f = (x) => x + 1
 y = f(x: 1)
    // ^
-"#;
-        let server = create_server();
-        open_file(&server, fluxscript.to_string()).await;
-
-        let params = hover_params(position_of(fluxscript));
-
-        let result = server.hover(params).await.unwrap();
-
-        assert_eq!(
-            result,
-            Some(lsp::Hover {
-                contents: lsp::HoverContents::Scalar(
-                    lsp::MarkedString::String(
-                        "type: int".to_string()
-                    )
-                ),
-                range: None,
-            })
-        );
+"#,
+            "type: int",
+        )
+        .await;
     }
 
     #[test]
     async fn test_hover_record_property() {
-        let fluxscript = r#"
+        test_hover(
+            r#"
 { abc: "" }
 // ^
-"#;
-        let server = create_server();
-        open_file(&server, fluxscript.to_string()).await;
-
-        let params = hover_params(position_of(fluxscript));
-
-        let result = server.hover(params).await.unwrap();
-
-        assert_eq!(
-            result,
-            Some(lsp::Hover {
-                contents: lsp::HoverContents::Scalar(
-                    lsp::MarkedString::String(
-                        "type: string".to_string()
-                    )
-                ),
-                range: None,
-            })
-        );
+"#,
+            "type: string",
+        )
+        .await;
     }
 
     #[test]
