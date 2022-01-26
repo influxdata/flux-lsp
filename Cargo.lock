@@ -692,7 +692,7 @@ dependencies = [
 [[package]]
 name = "flux"
 version = "0.5.1"
-source = "git+https://github.com/influxdata/flux?tag=v0.150.1#7da5c2d32884577f449ca6629e33d8ec720918bd"
+source = "git+https://github.com/influxdata/flux?tag=v0.151.0#4db5fa9f19517cbcd6fe5d651c80067f4bd681e8"
 dependencies = [
  "anyhow",
  "flatbuffers",
@@ -710,7 +710,7 @@ dependencies = [
 [[package]]
 name = "flux-core"
 version = "0.4.0"
-source = "git+https://github.com/influxdata/flux?tag=v0.150.1#7da5c2d32884577f449ca6629e33d8ec720918bd"
+source = "git+https://github.com/influxdata/flux?tag=v0.151.0#4db5fa9f19517cbcd6fe5d651c80067f4bd681e8"
 dependencies = [
  "anyhow",
  "chrono",
