@@ -797,31 +797,26 @@ impl LanguageServer for LspServer {
         flux::semantic::walk::walk(&mut visitor, pkg_node.clone());
 
         if let Some(node) = visitor.node {
-            let name = match node {
-                walk::Node::Identifier(ident) => Some(&ident.name),
-                walk::Node::IdentifierExpr(ident) => {
-                    Some(&ident.name)
-                }
+            let node_name = match node {
+                walk::Node::Identifier(ident) => &ident.name,
+                walk::Node::IdentifierExpr(ident) => &ident.name,
                 _ => return Ok(None),
             };
 
-            if let Some(node_name) = name {
-                let mut definition_visitor =
-                    semantic::DefinitionFinderVisitor::new(
-                        node_name.clone(),
-                    );
-                flux::semantic::walk::walk(
-                    &mut definition_visitor,
-                    pkg_node,
+            let mut definition_visitor =
+                semantic::DefinitionFinderVisitor::new(
+                    node_name.clone(),
                 );
+            flux::semantic::walk::walk(
+                &mut definition_visitor,
+                pkg_node,
+            );
 
-                if let Some(node) = definition_visitor.node {
-                    let location =
-                        convert::node_to_location(&node, key);
-                    return Ok(Some(
-                        lsp::GotoDefinitionResponse::from(location),
-                    ));
-                }
+            if let Some(node) = definition_visitor.node {
+                let location = convert::node_to_location(&node, key);
+                return Ok(Some(lsp::GotoDefinitionResponse::from(
+                    location,
+                )));
             }
         }
         Ok(None)
@@ -1942,6 +1937,55 @@ errorCounts
             });
 
         assert_eq!(expected, result);
+    }
+
+    #[test]
+    async fn test_goto_definition_builtin() {
+        let fluxscript = r#"
+builtin func : (x: A) => A
+
+func(x: 1)
+// ^
+"#;
+        let server = create_server();
+        open_file(&server, fluxscript.to_string()).await;
+
+        let params = lsp::GotoDefinitionParams {
+            text_document_position_params:
+                lsp::TextDocumentPositionParams::new(
+                    lsp::TextDocumentIdentifier::new(
+                        lsp::Url::parse(
+                            "file:///home/user/file.flux",
+                        )
+                        .unwrap(),
+                    ),
+                    position_of(fluxscript),
+                ),
+            work_done_progress_params: lsp::WorkDoneProgressParams {
+                work_done_token: None,
+            },
+            partial_result_params: lsp::PartialResultParams {
+                partial_result_token: None,
+            },
+        };
+
+        let result = server.goto_definition(params).await.unwrap();
+
+        expect_test::expect![[r#"
+            {
+              "uri": "file:///home/user/file.flux",
+              "range": {
+                "start": {
+                  "line": 1,
+                  "character": 8
+                },
+                "end": {
+                  "line": 1,
+                  "character": 12
+                }
+              }
+            }"#]]
+        .assert_eq(&serde_json::to_string_pretty(&result).unwrap());
     }
 
     #[test]
