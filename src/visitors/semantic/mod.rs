@@ -128,6 +128,14 @@ impl<'a> Visitor<'a> for DefinitionFinderVisitor<'a> {
 
                 true
             }
+            walk::Node::BuiltinStmt(v) => {
+                if v.id.name == self.name {
+                    self.node = Some(walk::Node::Identifier(&v.id));
+                    return false;
+                }
+
+                true
+            }
             walk::Node::FunctionParameter(param) => {
                 if param.key.name == self.name {
                     self.node = Some(node);
