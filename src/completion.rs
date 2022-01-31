@@ -1654,7 +1654,7 @@ fn create_completion_package_removed(
         })
         .collect();
 
-    match analyze(pkg) {
+    match analyze(&pkg) {
         Ok(p) => Ok(p),
         Err(e) => Err(format!("ERROR IS HERE {}", e)),
     }
@@ -1704,7 +1704,7 @@ where
         })
         .collect();
 
-    match analyze(ast_pkg) {
+    match analyze(&ast_pkg) {
         Ok(p) => Ok(p),
         Err(e) => Err(format!("{}", e)),
     }
