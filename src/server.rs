@@ -319,6 +319,7 @@ impl LspServer {
                     // are no longer relevant.
                     Ok(_) => Ok(Vec::new()),
                     Err(errors) => Ok(errors
+                        .error
                         .errors
                         .iter()
                         .map(|e| lsp::Diagnostic {
@@ -3121,6 +3122,7 @@ errorCounts
             "experimental/bigtable",
             "experimental/bitwise",
             "experimental/http",
+            "experimental/http/requests",
             "experimental/mqtt",
             "experimental/prometheus",
             "experimental/table",
