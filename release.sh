@@ -25,7 +25,7 @@ if [[ ! $(command -v hub) ]]; then
     echo "Please install the hub tool and re-run."
     exit 1
 fi
-if [[ ! -f $HOME/.config/hub ]]; then
+if [[ ! -f $HOME/.config/hub && "${GITHUB_TOKEN}" == "" ]]; then
     echo "Please authenticate your hub command. See https://github.com/github/hub/issues/2655#issuecomment-735836048"
     exit 1
 fi
