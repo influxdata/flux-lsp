@@ -946,6 +946,11 @@ impl LanguageServer for LspServer {
                             Some(builtin.typ_expr.expr.clone())
                         }
 
+                        // The type of an property identifier is the type of the value
+                        walk::Node::Property(property) => {
+                            Some(property.value.type_of())
+                        }
+
                         // The type Function parameters can be derived from the function type
                         // stored in the function expression
                         walk::Node::FunctionParameter(_) => {
@@ -2484,6 +2489,59 @@ option option_ = 123
                 contents: lsp::HoverContents::Scalar(
                     lsp::MarkedString::String(
                         "type: int".to_string()
+                    )
+                ),
+                range: None,
+            })
+        );
+    }
+
+    #[test]
+    async fn test_hover_call_property() {
+        let fluxscript = r#"
+f = (x) => x + 1
+y = f(x: 1)
+   // ^
+"#;
+        let server = create_server();
+        open_file(&server, fluxscript.to_string()).await;
+
+        let params = hover_params(position_of(fluxscript));
+
+        let result = server.hover(params).await.unwrap();
+
+        assert_eq!(
+            result,
+            Some(lsp::Hover {
+                contents: lsp::HoverContents::Scalar(
+                    lsp::MarkedString::String(
+                        "type: int".to_string()
+                    )
+                ),
+                range: None,
+            })
+        );
+    }
+
+    #[test]
+    async fn test_hover_record_property() {
+        let fluxscript = r#"
+{ abc: "" }
+// ^
+"#;
+        let server = create_server();
+        open_file(&server, fluxscript.to_string()).await;
+
+        let params = hover_params(position_of(fluxscript));
+
+        let result = server.hover(params).await.unwrap();
+
+        assert_eq!(
+            result,
+            Some(lsp::Hover {
+                contents: lsp::HoverContents::Scalar(
+                    lsp::MarkedString::String(
+                        "type: string".to_string()
                     )
                 ),
                 range: None,
