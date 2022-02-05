@@ -25,10 +25,13 @@ pub fn initLog() {
 struct MessageProcessor {
     handlers: Vec<js_sys::Function>,
     messages: MessageStream,
+    running: bool,
 }
 
 impl MessageProcessor {
     async fn process(mut self) {
+        self.running = true;
+
         // Watch for any messages generated in the service and send them to the client
         while let Some(msg) = self.messages.next().await {
             match serde_json::to_string(&msg) {
@@ -50,6 +53,9 @@ impl MessageProcessor {
     }
     /// Fire the message handlers with the server message.
     fn fire(&self, msg: &str) {
+        if !self.running {
+            panic!("Attempted to fire message handlers while server is not running")
+        }
         for handler in self.handlers.iter() {
             // Set the context to `undefined` explicitly, so the error
             // message on `this` usage is clear.
@@ -82,6 +88,7 @@ impl Default for Lsp {
             processor: Some(MessageProcessor {
                 handlers: vec![],
                 messages,
+                running: false,
             }),
             service,
         }
