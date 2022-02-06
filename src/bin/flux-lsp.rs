@@ -5,7 +5,7 @@ use clap::{App, Arg};
 use lspower::{LspService, Server};
 use simplelog::{CombinedLogger, Config, LevelFilter, WriteLogger};
 
-use flux_lsp::LspServerBuilder;
+use flux_lsp::LspServer;
 
 #[async_std::main]
 async fn main() {
@@ -14,16 +14,12 @@ async fn main() {
         .author("Flux Developers <flux-developers@influxdata.com>")
         .about("LSP server for the Flux programming language")
         .arg(
-            Arg::with_name("disable_folding")
-                .long("disable-folding")
-                .help("Turn folding off (used for editors with built-in folding")
-                .takes_value(false))
-        .arg(
             Arg::with_name("log_file")
-            .short("l")
-            .long("log-file")
-            .help("Path to write a debug log file")
-            .takes_value(true))
+                .short("l")
+                .long("log-file")
+                .help("Path to write a debug log file")
+                .takes_value(true),
+        )
         .get_matches();
 
     if matches.is_present("log_file") {
@@ -40,19 +36,12 @@ async fn main() {
         .unwrap();
     }
 
-    let disable_folding = matches.is_present("disable_folding");
-
     log::debug!("Starting lsp client");
     let stdin = async_std::io::stdin();
     let stdout = async_std::io::stdout();
 
-    let (service, messages) = LspService::new(|client| {
-        let mut builder = LspServerBuilder::default();
-        if disable_folding {
-            builder = builder.disable_folding();
-        }
-        builder.build(Some(client))
-    });
+    let (service, messages) =
+        LspService::new(|client| LspServer::new(Some(client)));
     Server::new(stdin, stdout)
         .interleave(messages)
         .serve(service)
