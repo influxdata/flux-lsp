@@ -172,51 +172,17 @@ pub fn find_stdlib_signatures(
         })
 }
 
-#[derive(Clone)]
-struct LspServerOptions {
-    folding: bool,
-}
-
-pub struct LspServerBuilder {
-    options: LspServerOptions,
-}
-
-impl LspServerBuilder {
-    pub fn disable_folding(self) -> Self {
-        Self {
-            options: LspServerOptions { folding: false },
-        }
-    }
-
-    pub fn build(self, client: Option<Client>) -> LspServer {
-        LspServer::new(client, self.options)
-    }
-}
-
-impl Default for LspServerBuilder {
-    fn default() -> Self {
-        LspServerBuilder {
-            options: LspServerOptions { folding: true },
-        }
-    }
-}
-
 #[allow(dead_code)]
 pub struct LspServer {
     client: Arc<Mutex<Option<Client>>>,
     store: FileStore,
-    options: LspServerOptions,
 }
 
 impl LspServer {
-    fn new(
-        client: Option<Client>,
-        options: LspServerOptions,
-    ) -> Self {
+    pub fn new(client: Option<Client>) -> Self {
         Self {
             client: Arc::new(Mutex::new(client)),
             store: Arc::new(Mutex::new(HashMap::new())),
-            options,
         }
     }
 
@@ -385,9 +351,7 @@ impl LanguageServer for LspServer {
                 execute_command_provider: None,
                 experimental: None,
                 folding_range_provider: Some(
-                    lsp::FoldingRangeProviderCapability::Simple(
-                        self.options.folding,
-                    ),
+                    lsp::FoldingRangeProviderCapability::Simple(true),
                 ),
                 hover_provider: Some(
                     lsp::HoverProviderCapability::Simple(true),
@@ -1115,7 +1079,7 @@ mod tests {
 
     fn create_server() -> LspServer {
         let _ = env_logger::try_init();
-        LspServerBuilder::default().build(None)
+        LspServer::new(None)
     }
 
     async fn open_file(server: &LspServer, text: String) {

@@ -17,4 +17,4 @@ mod wasm;
 #[macro_use]
 extern crate pretty_assertions;
 
-pub use server::LspServerBuilder;
+pub use server::LspServer;

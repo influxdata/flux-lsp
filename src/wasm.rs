@@ -9,7 +9,7 @@ use tower_service::Service;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::future_to_promise;
 
-use crate::LspServerBuilder;
+use crate::LspServer;
 
 /// Initialize logging - this requires the "console_log" feature to function,
 /// as this library adds 180k to the wasm binary being shipped.
@@ -75,8 +75,7 @@ impl Default for Lsp {
 
         let (service, messages) =
             lspower::LspService::new(|client| {
-                let builder = LspServerBuilder::default();
-                builder.build(Some(client))
+                LspServer::new(Some(client))
             });
         Lsp {
             processor: Some(MessageProcessor {
