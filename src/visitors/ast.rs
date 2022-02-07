@@ -121,3 +121,173 @@ impl From<&Package> for PackageInfo {
         }
     }
 }
+
+pub(crate) const SEMANTIC_TOKEN_KEYWORD: u32 = 0;
+pub(crate) const SEMANTIC_TOKEN_NUMBER: u32 = 1;
+pub(crate) const SEMANTIC_TOKEN_STRING: u32 = 2;
+
+#[derive(Clone, Default)]
+pub struct SemanticTokenVisitor {
+    pub tokens: Vec<lsp::SemanticToken>,
+}
+
+impl<'a> Visitor<'a> for SemanticTokenVisitor {
+    fn visit(&mut self, node: walk::Node<'a>) -> bool {
+        match node {
+            walk::Node::PackageClause(node) => {
+                let delta_line = node.base.location.start.line;
+                let delta_start = node.base.location.start.column;
+                let length = 7; // Length of "package"
+                self.tokens.push(lsp::SemanticToken {
+                    delta_line,
+                    delta_start,
+                    length,
+                    token_type: SEMANTIC_TOKEN_KEYWORD,
+                    token_modifiers_bitset: 0,
+                });
+
+                // Identifier itself is just too broad. Manually handle
+                // the case for the string identifier.
+                self.tokens.push(lsp::SemanticToken {
+                    delta_line: node.name.base.location.start.line,
+                    delta_start: node.name.base.location.start.column,
+                    length: node.name.base.location.end.column
+                        - node.name.base.location.start.column,
+                    token_type: SEMANTIC_TOKEN_STRING,
+                    token_modifiers_bitset: 0,
+                });
+            }
+            walk::Node::ImportDeclaration(node) => {
+                let delta_line = node.base.location.start.line;
+                let delta_start = node.base.location.start.column;
+                let length = 6; // Length of "import"
+                self.tokens.push(lsp::SemanticToken {
+                    delta_line,
+                    delta_start,
+                    length,
+                    token_type: SEMANTIC_TOKEN_KEYWORD,
+                    token_modifiers_bitset: 0,
+                });
+            }
+            walk::Node::IntegerLit(node) => {
+                let delta_line = node.base.location.start.line;
+                let delta_start = node.base.location.start.column;
+                let length = node.base.location.end.column
+                    - node.base.location.start.column;
+                self.tokens.push(lsp::SemanticToken {
+                    delta_line,
+                    delta_start,
+                    length,
+                    token_type: SEMANTIC_TOKEN_NUMBER,
+                    token_modifiers_bitset: 0,
+                });
+            }
+            walk::Node::FloatLit(node) => {
+                let delta_line = node.base.location.start.line;
+                let delta_start = node.base.location.start.column;
+                let length = node.base.location.end.column
+                    - node.base.location.start.column;
+                self.tokens.push(lsp::SemanticToken {
+                    delta_line,
+                    delta_start,
+                    length,
+                    token_type: SEMANTIC_TOKEN_NUMBER,
+                    token_modifiers_bitset: 0,
+                });
+            }
+            walk::Node::StringLit(node) => {
+                let delta_line = node.base.location.start.line;
+                let delta_start = node.base.location.start.column;
+                let length = node.base.location.end.column
+                    - node.base.location.start.column;
+                self.tokens.push(lsp::SemanticToken {
+                    delta_line,
+                    delta_start,
+                    length,
+                    token_type: SEMANTIC_TOKEN_STRING,
+                    token_modifiers_bitset: 0,
+                });
+            }
+            walk::Node::DurationLit(node) => {
+                let delta_line = node.base.location.start.line;
+                let delta_start = node.base.location.start.column;
+                let length = node.base.location.end.column
+                    - node.base.location.start.column;
+                self.tokens.push(lsp::SemanticToken {
+                    delta_line,
+                    delta_start,
+                    length,
+                    token_type: SEMANTIC_TOKEN_NUMBER,
+                    token_modifiers_bitset: 0,
+                });
+            }
+            walk::Node::UintLit(node) => {
+                let delta_line = node.base.location.start.line;
+                let delta_start = node.base.location.start.column;
+                let length = node.base.location.end.column
+                    - node.base.location.start.column;
+                self.tokens.push(lsp::SemanticToken {
+                    delta_line,
+                    delta_start,
+                    length,
+                    token_type: SEMANTIC_TOKEN_NUMBER,
+                    token_modifiers_bitset: 0,
+                });
+            }
+            walk::Node::DateTimeLit(node) => {
+                let delta_line = node.base.location.start.line;
+                let delta_start = node.base.location.start.column;
+                let length = node.base.location.end.column
+                    - node.base.location.start.column;
+                self.tokens.push(lsp::SemanticToken {
+                    delta_line,
+                    delta_start,
+                    length,
+                    token_type: SEMANTIC_TOKEN_NUMBER,
+                    token_modifiers_bitset: 0,
+                });
+            }
+            // These statements are internal to flux developement.
+            walk::Node::TestCaseStmt(node) => {
+                let delta_line = node.base.location.start.line;
+                let delta_start = node.base.location.start.column;
+                let length = 7; // Length of "builtin"
+                self.tokens.push(lsp::SemanticToken {
+                    delta_line,
+                    delta_start,
+                    length,
+                    token_type: SEMANTIC_TOKEN_KEYWORD,
+                    token_modifiers_bitset: 0,
+                });
+            }
+            walk::Node::TestStmt(node) => {
+                let delta_line = node.base.location.start.line;
+                let delta_start = node.base.location.start.column;
+                let length = 4; // Length of "test"
+                self.tokens.push(lsp::SemanticToken {
+                    delta_line,
+                    delta_start,
+                    length,
+                    token_type: SEMANTIC_TOKEN_KEYWORD,
+                    token_modifiers_bitset: 0,
+                });
+            }
+            walk::Node::BuiltinStmt(node) => {
+                let delta_line = node.base.location.start.line;
+                let delta_start = node.base.location.start.column;
+                let length = 8; // Length of "testcase"
+                self.tokens.push(lsp::SemanticToken {
+                    delta_line,
+                    delta_start,
+                    length,
+                    token_type: SEMANTIC_TOKEN_KEYWORD,
+                    token_modifiers_bitset: 0,
+                });
+            }
+            _ => {
+                println!("{}", node);
+            }
+        }
+        true
+    }
+}
