@@ -41,8 +41,10 @@ fn parse_and_analyze(
     ) {
         Ok(res) => res,
         Err(e) => {
-            log::debug!("Unable to parse source: {}", e);
-            return Ok(None);
+            if e.value.is_none() {
+                log::debug!("Unable to parse source: {}", e);
+            }
+            return Ok(e.value.map(|(_, sem_pkg)| sem_pkg));
         }
     };
     Ok(Some(sem_pkg))
@@ -612,12 +614,16 @@ impl LanguageServer for LspServer {
         // are currently unsupported, as they were unsupported in the previous
         // version of the server. They should be implemented, as it presents a
         // much better user interface.
-        let response = lsp::SignatureHelp {
-            signatures,
-            active_signature: None,
-            active_parameter: None,
+        let response = if signatures.is_empty() {
+            None
+        } else {
+            Some(lsp::SignatureHelp {
+                signatures,
+                active_signature: None,
+                active_parameter: None,
+            })
         };
-        Ok(Some(response))
+        Ok(response)
     }
 
     async fn formatting(
@@ -718,7 +724,11 @@ impl LanguageServer for LspServer {
             })
         }
 
-        Ok(Some(results))
+        Ok(if results.is_empty() {
+            None
+        } else {
+            Some(results)
+        })
     }
 
     async fn document_symbol(
@@ -750,9 +760,13 @@ impl LanguageServer for LspServer {
             }
         });
 
-        let response = lsp::DocumentSymbolResponse::Flat(symbols);
+        let response = if symbols.is_empty() {
+            None
+        } else {
+            Some(lsp::DocumentSymbolResponse::Flat(symbols))
+        };
 
-        Ok(Some(response))
+        Ok(response)
     }
 
     async fn goto_definition(
@@ -885,7 +899,12 @@ impl LanguageServer for LspServer {
             params.text_document_position.position,
         );
 
-        Ok(Some(find_references(&key, node)))
+        let references = find_references(&key, node);
+        Ok(if references.is_empty() {
+            None
+        } else {
+            Some(references)
+        })
     }
 
     async fn hover(
@@ -2542,6 +2561,34 @@ y = f(x: 1)
     }
 
     #[test]
+    async fn test_hover_on_semantic_error() {
+        let fluxscript = r#"
+y = 1 + ""
+x = 1
+1 + x
+ // ^
+"#;
+        let server = create_server();
+        open_file(&server, fluxscript.to_string()).await;
+
+        let params = hover_params(position_of(fluxscript));
+
+        let result = server.hover(params).await.unwrap();
+
+        assert_eq!(
+            result,
+            Some(lsp::Hover {
+                contents: lsp::HoverContents::Scalar(
+                    lsp::MarkedString::String(
+                        "type: int".to_string()
+                    )
+                ),
+                range: None,
+            })
+        );
+    }
+
+    #[test]
     async fn test_completion_resolve() {
         let fluxscript = r#"import "strings"#;
         let server = create_server();
@@ -3285,7 +3332,7 @@ errorCounts
         };
 
         let result = server.signature_help(params).await;
-        assert!(matches!(result, Ok(None)));
+        assert_eq!(result, Ok(None));
     }
 
     #[test]
@@ -3308,7 +3355,7 @@ errorCounts
         };
 
         let result = server.folding_range(params).await;
-        assert!(matches!(result, Ok(None)));
+        assert_eq!(result, Ok(None));
     }
 
     #[test]
@@ -3331,7 +3378,7 @@ errorCounts
         };
         let result = server.document_symbol(params).await;
 
-        assert!(matches!(result, Ok(None)));
+        assert_eq!(result, Ok(None));
     }
 
     #[test]
@@ -3396,7 +3443,7 @@ errorCounts
 
         let result = server.references(params.clone()).await;
 
-        assert!(matches!(result, Ok(None)));
+        assert_eq!(result, Ok(None));
     }
 
     #[test]

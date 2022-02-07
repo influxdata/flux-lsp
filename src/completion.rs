@@ -1,6 +1,5 @@
 use std::sync::{Arc, Mutex};
 
-use flux::analyze;
 use flux::ast::walk::walk;
 use flux::ast::walk::Node as AstNode;
 use flux::ast::{Expression, Package, PropertyKey, SourceLocation};
@@ -90,7 +89,7 @@ pub fn find_completions(
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 enum CompletionType {
     Generic,
     Logical(flux::ast::Operator),
@@ -100,7 +99,7 @@ enum CompletionType {
     Bad,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 struct CompletionInfo {
     completion_type: CompletionType,
     ident: String,
@@ -125,6 +124,7 @@ impl CompletionInfo {
             NodeFinderVisitor::new(move_back(position, 1));
 
         walk(&mut visitor, walker);
+        dbg!(&visitor.node);
 
         let package = PackageInfo::from(&pkg);
 
@@ -1649,10 +1649,21 @@ fn create_completion_package_removed(
 
     // XXX: rockstar (5 Feb 2022) - This is the cause of issue #391. This should
     // bubble up and emit some diagnostic messages.
-    match analyze(&pkg) {
-        Ok(p) => Some(p),
-        Err(_) => None,
+    if let Ok(mut analyzer) = flux::new_semantic_analyzer(
+        flux::semantic::AnalyzerConfig::default(),
+    ) {
+        match analyzer.analyze_ast(&pkg) {
+            Ok((_, p)) => return Some(p),
+            Err(e) => {
+                if let Some((_, pkg)) = e.value {
+                    return Some(pkg);
+                } else {
+                    return None;
+                }
+            }
+        }
     }
+    None
 }
 
 fn create_completion_package(
@@ -1701,10 +1712,21 @@ where
 
     // XXX: rockstar (5 Feb 2022) - This is the cause of issue #391. This should
     // bubble up and emit some diagnostic messages.
-    match analyze(&ast_pkg) {
-        Ok(p) => Some(p),
-        Err(_) => None,
+    if let Ok(mut analyzer) = flux::new_semantic_analyzer(
+        flux::semantic::AnalyzerConfig::default(),
+    ) {
+        match analyzer.analyze_ast(&ast_pkg) {
+            Ok((_, p)) => return Some(p),
+            Err(e) => {
+                if let Some((_, pkg)) = e.value {
+                    return Some(pkg);
+                } else {
+                    return None;
+                }
+            }
+        }
     }
+    None
 }
 
 #[derive(Clone)]

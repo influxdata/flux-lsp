@@ -63,7 +63,7 @@ impl<'a> Visitor<'a> for CallFinderVisitor<'a> {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct NodeFinderNode<'a> {
     pub node: walk::Node<'a>,
     pub parent: Option<Box<NodeFinderNode<'a>>>,
@@ -105,7 +105,7 @@ impl<'a> Visitor<'a> for NodeFinderVisitor<'a> {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct PackageInfo {
     pub name: String,
     pub position: lsp::Position,
