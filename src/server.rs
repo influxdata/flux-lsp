@@ -1005,10 +1005,10 @@ impl LanguageServer for LspServer {
                         // completion will live, e.g. buckets, measurements and
                         // tag keys/values. There are multiple issues open to support
                         // this functionality open currently.
-                        Ok(lsp::CompletionList {
+                        lsp::CompletionList {
                             is_incomplete: false,
                             items: vec![],
-                        })
+                        }
                     }
                     "(" | "," => completion::find_param_completions(
                         Some(c),
@@ -1027,17 +1027,6 @@ impl LanguageServer for LspServer {
             }
         } else {
             completion::find_completions(params, contents.as_str())
-        };
-
-        let items = match items {
-            Ok(items) => items,
-            Err(e) => {
-                log::warn!(
-                    "failed to get completion items: {}",
-                    e.msg
-                );
-                return Ok(None);
-            }
         };
 
         let response = lsp::CompletionResponse::List(items);
