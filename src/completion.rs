@@ -26,29 +26,12 @@ use crate::visitors::semantic::{
 
 const PRELUDE_PACKAGE: &str = "prelude";
 
-#[derive(Debug)]
-pub struct Error {
-    pub msg: String,
-}
-
-impl From<String> for Error {
-    fn from(s: String) -> Error {
-        Error { msg: s }
-    }
-}
-
-impl From<Error> for String {
-    fn from(err: Error) -> String {
-        err.msg
-    }
-}
-
 pub fn find_completions(
     params: lsp::CompletionParams,
     contents: &str,
-) -> Result<lsp::CompletionList, Error> {
+) -> lsp::CompletionList {
     let uri = &params.text_document_position.text_document.uri;
-    let info = CompletionInfo::create(&params, contents)?;
+    let info = CompletionInfo::create(&params, contents);
 
     let mut items: Vec<lsp::CompletionItem> = vec![];
 
@@ -62,7 +45,7 @@ pub fn find_completions(
                 items.append(&mut stdlib_matches);
 
                 let mut user_matches =
-                    get_user_matches(info, contents)?;
+                    get_user_matches(info, contents);
 
                 items.append(&mut user_matches);
             }
@@ -75,11 +58,8 @@ pub fn find_completions(
             CompletionType::Import => {
                 let infos = stdlib::get_package_infos();
 
-                let imports = get_imports_removed(
-                    uri,
-                    info.position,
-                    contents,
-                )?;
+                let imports =
+                    get_imports_removed(uri, info.position, contents);
 
                 let mut items = vec![];
                 for info in infos {
@@ -92,10 +72,10 @@ pub fn find_completions(
                     }
                 }
 
-                return Ok(lsp::CompletionList {
+                return lsp::CompletionList {
                     is_incomplete: false,
                     items,
-                });
+                };
             }
             CompletionType::ObjectMember(_obj) => {
                 return find_dot_completions(params, contents);
@@ -104,10 +84,10 @@ pub fn find_completions(
         }
     }
 
-    Ok(lsp::CompletionList {
+    lsp::CompletionList {
         is_incomplete: false,
         items,
-    })
+    }
 }
 
 #[derive(Clone)]
@@ -134,7 +114,7 @@ impl CompletionInfo {
     fn create(
         params: &lsp::CompletionParams,
         source: &str,
-    ) -> Result<Option<CompletionInfo>, String> {
+    ) -> Option<CompletionInfo> {
         let uri = &params.text_document_position.text_document.uri;
         let position = params.text_document_position.position;
 
@@ -155,7 +135,7 @@ impl CompletionInfo {
                         if let Expression::Identifier(obj) =
                             me.object.clone()
                         {
-                            return Ok(Some(CompletionInfo {
+                            return Some(CompletionInfo {
                                 completion_type:
                                     CompletionType::ObjectMember(
                                         obj.name.clone(),
@@ -165,28 +145,28 @@ impl CompletionInfo {
                                 uri: uri.clone(),
                                 imports: get_imports_removed(
                                     uri, position, source,
-                                )?,
+                                ),
                                 package: Some(package),
-                            }));
+                            });
                         }
                     }
                     AstNode::ImportDeclaration(_id) => {
-                        return Ok(Some(CompletionInfo {
+                        return Some(CompletionInfo {
                             completion_type: CompletionType::Import,
                             ident: "".to_string(),
                             position,
                             uri: uri.clone(),
                             imports: get_imports_removed(
                                 uri, position, source,
-                            )?,
+                            ),
                             package: Some(package),
-                        }));
+                        });
                     }
                     AstNode::BinaryExpr(be) => match &be.left {
                         Expression::Identifier(left) => {
                             let name = &left.name;
 
-                            return Ok(Some(CompletionInfo {
+                            return Some(CompletionInfo {
                                 completion_type:
                                     CompletionType::Logical(
                                         be.operator.clone(),
@@ -196,9 +176,9 @@ impl CompletionInfo {
                                 uri: uri.clone(),
                                 imports: get_imports(
                                     uri, position, source,
-                                )?,
+                                ),
                                 package: Some(package),
-                            }));
+                            });
                         }
                         Expression::Member(left) => {
                             if let Expression::Identifier(ident) =
@@ -216,7 +196,7 @@ impl CompletionInfo {
                                 let name =
                                     format!("{}.{}", ident.name, key);
 
-                                return Ok(Some(CompletionInfo {
+                                return Some(CompletionInfo {
                                     completion_type:
                                         CompletionType::Logical(
                                             be.operator.clone(),
@@ -226,9 +206,9 @@ impl CompletionInfo {
                                     uri: uri.clone(),
                                     imports: get_imports(
                                         uri, position, source,
-                                    )?,
+                                    ),
                                     package: Some(package),
-                                }));
+                                });
                             }
                         }
                         _ => {}
@@ -260,7 +240,7 @@ impl CompletionInfo {
                             if let Expression::Identifier(func) =
                                 &call.callee
                             {
-                                return Ok(Some(CompletionInfo {
+                                return Some(CompletionInfo {
                                     completion_type:
                                         CompletionType::CallProperty(
                                             func.name.clone(),
@@ -270,9 +250,9 @@ impl CompletionInfo {
                                     uri: uri.clone(),
                                     imports: get_imports(
                                         uri, position, source,
-                                    )?,
+                                    ),
                                     package: Some(package),
-                                }));
+                                });
                             }
                         }
                     }
@@ -284,7 +264,7 @@ impl CompletionInfo {
                         {
                             let name = &left.name;
 
-                            return Ok(Some(CompletionInfo {
+                            return Some(CompletionInfo {
                                 completion_type:
                                     CompletionType::Logical(
                                         be.operator.clone(),
@@ -294,42 +274,42 @@ impl CompletionInfo {
                                 uri: uri.clone(),
                                 imports: get_imports(
                                     uri, position, source,
-                                )?,
+                                ),
                                 package: Some(package),
-                            }));
+                            });
                         }
                     }
                     AstNode::Identifier(ident) => {
                         let name = ident.name.clone();
-                        return Ok(Some(CompletionInfo {
+                        return Some(CompletionInfo {
                             completion_type: CompletionType::Generic,
                             ident: name,
                             position,
                             uri: uri.clone(),
                             imports: get_imports(
                                 uri, position, source,
-                            )?,
+                            ),
                             package: Some(package),
-                        }));
+                        });
                     }
                     AstNode::BadExpr(expr) => {
                         let name = expr.text.clone();
-                        return Ok(Some(CompletionInfo {
+                        return Some(CompletionInfo {
                             completion_type: CompletionType::Bad,
                             ident: name,
                             position,
                             uri: uri.clone(),
                             imports: get_imports(
                                 uri, position, source,
-                            )?,
+                            ),
                             package: Some(package),
-                        }));
+                        });
                     }
                     AstNode::MemberExpr(mbr) => {
                         if let Expression::Identifier(ident) =
                             &mbr.object
                         {
-                            return Ok(Some(CompletionInfo {
+                            return Some(CompletionInfo {
                                 completion_type:
                                     CompletionType::Generic,
                                 ident: ident.name.clone(),
@@ -337,16 +317,16 @@ impl CompletionInfo {
                                 uri: uri.clone(),
                                 imports: get_imports(
                                     uri, position, source,
-                                )?,
+                                ),
                                 package: Some(package),
-                            }));
+                            });
                         }
                     }
                     AstNode::CallExpr(c) => {
                         if let Some(Expression::Identifier(ident)) =
                             c.arguments.last()
                         {
-                            return Ok(Some(CompletionInfo {
+                            return Some(CompletionInfo {
                                 completion_type:
                                     CompletionType::Generic,
                                 ident: ident.name.clone(),
@@ -354,9 +334,9 @@ impl CompletionInfo {
                                 uri: uri.clone(),
                                 imports: get_imports(
                                     uri, position, source,
-                                )?,
+                                ),
                                 package: Some(package),
-                            }));
+                            });
                         }
                     }
                     _ => {}
@@ -364,7 +344,7 @@ impl CompletionInfo {
             }
         }
 
-        Ok(None)
+        None
     }
 }
 
@@ -372,28 +352,35 @@ fn get_imports(
     uri: &lsp::Url,
     pos: lsp::Position,
     contents: &str,
-) -> Result<Vec<Import>, String> {
-    let pkg = create_completion_package(uri, pos, contents)?;
-    let walker = flux::semantic::walk::Node::Package(&pkg);
-    let mut visitor = ImportFinderVisitor::default();
+) -> Vec<Import> {
+    if let Some(pkg) = create_completion_package(uri, pos, contents) {
+        let walker = flux::semantic::walk::Node::Package(&pkg);
+        let mut visitor = ImportFinderVisitor::default();
 
-    flux::semantic::walk::walk(&mut visitor, walker);
+        flux::semantic::walk::walk(&mut visitor, walker);
+        return visitor.imports;
+    }
 
-    Ok(visitor.imports)
+    vec![]
 }
 
 fn get_imports_removed(
     uri: &lsp::Url,
     pos: lsp::Position,
     contents: &str,
-) -> Result<Vec<Import>, String> {
-    let pkg = create_completion_package_removed(uri, pos, contents)?;
-    let walker = flux::semantic::walk::Node::Package(&pkg);
-    let mut visitor = ImportFinderVisitor::default();
+) -> Vec<Import> {
+    if let Some(pkg) =
+        create_completion_package_removed(uri, pos, contents)
+    {
+        let walker = flux::semantic::walk::Node::Package(&pkg);
+        let mut visitor = ImportFinderVisitor::default();
 
-    flux::semantic::walk::walk(&mut visitor, walker);
+        flux::semantic::walk::walk(&mut visitor, walker);
 
-    Ok(visitor.imports)
+        return visitor.imports;
+    }
+
+    vec![]
 }
 
 fn move_back(position: lsp::Position, count: u32) -> lsp::Position {
@@ -406,12 +393,12 @@ fn move_back(position: lsp::Position, count: u32) -> lsp::Position {
 fn get_user_matches(
     info: CompletionInfo,
     contents: &str,
-) -> Result<Vec<lsp::CompletionItem>, Error> {
+) -> Vec<lsp::CompletionItem> {
     let completables = get_user_completables(
         info.uri.clone(),
         info.position,
         contents,
-    )?;
+    );
 
     let mut result: Vec<lsp::CompletionItem> = vec![];
     for x in completables {
@@ -420,7 +407,7 @@ fn get_user_matches(
         }
     }
 
-    Ok(result)
+    result
 }
 
 fn get_trigger(params: lsp::CompletionParams) -> Option<String> {
@@ -434,10 +421,10 @@ fn get_trigger(params: lsp::CompletionParams) -> Option<String> {
 pub fn find_dot_completions(
     params: lsp::CompletionParams,
     contents: &str,
-) -> Result<lsp::CompletionList, Error> {
+) -> lsp::CompletionList {
     let uri = &params.text_document_position.text_document.uri;
     let pos = params.text_document_position.position;
-    let info = CompletionInfo::create(&params, contents)?;
+    let info = CompletionInfo::create(&params, contents);
 
     if let Some(info) = info {
         let mut list = vec![];
@@ -454,7 +441,7 @@ pub fn find_dot_completions(
             pos,
             uri,
             contents,
-        )?;
+        );
 
         for completable in obj_results.into_iter() {
             items.push(completable.completion_item(info.clone()));
@@ -464,16 +451,16 @@ pub fn find_dot_completions(
             items.push(item.completion_item(info.clone()));
         }
 
-        return Ok(lsp::CompletionList {
+        return lsp::CompletionList {
             is_incomplete: false,
             items,
-        });
+        };
     }
 
-    Ok(lsp::CompletionList {
+    lsp::CompletionList {
         is_incomplete: false,
         items: vec![],
-    })
+    }
 }
 
 fn new_string_arg_completion(
@@ -512,20 +499,19 @@ fn get_user_completables(
     uri: lsp::Url,
     pos: lsp::Position,
     contents: &str,
-) -> Result<Vec<Arc<dyn Completable>>, Error> {
-    let pkg = create_completion_package(&uri, pos, contents)?;
-    let walker = flux::semantic::walk::Node::Package(&pkg);
-    let mut visitor = CompletableFinderVisitor::new(pos);
+) -> Vec<Arc<dyn Completable>> {
+    if let Some(pkg) = create_completion_package(&uri, pos, contents)
+    {
+        let walker = flux::semantic::walk::Node::Package(&pkg);
+        let mut visitor = CompletableFinderVisitor::new(pos);
 
-    flux::semantic::walk::walk(&mut visitor, walker);
+        flux::semantic::walk::walk(&mut visitor, walker);
 
-    if let Ok(state) = visitor.state.lock() {
-        return Ok((*state).completables.clone());
+        if let Ok(state) = visitor.state.lock() {
+            return (*state).completables.clone();
+        };
     }
-
-    Err(Error {
-        msg: "failed to get completables".to_string(),
-    })
+    vec![]
 }
 
 fn get_stdlib_matches(
@@ -547,7 +533,7 @@ pub fn find_param_completions(
     trigger: Option<&str>,
     params: &lsp::CompletionParams,
     source: &str,
-) -> Result<lsp::CompletionList, Error> {
+) -> lsp::CompletionList {
     let uri = &params.text_document_position.text_document.uri;
     let position = params.text_document_position.position;
 
@@ -569,15 +555,13 @@ pub fn find_param_completions(
                 &provided,
             ));
 
-            if let Ok(user_functions) =
-                get_user_functions(uri, position, source)
-            {
-                items.extend(get_function_params(
-                    ident.name.as_str(),
-                    user_functions,
-                    &provided,
-                ));
-            }
+            let user_functions =
+                get_user_functions(uri, position, source);
+            items.extend(get_function_params(
+                ident.name.as_str(),
+                user_functions,
+                &provided,
+            ));
         }
         if let Expression::Member(me) = &call.callee {
             if let Expression::Identifier(ident) = &me.object {
@@ -589,7 +573,7 @@ pub fn find_param_completions(
                     position,
                     ident.name.as_str(),
                     source,
-                )?;
+                );
 
                 let key = match &me.property {
                     PropertyKey::Identifier(i) => &i.name,
@@ -611,13 +595,13 @@ pub fn find_param_completions(
         }
     }
 
-    Ok(lsp::CompletionList {
+    lsp::CompletionList {
         is_incomplete: false,
         items: items
             .into_iter()
             .map(|x| new_param_completion(x, trigger))
             .collect(),
-    })
+    }
 }
 
 fn get_specific_package_functions(
@@ -651,14 +635,19 @@ fn get_specific_object(
     pos: lsp::Position,
     uri: &lsp::Url,
     contents: &str,
-) -> Result<Vec<Arc<dyn Completable>>, Error> {
-    let pkg = create_completion_package_removed(uri, pos, contents)?;
-    let walker = flux::semantic::walk::Node::Package(&pkg);
-    let mut visitor = CompletableObjectFinderVisitor::new(name);
+) -> Vec<Arc<dyn Completable>> {
+    if let Some(pkg) =
+        create_completion_package_removed(uri, pos, contents)
+    {
+        let walker = flux::semantic::walk::Node::Package(&pkg);
+        let mut visitor = CompletableObjectFinderVisitor::new(name);
 
-    flux::semantic::walk::walk(&mut visitor, walker);
+        flux::semantic::walk::walk(&mut visitor, walker);
 
-    Ok(visitor.completables.clone())
+        return visitor.completables.clone();
+    }
+
+    vec![]
 }
 
 fn get_provided_arguments(call: &flux::ast::CallExpr) -> Vec<String> {
@@ -698,14 +687,16 @@ fn get_user_functions(
     uri: &lsp::Url,
     pos: lsp::Position,
     source: &str,
-) -> Result<Vec<Function>, Error> {
-    let pkg = create_completion_package(uri, pos, source)?;
-    let walker = flux::semantic::walk::Node::Package(&pkg);
-    let mut visitor = FunctionFinderVisitor::new(pos);
+) -> Vec<Function> {
+    if let Some(pkg) = create_completion_package(uri, pos, source) {
+        let walker = flux::semantic::walk::Node::Package(&pkg);
+        let mut visitor = FunctionFinderVisitor::new(pos);
 
-    flux::semantic::walk::walk(&mut visitor, walker);
+        flux::semantic::walk::walk(&mut visitor, walker);
 
-    Ok(visitor.functions.clone())
+        return visitor.functions.clone();
+    }
+    vec![]
 }
 
 fn get_object_functions(
@@ -713,19 +704,21 @@ fn get_object_functions(
     pos: lsp::Position,
     object: &str,
     contents: &str,
-) -> Result<Vec<Function>, Error> {
-    let pkg = create_completion_package(uri, pos, contents)?;
-    let walker = flux::semantic::walk::Node::Package(&pkg);
-    let mut visitor = ObjectFunctionFinderVisitor::default();
+) -> Vec<Function> {
+    if let Some(pkg) = create_completion_package(uri, pos, contents) {
+        let walker = flux::semantic::walk::Node::Package(&pkg);
+        let mut visitor = ObjectFunctionFinderVisitor::default();
 
-    flux::semantic::walk::walk(&mut visitor, walker);
+        flux::semantic::walk::walk(&mut visitor, walker);
 
-    Ok(visitor
-        .results
-        .into_iter()
-        .filter(|obj| obj.object == object)
-        .map(|obj| obj.function)
-        .collect())
+        return visitor
+            .results
+            .into_iter()
+            .filter(|obj| obj.object == object)
+            .map(|obj| obj.function)
+            .collect();
+    }
+    vec![]
 }
 
 fn new_param_completion(
@@ -1624,7 +1617,7 @@ fn create_completion_package_removed(
     uri: &lsp::Url,
     pos: lsp::Position,
     contents: &str,
-) -> Result<flux::semantic::nodes::Package, String> {
+) -> Option<flux::semantic::nodes::Package> {
     let mut file = parse_string("".to_string(), contents);
 
     file.imports = file
@@ -1654,9 +1647,11 @@ fn create_completion_package_removed(
         })
         .collect();
 
+    // XXX: rockstar (5 Feb 2022) - This is the cause of issue #391. This should
+    // bubble up and emit some diagnostic messages.
     match analyze(&pkg) {
-        Ok(p) => Ok(p),
-        Err(e) => Err(format!("ERROR IS HERE {}", e)),
+        Ok(p) => Some(p),
+        Err(_) => None,
     }
 }
 
@@ -1664,7 +1659,7 @@ fn create_completion_package(
     uri: &lsp::Url,
     pos: lsp::Position,
     contents: &str,
-) -> Result<flux::semantic::nodes::Package, String> {
+) -> Option<flux::semantic::nodes::Package> {
     create_filtered_package(uri, contents, |x| {
         valid_node(x.base(), pos)
     })
@@ -1681,7 +1676,7 @@ fn create_filtered_package<F>(
     uri: &lsp::Url,
     contents: &str,
     mut filter: F,
-) -> Result<flux::semantic::nodes::Package, String>
+) -> Option<flux::semantic::nodes::Package>
 where
     F: FnMut(&flux::ast::Statement) -> bool,
 {
@@ -1704,9 +1699,11 @@ where
         })
         .collect();
 
+    // XXX: rockstar (5 Feb 2022) - This is the cause of issue #391. This should
+    // bubble up and emit some diagnostic messages.
     match analyze(&ast_pkg) {
-        Ok(p) => Ok(p),
-        Err(e) => Err(format!("{}", e)),
+        Ok(p) => Some(p),
+        Err(_) => None,
     }
 }
 
