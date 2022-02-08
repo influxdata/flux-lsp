@@ -692,7 +692,7 @@ dependencies = [
 [[package]]
 name = "flux"
 version = "0.5.1"
-source = "git+https://github.com/influxdata/flux?tag=v0.152.0#7a01fff54085c97bf3099f929846edff63f05ed2"
+source = "git+https://github.com/influxdata/flux?tag=v0.153.0#f4b59734c0e21d475a08526534b1cd782a27f10f"
 dependencies = [
  "anyhow",
  "flatbuffers",
@@ -710,7 +710,7 @@ dependencies = [
 [[package]]
 name = "flux-core"
 version = "0.4.0"
-source = "git+https://github.com/influxdata/flux?tag=v0.152.0#7a01fff54085c97bf3099f929846edff63f05ed2"
+source = "git+https://github.com/influxdata/flux?tag=v0.153.0#f4b59734c0e21d475a08526534b1cd782a27f10f"
 dependencies = [
  "anyhow",
  "chrono",
@@ -725,6 +725,7 @@ dependencies = [
  "fnv",
  "libflate",
  "log",
+ "lsp-types",
  "maplit",
  "once_cell",
  "pad",

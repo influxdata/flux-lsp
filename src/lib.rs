@@ -6,7 +6,6 @@
     clippy::wildcard_imports
 )]
 mod completion;
-mod convert;
 mod server;
 mod shared;
 mod stdlib;
