@@ -124,7 +124,6 @@ impl CompletionInfo {
             NodeFinderVisitor::new(move_back(position, 1));
 
         walk(&mut visitor, walker);
-        dbg!(&visitor.node);
 
         let package = PackageInfo::from(&pkg);
 
