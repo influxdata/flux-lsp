@@ -12,8 +12,7 @@ use lspower::{
 };
 
 use crate::{
-    completion, convert, shared::FunctionSignature, stdlib,
-    visitors::semantic,
+    completion, shared::FunctionSignature, stdlib, visitors::semantic,
 };
 
 // The spec talks specifically about setting versions for files, but isn't
@@ -46,6 +45,19 @@ fn parse_and_analyze(
         }
     };
     Ok(Some(sem_pkg))
+}
+
+/// Convert a flux::semantic::walk::Node to a lsp::Location
+/// https://microsoft.github.io/language-server-protocol/specification#location
+fn node_to_location(
+    node: &flux::semantic::walk::Node,
+    uri: lsp::Url,
+) -> lsp::Location {
+    let node_location = node.loc().clone();
+    lsp::Location {
+        uri,
+        range: node_location.into(),
+    }
 }
 
 /// Take a lsp::Range that contains a start and end lsp::Position, find the
@@ -131,7 +143,7 @@ fn find_references(
         let locations: Vec<lsp::Location> = visitor
             .identifiers
             .iter()
-            .map(|node| convert::node_to_location(node, uri.clone()))
+            .map(|node| node_to_location(node, uri.clone()))
             .collect();
         locations
     } else {
@@ -285,9 +297,7 @@ impl LspServer {
                         .errors
                         .iter()
                         .map(|e| lsp::Diagnostic {
-                            range: convert::ast_to_lsp_range(
-                                &e.location,
-                            ),
+                            range: e.location.clone().into(),
                             severity: Some(
                                 lsp::DiagnosticSeverity::ERROR,
                             ),
@@ -792,7 +802,7 @@ impl LanguageServer for LspServer {
             );
 
             if let Some(node) = definition_visitor.node {
-                let location = convert::node_to_location(&node, key);
+                let location = node_to_location(&node, key);
                 return Ok(Some(lsp::GotoDefinitionResponse::from(
                     location,
                 )));
