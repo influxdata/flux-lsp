@@ -22,6 +22,15 @@ jobs:
           name: "run cargo tests"
           command: cargo test --locked
 
+  bench-test:
+    docker:
+      - image: quay.io/influxdb/wasm-build
+    steps:
+      - checkout
+      - run:
+          name: "run cargo bench"
+          command: cargo bench
+
   wasm-test:
     docker:
       - image: quay.io/influxdb/wasm-build
@@ -74,6 +83,7 @@ workflows:
       - wasm-build
       - test
       - wasm-test
+      - bench-test
 
   build-and-deploy:
     jobs:
