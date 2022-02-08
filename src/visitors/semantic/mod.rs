@@ -170,7 +170,7 @@ impl<'a> Visitor<'a> for FoldFinderVisitor<'a> {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Import {
     pub path: String,
     pub initial_name: Option<String>,
