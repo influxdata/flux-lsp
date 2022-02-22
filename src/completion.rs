@@ -6,7 +6,9 @@ use flux::ast::{Expression, Package, PropertyKey, SourceLocation};
 use flux::parser::parse_string;
 use flux::semantic::nodes::CallExpr;
 use flux::semantic::nodes::Expression as SemanticExpression;
-use flux::semantic::types::{BuiltinType, MonoType, Record};
+use flux::semantic::types::{
+    BuiltinType, CollectionType, MonoType, Record,
+};
 use flux::semantic::walk::Visitor as SemanticVisitor;
 use flux::{imports, prelude};
 use lspower::lsp;
@@ -784,10 +786,14 @@ fn walk_package(
                         package_name: get_package_name(package),
                     }));
                 }
-                MonoType::Arr(_) => push_var_result(
-                    &head.k.clone().into(),
-                    VarType::Array,
-                ),
+                MonoType::Collection(c) => {
+                    if c.collection == CollectionType::Array {
+                        push_var_result(
+                            &head.k.clone().into(),
+                            VarType::Array,
+                        )
+                    }
+                }
                 MonoType::Builtin(b) => push_var_result(
                     &head.k.clone().into(),
                     VarType::from(*b),
@@ -1041,7 +1047,11 @@ fn get_builtins(list: &mut Vec<Box<dyn Completable>>) {
                         optional_args: get_argument_names(&f.opt),
                     }))
                 }
-                MonoType::Arr(_) => push_var_result(VarType::Array),
+                MonoType::Collection(c) => {
+                    if c.collection == CollectionType::Array {
+                        push_var_result(VarType::Array)
+                    }
+                }
                 MonoType::Builtin(b) => {
                     push_var_result(VarType::from(*b))
                 }
@@ -1455,7 +1465,10 @@ enum CompletionVarType {
 impl CompletionVarType {
     pub fn from_monotype(typ: &MonoType) -> Option<Self> {
         Some(match typ {
-            MonoType::Arr(_) => CompletionVarType::Array,
+            MonoType::Collection(c) => match c.collection {
+                CollectionType::Array => CompletionVarType::Array,
+                _ => return None,
+            },
             MonoType::Builtin(b) => match b {
                 BuiltinType::Duration => CompletionVarType::Duration,
                 BuiltinType::Int => CompletionVarType::Int,
