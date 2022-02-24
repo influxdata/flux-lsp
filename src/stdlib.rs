@@ -1,6 +1,4 @@
-use crate::shared::{
-    get_argument_names, get_package_name, Function, FunctionInfo,
-};
+use crate::shared::{get_package_name, Function, FunctionInfo};
 
 use flux::imports;
 use flux::prelude;
@@ -169,15 +167,7 @@ fn walk_package_functions(list: &mut Vec<Function>, t: &MonoType) {
     if let MonoType::Record(record) = t {
         for head in record_fields(record) {
             if let MonoType::Fun(f) = &head.v {
-                let mut params = vec![];
-
-                params.extend(get_argument_names(&f.req));
-                params.extend(get_argument_names(&f.opt));
-
-                list.push(Function {
-                    params,
-                    name: head.k.clone().into(),
-                });
+                list.push(Function::new(head.k.clone().into(), f));
             }
         }
     }
@@ -258,13 +248,7 @@ pub fn get_builtin_functions() -> Vec<Function> {
     if let Some(env) = prelude() {
         for (key, val) in env.iter() {
             if let MonoType::Fun(f) = &val.expr {
-                let mut params = get_argument_names(&f.req);
-                params.extend(get_argument_names(&f.opt));
-
-                list.push(Function {
-                    name: key.to_string(),
-                    params,
-                })
+                list.push(Function::new(key.to_string(), f));
             }
         }
     }
