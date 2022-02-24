@@ -183,14 +183,8 @@ impl CompletionInfo {
                             if let Expression::Identifier(ident) =
                                 &left.object
                             {
-                                let key = match &left.property {
-                                    PropertyKey::Identifier(
-                                        ident,
-                                    ) => &ident.name,
-                                    PropertyKey::StringLit(lit) => {
-                                        &lit.value
-                                    }
-                                };
+                                let key =
+                                    property_key_str(&left.property);
 
                                 let name =
                                     format!("{}.{}", ident.name, key);
@@ -226,14 +220,7 @@ impl CompletionInfo {
                             grandparent.node,
                             greatgrandparent.node,
                         ) {
-                            let name = match &prop.key {
-                                PropertyKey::Identifier(ident) => {
-                                    &ident.name
-                                }
-                                PropertyKey::StringLit(lit) => {
-                                    &lit.value
-                                }
-                            };
+                            let name = property_key_str(&prop.key);
 
                             if let Expression::Identifier(func) =
                                 &call.callee
@@ -243,7 +230,7 @@ impl CompletionInfo {
                                         CompletionType::CallProperty(
                                             func.name.clone(),
                                         ),
-                                    ident: name.clone(),
+                                    ident: name.to_owned(),
                                     position,
                                     uri: uri.clone(),
                                     imports: get_imports(
@@ -337,6 +324,13 @@ impl CompletionInfo {
         }
 
         None
+    }
+}
+
+fn property_key_str(p: &PropertyKey) -> &str {
+    match p {
+        PropertyKey::Identifier(i) => &i.name,
+        PropertyKey::StringLit(l) => &l.value,
     }
 }
 
@@ -567,19 +561,16 @@ pub fn find_param_completions(
                     source,
                 );
 
-                let key = match &me.property {
-                    PropertyKey::Identifier(i) => &i.name,
-                    PropertyKey::StringLit(l) => &l.value,
-                };
+                let key = property_key_str(&me.property);
 
                 items.extend(get_function_params(
-                    key.as_str(),
+                    key,
                     package_functions,
                     &provided,
                 ));
 
                 items.extend(get_function_params(
-                    key.as_str(),
+                    key,
                     object_functions,
                     &provided,
                 ));
