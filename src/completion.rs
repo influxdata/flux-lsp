@@ -534,47 +534,50 @@ pub fn find_param_completions(
     if let Some(AstNode::CallExpr(call)) = visitor.node {
         let provided = get_provided_arguments(call);
 
-        if let Expression::Identifier(ident) = &call.callee {
-            items.extend(get_function_params(
-                ident.name.as_str(),
-                stdlib::get_builtin_functions(),
-                &provided,
-            ));
-
-            let user_functions =
-                get_user_functions(uri, position, source);
-            items.extend(get_function_params(
-                ident.name.as_str(),
-                user_functions,
-                &provided,
-            ));
-        }
-        if let Expression::Member(me) = &call.callee {
-            if let Expression::Identifier(ident) = &me.object {
-                let package_functions =
-                    stdlib::get_package_functions(&ident.name);
-
-                let object_functions = get_object_functions(
-                    uri,
-                    position,
-                    ident.name.as_str(),
-                    source,
-                );
-
-                let key = property_key_str(&me.property);
-
+        match &call.callee {
+            Expression::Identifier(ident) => {
                 items.extend(get_function_params(
-                    key,
-                    package_functions,
+                    ident.name.as_str(),
+                    stdlib::get_builtin_functions(),
                     &provided,
                 ));
 
+                let user_functions =
+                    get_user_functions(uri, position, source);
                 items.extend(get_function_params(
-                    key,
-                    object_functions,
+                    ident.name.as_str(),
+                    user_functions,
                     &provided,
                 ));
             }
+            Expression::Member(me) => {
+                if let Expression::Identifier(ident) = &me.object {
+                    let package_functions =
+                        stdlib::get_package_functions(&ident.name);
+
+                    let object_functions = get_object_functions(
+                        uri,
+                        position,
+                        ident.name.as_str(),
+                        source,
+                    );
+
+                    let key = property_key_str(&me.property);
+
+                    items.extend(get_function_params(
+                        key,
+                        package_functions,
+                        &provided,
+                    ));
+
+                    items.extend(get_function_params(
+                        key,
+                        object_functions,
+                        &provided,
+                    ));
+                }
+            }
+            _ => (),
         }
     }
 
