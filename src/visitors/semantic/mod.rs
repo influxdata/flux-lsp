@@ -188,7 +188,7 @@ impl<'a> Visitor<'a> for ImportFinderVisitor {
             let alias = match import.alias.clone() {
                 Some(alias) => alias.name.to_string(),
                 None => get_package_name(import.path.value.as_str())
-                    .unwrap_or_else(|| "")
+                    .unwrap_or_default()
                     .to_owned(),
             };
 
