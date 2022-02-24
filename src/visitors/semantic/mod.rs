@@ -188,7 +188,8 @@ impl<'a> Visitor<'a> for ImportFinderVisitor {
             let alias = match import.alias.clone() {
                 Some(alias) => alias.name.to_string(),
                 None => get_package_name(import.path.value.as_str())
-                    .unwrap_or_else(|| "".to_string()),
+                    .unwrap_or_else(|| "")
+                    .to_owned(),
             };
 
             self.imports.push(Import {
@@ -196,7 +197,8 @@ impl<'a> Visitor<'a> for ImportFinderVisitor {
                 alias,
                 initial_name: get_package_name(
                     import.path.value.as_str(),
-                ),
+                )
+                .map(|s| s.to_owned()),
             });
         }
 

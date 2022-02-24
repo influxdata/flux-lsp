@@ -136,10 +136,9 @@ pub fn get_package_infos() -> Vec<PackageInfo> {
 
     if let Some(env) = imports() {
         for (path, _val) in env.iter() {
-            let name = get_package_name(path);
-            if let Some(name) = name {
+            if let Some(name) = get_package_name(path) {
                 result.push(PackageInfo {
-                    name,
+                    name: name.into(),
                     path: path.to_string(),
                 })
             }
@@ -207,7 +206,7 @@ fn walk_functions(
                     list.push(FunctionInfo::new(
                         head.k.clone().into(),
                         f.as_ref(),
-                        package_name,
+                        package_name.into(),
                     ));
                 }
             }

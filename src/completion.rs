@@ -760,7 +760,8 @@ fn walk_package(
                     name: name.to_owned(),
                     var_type,
                     package: package.into(),
-                    package_name: get_package_name(package),
+                    package_name: get_package_name(package)
+                        .map(|s| s.to_owned()),
                 }));
             };
 
@@ -1020,10 +1021,9 @@ fn add_package_result(
     name: &str,
     list: &mut Vec<Box<dyn Completable>>,
 ) {
-    let package_name = get_package_name(name);
-    if let Some(package_name) = package_name {
+    if let Some(package_name) = get_package_name(name) {
         list.push(Box::new(PackageResult {
-            name: package_name,
+            name: package_name.into(),
             full_name: name.to_string(),
         }));
     }
