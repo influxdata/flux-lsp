@@ -148,11 +148,7 @@ pub fn get_package_infos() -> Vec<PackageInfo> {
     result
 }
 
-fn walk_package_functions(
-    package: String,
-    list: &mut Vec<Function>,
-    t: &MonoType,
-) {
+fn walk_package_functions(list: &mut Vec<Function>, t: &MonoType) {
     if let MonoType::Record(record) = t {
         if let Record::Extension { head, tail } = record.as_ref() {
             if let MonoType::Fun(f) = &head.v {
@@ -167,7 +163,7 @@ fn walk_package_functions(
                 });
             }
 
-            walk_package_functions(package, list, tail);
+            walk_package_functions(list, tail);
         }
     }
 }
@@ -180,7 +176,6 @@ pub fn get_package_functions(name: &str) -> Vec<Function> {
             if let Some(package_name) = get_package_name(key) {
                 if package_name == name {
                     walk_package_functions(
-                        key.to_string(),
                         &mut list,
                         &val.typ().expr,
                     );
