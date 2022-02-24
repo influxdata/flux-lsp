@@ -1,4 +1,4 @@
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use flux::ast::walk::walk;
 use flux::ast::walk::Node as AstNode;
@@ -493,9 +493,7 @@ fn get_user_completables(
 
         flux::semantic::walk::walk(&mut visitor, walker);
 
-        if let Ok(state) = visitor.state.lock() {
-            return (*state).completables.clone();
-        };
+        return visitor.completables;
     }
     vec![]
 }
@@ -1023,14 +1021,9 @@ fn add_package_result(
     }
 }
 
-#[derive(Default)]
-struct CompletableFinderState {
-    completables: Vec<Arc<dyn Completable>>,
-}
-
 struct CompletableFinderVisitor {
     pos: lsp::Position,
-    state: Arc<Mutex<CompletableFinderState>>,
+    completables: Vec<Arc<dyn Completable>>,
 }
 
 impl<'a> SemanticVisitor<'a> for CompletableFinderVisitor {
@@ -1038,74 +1031,68 @@ impl<'a> SemanticVisitor<'a> for CompletableFinderVisitor {
         &mut self,
         node: flux::semantic::walk::Node<'a>,
     ) -> bool {
-        if let Ok(mut state) = self.state.lock() {
-            let loc = node.loc();
+        let loc = node.loc();
 
-            if defined_after(loc, self.pos) {
-                return true;
+        if defined_after(loc, self.pos) {
+            return true;
+        }
+
+        if let flux::semantic::walk::Node::ImportDeclaration(id) =
+            node
+        {
+            if let Some(alias) = id.alias.clone() {
+                self.completables.push(Arc::new(
+                    ImportAliasResult::new(
+                        id.path.value.clone(),
+                        alias.name.to_string(),
+                    ),
+                ));
+            }
+        }
+
+        if let flux::semantic::walk::Node::VariableAssgn(assgn) = node
+        {
+            let name = assgn.id.name.clone();
+            if let Some(var_type) = get_var_type(&assgn.init) {
+                self.completables.push(Arc::new(
+                    CompletionVarResult {
+                        var_type,
+                        name: name.to_string(),
+                    },
+                ));
             }
 
-            if let flux::semantic::walk::Node::ImportDeclaration(id) =
-                node
+            if let Some(fun) =
+                create_function_result(name.to_string(), &assgn.init)
             {
-                if let Some(alias) = id.alias.clone() {
-                    (*state).completables.push(Arc::new(
-                        ImportAliasResult::new(
-                            id.path.value.clone(),
-                            alias.name.to_string(),
-                        ),
-                    ));
-                }
+                self.completables.push(Arc::new(fun));
             }
+        }
 
-            if let flux::semantic::walk::Node::VariableAssgn(assgn) =
-                node
+        if let flux::semantic::walk::Node::OptionStmt(opt) = node {
+            if let flux::semantic::nodes::Assignment::Variable(
+                var_assign,
+            ) = &opt.assignment
             {
-                let name = assgn.id.name.clone();
-                if let Some(var_type) = get_var_type(&assgn.init) {
-                    (*state).completables.push(Arc::new(
+                let name = var_assign.id.name.clone();
+                if let Some(var_type) = get_var_type(&var_assign.init)
+                {
+                    self.completables.push(Arc::new(
                         CompletionVarResult {
-                            var_type,
                             name: name.to_string(),
+                            var_type,
                         },
                     ));
+
+                    return false;
                 }
 
                 if let Some(fun) = create_function_result(
                     name.to_string(),
-                    &assgn.init,
+                    &var_assign.init,
                 ) {
-                    (*state).completables.push(Arc::new(fun));
-                }
-            }
-
-            if let flux::semantic::walk::Node::OptionStmt(opt) = node
-            {
-                if let flux::semantic::nodes::Assignment::Variable(
-                    var_assign,
-                ) = &opt.assignment
-                {
-                    let name = var_assign.id.name.clone();
-                    if let Some(var_type) =
-                        get_var_type(&var_assign.init)
-                    {
-                        (*state).completables.push(Arc::new(
-                            CompletionVarResult {
-                                name: name.to_string(),
-                                var_type,
-                            },
-                        ));
-
-                        return false;
-                    }
-
-                    if let Some(fun) = create_function_result(
-                        name.to_string(),
-                        &var_assign.init,
-                    ) {
-                        (*state).completables.push(Arc::new(fun));
-                        return false;
-                    }
+                    self.completables.push(Arc::new(fun));
+                    return false;
                 }
             }
         }
@@ -1117,9 +1104,7 @@ impl<'a> SemanticVisitor<'a> for CompletableFinderVisitor {
 impl CompletableFinderVisitor {
     fn new(pos: lsp::Position) -> Self {
         CompletableFinderVisitor {
-            state: Arc::new(Mutex::new(
-                CompletableFinderState::default(),
-            )),
+            completables: Vec::new(),
             pos,
         }
     }
