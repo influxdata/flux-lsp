@@ -148,9 +148,26 @@ pub fn get_package_infos() -> Vec<PackageInfo> {
     result
 }
 
+// TODO Use Record/MonoType::fields from flux
+fn record_fields(
+    this: &Record,
+) -> impl Iterator<Item = &flux::semantic::types::Property> {
+    let mut record = Some(this);
+    std::iter::from_fn(move || match record {
+        Some(Record::Extension { head, tail }) => {
+            match tail {
+                MonoType::Record(tail) => record = Some(tail),
+                _ => record = None,
+            }
+            Some(head)
+        }
+        _ => None,
+    })
+}
+
 fn walk_package_functions(list: &mut Vec<Function>, t: &MonoType) {
     if let MonoType::Record(record) = t {
-        if let Record::Extension { head, tail } = record.as_ref() {
+        for head in record_fields(record) {
             if let MonoType::Fun(f) = &head.v {
                 let mut params = vec![];
 
@@ -162,8 +179,6 @@ fn walk_package_functions(list: &mut Vec<Function>, t: &MonoType) {
                     name: head.k.clone().into(),
                 });
             }
-
-            walk_package_functions(list, tail);
         }
     }
 }
@@ -193,7 +208,7 @@ fn walk_functions(
     t: &MonoType,
 ) {
     if let MonoType::Record(record) = t {
-        if let Record::Extension { head, tail } = record.as_ref() {
+        for head in record_fields(record) {
             if let MonoType::Fun(f) = &head.v {
                 if let Some(package_name) =
                     get_package_name(package.as_str())
@@ -205,8 +220,6 @@ fn walk_functions(
                     ));
                 }
             }
-
-            walk_functions(package, list, tail);
         }
     }
 }
