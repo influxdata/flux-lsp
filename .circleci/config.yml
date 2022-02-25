@@ -58,7 +58,7 @@ jobs:
     resource_class: large
     steps:
       - checkout
-      - run: BUILD_MODE=release make wasm
+      - run: BUILD_MODE=release AR=llvm-ar ./wasm-build.sh
 
 
   deploy:
@@ -68,10 +68,10 @@ jobs:
     steps:
       - checkout
       - run: |
-          BUILD_MODE=release make wasm
+          BUILD_MODE=release AR=llvm-ar ./wasm-build.sh
           echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN" > pkg-node/.npmrc
           echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN" > pkg-browser/.npmrc
-          make publish
+          ./publish.sh
 
 
 workflows:
