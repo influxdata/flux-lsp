@@ -781,9 +781,6 @@ fn walk_package(
                         signature: stdlib::create_function_signature(
                             f,
                         ),
-                        required_args: get_argument_names(&f.req),
-                        optional_args: get_argument_names(&f.opt),
-                        package_name: get_package_name(package),
                     }));
                 }
                 MonoType::Collection(c) => {
@@ -1038,13 +1035,10 @@ fn get_builtins(list: &mut Vec<Box<dyn Completable>>) {
                 MonoType::Fun(f) => {
                     list.push(Box::new(FunctionResult {
                         package: PRELUDE_PACKAGE.to_string(),
-                        package_name: None,
                         name: key.to_string(),
                         signature: stdlib::create_function_signature(
                             f,
                         ),
-                        required_args: get_argument_names(&f.req),
-                        optional_args: get_argument_names(&f.opt),
                     }))
                 }
                 MonoType::Collection(c) => {
@@ -1587,12 +1581,6 @@ impl CompletionVarResult {
 struct FunctionResult {
     name: String,
     package: String,
-    #[allow(dead_code)]
-    package_name: Option<String>,
-    #[allow(dead_code)]
-    required_args: Vec<String>,
-    #[allow(dead_code)]
-    optional_args: Vec<String>,
     signature: String,
 }
 #[derive(Clone)]

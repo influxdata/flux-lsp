@@ -182,7 +182,6 @@ pub fn find_stdlib_signatures(
         })
 }
 
-#[allow(dead_code)]
 pub struct LspServer {
     client: Arc<Mutex<Option<Client>>>,
     store: FileStore,
