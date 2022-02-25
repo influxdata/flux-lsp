@@ -3,8 +3,10 @@ use std::collections::{hash_map::Entry, HashMap};
 use std::sync::{Arc, Mutex};
 
 use anyhow::Result;
+use flux::semantic::nodes::ErrorKind as SemanticNodeErrorKind;
 use flux::semantic::{
     nodes::FunctionParameter, nodes::Symbol, types::MonoType, walk,
+    ErrorKind,
 };
 use lspower::{
     jsonrpc::Error as RpcError, jsonrpc::ErrorCode as RpcErrorCode,
@@ -323,7 +325,7 @@ impl LanguageServer for LspServer {
         Ok(lsp::InitializeResult {
             capabilities: lsp::ServerCapabilities {
                 call_hierarchy_provider: None,
-                code_action_provider: None,
+                code_action_provider: Some(lsp::CodeActionProviderCapability::Simple(true)),
                 code_lens_provider: None,
                 color_provider: None,
                 completion_provider: Some(lsp::CompletionOptions {
@@ -1084,6 +1086,138 @@ impl LanguageServer for LspServer {
                 data: visitor.tokens.clone(),
             },
         )))
+    }
+
+    // The use of unwrap/expect here is intentional, and should only occur with prior
+    // checks in place. If we were to use nested matchers, it makes the code difficult
+    // to reason about.
+    #[allow(clippy::expect_used)]
+    async fn code_action(
+        &self,
+        params: lsp::CodeActionParams,
+    ) -> RpcResult<Option<lsp::CodeActionResponse>> {
+        // Our code actions should all be connected with a diagnostic. The
+        // client user experience can vary when not directly connected to
+        // a diagnostic, which is sorta the client's fault, but we also
+        // don't have a need for trying to support any other flows.
+        if params.context.diagnostics.is_empty() {
+            return Ok(None);
+        }
+
+        let contents =
+            match self.get_document(&params.text_document.uri) {
+                Ok(value) => value,
+                Err(e) => {
+                    log::error!("{}", e);
+                    return Ok(None);
+                }
+            };
+
+        let analyzer_result = flux::new_semantic_analyzer(
+            flux::semantic::AnalyzerConfig::default(),
+        );
+        if analyzer_result.is_err() {
+            return Ok(None);
+        }
+        let mut analyzer =
+            analyzer_result.expect("Previous check failed.");
+
+        let analyzed = analyzer.analyze_source(
+            "".into(),
+            params.text_document.uri.clone().into(),
+            &contents,
+        );
+        if analyzed.is_ok() {
+            return Ok(None);
+        }
+        let errors = analyzed.err().expect("Previous check failed.");
+
+        let relevant: Vec<&flux::semantic::Error> = errors
+            .error
+            .errors
+            .iter()
+            .filter(|error| {
+                crate::lsp::ranges_overlap(
+                    &params.range,
+                    &error.location.clone().into(),
+                )
+            })
+            .collect();
+        if relevant.is_empty() {
+            return Ok(None);
+        }
+
+        if errors.value.is_none() {
+            return Ok(None);
+        }
+        let (_exports, source) =
+            errors.value.expect("Previous check failed.");
+
+        let mut visitor =
+            semantic::PackageNodeFinderVisitor::default();
+        let walker = walk::Node::Package(&source);
+        walk::walk(&mut visitor, walker);
+
+        let import_position = match visitor.location {
+            Some(location) => lsp::Position {
+                line: location.start.line + 1,
+                character: 0,
+            },
+            None => lsp::Position::default(),
+        };
+
+        let actions: Vec<lsp::CodeActionOrCommand> = relevant.iter().map(|error| {
+            if let ErrorKind::Inference(kind) = &error.error {
+                match kind {
+                    SemanticNodeErrorKind::UndefinedIdentifier(identifier) => {
+                        // When encountering undefined identifiers, check to see if they match a corresponding
+                        // package available for import.
+                        let imports = flux::imports()?;
+                        let potential_imports: Vec<&String> = imports.iter().filter(|x| match crate::shared::get_package_name(x.0) {
+                            Some(name) => &name == identifier,
+                            None => false,
+                        }).map(|x| x.0 ).collect();
+                        if potential_imports.is_empty() {
+                            return None;
+                        }
+
+                        let inner_actions: Vec<lsp::CodeActionOrCommand> = potential_imports.iter().map(|package_name| {
+                            lsp::CodeAction {
+                                title: format!("Import `{}`", package_name),
+                                kind: Some(lsp::CodeActionKind::QUICKFIX),
+                                diagnostics: None,
+                                edit: Some(lsp::WorkspaceEdit {
+                                    changes: Some(HashMap::from([
+                                        (params.text_document.uri.clone(), vec![
+                                            lsp::TextEdit {
+                                                range: lsp::Range {
+                                                    start: import_position,
+                                                    end: import_position,
+                                                },
+                                                new_text: format!("import \"{}\"\n", package_name),
+                                            }
+                                        ])
+                                    ])),
+                                    document_changes: None,
+                                    change_annotations: None,
+                                }),
+                                command: None,
+                                is_preferred: Some(true),
+                                disabled: None,
+                                data: None,
+                            }.into()
+                        }).collect();
+                        return Some(inner_actions);
+                    },
+                    _ => return None,
+                }
+            }
+            None
+        }).filter(|action| action.is_some()).map(|action| {
+            action.expect("Previous .filter() call failed.")
+        }).flatten().collect();
+
+        return Ok(Some(actions));
     }
 }
 
@@ -3455,6 +3589,63 @@ errorCounts
         assert_eq!(result, Ok(None));
     }
 
+    // Historically, the completion of a package also brought with it an additional edit
+    // that would import the stdlib module it was referring to. This test asserts that we
+    // don't add it back in, but also serves as documentation that this was a conscious
+    // choice, as the user experience was not good.
+    #[test]
+    async fn test_package_completion_when_it_is_not_imported() {
+        let fluxscript = r#"sql"#;
+        let server = create_server();
+        open_file(&server, fluxscript.to_string()).await;
+
+        let params = lsp::CompletionParams {
+            text_document_position: lsp::TextDocumentPositionParams {
+                text_document: lsp::TextDocumentIdentifier {
+                    uri: lsp::Url::parse(
+                        "file:///home/user/file.flux",
+                    )
+                    .unwrap(),
+                },
+                position: lsp::Position {
+                    line: 0,
+                    character: 2,
+                },
+            },
+            work_done_progress_params: lsp::WorkDoneProgressParams {
+                work_done_token: None,
+            },
+            partial_result_params: lsp::PartialResultParams {
+                partial_result_token: None,
+            },
+            context: Some(lsp::CompletionContext {
+                trigger_kind: lsp::CompletionTriggerKind::INVOKED,
+                trigger_character: None,
+            }),
+        };
+
+        let result =
+            server.completion(params.clone()).await.unwrap().unwrap();
+
+        expect_test::expect![[r#"
+                    {
+                      "isIncomplete": false,
+                      "items": [
+                        {
+                          "label": "sql",
+                          "kind": 9,
+                          "detail": "Package",
+                          "documentation": "sql",
+                          "sortText": "sql",
+                          "filterText": "sql",
+                          "insertText": "sql",
+                          "insertTextFormat": 1
+                        }
+                      ]
+                    }"#]]
+        .assert_eq(&serde_json::to_string_pretty(&result).unwrap());
+    }
+
     #[test]
     async fn test_package_completion_when_it_is_imported() {
         let fluxscript = r#"import "sql"
@@ -3491,7 +3682,6 @@ sql"#;
         let result =
             server.completion(params.clone()).await.unwrap().unwrap();
 
-        // We should not try to insert the `sql` import again
         expect_test::expect![[r#"
             {
               "isIncomplete": false,
@@ -3504,8 +3694,7 @@ sql"#;
                   "sortText": "sql",
                   "filterText": "sql",
                   "insertText": "sql",
-                  "insertTextFormat": 1,
-                  "additionalTextEdits": []
+                  "insertTextFormat": 1
                 }
               ]
             }"#]]
@@ -3625,5 +3814,371 @@ csv.from(file: "my.csv")
         } else {
             panic!("Result was not a token result");
         }
+    }
+
+    // A code action for importing a package when an undefined identifier
+    // is found.
+    #[test]
+    async fn test_code_action_import_insertion() {
+        let fluxscript = r#"sql"#;
+        let server = create_server();
+        open_file(&server, fluxscript.to_string()).await;
+
+        let params = lsp::CodeActionParams {
+            text_document: lsp::TextDocumentIdentifier {
+                uri: lsp::Url::parse("file:///home/user/file.flux")
+                    .unwrap(),
+            },
+            context: lsp::CodeActionContext {
+                diagnostics: vec![lsp::Diagnostic {
+                    code: None,
+                    code_description: None,
+                    data: None,
+                    related_information: None,
+                    severity: Some(lsp::DiagnosticSeverity::ERROR),
+                    source: Some("flux".into()),
+                    tags: None,
+                    message: "undefined identifier sql".into(),
+                    range: lsp::Range {
+                        start: lsp::Position {
+                            line: 0,
+                            character: 0,
+                        },
+                        end: lsp::Position {
+                            line: 0,
+                            character: 0,
+                        },
+                    },
+                }],
+                only: None,
+            },
+            range: lsp::Range {
+                start: lsp::Position {
+                    line: 0,
+                    character: 2,
+                },
+                end: lsp::Position {
+                    line: 0,
+                    character: 2,
+                },
+            },
+            work_done_progress_params: lsp::WorkDoneProgressParams {
+                work_done_token: None,
+            },
+            partial_result_params: lsp::PartialResultParams {
+                partial_result_token: None,
+            },
+        };
+
+        let result = server.code_action(params).await.unwrap();
+
+        expect_test::expect![[r#"
+            [
+              {
+                "title": "Import `sql`",
+                "kind": "quickfix",
+                "edit": {
+                  "changes": {
+                    "file:///home/user/file.flux": [
+                      {
+                        "range": {
+                          "start": {
+                            "line": 0,
+                            "character": 0
+                          },
+                          "end": {
+                            "line": 0,
+                            "character": 0
+                          }
+                        },
+                        "newText": "import \"sql\"\n"
+                      }
+                    ]
+                  }
+                },
+                "isPreferred": true
+              }
+            ]"#]]
+        .assert_eq(&serde_json::to_string_pretty(&result).unwrap());
+    }
+
+    // When inserting a package import, don't clobber the package statement at the beginning.
+    #[test]
+    async fn test_code_action_import_insertion_with_package() {
+        let fluxscript = "package anPackage\n\nsql";
+        let server = create_server();
+        open_file(&server, fluxscript.to_string()).await;
+
+        let params = lsp::CodeActionParams {
+            text_document: lsp::TextDocumentIdentifier {
+                uri: lsp::Url::parse("file:///home/user/file.flux")
+                    .unwrap(),
+            },
+            context: lsp::CodeActionContext {
+                diagnostics: vec![lsp::Diagnostic {
+                    code: None,
+                    code_description: None,
+                    data: None,
+                    related_information: None,
+                    severity: Some(lsp::DiagnosticSeverity::ERROR),
+                    source: Some("flux".into()),
+                    tags: None,
+                    message: "undefined identifier sql".into(),
+                    range: lsp::Range {
+                        start: lsp::Position {
+                            line: 2,
+                            character: 0,
+                        },
+                        end: lsp::Position {
+                            line: 2,
+                            character: 0,
+                        },
+                    },
+                }],
+                only: None,
+            },
+            range: lsp::Range {
+                start: lsp::Position {
+                    line: 2,
+                    character: 2,
+                },
+                end: lsp::Position {
+                    line: 2,
+                    character: 2,
+                },
+            },
+            work_done_progress_params: lsp::WorkDoneProgressParams {
+                work_done_token: None,
+            },
+            partial_result_params: lsp::PartialResultParams {
+                partial_result_token: None,
+            },
+        };
+
+        let result = server.code_action(params).await.unwrap();
+
+        expect_test::expect![[r#"
+            [
+              {
+                "title": "Import `sql`",
+                "kind": "quickfix",
+                "edit": {
+                  "changes": {
+                    "file:///home/user/file.flux": [
+                      {
+                        "range": {
+                          "start": {
+                            "line": 1,
+                            "character": 0
+                          },
+                          "end": {
+                            "line": 1,
+                            "character": 0
+                          }
+                        },
+                        "newText": "import \"sql\"\n"
+                      }
+                    ]
+                  }
+                },
+                "isPreferred": true
+              }
+            ]"#]]
+        .assert_eq(&serde_json::to_string_pretty(&result).unwrap());
+    }
+
+    /// If the identifier matches multiple potential imports, multiple code
+    /// actions should be offered to the user.
+    #[test]
+    async fn test_code_action_import_insertion_multiple_actions() {
+        let fluxscript = r#"array"#;
+        let server = create_server();
+        open_file(&server, fluxscript.to_string()).await;
+
+        let params = lsp::CodeActionParams {
+            text_document: lsp::TextDocumentIdentifier {
+                uri: lsp::Url::parse("file:///home/user/file.flux")
+                    .unwrap(),
+            },
+            context: lsp::CodeActionContext {
+                diagnostics: vec![lsp::Diagnostic {
+                    code: None,
+                    code_description: None,
+                    data: None,
+                    related_information: None,
+                    severity: Some(lsp::DiagnosticSeverity::ERROR),
+                    source: Some("flux".into()),
+                    tags: None,
+                    message: "undefined identifier array".into(),
+                    range: lsp::Range {
+                        start: lsp::Position {
+                            line: 0,
+                            character: 0,
+                        },
+                        end: lsp::Position {
+                            line: 0,
+                            character: 0,
+                        },
+                    },
+                }],
+                only: None,
+            },
+            range: lsp::Range {
+                start: lsp::Position {
+                    line: 0,
+                    character: 4,
+                },
+                end: lsp::Position {
+                    line: 0,
+                    character: 4,
+                },
+            },
+            work_done_progress_params: lsp::WorkDoneProgressParams {
+                work_done_token: None,
+            },
+            partial_result_params: lsp::PartialResultParams {
+                partial_result_token: None,
+            },
+        };
+
+        let result = server.code_action(params).await.unwrap();
+
+        expect_test::expect![[r#"
+            [
+              {
+                "title": "Import `array`",
+                "kind": "quickfix",
+                "edit": {
+                  "changes": {
+                    "file:///home/user/file.flux": [
+                      {
+                        "range": {
+                          "start": {
+                            "line": 0,
+                            "character": 0
+                          },
+                          "end": {
+                            "line": 0,
+                            "character": 0
+                          }
+                        },
+                        "newText": "import \"array\"\n"
+                      }
+                    ]
+                  }
+                },
+                "isPreferred": true
+              },
+              {
+                "title": "Import `experimental/array`",
+                "kind": "quickfix",
+                "edit": {
+                  "changes": {
+                    "file:///home/user/file.flux": [
+                      {
+                        "range": {
+                          "start": {
+                            "line": 0,
+                            "character": 0
+                          },
+                          "end": {
+                            "line": 0,
+                            "character": 0
+                          }
+                        },
+                        "newText": "import \"experimental/array\"\n"
+                      }
+                    ]
+                  }
+                },
+                "isPreferred": true
+              }
+            ]"#]]
+        .assert_eq(&serde_json::to_string_pretty(&result).unwrap());
+    }
+
+    /// If the import requires a full path, that the action suggests the full path.
+    #[test]
+    async fn test_code_action_import_insertion_full_path() {
+        let fluxscript = r#"schema"#;
+        let server = create_server();
+        open_file(&server, fluxscript.to_string()).await;
+
+        let params = lsp::CodeActionParams {
+            text_document: lsp::TextDocumentIdentifier {
+                uri: lsp::Url::parse("file:///home/user/file.flux")
+                    .unwrap(),
+            },
+            context: lsp::CodeActionContext {
+                diagnostics: vec![lsp::Diagnostic {
+                    code: None,
+                    code_description: None,
+                    data: None,
+                    related_information: None,
+                    severity: Some(lsp::DiagnosticSeverity::ERROR),
+                    source: Some("flux".into()),
+                    tags: None,
+                    message: "undefined identifier schema".into(),
+                    range: lsp::Range {
+                        start: lsp::Position {
+                            line: 0,
+                            character: 0,
+                        },
+                        end: lsp::Position {
+                            line: 0,
+                            character: 0,
+                        },
+                    },
+                }],
+                only: None,
+            },
+            range: lsp::Range {
+                start: lsp::Position {
+                    line: 0,
+                    character: 5,
+                },
+                end: lsp::Position {
+                    line: 0,
+                    character: 5,
+                },
+            },
+            work_done_progress_params: lsp::WorkDoneProgressParams {
+                work_done_token: None,
+            },
+            partial_result_params: lsp::PartialResultParams {
+                partial_result_token: None,
+            },
+        };
+
+        let result = server.code_action(params).await.unwrap();
+
+        expect_test::expect![[r#"
+            [
+              {
+                "title": "Import `influxdata/influxdb/schema`",
+                "kind": "quickfix",
+                "edit": {
+                  "changes": {
+                    "file:///home/user/file.flux": [
+                      {
+                        "range": {
+                          "start": {
+                            "line": 0,
+                            "character": 0
+                          },
+                          "end": {
+                            "line": 0,
+                            "character": 0
+                          }
+                        },
+                        "newText": "import \"influxdata/influxdb/schema\"\n"
+                      }
+                    ]
+                  }
+                },
+                "isPreferred": true
+              }
+            ]"#]]
+        .assert_eq(&serde_json::to_string_pretty(&result).unwrap());
     }
 }

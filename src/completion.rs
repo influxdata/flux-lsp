@@ -17,9 +17,7 @@ use crate::shared::get_argument_names;
 use crate::shared::Function;
 use crate::shared::{get_package_name, is_in_node};
 use crate::stdlib;
-use crate::visitors::ast::{
-    CallFinderVisitor, NodeFinderVisitor, PackageInfo,
-};
+use crate::visitors::ast::{CallFinderVisitor, NodeFinderVisitor};
 use crate::visitors::semantic::{
     FunctionFinderVisitor, Import, ImportFinderVisitor,
     ObjectFunctionFinderVisitor,
@@ -108,7 +106,6 @@ struct CompletionInfo {
     position: lsp::Position,
     uri: lsp::Url,
     imports: Vec<Import>,
-    package: Option<PackageInfo>,
 }
 
 impl CompletionInfo {
@@ -126,8 +123,6 @@ impl CompletionInfo {
             NodeFinderVisitor::new(move_back(position, 1));
 
         walk(&mut visitor, walker);
-
-        let package = PackageInfo::from(&pkg);
 
         if let Some(finder_node) = visitor.node {
             if let Some(parent) = finder_node.parent {
@@ -147,7 +142,6 @@ impl CompletionInfo {
                                 imports: get_imports_removed(
                                     uri, position, source,
                                 ),
-                                package: Some(package),
                             });
                         }
                     }
@@ -160,7 +154,6 @@ impl CompletionInfo {
                             imports: get_imports_removed(
                                 uri, position, source,
                             ),
-                            package: Some(package),
                         });
                     }
                     AstNode::BinaryExpr(be) => match &be.left {
@@ -178,7 +171,6 @@ impl CompletionInfo {
                                 imports: get_imports(
                                     uri, position, source,
                                 ),
-                                package: Some(package),
                             });
                         }
                         Expression::Member(left) => {
@@ -208,7 +200,6 @@ impl CompletionInfo {
                                     imports: get_imports(
                                         uri, position, source,
                                     ),
-                                    package: Some(package),
                                 });
                             }
                         }
@@ -252,7 +243,6 @@ impl CompletionInfo {
                                     imports: get_imports(
                                         uri, position, source,
                                     ),
-                                    package: Some(package),
                                 });
                             }
                         }
@@ -276,7 +266,6 @@ impl CompletionInfo {
                                 imports: get_imports(
                                     uri, position, source,
                                 ),
-                                package: Some(package),
                             });
                         }
                     }
@@ -290,7 +279,6 @@ impl CompletionInfo {
                             imports: get_imports(
                                 uri, position, source,
                             ),
-                            package: Some(package),
                         });
                     }
                     AstNode::BadExpr(expr) => {
@@ -303,7 +291,6 @@ impl CompletionInfo {
                             imports: get_imports(
                                 uri, position, source,
                             ),
-                            package: Some(package),
                         });
                     }
                     AstNode::MemberExpr(mbr) => {
@@ -319,7 +306,6 @@ impl CompletionInfo {
                                 imports: get_imports(
                                     uri, position, source,
                                 ),
-                                package: Some(package),
                             });
                         }
                     }
@@ -336,7 +322,6 @@ impl CompletionInfo {
                                 imports: get_imports(
                                     uri, position, source,
                                 ),
-                                package: Some(package),
                             });
                         }
                     }
@@ -826,47 +811,17 @@ impl Completable for stdlib::PackageResult {
         &self,
         info: CompletionInfo,
     ) -> lsp::CompletionItem {
-        let imports = info.imports;
-        let mut additional_text_edits = vec![];
         let mut insert_text = self.name.clone();
 
-        if imports
-            .iter()
-            .map(|x| &x.path)
-            .all(|x| *x != self.full_name)
-        {
-            let alias = find_alias_name(&imports, &self.name, 1);
-
-            let new_text = if let Some(alias) = alias {
-                insert_text = alias.clone();
-                format!("import {} \"{}\"\n", alias, self.full_name)
-            } else {
-                format!("import \"{}\"\n", self.full_name)
-            };
-
-            let line = match info.package {
-                Some(pi) => pi.position.line + 1,
-                None => 0,
-            };
-
-            additional_text_edits.push(lsp::TextEdit {
-                new_text,
-                range: lsp::Range {
-                    start: lsp::Position { character: 0, line },
-                    end: lsp::Position { character: 0, line },
-                },
-            })
-        } else {
-            for import in imports {
-                if self.full_name == import.path {
-                    insert_text = import.alias;
-                }
+        for import in info.imports {
+            if self.full_name == import.path {
+                insert_text = import.alias;
             }
         }
 
         lsp::CompletionItem {
             label: self.full_name.clone(),
-            additional_text_edits: Some(additional_text_edits),
+            additional_text_edits: None,
             commit_characters: None,
             deprecated: None,
             detail: Some("Package".to_string()),
@@ -1053,37 +1008,6 @@ fn get_builtins(list: &mut Vec<Box<dyn Completable>>) {
             }
         }
     }
-}
-
-fn find_alias_name(
-    imports: &[Import],
-    name: &str,
-    iteration: i32,
-) -> Option<String> {
-    let first_iteration = iteration == 1;
-    let pkg_name = if first_iteration {
-        name.to_string()
-    } else {
-        format!("{}{}", name, iteration)
-    };
-
-    for import in imports {
-        if import.alias == pkg_name {
-            return find_alias_name(imports, name, iteration + 1);
-        }
-
-        if let Some(initial_name) = &import.initial_name {
-            if *initial_name == pkg_name && first_iteration {
-                return find_alias_name(imports, name, iteration + 1);
-            }
-        }
-    }
-
-    if first_iteration {
-        return None;
-    }
-
-    Some(format!("{}{}", name, iteration))
 }
 
 fn add_package_result(
