@@ -203,3 +203,18 @@ impl<'a> Visitor<'a> for ImportFinderVisitor {
         true
     }
 }
+
+#[derive(Default)]
+pub struct PackageNodeFinderVisitor {
+    pub location: Option<lsp::Range>,
+}
+
+impl<'a> Visitor<'a> for PackageNodeFinderVisitor {
+    fn visit(&mut self, node: Node<'a>) -> bool {
+        if let Node::PackageClause(n) = node {
+            self.location = Some(n.loc.clone().into());
+            return false;
+        }
+        true
+    }
+}
