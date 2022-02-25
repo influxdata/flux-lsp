@@ -284,9 +284,7 @@ impl<'a> Visitor<'a> for SemanticTokenVisitor {
                     token_modifiers_bitset: 0,
                 });
             }
-            _ => {
-                println!("{}", node);
-            }
+            _ => {}
         }
         true
     }
