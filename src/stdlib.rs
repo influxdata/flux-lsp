@@ -10,16 +10,10 @@ use std::collections::{BTreeMap, HashMap};
 use std::fmt;
 use std::iter::Iterator;
 
-pub const BUILTIN_PACKAGE: &str = "builtin";
-
-#[derive(Clone)]
-pub struct PackageResult {
-    pub name: String,
-    pub full_name: String,
-}
+const BUILTIN_PACKAGE: &str = "builtin";
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Property {
+struct Property {
     pub k: String,
     pub v: String,
 }

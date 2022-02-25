@@ -1,15 +1,24 @@
-use std::collections::BTreeMap;
-
-use flux::semantic::types::{Function, MonoType};
 use lspower::lsp;
 
-use crate::shared::all_combos;
+pub fn get_package_name(name: &str) -> Option<String> {
+    let items = name.split('/');
+    items.last().map(|n| n.to_string())
+}
 
 #[allow(clippy::implicit_hasher)]
 pub fn get_argument_names(
-    args: &BTreeMap<String, MonoType>,
+    args: &std::collections::BTreeMap<
+        String,
+        flux::semantic::types::MonoType,
+    >,
 ) -> Vec<String> {
     args.keys().map(String::from).collect()
+}
+
+#[derive(Clone)]
+pub struct Function {
+    pub name: String,
+    pub params: Vec<String>,
 }
 
 pub struct FunctionSignature {
@@ -56,7 +65,7 @@ pub struct FunctionInfo {
 impl FunctionInfo {
     pub fn new(
         name: String,
-        f: &Function,
+        f: &flux::semantic::types::Function,
         package_name: String,
     ) -> Self {
         FunctionInfo {
@@ -73,7 +82,20 @@ impl FunctionInfo {
             arguments: self.required_args.clone(),
         }];
 
-        for l in all_combos(self.optional_args.clone()) {
+        let mut combos = vec![];
+        let length = self.optional_args.len();
+        for i in 1..length {
+            let c: Vec<Vec<String>> =
+                combinations::Combinations::new(
+                    self.optional_args.clone(),
+                    i,
+                )
+                .collect();
+            combos.extend(c);
+        }
+        combos.push(self.optional_args.clone());
+
+        for l in combos {
             let mut arguments = self.required_args.clone();
             arguments.extend(l.clone());
 

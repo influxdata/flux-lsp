@@ -1,38 +1,5 @@
-use flux::ast::{
-    walk::{self, Visitor},
-    Package,
-};
+use flux::ast::walk;
 use lspower::lsp;
-
-use crate::shared::flux_position_to_position;
-
-fn contains_position(
-    node: walk::Node<'_>,
-    pos: lsp::Position,
-) -> bool {
-    let start_line = node.base().location.start.line - 1;
-    let start_col = node.base().location.start.column - 1;
-    let end_line = node.base().location.end.line - 1;
-    let end_col = node.base().location.end.column - 1;
-
-    if pos.line < start_line {
-        return false;
-    }
-
-    if pos.line > end_line {
-        return false;
-    }
-
-    if pos.line == start_line && pos.character < start_col {
-        return false;
-    }
-
-    if pos.line == end_line && pos.character > end_col {
-        return false;
-    }
-
-    true
-}
 
 #[derive(Clone)]
 pub struct CallFinderVisitor<'a> {
@@ -49,11 +16,12 @@ impl<'a> CallFinderVisitor<'a> {
     }
 }
 
-impl<'a> Visitor<'a> for CallFinderVisitor<'a> {
+impl<'a> walk::Visitor<'a> for CallFinderVisitor<'a> {
     fn visit(&mut self, node: walk::Node<'a>) -> bool {
-        let contains = contains_position(node.clone(), self.position);
-
-        if contains {
+        if crate::lsp::position_in_range(
+            &self.position,
+            &node.base().clone().location.into(),
+        ) {
             if let walk::Node::CallExpr(_) = node {
                 self.node = Some(node.clone())
             }
@@ -84,11 +52,12 @@ impl<'a> NodeFinderVisitor<'a> {
     }
 }
 
-impl<'a> Visitor<'a> for NodeFinderVisitor<'a> {
+impl<'a> walk::Visitor<'a> for NodeFinderVisitor<'a> {
     fn visit(&mut self, node: walk::Node<'a>) -> bool {
-        let contains = contains_position(node.clone(), self.position);
-
-        if contains {
+        if crate::lsp::position_in_range(
+            &self.position,
+            &node.base().clone().location.into(),
+        ) {
             let parent = self.node.clone();
             if let Some(parent) = parent {
                 self.node = Some(NodeFinderNode {
@@ -111,13 +80,11 @@ pub struct PackageInfo {
     pub position: lsp::Position,
 }
 
-impl From<&Package> for PackageInfo {
-    fn from(pkg: &Package) -> Self {
+impl From<&flux::ast::Package> for PackageInfo {
+    fn from(pkg: &flux::ast::Package) -> Self {
         Self {
             name: pkg.package.clone(),
-            position: flux_position_to_position(
-                &pkg.base.location.start,
-            ),
+            position: pkg.base.location.start.into(),
         }
     }
 }
@@ -131,7 +98,7 @@ pub struct SemanticTokenVisitor {
     pub tokens: Vec<lsp::SemanticToken>,
 }
 
-impl<'a> Visitor<'a> for SemanticTokenVisitor {
+impl<'a> walk::Visitor<'a> for SemanticTokenVisitor {
     fn visit(&mut self, node: walk::Node<'a>) -> bool {
         match node {
             walk::Node::PackageClause(node) => {
