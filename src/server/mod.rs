@@ -1,5 +1,7 @@
+mod store;
+
 use std::borrow::Cow;
-use std::collections::{hash_map::Entry, HashMap};
+use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use anyhow::Result;
@@ -16,12 +18,6 @@ use lspower::{
 use crate::{
     completion, shared::FunctionSignature, stdlib, visitors::semantic,
 };
-
-// The spec talks specifically about setting versions for files, but isn't
-// clear on how those versions are surfaced to the client, if ever. This
-// type could be extended to keep track of versions of files, but simplicity
-// is preferred at this point.
-type FileStore = Arc<Mutex<HashMap<lsp::Url, String>>>;
 
 /// Returns `None` when the flux source fails analysis.
 fn parse_and_analyze(
@@ -186,14 +182,14 @@ pub fn find_stdlib_signatures(
 
 pub struct LspServer {
     client: Arc<Mutex<Option<Client>>>,
-    store: FileStore,
+    store: store::Store,
 }
 
 impl LspServer {
     pub fn new(client: Option<Client>) -> Self {
         Self {
             client: Arc::new(Mutex::new(client)),
-            store: Arc::new(Mutex::new(HashMap::new())),
+            store: store::Store::default(),
         }
     }
 
@@ -214,20 +210,7 @@ impl LspServer {
     }
 
     fn get_document(&self, key: &lsp::Url) -> RpcResult<String> {
-        let store = match self.store.lock() {
-            Ok(value) => value,
-            Err(err) => {
-                return Err(lspower::jsonrpc::Error {
-                    code: lspower::jsonrpc::ErrorCode::InternalError,
-                    message: format!(
-                        "Could not acquire store lock. Error: {}",
-                        err
-                    ),
-                    data: None,
-                });
-            }
-        };
-        if let Some(contents) = store.get(key) {
+        if let Some(contents) = self.store.get(key) {
             Ok(contents.clone())
         } else {
             Err(lspower::jsonrpc::Error::invalid_params(format!(
@@ -446,32 +429,8 @@ impl LanguageServer for LspServer {
         let key = params.text_document.uri;
         let value = params.text_document.text;
         self.publish_diagnostics(&key, value.as_str()).await;
-        // Add document to the store
-        let mut store = match self.store.lock() {
-            Ok(value) => value,
-            Err(err) => {
-                log::warn!(
-                    "Could not acquire store lock. Error: {}",
-                    err
-                );
-                return;
-            }
-        };
-        match store.entry(key) {
-            Entry::Vacant(entry) => {
-                entry.insert(value);
-            }
-            Entry::Occupied(entry) => {
-                // The protocol spec is unclear on whether trying to open a file
-                // that is already opened is allowed, and research would indicate that
-                // there are badly behaved clients that do this. Rather than making this
-                // error, log the issue and move on.
-                log::warn!(
-                    "textDocument/didOpen called on open file {}",
-                    entry.key(),
-                );
-            }
-        }
+
+        self.store.put(&key, &value);
     }
 
     async fn did_change(
@@ -479,45 +438,28 @@ impl LanguageServer for LspServer {
         params: lsp::DidChangeTextDocumentParams,
     ) -> () {
         let key = params.text_document.uri;
-        let contents = {
-            let mut store = match self.store.lock() {
-                Ok(value) => value,
-                Err(err) => {
-                    log::warn!(
-                        "Could not acquire store lock. Error: {}",
-                        err
-                    );
-                    return;
+
+        match self.store.get(&key) {
+            Some(value) => {
+                let mut contents = Cow::Borrowed(&value);
+                for change in params.content_changes {
+                    contents =
+                        Cow::Owned(if let Some(range) = change.range {
+                            replace_string_in_range(
+                                contents.into_owned(),
+                                range,
+                                change.text,
+                            )
+                        } else {
+                            change.text
+                        });
                 }
-            };
-            let mut contents = if let Some(contents) = store.get(&key)
-            {
-                Cow::Borrowed(contents)
-            } else {
-                log::error!(
-                "textDocument/didChange called on unknown file {}",
-                key
-            );
-                return;
-            };
-            for change in params.content_changes {
-                contents =
-                    Cow::Owned(if let Some(range) = change.range {
-                        replace_string_in_range(
-                            contents.into_owned(),
-                            range,
-                            change.text,
-                        )
-                    } else {
-                        change.text
-                    });
-            }
-            let new_contents = contents.into_owned();
-            let c = new_contents.clone();
-            store.insert(key.clone(), new_contents);
-            c
-        };
-        self.publish_diagnostics(&key, contents.as_str()).await;
+                let new_contents = contents.into_owned();
+                self.store.put(&key, &new_contents.clone());
+                self.publish_diagnostics(&key, new_contents.as_str()).await;
+            },
+            None => log::error!("Could not update key: {}", key),
+        }
     }
 
     async fn did_save(
@@ -526,26 +468,7 @@ impl LanguageServer for LspServer {
     ) -> () {
         if let Some(text) = params.text {
             let key = params.text_document.uri;
-            {
-                let mut store = match self.store.lock() {
-                    Ok(value) => value,
-                    Err(err) => {
-                        log::warn!(
-                            "Could not acquire store lock. Error: {}",
-                            err
-                        );
-                        return;
-                    }
-                };
-                if !store.contains_key(&key) {
-                    log::warn!(
-                    "textDocument/didSave called on unknown file {}",
-                    key
-                );
-                    return;
-                }
-                store.insert(key.clone(), text.clone());
-            }
+            self.store.put(&key, &text);
             self.publish_diagnostics(&key, text.as_str()).await;
         }
     }
@@ -555,27 +478,7 @@ impl LanguageServer for LspServer {
         params: lsp::DidCloseTextDocumentParams,
     ) -> () {
         let key = params.text_document.uri;
-
-        let mut store = match self.store.lock() {
-            Ok(value) => value,
-            Err(err) => {
-                log::warn!(
-                    "Could not acquire store lock. Error: {}",
-                    err
-                );
-                return;
-            }
-        };
-        if store.remove(&key).is_none() {
-            // The protocol spec is unclear on whether trying to close a file
-            // that isn't open is allowed. To stop consistent with the
-            // implementation of textDocument/didOpen, this error is logged and
-            // allowed.
-            log::warn!(
-                "textDocument/didClose called on unknown file {}",
-                key
-            );
-        }
+        self.store.remove(&key);
     }
 
     async fn signature_help(
