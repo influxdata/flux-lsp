@@ -14,8 +14,8 @@ use flux::{imports, prelude};
 use lspower::lsp;
 
 use crate::shared::get_argument_names;
+use crate::shared::get_package_name;
 use crate::shared::Function;
-use crate::shared::{get_package_name, is_in_node};
 use crate::stdlib;
 use crate::visitors::ast::{CallFinderVisitor, NodeFinderVisitor};
 use crate::visitors::semantic::{
@@ -24,6 +24,12 @@ use crate::visitors::semantic::{
 };
 
 const PRELUDE_PACKAGE: &str = "prelude";
+
+#[derive(Clone)]
+struct PackageResult {
+    pub name: String,
+    pub full_name: String,
+}
 
 pub fn find_completions(
     params: lsp::CompletionParams,
@@ -806,7 +812,7 @@ fn fuzzy_match(haystack: &str, needle: &str) -> bool {
         .contains(needle.to_lowercase().as_str());
 }
 
-impl Completable for stdlib::PackageResult {
+impl Completable for PackageResult {
     fn completion_item(
         &self,
         info: CompletionInfo,
@@ -1016,7 +1022,7 @@ fn add_package_result(
 ) {
     let package_name = get_package_name(name);
     if let Some(package_name) = package_name {
-        list.push(Box::new(stdlib::PackageResult {
+        list.push(Box::new(PackageResult {
             name: package_name,
             full_name: name.to_string(),
         }));
@@ -1547,13 +1553,23 @@ fn create_completion_package_removed(
     file.imports = file
         .imports
         .into_iter()
-        .filter(|x| valid_node(&x.base, pos))
+        .filter(|x| {
+            !crate::lsp::position_in_range(
+                &pos,
+                &x.base.location.clone().into(),
+            )
+        })
         .collect();
 
     file.body = file
         .body
         .into_iter()
-        .filter(|x| valid_node(x.base(), pos))
+        .filter(|x| {
+            !crate::lsp::position_in_range(
+                &pos,
+                &x.base().location.clone().into(),
+            )
+        })
         .collect();
 
     let mut pkg: Package =
@@ -1596,15 +1612,11 @@ fn create_completion_package(
     contents: &str,
 ) -> Option<flux::semantic::nodes::Package> {
     create_filtered_package(uri, contents, |x| {
-        valid_node(x.base(), pos)
+        !crate::lsp::position_in_range(
+            &pos,
+            &x.base().location.clone().into(),
+        )
     })
-}
-
-fn valid_node(
-    node: &flux::ast::BaseNode,
-    position: lsp::Position,
-) -> bool {
-    !is_in_node(position, node)
 }
 
 fn create_filtered_package<F>(
