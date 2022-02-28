@@ -5,9 +5,9 @@ pub enum LspError {
     FileNotFound(String),
 }
 
-impl Into<lspower::jsonrpc::Error> for LspError {
-    fn into(self) -> lspower::jsonrpc::Error {
-        match self {
+impl From<LspError> for lspower::jsonrpc::Error {
+    fn from(error: LspError) -> Self {
+        match error {
             LspError::InternalError(error) => {
                 lspower::jsonrpc::Error {
                     code: lspower::jsonrpc::ErrorCode::InternalError,
@@ -26,7 +26,7 @@ impl Into<lspower::jsonrpc::Error> for LspError {
                     message: format!("File not fiend: {}", filename),
                     data: None,
                 }
-            },
+            }
         }
     }
 }

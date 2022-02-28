@@ -184,7 +184,7 @@ impl LspServer {
 
     fn get_document(&self, key: &lsp::Url) -> RpcResult<String> {
         match self.store.get(key) {
-            Ok(contents) => Ok(contents.clone()),
+            Ok(contents) => Ok(contents),
             Err(err) => Err(err.into()),
         }
     }
@@ -396,8 +396,8 @@ impl LanguageServer for LspServer {
             Ok(value) => {
                 let mut contents = Cow::Borrowed(&value);
                 for change in params.content_changes {
-                    contents =
-                        Cow::Owned(if let Some(range) = change.range {
+                    contents = Cow::Owned(
+                        if let Some(range) = change.range {
                             replace_string_in_range(
                                 contents.into_owned(),
                                 range,
@@ -405,13 +405,19 @@ impl LanguageServer for LspServer {
                             )
                         } else {
                             change.text
-                        });
+                        },
+                    );
                 }
                 let new_contents = contents.into_owned();
                 self.store.put(&key, &new_contents.clone());
-                self.publish_diagnostics(&key, new_contents.as_str()).await;
-            },
-            Err(err) => log::error!("Could not update key: {}\n{:?}", key, err),
+                self.publish_diagnostics(&key, new_contents.as_str())
+                    .await;
+            }
+            Err(err) => log::error!(
+                "Could not update key: {}\n{:?}",
+                key,
+                err
+            ),
         }
     }
 
@@ -636,10 +642,10 @@ impl LanguageServer for LspServer {
     ) -> RpcResult<Option<lsp::GotoDefinitionResponse>> {
         let key =
             params.text_document_position_params.text_document.uri;
-            let pkg = match self.store.get_package(&key) {
-                Ok(pkg) => pkg,
-                Err(err) => return Err(err.into()),
-            };
+        let pkg = match self.store.get_package(&key) {
+            Ok(pkg) => pkg,
+            Err(err) => return Err(err.into()),
+        };
 
         let pkg_node = walk::Node::Package(&pkg);
         let mut visitor = semantic::NodeFinderVisitor::new(
@@ -715,10 +721,10 @@ impl LanguageServer for LspServer {
     ) -> RpcResult<Option<Vec<lsp::DocumentHighlight>>> {
         let key =
             params.text_document_position_params.text_document.uri;
-            let pkg = match self.store.get_package(&key) {
-                Ok(pkg) => pkg,
-                Err(err) => return Err(err.into()),
-            };
+        let pkg = match self.store.get_package(&key) {
+            Ok(pkg) => pkg,
+            Err(err) => return Err(err.into()),
+        };
 
         let node = find_node(
             walk::Node::Package(&pkg),
@@ -766,10 +772,10 @@ impl LanguageServer for LspServer {
     ) -> RpcResult<Option<lsp::Hover>> {
         let key =
             params.text_document_position_params.text_document.uri;
-            let pkg = match self.store.get_package(&key) {
-                Ok(pkg) => pkg,
-                Err(err) => return Err(err.into()),
-            };
+        let pkg = match self.store.get_package(&key) {
+            Ok(pkg) => pkg,
+            Err(err) => return Err(err.into()),
+        };
 
         let node_finder_result = find_node(
             walk::Node::Package(&pkg),

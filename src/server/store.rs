@@ -9,7 +9,7 @@ use lspower::lsp;
 use super::types::LspError;
 
 /// Store acts as the in-memory storage backend for the LSP server.
-/// 
+///
 /// The spec talks specifically about setting versions for files, but isn't
 /// clear on how those versions are surfaced to the client, if ever. This
 /// type could be extended to keep track of versions of files, but simplicity
@@ -27,11 +27,7 @@ impl Default for Store {
 }
 
 impl Store {
-    pub fn put(
-        &self,
-        key: &lsp::Url,
-        contents: &str,
-    ) {
+    pub fn put(&self, key: &lsp::Url, contents: &str) {
         match self.backend.lock() {
             Ok(mut store) => {
                 match store.entry(key.clone()) {
@@ -60,13 +56,10 @@ impl Store {
         }
     }
 
-    pub fn remove(
-        &self,
-        key: &lsp::Url,
-    ) {
+    pub fn remove(&self, key: &lsp::Url) {
         match self.backend.lock() {
             Ok(mut store) => {
-                if store.remove(&key).is_none() {
+                if store.remove(key).is_none() {
                     // The protocol spec is unclear on whether trying to close a file
                     // that isn't open is allowed. To stop consistent with the
                     // implementation of textDocument/didOpen, this error is logged and
@@ -76,10 +69,11 @@ impl Store {
                         key
                     );
                 }
-            },
+            }
             Err(error) => {
                 log::error!(
-                    "Could not acquire store lock. Error: {}", error
+                    "Could not acquire store lock. Error: {}",
+                    error
                 )
             }
         }
@@ -88,14 +82,19 @@ impl Store {
     pub fn get(&self, key: &lsp::Url) -> Result<String, LspError> {
         match self.backend.lock() {
             Ok(mut store) => match store.entry(key.clone()) {
-                Entry::Vacant(_) => Err(LspError::FileNotFound(key.to_string())),
+                Entry::Vacant(_) => {
+                    Err(LspError::FileNotFound(key.to_string()))
+                }
                 Entry::Occupied(entry) => Ok(entry.get().into()),
             },
             Err(_) => Err(LspError::LockNotAcquired),
         }
     }
 
-    pub fn get_package(&self, key: &lsp::Url) -> Result<flux::semantic::nodes::Package, LspError> {
+    pub fn get_package(
+        &self,
+        key: &lsp::Url,
+    ) -> Result<flux::semantic::nodes::Package, LspError> {
         let contents = self.get(key)?;
         let mut analyzer = match flux::new_semantic_analyzer(
             flux::semantic::AnalyzerConfig {
@@ -106,7 +105,12 @@ impl Store {
             },
         ) {
             Ok(analyzer) => analyzer,
-            Err(err) => return Err(LspError::InternalError(format!("{}", err))),
+            Err(err) => {
+                return Err(LspError::InternalError(format!(
+                    "{}",
+                    err
+                )))
+            }
         };
         let (_, sem_pkg) = match analyzer.analyze_source(
             "".to_string(),
@@ -119,9 +123,13 @@ impl Store {
                 if e.value.is_none() {
                     log::debug!("Unable to parse source: {}", e);
                 }
-                match e.value.map(|(_, sem_pkg) | sem_pkg) {
+                match e.value.map(|(_, sem_pkg)| sem_pkg) {
                     Some(value) => return Ok(value),
-                    None => return Err(LspError::InternalError(error_string)),
+                    None => {
+                        return Err(LspError::InternalError(
+                            error_string,
+                        ))
+                    }
                 }
             }
         };
@@ -163,9 +171,7 @@ mod test {
         {
             let mut backend =
                 store.backend.lock().expect("Could not acquire lock");
-            if let Entry::Vacant(entry) =
-                backend.entry(key.clone())
-            {
+            if let Entry::Vacant(entry) = backend.entry(key.clone()) {
                 entry.insert(contents.into());
             }
         }
@@ -187,9 +193,7 @@ mod test {
         {
             let mut backend =
                 store.backend.lock().expect("Could not acquire lock");
-            if let Entry::Vacant(entry) =
-                backend.entry(key.clone())
-            {
+            if let Entry::Vacant(entry) = backend.entry(key.clone()) {
                 entry.insert(contents.into());
             }
         }
