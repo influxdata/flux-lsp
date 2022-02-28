@@ -255,7 +255,7 @@ async fn test_did_close() {
     let server = create_server();
     open_file(&server, "from(".to_string()).await;
 
-    assert!(server.store.get(&lsp::Url::parse("file:///home/user/file.flux").unwrap()).is_some());
+    assert!(server.store.get(&lsp::Url::parse("file:///home/user/file.flux").unwrap()).is_ok());
 
     let params = lsp::DidCloseTextDocumentParams {
         text_document: lsp::TextDocumentIdentifier::new(
@@ -265,7 +265,7 @@ async fn test_did_close() {
 
     server.did_close(params).await;
 
-    assert!(server.store.get(&lsp::Url::parse("file:///home/user/file.flux").unwrap()).is_none());
+    assert!(server.store.get(&lsp::Url::parse("file:///home/user/file.flux").unwrap()).is_err());
 }
 
 // If the file hasn't been opened on the server get, return an error.

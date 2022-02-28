@@ -6,7 +6,9 @@ use std::sync::{Arc, Mutex};
 
 use lspower::lsp;
 
-/// LSPStore acts as the in-memory storage backend for the LSP server.
+use super::types::LspError;
+
+/// Store acts as the in-memory storage backend for the LSP server.
 /// 
 /// The spec talks specifically about setting versions for files, but isn't
 /// clear on how those versions are surfaced to the client, if ever. This
@@ -83,20 +85,47 @@ impl Store {
         }
     }
 
-    pub fn get(&self, key: &lsp::Url) -> Option<String> {
+    pub fn get(&self, key: &lsp::Url) -> Result<String, LspError> {
         match self.backend.lock() {
             Ok(mut store) => match store.entry(key.clone()) {
-                Entry::Vacant(_) => None,
-                Entry::Occupied(entry) => Some(entry.get().into()),
+                Entry::Vacant(_) => Err(LspError::FileNotFound(key.to_string())),
+                Entry::Occupied(entry) => Ok(entry.get().into()),
             },
-            Err(error) => {
-                log::error!(
-                    "Could not acquire store lock. Error: {}",
-                    error
-                );
-                None
-            }
+            Err(_) => Err(LspError::LockNotAcquired),
         }
+    }
+
+    pub fn get_package(&self, key: &lsp::Url) -> Result<flux::semantic::nodes::Package, LspError> {
+        let contents = self.get(key)?;
+        let mut analyzer = match flux::new_semantic_analyzer(
+            flux::semantic::AnalyzerConfig {
+                // Explicitly disable the AST and Semantic checks.
+                // We do not care if the code is syntactically or semantically correct as this may be
+                // partially written code.
+                skip_checks: true,
+            },
+        ) {
+            Ok(analyzer) => analyzer,
+            Err(err) => return Err(LspError::InternalError(format!("{}", err))),
+        };
+        let (_, sem_pkg) = match analyzer.analyze_source(
+            "".to_string(),
+            "main.flux".to_string(),
+            &contents,
+        ) {
+            Ok(res) => res,
+            Err(e) => {
+                let error_string = format!("{}", e);
+                if e.value.is_none() {
+                    log::debug!("Unable to parse source: {}", e);
+                }
+                match e.value.map(|(_, sem_pkg) | sem_pkg) {
+                    Some(value) => return Ok(value),
+                    None => return Err(LspError::InternalError(error_string)),
+                }
+            }
+        };
+        Ok(sem_pkg)
     }
 }
 
@@ -168,6 +197,22 @@ mod test {
         store.remove(&key);
         let result = store.get(&key);
 
-        assert!(result.is_none());
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn get_package() {
+        let store = Store::default();
+        let key = lsp::Url::parse("file:///a/b/c").unwrap();
+        let contents = r#"import "foo"
+
+from(bucket: "bucket")
+|> range(start: -15m)
+|> filter(fn: (r) => r.tag == "anTag")"#;
+        store.put(&key, contents);
+
+        let result = store.get_package(&key);
+
+        assert!(result.is_ok());
     }
 }
