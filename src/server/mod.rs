@@ -1,5 +1,8 @@
+mod store;
+mod types;
+
 use std::borrow::Cow;
-use std::collections::{hash_map::Entry, HashMap};
+use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use anyhow::Result;
@@ -16,40 +19,6 @@ use lspower::{
 use crate::{
     completion, shared::FunctionSignature, stdlib, visitors::semantic,
 };
-
-// The spec talks specifically about setting versions for files, but isn't
-// clear on how those versions are surfaced to the client, if ever. This
-// type could be extended to keep track of versions of files, but simplicity
-// is preferred at this point.
-type FileStore = Arc<Mutex<HashMap<lsp::Url, String>>>;
-
-/// Returns `None` when the flux source fails analysis.
-fn parse_and_analyze(
-    code: &str,
-) -> Result<Option<flux::semantic::nodes::Package>> {
-    let mut analyzer = flux::new_semantic_analyzer(
-        flux::semantic::AnalyzerConfig {
-            // Explicitly disable the AST and Semantic checks.
-            // We do not care if the code is syntactically or semantically correct as this may be
-            // partially written code.
-            skip_checks: true,
-        },
-    )?;
-    let (_, sem_pkg) = match analyzer.analyze_source(
-        "".to_string(),
-        "main.flux".to_string(),
-        code,
-    ) {
-        Ok(res) => res,
-        Err(e) => {
-            if e.value.is_none() {
-                log::debug!("Unable to parse source: {}", e);
-            }
-            return Ok(e.value.map(|(_, sem_pkg)| sem_pkg));
-        }
-    };
-    Ok(Some(sem_pkg))
-}
 
 /// Convert a flux::semantic::walk::Node to a lsp::Location
 /// https://microsoft.github.io/language-server-protocol/specification#location
@@ -186,14 +155,14 @@ pub fn find_stdlib_signatures(
 
 pub struct LspServer {
     client: Arc<Mutex<Option<Client>>>,
-    store: FileStore,
+    store: store::Store,
 }
 
 impl LspServer {
     pub fn new(client: Option<Client>) -> Self {
         Self {
             client: Arc::new(Mutex::new(client)),
-            store: Arc::new(Mutex::new(HashMap::new())),
+            store: store::Store::default(),
         }
     }
 
@@ -214,42 +183,9 @@ impl LspServer {
     }
 
     fn get_document(&self, key: &lsp::Url) -> RpcResult<String> {
-        let store = match self.store.lock() {
-            Ok(value) => value,
-            Err(err) => {
-                return Err(lspower::jsonrpc::Error {
-                    code: lspower::jsonrpc::ErrorCode::InternalError,
-                    message: format!(
-                        "Could not acquire store lock. Error: {}",
-                        err
-                    ),
-                    data: None,
-                });
-            }
-        };
-        if let Some(contents) = store.get(key) {
-            Ok(contents.clone())
-        } else {
-            Err(lspower::jsonrpc::Error::invalid_params(format!(
-                "file not opened: {}",
-                key
-            )))
-        }
-    }
-
-    /// Returns `None` when the flux source couldn't be analyzed.
-    fn parse_analyze_document(
-        &self,
-        key: &lsp::Url,
-    ) -> RpcResult<Option<flux::semantic::nodes::Package>> {
-        let contents = self.get_document(key)?;
-        match parse_and_analyze(&contents) {
-            Ok(maybe_pkg) => Ok(maybe_pkg),
-            Err(err) => RpcResult::Err(RpcError {
-                code: RpcErrorCode::InternalError,
-                message: format!("{}", err),
-                data: None,
-            }),
+        match self.store.get(key) {
+            Ok(contents) => Ok(contents),
+            Err(err) => Err(err.into()),
         }
     }
 
@@ -446,32 +382,8 @@ impl LanguageServer for LspServer {
         let key = params.text_document.uri;
         let value = params.text_document.text;
         self.publish_diagnostics(&key, value.as_str()).await;
-        // Add document to the store
-        let mut store = match self.store.lock() {
-            Ok(value) => value,
-            Err(err) => {
-                log::warn!(
-                    "Could not acquire store lock. Error: {}",
-                    err
-                );
-                return;
-            }
-        };
-        match store.entry(key) {
-            Entry::Vacant(entry) => {
-                entry.insert(value);
-            }
-            Entry::Occupied(entry) => {
-                // The protocol spec is unclear on whether trying to open a file
-                // that is already opened is allowed, and research would indicate that
-                // there are badly behaved clients that do this. Rather than making this
-                // error, log the issue and move on.
-                log::warn!(
-                    "textDocument/didOpen called on open file {}",
-                    entry.key(),
-                );
-            }
-        }
+
+        self.store.put(&key, &value);
     }
 
     async fn did_change(
@@ -479,45 +391,34 @@ impl LanguageServer for LspServer {
         params: lsp::DidChangeTextDocumentParams,
     ) -> () {
         let key = params.text_document.uri;
-        let contents = {
-            let mut store = match self.store.lock() {
-                Ok(value) => value,
-                Err(err) => {
-                    log::warn!(
-                        "Could not acquire store lock. Error: {}",
-                        err
+
+        match self.store.get(&key) {
+            Ok(value) => {
+                let mut contents = Cow::Borrowed(&value);
+                for change in params.content_changes {
+                    contents = Cow::Owned(
+                        if let Some(range) = change.range {
+                            replace_string_in_range(
+                                contents.into_owned(),
+                                range,
+                                change.text,
+                            )
+                        } else {
+                            change.text
+                        },
                     );
-                    return;
                 }
-            };
-            let mut contents = if let Some(contents) = store.get(&key)
-            {
-                Cow::Borrowed(contents)
-            } else {
-                log::error!(
-                "textDocument/didChange called on unknown file {}",
-                key
-            );
-                return;
-            };
-            for change in params.content_changes {
-                contents =
-                    Cow::Owned(if let Some(range) = change.range {
-                        replace_string_in_range(
-                            contents.into_owned(),
-                            range,
-                            change.text,
-                        )
-                    } else {
-                        change.text
-                    });
+                let new_contents = contents.into_owned();
+                self.store.put(&key, &new_contents.clone());
+                self.publish_diagnostics(&key, new_contents.as_str())
+                    .await;
             }
-            let new_contents = contents.into_owned();
-            let c = new_contents.clone();
-            store.insert(key.clone(), new_contents);
-            c
-        };
-        self.publish_diagnostics(&key, contents.as_str()).await;
+            Err(err) => log::error!(
+                "Could not update key: {}\n{:?}",
+                key,
+                err
+            ),
+        }
     }
 
     async fn did_save(
@@ -526,26 +427,7 @@ impl LanguageServer for LspServer {
     ) -> () {
         if let Some(text) = params.text {
             let key = params.text_document.uri;
-            {
-                let mut store = match self.store.lock() {
-                    Ok(value) => value,
-                    Err(err) => {
-                        log::warn!(
-                            "Could not acquire store lock. Error: {}",
-                            err
-                        );
-                        return;
-                    }
-                };
-                if !store.contains_key(&key) {
-                    log::warn!(
-                    "textDocument/didSave called on unknown file {}",
-                    key
-                );
-                    return;
-                }
-                store.insert(key.clone(), text.clone());
-            }
+            self.store.put(&key, &text);
             self.publish_diagnostics(&key, text.as_str()).await;
         }
     }
@@ -555,27 +437,7 @@ impl LanguageServer for LspServer {
         params: lsp::DidCloseTextDocumentParams,
     ) -> () {
         let key = params.text_document.uri;
-
-        let mut store = match self.store.lock() {
-            Ok(value) => value,
-            Err(err) => {
-                log::warn!(
-                    "Could not acquire store lock. Error: {}",
-                    err
-                );
-                return;
-            }
-        };
-        if store.remove(&key).is_none() {
-            // The protocol spec is unclear on whether trying to close a file
-            // that isn't open is allowed. To stop consistent with the
-            // implementation of textDocument/didOpen, this error is logged and
-            // allowed.
-            log::warn!(
-                "textDocument/didClose called on unknown file {}",
-                key
-            );
-        }
+        self.store.remove(&key);
     }
 
     async fn signature_help(
@@ -584,11 +446,9 @@ impl LanguageServer for LspServer {
     ) -> RpcResult<Option<lsp::SignatureHelp>> {
         let key =
             params.text_document_position_params.text_document.uri;
-        let maybe_pkg = self.parse_analyze_document(&key)?;
-        let pkg = match maybe_pkg {
-            Some(pkg) => pkg,
-            // Short circuit if the flux source couldn't be analyzed
-            None => return Ok(None),
+        let pkg = match self.store.get_package(&key) {
+            Ok(pkg) => pkg,
+            Err(err) => return Err(err.into()),
         };
 
         let mut signatures = vec![];
@@ -710,11 +570,9 @@ impl LanguageServer for LspServer {
         params: lsp::FoldingRangeParams,
     ) -> RpcResult<Option<Vec<lsp::FoldingRange>>> {
         let key = params.text_document.uri;
-        let maybe_pkg = self.parse_analyze_document(&key)?;
-        let pkg = match maybe_pkg {
-            Some(pkg) => pkg,
-            // Short circuit if the flux source couldn't be analyzed
-            None => return Ok(None),
+        let pkg = match self.store.get_package(&key) {
+            Ok(pkg) => pkg,
+            Err(err) => return Err(err.into()),
         };
 
         let mut visitor = semantic::FoldFinderVisitor::default();
@@ -747,11 +605,9 @@ impl LanguageServer for LspServer {
         params: lsp::DocumentSymbolParams,
     ) -> RpcResult<Option<lsp::DocumentSymbolResponse>> {
         let key = params.text_document.uri;
-        let maybe_pkg = self.parse_analyze_document(&key)?;
-        let pkg = match maybe_pkg {
-            Some(pkg) => pkg,
-            // Short circuit if the flux source couldn't be analyzed
-            None => return Ok(None),
+        let pkg = match self.store.get_package(&key) {
+            Ok(pkg) => pkg,
+            Err(err) => return Err(err.into()),
         };
 
         let pkg_node = walk::Node::Package(&pkg);
@@ -786,11 +642,9 @@ impl LanguageServer for LspServer {
     ) -> RpcResult<Option<lsp::GotoDefinitionResponse>> {
         let key =
             params.text_document_position_params.text_document.uri;
-        let maybe_pkg = self.parse_analyze_document(&key)?;
-        let pkg = match maybe_pkg {
-            Some(pkg) => pkg,
-            // Short circuit if the flux source couldn't be analyzed
-            None => return Ok(None),
+        let pkg = match self.store.get_package(&key) {
+            Ok(pkg) => pkg,
+            Err(err) => return Err(err.into()),
         };
 
         let pkg_node = walk::Node::Package(&pkg);
@@ -831,11 +685,9 @@ impl LanguageServer for LspServer {
         params: lsp::RenameParams,
     ) -> RpcResult<Option<lsp::WorkspaceEdit>> {
         let key = params.text_document_position.text_document.uri;
-        let maybe_pkg = self.parse_analyze_document(&key)?;
-        let pkg = match maybe_pkg {
-            Some(pkg) => pkg,
-            // Short circuit if the flux source couldn't be analyzed
-            None => return Ok(None),
+        let pkg = match self.store.get_package(&key) {
+            Ok(pkg) => pkg,
+            Err(err) => return Err(err.into()),
         };
 
         let node = find_node(
@@ -869,11 +721,9 @@ impl LanguageServer for LspServer {
     ) -> RpcResult<Option<Vec<lsp::DocumentHighlight>>> {
         let key =
             params.text_document_position_params.text_document.uri;
-        let maybe_pkg = self.parse_analyze_document(&key)?;
-        let pkg = match maybe_pkg {
-            Some(pkg) => pkg,
-            // Short circuit if the flux source couldn't be analyzed
-            None => return Ok(None),
+        let pkg = match self.store.get_package(&key) {
+            Ok(pkg) => pkg,
+            Err(err) => return Err(err.into()),
         };
 
         let node = find_node(
@@ -898,11 +748,9 @@ impl LanguageServer for LspServer {
         params: lsp::ReferenceParams,
     ) -> RpcResult<Option<Vec<lsp::Location>>> {
         let key = params.text_document_position.text_document.uri;
-        let maybe_pkg = self.parse_analyze_document(&key)?;
-        let pkg = match maybe_pkg {
-            Some(pkg) => pkg,
-            // Short circuit if the flux source couldn't be analyzed
-            None => return Ok(None),
+        let pkg = match self.store.get_package(&key) {
+            Ok(pkg) => pkg,
+            Err(err) => return Err(err.into()),
         };
 
         let node = find_node(
@@ -924,11 +772,9 @@ impl LanguageServer for LspServer {
     ) -> RpcResult<Option<lsp::Hover>> {
         let key =
             params.text_document_position_params.text_document.uri;
-        let maybe_pkg = self.parse_analyze_document(&key)?;
-        let pkg = match maybe_pkg {
-            Some(pkg) => pkg,
-            // Short circuit if the flux source couldn't be analyzed
-            None => return Ok(None),
+        let pkg = match self.store.get_package(&key) {
+            Ok(pkg) => pkg,
+            Err(err) => return Err(err.into()),
         };
 
         let node_finder_result = find_node(

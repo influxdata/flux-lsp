@@ -98,18 +98,8 @@ async fn test_did_open() {
 
     server.did_open(params).await;
 
-    assert_eq!(
-        vec![&lsp::Url::parse("file:///home/user/file.flux").unwrap()],
-        server
-            .store
-            .lock()
-            .unwrap()
-            .keys()
-            .collect::<Vec<&lsp::Url>>()
-    );
     let uri = lsp::Url::parse("file:///home/user/file.flux").unwrap();
-    let contents =
-        server.store.lock().unwrap().get(&uri).unwrap().clone();
+    let contents = server.store.get(&uri).unwrap().clone();
     assert_eq!("from(", contents);
 }
 
@@ -138,8 +128,7 @@ async fn test_did_change() {
     server.did_change(params).await;
 
     let uri = lsp::Url::parse("file:///home/user/file.flux").unwrap();
-    let contents =
-        server.store.lock().unwrap().get(&uri).unwrap().clone();
+    let contents = server.store.get(&uri).unwrap().clone();
     assert_eq!(r#"from(bucket: "bucket")"#, contents);
 }
 
@@ -179,8 +168,7 @@ async fn test_did_change_with_range() {
     server.did_change(params).await;
 
     let uri = lsp::Url::parse("file:///home/user/file.flux").unwrap();
-    let contents =
-        server.store.lock().unwrap().get(&uri).unwrap().clone();
+    let contents = server.store.get(&uri).unwrap().clone();
     assert_eq!(
         r#"from(bucket: "bucket")
 |>  first()"#,
@@ -227,8 +215,7 @@ async fn test_did_change_with_multiline_range() {
     server.did_change(params).await;
 
     let uri = lsp::Url::parse("file:///home/user/file.flux").unwrap();
-    let contents =
-        server.store.lock().unwrap().get(&uri).unwrap().clone();
+    let contents = server.store.get(&uri).unwrap().clone();
     assert_eq!(
         r#"from(bucket: "bucket")
 |>drop(columns: ["_start", "_stop"])
@@ -254,8 +241,7 @@ async fn test_did_save() {
     };
     server.did_save(params).await;
 
-    let contents =
-        server.store.lock().unwrap().get(&uri).unwrap().clone();
+    let contents = server.store.get(&uri).unwrap().clone();
     assert_eq!(r#"from(bucket: "test2")"#.to_string(), contents);
 }
 
@@ -264,7 +250,10 @@ async fn test_did_close() {
     let server = create_server();
     open_file(&server, "from(".to_string()).await;
 
-    assert!(server.store.lock().unwrap().keys().next().is_some());
+    assert!(server
+        .store
+        .get(&lsp::Url::parse("file:///home/user/file.flux").unwrap())
+        .is_ok());
 
     let params = lsp::DidCloseTextDocumentParams {
         text_document: lsp::TextDocumentIdentifier::new(
@@ -274,7 +263,10 @@ async fn test_did_close() {
 
     server.did_close(params).await;
 
-    assert!(server.store.lock().unwrap().keys().next().is_none());
+    assert!(server
+        .store
+        .get(&lsp::Url::parse("file:///home/user/file.flux").unwrap())
+        .is_err());
 }
 
 // If the file hasn't been opened on the server get, return an error.
