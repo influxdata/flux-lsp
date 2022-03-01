@@ -991,24 +991,21 @@ impl LanguageServer for LspServer {
                 }
             };
 
-        let analyzer_result = flux::new_semantic_analyzer(
+        let mut analyzer = match flux::new_semantic_analyzer(
             flux::semantic::AnalyzerConfig::default(),
-        );
-        if analyzer_result.is_err() {
-            return Ok(None);
-        }
-        let mut analyzer =
-            analyzer_result.expect("Previous check failed.");
+        ) {
+            Ok(analyzer) => analyzer,
+            Err(_) => return Ok(None),
+        };
 
-        let analyzed = analyzer.analyze_source(
+        let errors = match analyzer.analyze_source(
             "".into(),
             params.text_document.uri.clone().into(),
             &contents,
-        );
-        if analyzed.is_ok() {
-            return Ok(None);
-        }
-        let errors = analyzed.err().expect("Previous check failed.");
+        ) {
+            Ok(_) => return Ok(None),
+            Err(errors) => errors,
+        };
 
         let relevant: Vec<&flux::semantic::Error> = errors
             .error
