@@ -1480,7 +1480,6 @@ sql.
     let result =
         server.completion(params.clone()).await.unwrap().unwrap();
 
-
     let expected_labels: Vec<String> = vec!["to", "from"]
         .into_iter()
         .map(|x| x.into())
@@ -1620,7 +1619,8 @@ x = 1
                     "\"types\"",
                     "\"universe\"",
                 ]
-            "#]].assert_debug_eq(
+            "#]]
+            .assert_debug_eq(
                 &l.items.iter().map(|x| &x.label).collect::<Vec<_>>(),
             );
         }
@@ -2111,6 +2111,52 @@ csv.from(
         items.iter().map(|item| item.label.as_str()).collect();
 
     let expected = vec!["csv", "file", "mode", "url"];
+
+    assert_eq!(expected, labels);
+}
+
+#[test]
+async fn test_param_completion_3() {
+    let fluxscript = r#"import "csv"
+
+csv.from(mode: "raw",
+                   // ^
+"#;
+    let server = create_server();
+    open_file(&server, fluxscript.to_string()).await;
+
+    let params = lsp::CompletionParams {
+        text_document_position: lsp::TextDocumentPositionParams {
+            text_document: lsp::TextDocumentIdentifier {
+                uri: lsp::Url::parse("file:///home/user/file.flux")
+                    .unwrap(),
+            },
+            position: position_of(fluxscript),
+        },
+        work_done_progress_params: lsp::WorkDoneProgressParams {
+            work_done_token: None,
+        },
+        partial_result_params: lsp::PartialResultParams {
+            partial_result_token: None,
+        },
+        context: Some(lsp::CompletionContext {
+            trigger_kind: lsp::CompletionTriggerKind::INVOKED,
+            trigger_character: None,
+        }),
+    };
+
+    let result =
+        server.completion(params.clone()).await.unwrap().unwrap();
+
+    let items = match result.clone() {
+        lsp::CompletionResponse::List(l) => l.items,
+        _ => unreachable!(),
+    };
+
+    let labels: Vec<&str> =
+        items.iter().map(|item| item.label.as_str()).collect();
+
+    let expected = vec!["csv", "file", "url"];
 
     assert_eq!(expected, labels);
 }
