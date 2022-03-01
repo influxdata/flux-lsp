@@ -61,8 +61,7 @@ pub fn find_completions(
             CompletionType::Import => {
                 let infos = stdlib::get_package_infos();
 
-                let imports =
-                    get_imports_removed(uri, info.position, contents);
+                let imports = get_imports(uri, contents);
 
                 let mut items = vec![];
                 for info in infos {
@@ -143,9 +142,7 @@ impl CompletionInfo {
                                 ident: obj.name.clone(),
                                 position,
                                 uri: uri.clone(),
-                                imports: get_imports_removed(
-                                    uri, position, source,
-                                ),
+                                imports: get_imports(uri, source),
                             });
                         }
                     }
@@ -155,9 +152,7 @@ impl CompletionInfo {
                             ident: "".to_string(),
                             position,
                             uri: uri.clone(),
-                            imports: get_imports_removed(
-                                uri, position, source,
-                            ),
+                            imports: get_imports(uri, source),
                         });
                     }
                     AstNode::BinaryExpr(be) => match &be.left {
@@ -172,9 +167,7 @@ impl CompletionInfo {
                                 ident: name.clone(),
                                 position,
                                 uri: uri.clone(),
-                                imports: get_imports(
-                                    uri, position, source,
-                                ),
+                                imports: get_imports(uri, source),
                             });
                         }
                         Expression::Member(left) => {
@@ -195,9 +188,7 @@ impl CompletionInfo {
                                     ident: name,
                                     position,
                                     uri: uri.clone(),
-                                    imports: get_imports(
-                                        uri, position, source,
-                                    ),
+                                    imports: get_imports(uri, source),
                                 });
                             }
                         }
@@ -231,9 +222,7 @@ impl CompletionInfo {
                                     ident: name.to_owned(),
                                     position,
                                     uri: uri.clone(),
-                                    imports: get_imports(
-                                        uri, position, source,
-                                    ),
+                                    imports: get_imports(uri, source),
                                 });
                             }
                         }
@@ -254,9 +243,7 @@ impl CompletionInfo {
                                 ident: name.clone(),
                                 position,
                                 uri: uri.clone(),
-                                imports: get_imports(
-                                    uri, position, source,
-                                ),
+                                imports: get_imports(uri, source),
                             });
                         }
                     }
@@ -267,9 +254,7 @@ impl CompletionInfo {
                             ident: name,
                             position,
                             uri: uri.clone(),
-                            imports: get_imports(
-                                uri, position, source,
-                            ),
+                            imports: get_imports(uri, source),
                         });
                     }
                     AstNode::BadExpr(expr) => {
@@ -279,9 +264,7 @@ impl CompletionInfo {
                             ident: name,
                             position,
                             uri: uri.clone(),
-                            imports: get_imports(
-                                uri, position, source,
-                            ),
+                            imports: get_imports(uri, source),
                         });
                     }
                     AstNode::MemberExpr(mbr) => {
@@ -294,9 +277,7 @@ impl CompletionInfo {
                                 ident: ident.name.clone(),
                                 position,
                                 uri: uri.clone(),
-                                imports: get_imports(
-                                    uri, position, source,
-                                ),
+                                imports: get_imports(uri, source),
                             });
                         }
                     }
@@ -310,9 +291,7 @@ impl CompletionInfo {
                                 ident: ident.name.clone(),
                                 position,
                                 uri: uri.clone(),
-                                imports: get_imports(
-                                    uri, position, source,
-                                ),
+                                imports: get_imports(uri, source),
                             });
                         }
                     }
@@ -332,35 +311,12 @@ fn property_key_str(p: &PropertyKey) -> &str {
     }
 }
 
-fn get_imports(
-    uri: &lsp::Url,
-    pos: lsp::Position,
-    contents: &str,
-) -> Vec<Import> {
-    if let Some(pkg) = create_completion_package(uri, pos, contents) {
+fn get_imports(uri: &lsp::Url, contents: &str) -> Vec<Import> {
+    if let Some(pkg) = create_completion_package(uri, contents) {
         let walker = flux::semantic::walk::Node::Package(&pkg);
         let mut visitor = ImportFinderVisitor::default();
 
         flux::semantic::walk::walk(&mut visitor, walker);
-        return visitor.imports;
-    }
-
-    vec![]
-}
-
-fn get_imports_removed(
-    uri: &lsp::Url,
-    pos: lsp::Position,
-    contents: &str,
-) -> Vec<Import> {
-    if let Some(pkg) =
-        create_completion_package_removed(uri, pos, contents)
-    {
-        let walker = flux::semantic::walk::Node::Package(&pkg);
-        let mut visitor = ImportFinderVisitor::default();
-
-        flux::semantic::walk::walk(&mut visitor, walker);
-
         return visitor.imports;
     }
 
@@ -407,7 +363,6 @@ pub fn find_dot_completions(
     contents: &str,
 ) -> lsp::CompletionList {
     let uri = &params.text_document_position.text_document.uri;
-    let pos = params.text_document_position.position;
     let info = CompletionInfo::create(&params, contents);
 
     if let Some(info) = info {
@@ -422,7 +377,7 @@ pub fn find_dot_completions(
         let mut items = vec![];
 
         for completable in
-            get_specific_object(&info.ident, pos, uri, contents)
+            get_specific_object(&info.ident, uri, contents)
         {
             items.push(completable.completion_item(&info));
         }
@@ -479,8 +434,7 @@ fn get_user_completables(
     pos: lsp::Position,
     contents: &str,
 ) -> Vec<Arc<dyn Completable>> {
-    if let Some(pkg) = create_completion_package(&uri, pos, contents)
-    {
+    if let Some(pkg) = create_completion_package(&uri, contents) {
         let walker = flux::semantic::walk::Node::Package(&pkg);
         let mut visitor = CompletableFinderVisitor::new(pos);
 
@@ -547,7 +501,6 @@ pub fn find_param_completions(
 
                     let object_functions = get_object_functions(
                         uri,
-                        position,
                         ident.name.as_str(),
                         source,
                     );
@@ -608,13 +561,10 @@ fn get_specific_package_functions(
 
 fn get_specific_object(
     name: &str,
-    pos: lsp::Position,
     uri: &lsp::Url,
     contents: &str,
 ) -> Vec<Arc<dyn Completable>> {
-    if let Some(pkg) =
-        create_completion_package_removed(uri, pos, contents)
-    {
+    if let Some(pkg) = create_completion_package(uri, contents) {
         let walker = flux::semantic::walk::Node::Package(&pkg);
         let mut visitor = CompletableObjectFinderVisitor::new(name);
 
@@ -664,7 +614,7 @@ fn get_user_functions(
     pos: lsp::Position,
     source: &str,
 ) -> Vec<Function> {
-    if let Some(pkg) = create_completion_package(uri, pos, source) {
+    if let Some(pkg) = create_completion_package(uri, source) {
         let walker = flux::semantic::walk::Node::Package(&pkg);
         let mut visitor = FunctionFinderVisitor::new(pos);
 
@@ -677,11 +627,10 @@ fn get_user_functions(
 
 fn get_object_functions(
     uri: &lsp::Url,
-    pos: lsp::Position,
     object: &str,
     contents: &str,
 ) -> Vec<Function> {
-    if let Some(pkg) = create_completion_package(uri, pos, contents) {
+    if let Some(pkg) = create_completion_package(uri, contents) {
         let walker = flux::semantic::walk::Node::Package(&pkg);
         let mut visitor = ObjectFunctionFinderVisitor::default();
 
@@ -1519,108 +1468,12 @@ impl From<BuiltinType> for VarType {
     }
 }
 
-fn create_completion_package_removed(
-    uri: &lsp::Url,
-    pos: lsp::Position,
-    contents: &str,
-) -> Option<flux::semantic::nodes::Package> {
-    let mut file = parse_string("".to_string(), contents);
-
-    file.imports = file
-        .imports
-        .into_iter()
-        .filter(|x| {
-            !crate::lsp::position_in_range(
-                &pos,
-                &x.base.location.clone().into(),
-            )
-        })
-        .collect();
-
-    file.body = file
-        .body
-        .into_iter()
-        .filter(|x| {
-            !crate::lsp::position_in_range(
-                &pos,
-                &x.base().location.clone().into(),
-            )
-        })
-        .collect();
-
-    let mut pkg: Package =
-        parse_string(uri.to_string(), contents).into();
-
-    pkg.files = pkg
-        .files
-        .into_iter()
-        .map(|curr| {
-            if curr.name == uri.as_str() {
-                file.clone()
-            } else {
-                curr
-            }
-        })
-        .collect();
-
-    // XXX: rockstar (5 Feb 2022) - This is the cause of issue #391. This should
-    // bubble up and emit some diagnostic messages.
-    if let Ok(mut analyzer) = flux::new_semantic_analyzer(
-        flux::semantic::AnalyzerConfig::default(),
-    ) {
-        match analyzer.analyze_ast(&pkg) {
-            Ok((_, p)) => return Some(p),
-            Err(e) => {
-                if let Some((_, pkg)) = e.value {
-                    return Some(pkg);
-                } else {
-                    return None;
-                }
-            }
-        }
-    }
-    None
-}
-
 fn create_completion_package(
     uri: &lsp::Url,
-    pos: lsp::Position,
     contents: &str,
 ) -> Option<flux::semantic::nodes::Package> {
-    create_filtered_package(uri, contents, |x| {
-        !crate::lsp::position_in_range(
-            &pos,
-            &x.base().location.clone().into(),
-        )
-    })
-}
-
-fn create_filtered_package<F>(
-    uri: &lsp::Url,
-    contents: &str,
-    mut filter: F,
-) -> Option<flux::semantic::nodes::Package>
-where
-    F: FnMut(&flux::ast::Statement) -> bool,
-{
-    let mut ast_pkg: Package =
+    let ast_pkg: Package =
         parse_string(uri.to_string(), contents).into();
-
-    ast_pkg.files = ast_pkg
-        .files
-        .into_iter()
-        .map(|mut file| {
-            if file.name == uri.as_str() {
-                file.body = file
-                    .body
-                    .into_iter()
-                    .filter(|x| filter(x))
-                    .collect();
-            }
-
-            file
-        })
-        .collect();
 
     // XXX: rockstar (5 Feb 2022) - This is the cause of issue #391. This should
     // bubble up and emit some diagnostic messages.
