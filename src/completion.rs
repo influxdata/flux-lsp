@@ -43,10 +43,8 @@ pub fn find_completions(
     if let Some(info) = info {
         match info.completion_type {
             CompletionType::Generic => {
-                let mut stdlib_matches = get_stdlib_matches(
-                    info.ident.as_str(),
-                    info.clone(),
-                );
+                let mut stdlib_matches =
+                    get_stdlib_matches(info.ident.as_str(), &info);
                 items.append(&mut stdlib_matches);
 
                 let mut user_matches =
@@ -72,7 +70,7 @@ pub fn find_completions(
                     {
                         items.push(new_string_arg_completion(
                             info.path.as_str(),
-                            get_trigger(params.clone()),
+                            get_trigger(&params),
                         ));
                     }
                 }
@@ -135,14 +133,14 @@ impl CompletionInfo {
                 match parent.node {
                     AstNode::MemberExpr(me) => {
                         if let Expression::Identifier(obj) =
-                            me.object.clone()
+                            &me.object
                         {
                             return Some(CompletionInfo {
                                 completion_type:
                                     CompletionType::ObjectMember(
                                         obj.name.clone(),
                                     ),
-                                ident: obj.name,
+                                ident: obj.name.clone(),
                                 position,
                                 uri: uri.clone(),
                                 imports: get_imports_removed(
@@ -389,16 +387,16 @@ fn get_user_matches(
     let mut result: Vec<lsp::CompletionItem> = vec![];
     for x in completables {
         if x.matches(contents, &info) {
-            result.push(x.completion_item(info.clone()))
+            result.push(x.completion_item(&info))
         }
     }
 
     result
 }
 
-fn get_trigger(params: lsp::CompletionParams) -> Option<String> {
-    if let Some(context) = params.context {
-        context.trigger_character
+fn get_trigger(params: &lsp::CompletionParams) -> Option<&str> {
+    if let Some(context) = &params.context {
+        context.trigger_character.as_deref()
     } else {
         None
     }
@@ -422,19 +420,15 @@ pub fn find_dot_completions(
         );
 
         let mut items = vec![];
-        let obj_results = get_specific_object(
-            info.ident.clone(),
-            pos,
-            uri,
-            contents,
-        );
 
-        for completable in obj_results.into_iter() {
-            items.push(completable.completion_item(info.clone()));
+        for completable in
+            get_specific_object(&info.ident, pos, uri, contents)
+        {
+            items.push(completable.completion_item(&info));
         }
 
-        for item in list.into_iter() {
-            items.push(item.completion_item(info.clone()));
+        for item in list {
+            items.push(item.completion_item(&info));
         }
 
         return lsp::CompletionList {
@@ -451,10 +445,9 @@ pub fn find_dot_completions(
 
 fn new_string_arg_completion(
     value: &str,
-    trigger: Option<String>,
+    trigger: Option<&str>,
 ) -> lsp::CompletionItem {
-    let trigger = trigger.unwrap_or_else(|| "".to_string());
-    let insert_text = if trigger == "\"" {
+    let insert_text = if trigger == Some("\"") {
         value.to_string()
     } else {
         format!("\"{}\"", value)
@@ -500,14 +493,13 @@ fn get_user_completables(
 
 fn get_stdlib_matches(
     name: &str,
-    info: CompletionInfo,
+    info: &CompletionInfo,
 ) -> Vec<lsp::CompletionItem> {
     let mut matches = vec![];
     let completes = get_stdlib_completables();
 
-    for c in completes.into_iter().filter(|x| x.matches(name, &info))
-    {
-        matches.push(c.completion_item(info.clone()));
+    for c in completes.iter().filter(|x| x.matches(name, info)) {
+        matches.push(c.completion_item(info));
     }
 
     matches
@@ -615,7 +607,7 @@ fn get_specific_package_functions(
 }
 
 fn get_specific_object(
-    name: String,
+    name: &str,
     pos: lsp::Position,
     uri: &lsp::Url,
     contents: &str,
@@ -678,7 +670,7 @@ fn get_user_functions(
 
         flux::semantic::walk::walk(&mut visitor, walker);
 
-        return visitor.functions.clone();
+        return visitor.functions;
     }
     vec![]
 }
@@ -790,7 +782,7 @@ fn walk_package(
 trait Completable {
     fn completion_item(
         &self,
-        info: CompletionInfo,
+        info: &CompletionInfo,
     ) -> lsp::CompletionItem;
     fn matches(&self, text: &str, info: &CompletionInfo) -> bool;
 }
@@ -808,13 +800,13 @@ fn fuzzy_match(haystack: &str, needle: &str) -> bool {
 impl Completable for PackageResult {
     fn completion_item(
         &self,
-        info: CompletionInfo,
+        info: &CompletionInfo,
     ) -> lsp::CompletionItem {
         let mut insert_text = self.name.clone();
 
-        for import in info.imports {
+        for import in &info.imports {
             if self.full_name == import.path {
-                insert_text = import.alias;
+                insert_text = import.alias.clone();
             }
         }
 
@@ -851,13 +843,13 @@ impl Completable for PackageResult {
 impl Completable for FunctionResult {
     fn completion_item(
         &self,
-        info: CompletionInfo,
+        info: &CompletionInfo,
     ) -> lsp::CompletionItem {
-        let imports = info.imports;
+        let imports = &info.imports;
         let mut additional_text_edits = vec![];
 
         let contains_pkg =
-            imports.into_iter().any(|x| self.package == x.path);
+            imports.iter().any(|x| self.package == x.path);
 
         if !contains_pkg && self.package != PRELUDE_PACKAGE {
             additional_text_edits.push(lsp::TextEdit {
@@ -921,7 +913,7 @@ impl Completable for FunctionResult {
 impl Completable for CompletionVarResult {
     fn completion_item(
         &self,
-        _info: CompletionInfo,
+        _info: &CompletionInfo,
     ) -> lsp::CompletionItem {
         lsp::CompletionItem {
             label: format!("{} (self)", self.name),
@@ -1037,64 +1029,64 @@ impl<'a> SemanticVisitor<'a> for CompletableFinderVisitor {
             return true;
         }
 
-        if let flux::semantic::walk::Node::ImportDeclaration(id) =
-            node
-        {
-            if let Some(alias) = id.alias.clone() {
-                self.completables.push(Arc::new(
-                    ImportAliasResult::new(
-                        id.path.value.clone(),
-                        alias.name.to_string(),
-                    ),
-                ));
-            }
-        }
-
-        if let flux::semantic::walk::Node::VariableAssgn(assgn) = node
-        {
-            let name = assgn.id.name.clone();
-            if let Some(var_type) = get_var_type(&assgn.init) {
-                self.completables.push(Arc::new(
-                    CompletionVarResult {
-                        var_type,
-                        name: name.to_string(),
-                    },
-                ));
+        match node {
+            flux::semantic::walk::Node::ImportDeclaration(id) => {
+                if let Some(alias) = &id.alias {
+                    self.completables.push(Arc::new(
+                        ImportAliasResult::new(
+                            id.path.value.clone(),
+                            alias.name.to_string(),
+                        ),
+                    ));
+                }
             }
 
-            if let Some(fun) =
-                create_function_result(name.to_string(), &assgn.init)
-            {
-                self.completables.push(Arc::new(fun));
-            }
-        }
-
-        if let flux::semantic::walk::Node::OptionStmt(opt) = node {
-            if let flux::semantic::nodes::Assignment::Variable(
-                var_assign,
-            ) = &opt.assignment
-            {
-                let name = var_assign.id.name.clone();
-                if let Some(var_type) = get_var_type(&var_assign.init)
-                {
+            flux::semantic::walk::Node::VariableAssgn(assgn) => {
+                let name = &assgn.id.name;
+                if let Some(var_type) = get_var_type(&assgn.init) {
                     self.completables.push(Arc::new(
                         CompletionVarResult {
-                            name: name.to_string(),
                             var_type,
+                            name: name.to_string(),
                         },
                     ));
-
-                    return false;
                 }
 
-                if let Some(fun) = create_function_result(
-                    name.to_string(),
-                    &var_assign.init,
-                ) {
+                if let Some(fun) =
+                    create_function_result(name, &assgn.init)
+                {
                     self.completables.push(Arc::new(fun));
-                    return false;
                 }
             }
+
+            flux::semantic::walk::Node::OptionStmt(opt) => {
+                if let flux::semantic::nodes::Assignment::Variable(
+                    var_assign,
+                ) = &opt.assignment
+                {
+                    let name = &var_assign.id.name;
+                    if let Some(var_type) =
+                        get_var_type(&var_assign.init)
+                    {
+                        self.completables.push(Arc::new(
+                            CompletionVarResult {
+                                name: name.to_string(),
+                                var_type,
+                            },
+                        ));
+
+                        return false;
+                    }
+
+                    if let Some(fun) =
+                        create_function_result(name, &var_assign.init)
+                    {
+                        self.completables.push(Arc::new(fun));
+                        return false;
+                    }
+                }
+            }
+            _ => (),
         }
 
         true
@@ -1136,7 +1128,7 @@ impl ImportAliasResult {
 impl Completable for ImportAliasResult {
     fn completion_item(
         &self,
-        _info: CompletionInfo,
+        _info: &CompletionInfo,
     ) -> lsp::CompletionItem {
         lsp::CompletionItem {
             label: format!("{} (self)", self.alias),
@@ -1199,13 +1191,13 @@ fn get_var_type(
 }
 
 fn create_function_result(
-    name: String,
+    name: &str,
     expr: &SemanticExpression,
 ) -> Option<UserFunctionResult> {
     if let SemanticExpression::Function(f) = expr {
-        if let MonoType::Fun(fun) = f.typ.clone() {
+        if let MonoType::Fun(fun) = &f.typ {
             return Some(UserFunctionResult {
-                name,
+                name: name.into(),
                 package: "self".to_string(),
                 package_name: Some("self".to_string()),
                 optional_args: get_argument_names(&fun.opt),
@@ -1226,13 +1218,13 @@ fn follow_function_pipes(c: &CallExpr) -> &MonoType {
     &c.typ
 }
 
-struct CompletableObjectFinderVisitor {
-    name: String,
+struct CompletableObjectFinderVisitor<'a> {
+    name: &'a str,
     completables: Vec<Arc<dyn Completable>>,
 }
 
-impl CompletableObjectFinderVisitor {
-    fn new(name: String) -> Self {
+impl<'a> CompletableObjectFinderVisitor<'a> {
+    fn new(name: &'a str) -> Self {
         CompletableObjectFinderVisitor {
             completables: Vec::new(),
             name,
@@ -1240,83 +1232,19 @@ impl CompletableObjectFinderVisitor {
     }
 }
 
-impl<'a> SemanticVisitor<'a> for CompletableObjectFinderVisitor {
+impl<'a> SemanticVisitor<'a> for CompletableObjectFinderVisitor<'_> {
     fn visit(
         &mut self,
         node: flux::semantic::walk::Node<'a>,
     ) -> bool {
-        let name = self.name.clone();
+        let name = self.name;
 
-        if let flux::semantic::walk::Node::ObjectExpr(obj) = node {
-            if let Some(ident) = &obj.with {
-                if name == *ident.name {
-                    for prop in obj.properties.clone() {
-                        let name = prop.key.name;
-                        if let Some(var_type) =
-                            get_var_type(&prop.value)
-                        {
-                            self.completables.push(Arc::new(
-                                CompletionVarResult {
-                                    var_type,
-                                    name: name.to_string(),
-                                },
-                            ));
-                        }
-                        if let Some(fun) = create_function_result(
-                            name.to_string(),
-                            &prop.value,
-                        ) {
-                            self.completables.push(Arc::new(fun));
-                        }
-                    }
-                }
-            }
-        }
-
-        if let flux::semantic::walk::Node::VariableAssgn(assign) =
-            node
-        {
-            if *assign.id.name == name {
-                if let SemanticExpression::Object(obj) = &assign.init
-                {
-                    for prop in obj.properties.clone() {
-                        let name = prop.key.name;
-
-                        if let Some(var_type) =
-                            get_var_type(&prop.value)
-                        {
-                            self.completables.push(Arc::new(
-                                CompletionVarResult {
-                                    var_type,
-                                    name: name.to_string(),
-                                },
-                            ));
-                        }
-
-                        if let Some(fun) = create_function_result(
-                            name.to_string(),
-                            &prop.value,
-                        ) {
-                            self.completables.push(Arc::new(fun));
-                        }
-                    }
-
-                    return false;
-                }
-            }
-        }
-
-        if let flux::semantic::walk::Node::OptionStmt(opt) = node {
-            if let flux::semantic::nodes::Assignment::Variable(
-                assign,
-            ) = opt.assignment.clone()
-            {
-                if *assign.id.name == name {
-                    if let SemanticExpression::Object(obj) =
-                        assign.init
-                    {
-                        for prop in obj.properties.clone() {
-                            let name = prop.key.name;
+        match node {
+            flux::semantic::walk::Node::ObjectExpr(obj) => {
+                if let Some(ident) = &obj.with {
+                    if ident.name == name {
+                        for prop in &obj.properties {
+                            let name = &prop.key.name;
                             if let Some(var_type) =
                                 get_var_type(&prop.value)
                             {
@@ -1328,16 +1256,85 @@ impl<'a> SemanticVisitor<'a> for CompletableObjectFinderVisitor {
                                 ));
                             }
                             if let Some(fun) = create_function_result(
-                                name.to_string(),
+                                name,
                                 &prop.value,
                             ) {
                                 self.completables.push(Arc::new(fun));
                             }
                         }
+                    }
+                }
+            }
+
+            flux::semantic::walk::Node::VariableAssgn(assign) => {
+                if assign.id.name == name {
+                    if let SemanticExpression::Object(obj) =
+                        &assign.init
+                    {
+                        for prop in &obj.properties {
+                            let name = &prop.key.name;
+
+                            if let Some(var_type) =
+                                get_var_type(&prop.value)
+                            {
+                                self.completables.push(Arc::new(
+                                    CompletionVarResult {
+                                        var_type,
+                                        name: name.to_string(),
+                                    },
+                                ));
+                            }
+
+                            if let Some(fun) = create_function_result(
+                                name,
+                                &prop.value,
+                            ) {
+                                self.completables.push(Arc::new(fun));
+                            }
+                        }
+
                         return false;
                     }
                 }
             }
+
+            flux::semantic::walk::Node::OptionStmt(opt) => {
+                if let flux::semantic::nodes::Assignment::Variable(
+                    assign,
+                ) = &opt.assignment
+                {
+                    if assign.id.name == name {
+                        if let SemanticExpression::Object(obj) =
+                            &assign.init
+                        {
+                            for prop in &obj.properties {
+                                let name = &prop.key.name;
+                                if let Some(var_type) =
+                                    get_var_type(&prop.value)
+                                {
+                                    self.completables.push(Arc::new(
+                                        CompletionVarResult {
+                                            var_type,
+                                            name: name.to_string(),
+                                        },
+                                    ));
+                                }
+                                if let Some(fun) =
+                                    create_function_result(
+                                        name,
+                                        &prop.value,
+                                    )
+                                {
+                                    self.completables
+                                        .push(Arc::new(fun));
+                                }
+                            }
+                            return false;
+                        }
+                    }
+                }
+            }
+            _ => (),
         }
 
         true
@@ -1416,7 +1413,7 @@ impl VarResult {
 impl Completable for VarResult {
     fn completion_item(
         &self,
-        _info: CompletionInfo,
+        _info: &CompletionInfo,
     ) -> lsp::CompletionItem {
         lsp::CompletionItem {
             label: format!("{} ({})", self.name, self.package),
@@ -1682,7 +1679,7 @@ impl UserFunctionResult {
 impl Completable for UserFunctionResult {
     fn completion_item(
         &self,
-        _info: CompletionInfo,
+        _info: &CompletionInfo,
     ) -> lsp::CompletionItem {
         lsp::CompletionItem {
             label: format!("{} (self)", self.name),
