@@ -1,4 +1,4 @@
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use flux::ast::walk::walk;
 use flux::ast::walk::Node as AstNode;
@@ -183,14 +183,8 @@ impl CompletionInfo {
                             if let Expression::Identifier(ident) =
                                 &left.object
                             {
-                                let key = match &left.property {
-                                    PropertyKey::Identifier(
-                                        ident,
-                                    ) => &ident.name,
-                                    PropertyKey::StringLit(lit) => {
-                                        &lit.value
-                                    }
-                                };
+                                let key =
+                                    property_key_str(&left.property);
 
                                 let name =
                                     format!("{}.{}", ident.name, key);
@@ -226,14 +220,7 @@ impl CompletionInfo {
                             grandparent.node,
                             greatgrandparent.node,
                         ) {
-                            let name = match &prop.key {
-                                PropertyKey::Identifier(ident) => {
-                                    &ident.name
-                                }
-                                PropertyKey::StringLit(lit) => {
-                                    &lit.value
-                                }
-                            };
+                            let name = property_key_str(&prop.key);
 
                             if let Expression::Identifier(func) =
                                 &call.callee
@@ -243,7 +230,7 @@ impl CompletionInfo {
                                         CompletionType::CallProperty(
                                             func.name.clone(),
                                         ),
-                                    ident: name.clone(),
+                                    ident: name.to_owned(),
                                     position,
                                     uri: uri.clone(),
                                     imports: get_imports(
@@ -337,6 +324,13 @@ impl CompletionInfo {
         }
 
         None
+    }
+}
+
+fn property_key_str(p: &PropertyKey) -> &str {
+    match p {
+        PropertyKey::Identifier(i) => &i.name,
+        PropertyKey::StringLit(l) => &l.value,
     }
 }
 
@@ -499,9 +493,7 @@ fn get_user_completables(
 
         flux::semantic::walk::walk(&mut visitor, walker);
 
-        if let Ok(state) = visitor.state.lock() {
-            return (*state).completables.clone();
-        };
+        return visitor.completables;
     }
     vec![]
 }
@@ -540,50 +532,50 @@ pub fn find_param_completions(
     if let Some(AstNode::CallExpr(call)) = visitor.node {
         let provided = get_provided_arguments(call);
 
-        if let Expression::Identifier(ident) = &call.callee {
-            items.extend(get_function_params(
-                ident.name.as_str(),
-                stdlib::get_builtin_functions(),
-                &provided,
-            ));
-
-            let user_functions =
-                get_user_functions(uri, position, source);
-            items.extend(get_function_params(
-                ident.name.as_str(),
-                user_functions,
-                &provided,
-            ));
-        }
-        if let Expression::Member(me) = &call.callee {
-            if let Expression::Identifier(ident) = &me.object {
-                let package_functions =
-                    stdlib::get_package_functions(&ident.name);
-
-                let object_functions = get_object_functions(
-                    uri,
-                    position,
-                    ident.name.as_str(),
-                    source,
-                );
-
-                let key = match &me.property {
-                    PropertyKey::Identifier(i) => &i.name,
-                    PropertyKey::StringLit(l) => &l.value,
-                };
-
+        match &call.callee {
+            Expression::Identifier(ident) => {
                 items.extend(get_function_params(
-                    key.as_str(),
-                    package_functions,
+                    ident.name.as_str(),
+                    stdlib::get_builtin_functions(),
                     &provided,
                 ));
 
+                let user_functions =
+                    get_user_functions(uri, position, source);
                 items.extend(get_function_params(
-                    key.as_str(),
-                    object_functions,
+                    ident.name.as_str(),
+                    user_functions,
                     &provided,
                 ));
             }
+            Expression::Member(me) => {
+                if let Expression::Identifier(ident) = &me.object {
+                    let package_functions =
+                        stdlib::get_package_functions(&ident.name);
+
+                    let object_functions = get_object_functions(
+                        uri,
+                        position,
+                        ident.name.as_str(),
+                        source,
+                    );
+
+                    let key = property_key_str(&me.property);
+
+                    items.extend(get_function_params(
+                        key,
+                        package_functions,
+                        &provided,
+                    ));
+
+                    items.extend(get_function_params(
+                        key,
+                        object_functions,
+                        &provided,
+                    ));
+                }
+            }
+            _ => (),
         }
     }
 
@@ -760,7 +752,8 @@ fn walk_package(
                     name: name.to_owned(),
                     var_type,
                     package: package.into(),
-                    package_name: get_package_name(package),
+                    package_name: get_package_name(package)
+                        .map(|s| s.to_owned()),
                 }));
             };
 
@@ -1020,23 +1013,17 @@ fn add_package_result(
     name: &str,
     list: &mut Vec<Box<dyn Completable>>,
 ) {
-    let package_name = get_package_name(name);
-    if let Some(package_name) = package_name {
+    if let Some(package_name) = get_package_name(name) {
         list.push(Box::new(PackageResult {
-            name: package_name,
+            name: package_name.into(),
             full_name: name.to_string(),
         }));
     }
 }
 
-#[derive(Default)]
-struct CompletableFinderState {
-    completables: Vec<Arc<dyn Completable>>,
-}
-
 struct CompletableFinderVisitor {
     pos: lsp::Position,
-    state: Arc<Mutex<CompletableFinderState>>,
+    completables: Vec<Arc<dyn Completable>>,
 }
 
 impl<'a> SemanticVisitor<'a> for CompletableFinderVisitor {
@@ -1044,74 +1031,68 @@ impl<'a> SemanticVisitor<'a> for CompletableFinderVisitor {
         &mut self,
         node: flux::semantic::walk::Node<'a>,
     ) -> bool {
-        if let Ok(mut state) = self.state.lock() {
-            let loc = node.loc();
+        let loc = node.loc();
 
-            if defined_after(loc, self.pos) {
-                return true;
+        if defined_after(loc, self.pos) {
+            return true;
+        }
+
+        if let flux::semantic::walk::Node::ImportDeclaration(id) =
+            node
+        {
+            if let Some(alias) = id.alias.clone() {
+                self.completables.push(Arc::new(
+                    ImportAliasResult::new(
+                        id.path.value.clone(),
+                        alias.name.to_string(),
+                    ),
+                ));
+            }
+        }
+
+        if let flux::semantic::walk::Node::VariableAssgn(assgn) = node
+        {
+            let name = assgn.id.name.clone();
+            if let Some(var_type) = get_var_type(&assgn.init) {
+                self.completables.push(Arc::new(
+                    CompletionVarResult {
+                        var_type,
+                        name: name.to_string(),
+                    },
+                ));
             }
 
-            if let flux::semantic::walk::Node::ImportDeclaration(id) =
-                node
+            if let Some(fun) =
+                create_function_result(name.to_string(), &assgn.init)
             {
-                if let Some(alias) = id.alias.clone() {
-                    (*state).completables.push(Arc::new(
-                        ImportAliasResult::new(
-                            id.path.value.clone(),
-                            alias.name.to_string(),
-                        ),
-                    ));
-                }
+                self.completables.push(Arc::new(fun));
             }
+        }
 
-            if let flux::semantic::walk::Node::VariableAssgn(assgn) =
-                node
+        if let flux::semantic::walk::Node::OptionStmt(opt) = node {
+            if let flux::semantic::nodes::Assignment::Variable(
+                var_assign,
+            ) = &opt.assignment
             {
-                let name = assgn.id.name.clone();
-                if let Some(var_type) = get_var_type(&assgn.init) {
-                    (*state).completables.push(Arc::new(
+                let name = var_assign.id.name.clone();
+                if let Some(var_type) = get_var_type(&var_assign.init)
+                {
+                    self.completables.push(Arc::new(
                         CompletionVarResult {
-                            var_type,
                             name: name.to_string(),
+                            var_type,
                         },
                     ));
+
+                    return false;
                 }
 
                 if let Some(fun) = create_function_result(
                     name.to_string(),
-                    &assgn.init,
+                    &var_assign.init,
                 ) {
-                    (*state).completables.push(Arc::new(fun));
-                }
-            }
-
-            if let flux::semantic::walk::Node::OptionStmt(opt) = node
-            {
-                if let flux::semantic::nodes::Assignment::Variable(
-                    var_assign,
-                ) = &opt.assignment
-                {
-                    let name = var_assign.id.name.clone();
-                    if let Some(var_type) =
-                        get_var_type(&var_assign.init)
-                    {
-                        (*state).completables.push(Arc::new(
-                            CompletionVarResult {
-                                name: name.to_string(),
-                                var_type,
-                            },
-                        ));
-
-                        return false;
-                    }
-
-                    if let Some(fun) = create_function_result(
-                        name.to_string(),
-                        &var_assign.init,
-                    ) {
-                        (*state).completables.push(Arc::new(fun));
-                        return false;
-                    }
+                    self.completables.push(Arc::new(fun));
+                    return false;
                 }
             }
         }
@@ -1123,9 +1104,7 @@ impl<'a> SemanticVisitor<'a> for CompletableFinderVisitor {
 impl CompletableFinderVisitor {
     fn new(pos: lsp::Position) -> Self {
         CompletableFinderVisitor {
-            state: Arc::new(Mutex::new(
-                CompletableFinderState::default(),
-            )),
+            completables: Vec::new(),
             pos,
         }
     }

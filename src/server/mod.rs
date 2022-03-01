@@ -1020,7 +1020,7 @@ impl LanguageServer for LspServer {
                         // package available for import.
                         let imports = flux::imports()?;
                         let potential_imports: Vec<&String> = imports.iter().filter(|x| match crate::shared::get_package_name(x.0) {
-                            Some(name) => &name == identifier,
+                            Some(name) => name == identifier,
                             None => false,
                         }).map(|x| x.0 ).collect();
                         if potential_imports.is_empty() {

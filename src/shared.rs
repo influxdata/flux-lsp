@@ -1,8 +1,8 @@
 use lspower::lsp;
 
-pub fn get_package_name(name: &str) -> Option<String> {
+pub fn get_package_name(name: &str) -> Option<&str> {
     let items = name.split('/');
-    items.last().map(|n| n.to_string())
+    items.last()
 }
 
 #[allow(clippy::implicit_hasher)]
@@ -19,6 +19,18 @@ pub fn get_argument_names(
 pub struct Function {
     pub name: String,
     pub params: Vec<String>,
+}
+
+impl Function {
+    pub(crate) fn new(
+        name: String,
+        f: &flux::semantic::types::Function,
+    ) -> Self {
+        let mut params = get_argument_names(&f.req);
+        params.extend(get_argument_names(&f.opt));
+
+        Self { name, params }
+    }
 }
 
 pub struct FunctionSignature {

@@ -1,6 +1,4 @@
-use crate::shared::{
-    get_argument_names, get_package_name, Function, FunctionInfo,
-};
+use crate::shared::{get_package_name, Function, FunctionInfo};
 
 use flux::imports;
 use flux::prelude;
@@ -136,10 +134,9 @@ pub fn get_package_infos() -> Vec<PackageInfo> {
 
     if let Some(env) = imports() {
         for (path, _val) in env.iter() {
-            let name = get_package_name(path);
-            if let Some(name) = name {
+            if let Some(name) = get_package_name(path) {
                 result.push(PackageInfo {
-                    name,
+                    name: name.into(),
                     path: path.to_string(),
                 })
             }
@@ -149,26 +146,29 @@ pub fn get_package_infos() -> Vec<PackageInfo> {
     result
 }
 
-fn walk_package_functions(
-    package: String,
-    list: &mut Vec<Function>,
-    t: &MonoType,
-) {
-    if let MonoType::Record(record) = t {
-        if let Record::Extension { head, tail } = record.as_ref() {
-            if let MonoType::Fun(f) = &head.v {
-                let mut params = vec![];
-
-                params.extend(get_argument_names(&f.req));
-                params.extend(get_argument_names(&f.opt));
-
-                list.push(Function {
-                    params,
-                    name: head.k.clone().into(),
-                });
+// TODO Use Record/MonoType::fields from flux
+fn record_fields(
+    this: &Record,
+) -> impl Iterator<Item = &flux::semantic::types::Property> {
+    let mut record = Some(this);
+    std::iter::from_fn(move || match record {
+        Some(Record::Extension { head, tail }) => {
+            match tail {
+                MonoType::Record(tail) => record = Some(tail),
+                _ => record = None,
             }
+            Some(head)
+        }
+        _ => None,
+    })
+}
 
-            walk_package_functions(package, list, tail);
+fn walk_package_functions(list: &mut Vec<Function>, t: &MonoType) {
+    if let MonoType::Record(record) = t {
+        for head in record_fields(record) {
+            if let MonoType::Fun(f) = &head.v {
+                list.push(Function::new(head.k.clone().into(), f));
+            }
         }
     }
 }
@@ -181,7 +181,6 @@ pub fn get_package_functions(name: &str) -> Vec<Function> {
             if let Some(package_name) = get_package_name(key) {
                 if package_name == name {
                     walk_package_functions(
-                        key.to_string(),
                         &mut list,
                         &val.typ().expr,
                     );
@@ -199,7 +198,7 @@ fn walk_functions(
     t: &MonoType,
 ) {
     if let MonoType::Record(record) = t {
-        if let Record::Extension { head, tail } = record.as_ref() {
+        for head in record_fields(record) {
             if let MonoType::Fun(f) = &head.v {
                 if let Some(package_name) =
                     get_package_name(package.as_str())
@@ -207,12 +206,10 @@ fn walk_functions(
                     list.push(FunctionInfo::new(
                         head.k.clone().into(),
                         f.as_ref(),
-                        package_name,
+                        package_name.into(),
                     ));
                 }
             }
-
-            walk_functions(package, list, tail);
         }
     }
 }
@@ -251,13 +248,7 @@ pub fn get_builtin_functions() -> Vec<Function> {
     if let Some(env) = prelude() {
         for (key, val) in env.iter() {
             if let MonoType::Fun(f) = &val.expr {
-                let mut params = get_argument_names(&f.req);
-                params.extend(get_argument_names(&f.opt));
-
-                list.push(Function {
-                    name: key.to_string(),
-                    params,
-                })
+                list.push(Function::new(key.to_string(), f));
             }
         }
     }
