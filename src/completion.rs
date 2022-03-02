@@ -1528,7 +1528,10 @@ pub fn find_completions_2(
 
     let mut items = Vec::new();
 
+    dbg!(position);
+
     if let Some(finder_node) = visitor.node {
+        dbg!(&finder_node.node);
         match finder_node.node {
             AstNode::Identifier(id) => {
                 items.extend(get_identifier_matches(
@@ -1556,6 +1559,77 @@ pub fn find_completions_2(
                         sem_pkg,
                     );
                 }
+            }
+            AstNode::CallExpr(call) => {
+                let mut completion_params = Vec::new();
+                let provided = get_provided_arguments(call);
+
+                match &call.callee {
+                    Expression::Identifier(ident) => {
+                        completion_params.extend(
+                            get_function_params(
+                                ident.name.as_str(),
+                                stdlib::get_builtin_functions(),
+                                &provided,
+                            ),
+                        );
+
+                        let user_functions =
+                            get_user_functions(position, &sem_pkg);
+                        completion_params.extend(
+                            get_function_params(
+                                ident.name.as_str(),
+                                user_functions,
+                                &provided,
+                            ),
+                        );
+                    }
+                    Expression::Member(me) => {
+                        if let Expression::Identifier(ident) =
+                            &me.object
+                        {
+                            let package_functions =
+                                stdlib::get_package_functions(
+                                    &ident.name,
+                                );
+
+                            let object_functions =
+                                get_object_functions(
+                                    ident.name.as_str(),
+                                    &sem_pkg,
+                                );
+
+                            let key = property_key_str(&me.property);
+
+                            completion_params.extend(
+                                get_function_params(
+                                    key,
+                                    package_functions,
+                                    &provided,
+                                ),
+                            );
+
+                            completion_params.extend(
+                                get_function_params(
+                                    key,
+                                    object_functions,
+                                    &provided,
+                                ),
+                            );
+                        }
+                    }
+                    _ => (),
+                }
+
+                let trigger =
+                    params.context.as_ref().and_then(|context| {
+                        context.trigger_character.as_deref()
+                    });
+
+                items = completion_params
+                    .into_iter()
+                    .map(|x| new_param_completion(x, trigger))
+                    .collect();
             }
             _ => (),
         }
