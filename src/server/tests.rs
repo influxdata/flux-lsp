@@ -1897,6 +1897,7 @@ async fn test_param_completion() {
     let fluxscript = r#"import "csv"
 
 csv.from(
+     // ^
         "#;
     let server = create_server();
     open_file(&server, fluxscript.to_string()).await;
@@ -1907,10 +1908,7 @@ csv.from(
                 uri: lsp::Url::parse("file:///home/user/file.flux")
                     .unwrap(),
             },
-            position: lsp::Position {
-                line: 2,
-                character: 8,
-            },
+            position: position_of(fluxscript),
         },
         work_done_progress_params: lsp::WorkDoneProgressParams {
             work_done_token: None,
