@@ -1479,6 +1479,7 @@ sql.
     let result =
         server.completion(params.clone()).await.unwrap().unwrap();
 
+
     let expected_labels: Vec<String> = vec!["to", "from"]
         .into_iter()
         .map(|x| x.into())
