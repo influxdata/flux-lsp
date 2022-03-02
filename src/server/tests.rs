@@ -79,9 +79,7 @@ async fn test_initialized() {
 async fn test_shutdown() {
     let server = create_server();
 
-    let result = server.shutdown().await.unwrap();
-
-    assert_eq!((), result)
+    server.shutdown().await.unwrap();
 }
 
 #[test]
@@ -99,7 +97,7 @@ async fn test_did_open() {
     server.did_open(params).await;
 
     let uri = lsp::Url::parse("file:///home/user/file.flux").unwrap();
-    let contents = server.store.get(&uri).unwrap().clone();
+    let contents = server.store.get(&uri).unwrap();
     assert_eq!("from(", contents);
 }
 
@@ -128,7 +126,7 @@ async fn test_did_change() {
     server.did_change(params).await;
 
     let uri = lsp::Url::parse("file:///home/user/file.flux").unwrap();
-    let contents = server.store.get(&uri).unwrap().clone();
+    let contents = server.store.get(&uri).unwrap();
     assert_eq!(r#"from(bucket: "bucket")"#, contents);
 }
 
@@ -168,7 +166,7 @@ async fn test_did_change_with_range() {
     server.did_change(params).await;
 
     let uri = lsp::Url::parse("file:///home/user/file.flux").unwrap();
-    let contents = server.store.get(&uri).unwrap().clone();
+    let contents = server.store.get(&uri).unwrap();
     assert_eq!(
         r#"from(bucket: "bucket")
 |>  first()"#,
@@ -215,7 +213,7 @@ async fn test_did_change_with_multiline_range() {
     server.did_change(params).await;
 
     let uri = lsp::Url::parse("file:///home/user/file.flux").unwrap();
-    let contents = server.store.get(&uri).unwrap().clone();
+    let contents = server.store.get(&uri).unwrap();
     assert_eq!(
         r#"from(bucket: "bucket")
 |>drop(columns: ["_start", "_stop"])
@@ -241,7 +239,7 @@ async fn test_did_save() {
     };
     server.did_save(params).await;
 
-    let contents = server.store.get(&uri).unwrap().clone();
+    let contents = server.store.get(&uri).unwrap();
     assert_eq!(r#"from(bucket: "test2")"#.to_string(), contents);
 }
 
@@ -480,7 +478,7 @@ errorCounts
                 character: 96,
             },
         },
-        flux::formatter::format(&fluxscript).unwrap(),
+        flux::formatter::format(fluxscript).unwrap(),
     );
     assert_eq!(vec![expected], result);
 }
@@ -529,7 +527,7 @@ errorCounts
     let result = server.formatting(params).await.unwrap().unwrap();
 
     let mut formatted_text =
-        flux::formatter::format(&fluxscript).unwrap();
+        flux::formatter::format(fluxscript).unwrap();
     formatted_text.push('\n');
     let expected = lsp::TextEdit::new(
         lsp::Range {
@@ -1487,7 +1485,7 @@ sql."#;
         .map(|x| x.into())
         .collect::<Vec<String>>();
 
-    match result.clone() {
+    match result {
         lsp::CompletionResponse::List(l) => {
             assert_eq!(
                 expected_labels,
@@ -1555,7 +1553,7 @@ errorCounts
     let result =
         server.completion(params.clone()).await.unwrap().unwrap();
 
-    let items = match result.clone() {
+    let items = match result {
         lsp::CompletionResponse::List(l) => l.items,
         _ => unreachable!(),
     };
@@ -1677,7 +1675,7 @@ task.
     let result =
         server.completion(params.clone()).await.unwrap().unwrap();
 
-    let items = match result.clone() {
+    let items = match result {
         lsp::CompletionResponse::List(l) => l.items,
         _ => unreachable!(),
     };
@@ -1741,7 +1739,7 @@ ab = 10
     let result =
         server.completion(params.clone()).await.unwrap().unwrap();
 
-    let items = match result.clone() {
+    let items = match result {
         lsp::CompletionResponse::List(l) => l.items,
         _ => unreachable!(),
     };
@@ -1883,7 +1881,7 @@ obj.func(
     let result =
         server.completion(params.clone()).await.unwrap().unwrap();
 
-    let items = match result.clone() {
+    let items = match result {
         lsp::CompletionResponse::List(l) => l.items,
         _ => unreachable!(),
     };
@@ -1932,7 +1930,7 @@ csv.from(
     let result =
         server.completion(params.clone()).await.unwrap().unwrap();
 
-    let items = match result.clone() {
+    let items = match result {
         lsp::CompletionResponse::List(l) => l.items,
         _ => unreachable!(),
     };
@@ -2008,7 +2006,7 @@ errorCounts
     let result =
         server.completion(params.clone()).await.unwrap().unwrap();
 
-    let items = match result.clone() {
+    let items = match result {
         lsp::CompletionResponse::List(l) => l.items,
         _ => unreachable!(),
     };

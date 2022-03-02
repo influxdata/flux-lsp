@@ -167,7 +167,7 @@ fn parse_semantic_graph(
     match analyzer.analyze_source(
         "".into(),
         key.clone().into(),
-        &contents,
+        contents,
     ) {
         Ok((_, pkg)) => Some(pkg),
         Err(err) => err.value.map(|(_, pkg)| pkg),

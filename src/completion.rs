@@ -48,20 +48,20 @@ pub fn find_completions(
                 items.append(&mut stdlib_matches);
 
                 let mut user_matches =
-                    get_user_matches(info, contents, &pkg);
+                    get_user_matches(info, contents, pkg);
 
                 items.append(&mut user_matches);
             }
             CompletionType::Bad => {}
             CompletionType::CallProperty(_func) => {
                 return find_param_completions(
-                    None, &params, contents, &pkg,
+                    None, &params, contents, pkg,
                 )
             }
             CompletionType::Import => {
                 let infos = stdlib::get_package_infos();
 
-                let imports = get_imports(&pkg);
+                let imports = get_imports(pkg);
 
                 let mut items = vec![];
                 for info in infos {
@@ -302,7 +302,7 @@ fn property_key_str(p: &PropertyKey) -> &str {
 }
 
 fn get_imports(pkg: &flux::semantic::nodes::Package) -> Vec<Import> {
-    let walker = flux::semantic::walk::Node::Package(&pkg);
+    let walker = flux::semantic::walk::Node::Package(pkg);
     let mut visitor = ImportFinderVisitor::default();
 
     flux::semantic::walk::walk(&mut visitor, walker);
@@ -414,7 +414,7 @@ fn get_user_completables(
     pos: lsp::Position,
     pkg: &flux::semantic::nodes::Package,
 ) -> Vec<Arc<dyn Completable>> {
-    let walker = flux::semantic::walk::Node::Package(&pkg);
+    let walker = flux::semantic::walk::Node::Package(pkg);
     let mut visitor = CompletableFinderVisitor::new(pos);
 
     flux::semantic::walk::walk(&mut visitor, walker);
@@ -465,7 +465,7 @@ pub fn find_param_completions(
                 ));
 
                 let user_functions =
-                    get_user_functions(position, &sem_pkg);
+                    get_user_functions(position, sem_pkg);
                 items.extend(get_function_params(
                     ident.name.as_str(),
                     user_functions,
@@ -479,7 +479,7 @@ pub fn find_param_completions(
 
                     let object_functions = get_object_functions(
                         ident.name.as_str(),
-                        &sem_pkg,
+                        sem_pkg,
                     );
 
                     let key = property_key_str(&me.property);
@@ -540,7 +540,7 @@ fn get_specific_object(
     name: &str,
     pkg: &flux::semantic::nodes::Package,
 ) -> Vec<Arc<dyn Completable>> {
-    let walker = flux::semantic::walk::Node::Package(&pkg);
+    let walker = flux::semantic::walk::Node::Package(pkg);
     let mut visitor = CompletableObjectFinderVisitor::new(name);
 
     flux::semantic::walk::walk(&mut visitor, walker);
@@ -585,7 +585,7 @@ fn get_user_functions(
     pos: lsp::Position,
     pkg: &flux::semantic::nodes::Package,
 ) -> Vec<Function> {
-    let walker = flux::semantic::walk::Node::Package(&pkg);
+    let walker = flux::semantic::walk::Node::Package(pkg);
     let mut visitor = FunctionFinderVisitor::new(pos);
 
     flux::semantic::walk::walk(&mut visitor, walker);
@@ -597,7 +597,7 @@ fn get_object_functions(
     object: &str,
     pkg: &flux::semantic::nodes::Package,
 ) -> Vec<Function> {
-    let walker = flux::semantic::walk::Node::Package(&pkg);
+    let walker = flux::semantic::walk::Node::Package(pkg);
     let mut visitor = ObjectFunctionFinderVisitor::default();
 
     flux::semantic::walk::walk(&mut visitor, walker);
@@ -1115,7 +1115,7 @@ fn create_function_result(
                 package_name: Some("self".to_string()),
                 optional_args: get_argument_names(&fun.opt),
                 required_args: get_argument_names(&fun.req),
-                signature: stdlib::create_function_signature(&fun),
+                signature: stdlib::create_function_signature(fun),
             });
         }
     }
