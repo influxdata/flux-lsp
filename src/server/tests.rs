@@ -1852,6 +1852,7 @@ async fn test_object_param_completion() {
 }
 
 obj.func(
+     // ^
         "#;
     let server = create_server();
     open_file(&server, fluxscript.to_string()).await;
@@ -1862,10 +1863,7 @@ obj.func(
                 uri: lsp::Url::parse("file:///home/user/file.flux")
                     .unwrap(),
             },
-            position: lsp::Position {
-                line: 4,
-                character: 8,
-            },
+            position: position_of(fluxscript),
         },
         work_done_progress_params: lsp::WorkDoneProgressParams {
             work_done_token: None,
