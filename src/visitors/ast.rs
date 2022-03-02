@@ -54,10 +54,8 @@ impl<'a> NodeFinderVisitor<'a> {
 
 impl<'a> walk::Visitor<'a> for NodeFinderVisitor<'a> {
     fn visit(&mut self, node: walk::Node<'a>) -> bool {
-        if crate::lsp::position_in_range(
-            &self.position,
-            &node.base().clone().location.into(),
-        ) {
+        let range = lsp::Range::from(node.base().clone().location);
+        if crate::lsp::position_in_range(&self.position, &range) {
             let parent = self.node.clone();
             if let Some(parent) = parent {
                 self.node = Some(NodeFinderNode {

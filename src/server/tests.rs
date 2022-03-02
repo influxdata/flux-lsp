@@ -1641,6 +1641,7 @@ option task = {
 }
 
 task.
+ // ^
 
 // ab = 10
 "#;
@@ -1653,10 +1654,7 @@ task.
                 uri: lsp::Url::parse("file:///home/user/file.flux")
                     .unwrap(),
             },
-            position: lsp::Position {
-                line: 16,
-                character: 5,
-            },
+            position: position_of(fluxscript),
         },
         work_done_progress_params: lsp::WorkDoneProgressParams {
             work_done_token: None,
