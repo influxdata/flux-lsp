@@ -1528,10 +1528,7 @@ pub fn find_completions_2(
 
     let mut items = Vec::new();
 
-    dbg!(position);
-
     if let Some(finder_node) = visitor.node {
-        dbg!(&finder_node.node);
         match finder_node.node {
             AstNode::Identifier(id) => {
                 items.extend(get_identifier_matches(
@@ -1631,6 +1628,42 @@ pub fn find_completions_2(
                     .map(|x| new_param_completion(x, trigger))
                     .collect();
             }
+
+            AstNode::StringLit(_) => {
+                let parent = finder_node
+                    .parent
+                    .as_ref()
+                    .map(|parent| &parent.node);
+                match parent {
+                    Some(AstNode::ImportDeclaration(_)) => {
+                        let infos = stdlib::get_package_infos();
+
+                        let imports = get_imports(&sem_pkg);
+
+                        let mut items = vec![];
+                        for info in infos {
+                            if !(&imports)
+                                .iter()
+                                .any(|x| x.path == info.name)
+                            {
+                                items.push(
+                                    new_string_arg_completion(
+                                        info.path.as_str(),
+                                        get_trigger(&params),
+                                    ),
+                                );
+                            }
+                        }
+
+                        return lsp::CompletionList {
+                            is_incomplete: false,
+                            items,
+                        };
+                    }
+                    _ => (),
+                }
+            }
+
             _ => (),
         }
     }
