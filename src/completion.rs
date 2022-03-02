@@ -354,27 +354,9 @@ pub fn find_dot_completions(
     let info = CompletionInfo::create(&params, source, pkg);
 
     if let Some(info) = info {
-        let mut list = vec![];
-        let name = &info.ident;
-        get_specific_package_functions(
-            &mut list,
-            name.as_str(),
-            &info.imports,
-        );
-
-        let mut items = vec![];
-
-        for completable in get_specific_object(&info.ident, pkg) {
-            items.push(completable.completion_item(&info));
-        }
-
-        for item in list {
-            items.push(item.completion_item(&info));
-        }
-
         return lsp::CompletionList {
             is_incomplete: false,
-            items,
+            items: get_dot_completions(info, pkg),
         };
     }
 
@@ -382,6 +364,31 @@ pub fn find_dot_completions(
         is_incomplete: false,
         items: vec![],
     }
+}
+
+fn get_dot_completions(
+    info: CompletionInfo,
+    pkg: &flux::semantic::nodes::Package,
+) -> Vec<lsp::CompletionItem> {
+    let mut list = vec![];
+    let name = &info.ident;
+    get_specific_package_functions(
+        &mut list,
+        name.as_str(),
+        &info.imports,
+    );
+
+    let mut items = vec![];
+
+    for completable in get_specific_object(&info.ident, pkg) {
+        items.push(completable.completion_item(&info));
+    }
+
+    for item in list {
+        items.push(item.completion_item(&info));
+    }
+
+    items
 }
 
 fn new_string_arg_completion(
@@ -1515,15 +1522,13 @@ pub fn find_completions_2(
 
     let pkg: Package = parse_string(uri.to_string(), contents).into();
     let walker = AstNode::File(&pkg.files[0]);
-    let mut visitor = NodeFinderVisitor::new(move_back(position, 1));
+    let mut visitor = NodeFinderVisitor::new(position);
 
     walk(&mut visitor, walker);
 
     let mut items = Vec::new();
 
     if let Some(finder_node) = visitor.node {
-        dbg!(&finder_node.node);
-
         match finder_node.node {
             AstNode::Identifier(id) => {
                 items.extend(get_identifier_matches(
@@ -1536,6 +1541,21 @@ pub fn find_completions_2(
                     contents,
                     sem_pkg,
                 ));
+            }
+            AstNode::MemberExpr(member) => {
+                // TODO Handle completion on member accesses on non-identifiers
+                if let Expression::Identifier(ident) = &member.object
+                {
+                    items = get_dot_completions(
+                        CompletionInfo {
+                            completion_type: CompletionType::Generic,
+                            ident: ident.name.clone(),
+                            position,
+                            imports: get_imports(sem_pkg),
+                        },
+                        sem_pkg,
+                    );
+                }
             }
             _ => (),
         }
