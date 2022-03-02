@@ -43,14 +43,9 @@ pub fn find_completions(
     if let Some(info) = info {
         match info.completion_type {
             CompletionType::Generic => {
-                let mut stdlib_matches =
-                    get_stdlib_matches(info.ident.as_str(), &info);
-                items.append(&mut stdlib_matches);
-
-                let mut user_matches =
-                    get_user_matches(info, contents, pkg);
-
-                items.append(&mut user_matches);
+                items.extend(get_identifier_matches(
+                    info, contents, pkg,
+                ));
             }
             CompletionType::Bad => {}
             CompletionType::CallProperty(_func) => {
@@ -331,6 +326,16 @@ fn get_user_matches(
     }
 
     result
+}
+
+fn get_identifier_matches<'a>(
+    info: CompletionInfo,
+    contents: &'a str,
+    pkg: &'a flux::semantic::nodes::Package,
+) -> impl Iterator<Item = lsp::CompletionItem> + 'a {
+    get_stdlib_matches(info.ident.as_str(), &info)
+        .into_iter()
+        .chain(get_user_matches(info, contents, &pkg))
 }
 
 fn get_trigger(params: &lsp::CompletionParams) -> Option<&str> {
@@ -1497,5 +1502,47 @@ impl Completable for UserFunctionResult {
 
     fn matches(&self, text: &str, _info: &CompletionInfo) -> bool {
         fuzzy_match(self.name.as_str(), text)
+    }
+}
+
+pub fn find_completions_2(
+    params: lsp::CompletionParams,
+    contents: &str,
+    sem_pkg: &flux::semantic::nodes::Package,
+) -> lsp::CompletionList {
+    let uri = &params.text_document_position.text_document.uri;
+    let position = params.text_document_position.position;
+
+    let pkg: Package = parse_string(uri.to_string(), contents).into();
+    let walker = AstNode::File(&pkg.files[0]);
+    let mut visitor = NodeFinderVisitor::new(move_back(position, 1));
+
+    walk(&mut visitor, walker);
+
+    let mut items = Vec::new();
+
+    if let Some(finder_node) = visitor.node {
+        dbg!(&finder_node.node);
+
+        match finder_node.node {
+            AstNode::Identifier(id) => {
+                items.extend(get_identifier_matches(
+                    CompletionInfo {
+                        completion_type: CompletionType::Generic,
+                        ident: id.name.clone(),
+                        position,
+                        imports: get_imports(sem_pkg),
+                    },
+                    contents,
+                    sem_pkg,
+                ));
+            }
+            _ => (),
+        }
+    }
+
+    lsp::CompletionList {
+        is_incomplete: false,
+        items,
     }
 }

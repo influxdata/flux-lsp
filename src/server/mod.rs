@@ -892,45 +892,14 @@ impl LanguageServer for LspServer {
             None => return Ok(None),
         };
 
-        let items = if let Some(ctx) = &params.context {
-            match (ctx.trigger_kind, &ctx.trigger_character) {
-                (
-                    lsp::CompletionTriggerKind::TRIGGER_CHARACTER,
-                    Some(c),
-                ) => match c.as_str() {
-                    "." => completion::find_dot_completions(
-                        params, &contents, &sem_pkg,
-                    ),
-                    ":" => {
-                        // XXX: rockstar (29 Nov 2021) - This is where argument
-                        // completion will live, e.g. buckets, measurements and
-                        // tag keys/values. There are multiple issues open to support
-                        // this functionality open currently.
-                        lsp::CompletionList {
-                            is_incomplete: false,
-                            items: vec![],
-                        }
-                    }
-                    "(" | "," => completion::find_param_completions(
-                        Some(c),
-                        &params,
-                        contents.as_str(),
-                        &sem_pkg,
-                    ),
-                    _ => completion::find_completions(
-                        params,
-                        contents.as_str(),
-                        &sem_pkg,
-                    ),
-                },
-                _ => completion::find_completions(
-                    params,
-                    contents.as_str(),
-                    &sem_pkg,
-                ),
-            }
-        } else {
+        let items = if false {
             completion::find_completions(
+                params,
+                contents.as_str(),
+                &sem_pkg,
+            )
+        } else {
+            completion::find_completions_2(
                 params,
                 contents.as_str(),
                 &sem_pkg,
