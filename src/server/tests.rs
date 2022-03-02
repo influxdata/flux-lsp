@@ -1445,6 +1445,7 @@ async fn test_completion_resolve() {
 
     assert_eq!(params, result);
 }
+
 #[test]
 async fn test_package_completion() {
     let fluxscript = r#"import "sql"
@@ -1495,6 +1496,135 @@ sql.
                     .collect::<Vec<String>>()
             );
         }
+        _ => unreachable!(),
+    };
+}
+
+#[test]
+async fn test_import_completion() {
+    let fluxscript = r#"
+import "
+    // ^
+
+x = 1
+"#;
+    let server = create_server();
+    open_file(&server, fluxscript.to_string()).await;
+
+    let params = lsp::CompletionParams {
+        text_document_position: lsp::TextDocumentPositionParams {
+            text_document: lsp::TextDocumentIdentifier {
+                uri: lsp::Url::parse("file:///home/user/file.flux")
+                    .unwrap(),
+            },
+            position: position_of(fluxscript),
+        },
+        work_done_progress_params: lsp::WorkDoneProgressParams {
+            work_done_token: None,
+        },
+        partial_result_params: lsp::PartialResultParams {
+            partial_result_token: None,
+        },
+        context: Some(lsp::CompletionContext {
+            trigger_kind: lsp::CompletionTriggerKind::INVOKED,
+            trigger_character: None,
+        }),
+    };
+
+    let result =
+        server.completion(params.clone()).await.unwrap().unwrap();
+
+    match result.clone() {
+        lsp::CompletionResponse::List(l) => {
+            expect![[r#"
+                [
+                    "\"array\"",
+                    "\"contrib/RohanSreerama5/naiveBayesClassifier\"",
+                    "\"contrib/anaisdg/anomalydetection\"",
+                    "\"contrib/anaisdg/statsmodels\"",
+                    "\"contrib/bonitoo-io/alerta\"",
+                    "\"contrib/bonitoo-io/hex\"",
+                    "\"contrib/bonitoo-io/servicenow\"",
+                    "\"contrib/bonitoo-io/tickscript\"",
+                    "\"contrib/bonitoo-io/victorops\"",
+                    "\"contrib/bonitoo-io/zenoss\"",
+                    "\"contrib/chobbs/discord\"",
+                    "\"contrib/jsternberg/aggregate\"",
+                    "\"contrib/jsternberg/influxdb\"",
+                    "\"contrib/jsternberg/math\"",
+                    "\"contrib/jsternberg/rows\"",
+                    "\"contrib/rhajek/bigpanda\"",
+                    "\"contrib/sranka/opsgenie\"",
+                    "\"contrib/sranka/sensu\"",
+                    "\"contrib/sranka/teams\"",
+                    "\"contrib/sranka/telegram\"",
+                    "\"contrib/sranka/webexteams\"",
+                    "\"contrib/tomhollingworth/events\"",
+                    "\"csv\"",
+                    "\"date\"",
+                    "\"dict\"",
+                    "\"experimental\"",
+                    "\"experimental/aggregate\"",
+                    "\"experimental/array\"",
+                    "\"experimental/bigtable\"",
+                    "\"experimental/bitwise\"",
+                    "\"experimental/csv\"",
+                    "\"experimental/geo\"",
+                    "\"experimental/http\"",
+                    "\"experimental/http/requests\"",
+                    "\"experimental/influxdb\"",
+                    "\"experimental/iox\"",
+                    "\"experimental/json\"",
+                    "\"experimental/mqtt\"",
+                    "\"experimental/oee\"",
+                    "\"experimental/prometheus\"",
+                    "\"experimental/query\"",
+                    "\"experimental/record\"",
+                    "\"experimental/table\"",
+                    "\"experimental/usage\"",
+                    "\"generate\"",
+                    "\"http\"",
+                    "\"influxdata/influxdb\"",
+                    "\"influxdata/influxdb/monitor\"",
+                    "\"influxdata/influxdb/sample\"",
+                    "\"influxdata/influxdb/schema\"",
+                    "\"influxdata/influxdb/secrets\"",
+                    "\"influxdata/influxdb/tasks\"",
+                    "\"influxdata/influxdb/v1\"",
+                    "\"internal/boolean\"",
+                    "\"internal/debug\"",
+                    "\"internal/gen\"",
+                    "\"internal/influxql\"",
+                    "\"internal/location\"",
+                    "\"internal/promql\"",
+                    "\"internal/testutil\"",
+                    "\"interpolate\"",
+                    "\"json\"",
+                    "\"kafka\"",
+                    "\"math\"",
+                    "\"pagerduty\"",
+                    "\"planner\"",
+                    "\"profiler\"",
+                    "\"pushbullet\"",
+                    "\"regexp\"",
+                    "\"runtime\"",
+                    "\"sampledata\"",
+                    "\"slack\"",
+                    "\"socket\"",
+                    "\"sql\"",
+                    "\"strings\"",
+                    "\"system\"",
+                    "\"testing\"",
+                    "\"testing/expect\"",
+                    "\"timezone\"",
+                    "\"types\"",
+                    "\"universe\"",
+                ]
+            "#]].assert_debug_eq(
+                &l.items.iter().map(|x| &x.label).collect::<Vec<_>>(),
+            );
+        }
+
         _ => unreachable!(),
     };
 }
