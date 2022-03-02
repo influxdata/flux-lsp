@@ -11,18 +11,7 @@ pub fn position_in_range(
     position: &lsp::Position,
     range: &lsp::Range,
 ) -> bool {
-    if position.line >= range.start.line
-        && position.line <= range.end.line
-    {
-        if position.line == range.start.line {
-            return position.character >= range.start.character;
-        }
-        if position.line == range.end.line {
-            return position.character <= range.end.character;
-        }
-        return true;
-    }
-    false
+    (range.start..=range.end).contains(position)
 }
 
 #[cfg(test)]
@@ -89,6 +78,25 @@ mod test {
     }
 
     #[test]
+    fn position_in_range_character_too_late_same_line() {
+        let range = lsp::Range {
+            start: lsp::Position {
+                line: 4,
+                character: 0,
+            },
+            end: lsp::Position {
+                line: 4,
+                character: 3,
+            },
+        };
+        let position = lsp::Position {
+            line: 4,
+            character: 7,
+        };
+        assert!(!position_in_range(&position, &range));
+    }
+
+    #[test]
     fn position_in_range_character_too_late() {
         let position = lsp::Position {
             line: 15,
@@ -124,5 +132,7 @@ mod test {
             },
         };
         assert!(position_in_range(&position, &range));
+        assert!(position_in_range(&range.start, &range));
+        assert!(position_in_range(&range.end, &range));
     }
 }
