@@ -1451,7 +1451,9 @@ async fn test_completion_resolve() {
 async fn test_package_completion() {
     let fluxscript = r#"import "sql"
 
-sql."#;
+sql.
+// ^
+"#;
     let server = create_server();
     open_file(&server, fluxscript.to_string()).await;
 
@@ -1461,10 +1463,7 @@ sql."#;
                 uri: lsp::Url::parse("file:///home/user/file.flux")
                     .unwrap(),
             },
-            position: lsp::Position {
-                line: 2,
-                character: 3,
-            },
+            position: position_of(fluxscript),
         },
         work_done_progress_params: lsp::WorkDoneProgressParams {
             work_done_token: None,
@@ -1481,6 +1480,7 @@ sql."#;
 
     let result =
         server.completion(params.clone()).await.unwrap().unwrap();
+
 
     let expected_labels: Vec<String> = vec!["to", "from"]
         .into_iter()
