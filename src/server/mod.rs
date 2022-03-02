@@ -892,19 +892,11 @@ impl LanguageServer for LspServer {
             None => return Ok(None),
         };
 
-        let items = if false {
-            completion::find_completions(
-                params,
-                contents.as_str(),
-                &sem_pkg,
-            )
-        } else {
-            completion::find_completions_2(
-                params,
-                contents.as_str(),
-                &sem_pkg,
-            )
-        };
+        let items = completion::find_completions(
+            params,
+            contents.as_str(),
+            &sem_pkg,
+        );
 
         let response = lsp::CompletionResponse::List(items);
         Ok(Some(response))

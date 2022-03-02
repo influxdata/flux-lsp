@@ -1,36 +1,6 @@
 use flux::ast::walk;
 use lspower::lsp;
 
-#[derive(Clone)]
-pub struct CallFinderVisitor<'a> {
-    pub node: Option<walk::Node<'a>>,
-    pub position: lsp::Position,
-}
-
-impl<'a> CallFinderVisitor<'a> {
-    pub fn new(position: lsp::Position) -> Self {
-        CallFinderVisitor {
-            node: None,
-            position,
-        }
-    }
-}
-
-impl<'a> walk::Visitor<'a> for CallFinderVisitor<'a> {
-    fn visit(&mut self, node: walk::Node<'a>) -> bool {
-        if crate::lsp::position_in_range(
-            &self.position,
-            &node.base().clone().location.into(),
-        ) {
-            if let walk::Node::CallExpr(_) = node {
-                self.node = Some(node.clone())
-            }
-        }
-
-        true
-    }
-}
-
 #[derive(Clone, Debug)]
 pub struct NodeFinderNode<'a> {
     pub node: walk::Node<'a>,
