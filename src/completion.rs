@@ -77,7 +77,7 @@ fn get_identifier_matches<'a>(
 ) -> impl Iterator<Item = lsp::CompletionItem> + 'a {
     get_stdlib_matches(info.ident.as_str(), &info)
         .into_iter()
-        .chain(get_user_matches(info, contents, &pkg))
+        .chain(get_user_matches(info, contents, pkg))
 }
 
 fn get_trigger(params: &lsp::CompletionParams) -> Option<&str> {
@@ -1218,7 +1218,7 @@ pub fn find_completions(
                         );
 
                         let user_functions =
-                            get_user_functions(position, &sem_pkg);
+                            get_user_functions(position, sem_pkg);
                         completion_params.extend(
                             get_function_params(
                                 ident.name.as_str(),
@@ -1239,7 +1239,7 @@ pub fn find_completions(
                             let object_functions =
                                 get_object_functions(
                                     ident.name.as_str(),
-                                    &sem_pkg,
+                                    sem_pkg,
                                 );
 
                             let key = property_key_str(&me.property);
@@ -1280,33 +1280,28 @@ pub fn find_completions(
                     .parent
                     .as_ref()
                     .map(|parent| &parent.node);
-                match parent {
-                    Some(AstNode::ImportDeclaration(_)) => {
-                        let infos = stdlib::get_package_infos();
+                if let Some(AstNode::ImportDeclaration(_)) = parent {
+                    let infos = stdlib::get_package_infos();
 
-                        let imports = get_imports(&sem_pkg);
+                    let imports = get_imports(sem_pkg);
 
-                        let mut items = vec![];
-                        for info in infos {
-                            if !(&imports)
-                                .iter()
-                                .any(|x| x.path == info.name)
-                            {
-                                items.push(
-                                    new_string_arg_completion(
-                                        info.path.as_str(),
-                                        get_trigger(&params),
-                                    ),
-                                );
-                            }
+                    let mut items = vec![];
+                    for info in infos {
+                        if !(&imports)
+                            .iter()
+                            .any(|x| x.path == info.name)
+                        {
+                            items.push(new_string_arg_completion(
+                                info.path.as_str(),
+                                get_trigger(&params),
+                            ));
                         }
-
-                        return lsp::CompletionList {
-                            is_incomplete: false,
-                            items,
-                        };
                     }
-                    _ => (),
+
+                    return lsp::CompletionList {
+                        is_incomplete: false,
+                        items,
+                    };
                 }
             }
 

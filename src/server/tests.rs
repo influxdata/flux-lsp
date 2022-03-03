@@ -1533,7 +1533,7 @@ x = 1
     let result =
         server.completion(params.clone()).await.unwrap().unwrap();
 
-    match result.clone() {
+    match result {
         lsp::CompletionResponse::List(l) => {
             expect![[r#"
                 [
@@ -2102,7 +2102,7 @@ csv.from(
     let result =
         server.completion(params.clone()).await.unwrap().unwrap();
 
-    let items = match result.clone() {
+    let items = match result {
         lsp::CompletionResponse::List(l) => l.items,
         _ => unreachable!(),
     };
@@ -2148,7 +2148,7 @@ csv.from(mode: "raw",
     let result =
         server.completion(params.clone()).await.unwrap().unwrap();
 
-    let items = match result.clone() {
+    let items = match result {
         lsp::CompletionResponse::List(l) => l.items,
         _ => unreachable!(),
     };
