@@ -2,11 +2,24 @@
 
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
+use std::path::Path;
 use std::sync::{Arc, Mutex};
 
 use lspower::lsp;
 
 use super::types::LspError;
+
+// Url is parsed and validated prior to this function. `unwrap` here
+// is okay.
+#[allow(clippy::unwrap_used)]
+fn url_to_key_val(url: &lsp::Url) -> (String, String) {
+    let path = Path::new(url.path());
+
+    let parent: String = path.parent().unwrap().display().to_string();
+    let filename = path.file_name().unwrap().to_str().unwrap();
+
+    (parent, filename.into())
+}
 
 /// Store acts as the in-memory storage backend for the LSP server.
 ///
@@ -15,7 +28,7 @@ use super::types::LspError;
 /// type could be extended to keep track of versions of files, but simplicity
 /// is preferred at this point.
 pub(crate) struct Store {
-    backend: Arc<Mutex<HashMap<lsp::Url, String>>>,
+    backend: Arc<Mutex<HashMap<String, HashMap<String, String>>>>,
 }
 
 impl Default for Store {
@@ -27,26 +40,21 @@ impl Default for Store {
 }
 
 impl Store {
-    pub fn put(&self, key: &lsp::Url, contents: &str) {
+    pub fn put(&self, url: &lsp::Url, contents: &str) {
+        let (key, val) = url_to_key_val(url);
+
         match self.backend.lock() {
-            Ok(mut store) => {
-                match store.entry(key.clone()) {
-                    Entry::Vacant(entry) => {
-                        entry.insert(contents.into());
-                    }
-                    Entry::Occupied(mut entry) => {
-                        // The protocol spec is unclear on whether trying to open a file
-                        // that is already opened is allowed, and research would indicate that
-                        // there are badly behaved clients that do this. Rather than making this
-                        // error, log the issue and move on.
-                        log::warn!(
-                        "Overwriting contents of existing key: {}",
-                        entry.key(),
-                    );
-                        entry.insert(contents.into());
-                    }
+            Ok(mut store) => match store.entry(key) {
+                Entry::Vacant(entry) => {
+                    let mut map = HashMap::new();
+                    map.insert(val, contents.into());
+                    entry.insert(map);
                 }
-            }
+                Entry::Occupied(mut entry) => {
+                    let map = entry.get_mut();
+                    map.insert(val, contents.into());
+                }
+            },
             Err(error) => {
                 log::error!(
                     "Could not acquire store lock. Error: {}",
@@ -56,46 +64,124 @@ impl Store {
         }
     }
 
-    pub fn remove(&self, key: &lsp::Url) {
+    pub fn remove(&self, url: &lsp::Url) {
+        let (key, val) = url_to_key_val(url);
+
         match self.backend.lock() {
-            Ok(mut store) => {
-                if store.remove(key).is_none() {
-                    // The protocol spec is unclear on whether trying to close a file
-                    // that isn't open is allowed. To stop consistent with the
-                    // implementation of textDocument/didOpen, this error is logged and
-                    // allowed.
+            Ok(mut store) => match store.entry(key) {
+                Entry::Vacant(_) => {
                     log::warn!(
-                        "Cannot remove non-existent key: {}",
-                        key
-                    );
+                        "remove called on non-existent file: {}",
+                        url
+                    )
                 }
-            }
+                Entry::Occupied(mut entry) => {
+                    let map = entry.get_mut();
+                    map.remove(&val);
+                }
+            },
             Err(error) => {
                 log::error!(
                     "Could not acquire store lock. Error: {}",
                     error
-                )
+                );
             }
         }
     }
 
-    pub fn get(&self, key: &lsp::Url) -> Result<String, LspError> {
+    pub fn get(&self, url: &lsp::Url) -> Result<String, LspError> {
+        let (key, val) = url_to_key_val(url);
+
         match self.backend.lock() {
-            Ok(mut store) => match store.entry(key.clone()) {
+            Ok(mut store) => match store.entry(key) {
                 Entry::Vacant(_) => {
-                    Err(LspError::FileNotFound(key.to_string()))
+                    Err(LspError::FileNotFound(url.to_string()))
                 }
-                Entry::Occupied(entry) => Ok(entry.get().into()),
+                Entry::Occupied(entry) => {
+                    let map = entry.get();
+                    match map.get(&val) {
+                        Some(value) => Ok(value.into()),
+                        None => Err(LspError::FileNotFound(
+                            url.to_string(),
+                        )),
+                    }
+                }
             },
             Err(_) => Err(LspError::LockNotAcquired),
         }
     }
 
-    pub fn get_package(
+    fn get_files(
         &self,
-        key: &lsp::Url,
+        path: String,
+    ) -> Result<Vec<(String, String)>, LspError> {
+        match self.backend.lock() {
+            Ok(mut store) => match store.entry(path.clone()) {
+                Entry::Vacant(_) => Err(LspError::FileNotFound(path)),
+                Entry::Occupied(entry) => {
+                    let map = entry.get();
+                    Ok(map
+                        .keys()
+                        .map(|key| {
+                            (
+                                key.clone(),
+                                map.get(key).unwrap().clone(),
+                            )
+                        })
+                        .collect())
+                }
+            },
+            Err(_) => Err(LspError::LockNotAcquired),
+        }
+    }
+
+    pub fn get_semantic_package(
+        &self,
+
+        url: &lsp::Url,
     ) -> Result<flux::semantic::nodes::Package, LspError> {
-        let contents = self.get(key)?;
+        let (key, val) = url_to_key_val(url);
+        let files = self.get_files(key)?;
+
+        // Grab the AST Package corresponding to currently requested package. Merge all
+        // other packages with it that one as root.
+        let mut pkgs: Vec<flux::ast::Package> = files
+            .iter()
+            .map(|source| {
+                flux::parser::parse_string(
+                    source.0.clone(),
+                    &source.1,
+                )
+                .into()
+            })
+            .collect();
+        let mut ast_pkg = match pkgs
+            .iter()
+            .position(|pkg| pkg.files[0].name == val)
+        {
+            Some(idx) => pkgs.remove(idx),
+            None => unreachable!(
+                "File requested was not in list of packages returned"
+            ),
+        };
+
+        for mut pkg in pkgs.into_iter() {
+            if let Err(_error) =
+                flux::merge_packages(&mut ast_pkg, &mut pkg)
+            {
+                // XXX: rockstar (3 Mar 2020) - Currently, this will discard any files that don't
+                // match the source file's package clause. This should really happen at a check state
+                // later, but this is how it works for now.
+                continue;
+            }
+        }
+        // XXX: rockstar (7 Mar 2022) - An ordering of these files has to be deterministic, but
+        // flux itself hasn't really established a mechanism whereby these packages _should_ be ordered.
+        // This hack allows us to make the files ordered deterministically so that the user can at least
+        // understand what's happening, but this is not a permanent fix.
+        // See: https://github.com/influxdata/flux/issues/4538
+        ast_pkg.files.sort_by(|a, b| a.name.cmp(&b.name));
+
         let mut analyzer = match flux::new_semantic_analyzer(
             flux::semantic::AnalyzerConfig {
                 // Explicitly disable the AST and Semantic checks.
@@ -112,28 +198,114 @@ impl Store {
                 )))
             }
         };
-        let (_, sem_pkg) = match analyzer.analyze_source(
-            "".to_string(),
-            "main.flux".to_string(),
-            &contents,
-        ) {
-            Ok(res) => res,
+        match analyzer.analyze_ast(&ast_pkg).map_err(|mut err| {
+            err.error.source = Some(
+                files
+                    .into_iter()
+                    .map(|file| file.1)
+                    .collect::<Vec<String>>()
+                    .join("\n"),
+            );
+            err
+        }) {
+            Ok((_, pkg)) => Ok(pkg),
             Err(e) => {
                 let error_string = format!("{}", e);
                 if e.value.is_none() {
                     log::debug!("Unable to parse source: {}", e);
                 }
                 match e.value.map(|(_, sem_pkg)| sem_pkg) {
-                    Some(value) => return Ok(value),
+                    Some(value) => Ok(value),
                     None => {
-                        return Err(LspError::InternalError(
-                            error_string,
-                        ))
+                        Err(LspError::InternalError(error_string))
                     }
                 }
             }
+        }
+    }
+
+    pub fn get_package_errors(
+        &self,
+        url: &lsp::Url,
+    ) -> Option<flux::semantic::FileErrors> {
+        let (key, val) = url_to_key_val(url);
+        let files = match self.get_files(key) {
+            Ok(files) => files,
+            Err(_) => {
+                log::warn!(
+                    "Could not get files/package for key: {}",
+                    url
+                );
+                return None;
+            }
         };
-        Ok(sem_pkg)
+
+        // Grab the AST Package corresponding to currently requested package. Merge all
+        // other packages with it that one as root.
+        let mut pkgs: Vec<flux::ast::Package> = files
+            .iter()
+            .map(|source| {
+                flux::parser::parse_string(
+                    source.0.clone(),
+                    &source.1,
+                )
+                .into()
+            })
+            .collect();
+        let mut ast_pkg = match pkgs
+            .iter()
+            .position(|pkg| pkg.files[0].name == val)
+        {
+            Some(idx) => pkgs.remove(idx),
+            None => unreachable!(
+                "File requested was not in list of packages returned"
+            ),
+        };
+
+        for mut pkg in pkgs.into_iter() {
+            if let Err(_error) =
+                flux::merge_packages(&mut ast_pkg, &mut pkg)
+            {
+                // XXX: rockstar (3 Mar 2020) - Currently, this will discard any files that don't
+                // match the source file's package clause. This should really happen at a check state
+                // later, but this is how it works for now.
+                continue;
+            }
+        }
+        // XXX: rockstar (7 Mar 2022) - An ordering of these files has to be deterministic, but
+        // flux itself hasn't really established a mechanism whereby these packages _should_ be ordered.
+        // This hack allows us to make the files ordered deterministically so that the user can at least
+        // understand what's happening, but this is not a permanent fix.
+        // See: https://github.com/influxdata/flux/issues/4538
+        ast_pkg.files.sort_by(|a, b| a.name.cmp(&b.name));
+
+        let mut analyzer = match flux::new_semantic_analyzer(
+            flux::semantic::AnalyzerConfig {
+                // Explicitly disable the AST and Semantic checks.
+                // We do not care if the code is syntactically or semantically correct as this may be
+                // partially written code.
+                skip_checks: true,
+            },
+        ) {
+            Ok(analyzer) => analyzer,
+            Err(err) => {
+                log::error!("{}", err);
+                return None;
+            }
+        };
+        match analyzer.analyze_ast(&ast_pkg).map_err(|mut err| {
+            err.error.source = Some(
+                files
+                    .into_iter()
+                    .map(|file| file.1)
+                    .collect::<Vec<String>>()
+                    .join("\n"),
+            );
+            err
+        }) {
+            Ok(_) => None,
+            Err(errors) => Some(errors.error),
+        }
     }
 }
 
@@ -145,38 +317,44 @@ mod test {
     #[test]
     fn put() {
         let store = Store::default();
-        let key = lsp::Url::parse("file:///a/b/c").unwrap();
+        let url = lsp::Url::parse("file:///a/b/c").unwrap();
         let contents = "import \"foo\"";
-        store.put(&key, contents);
+        store.put(&url, contents);
 
-        match store.backend.lock() {
-            Ok(mut backend) => match backend.entry(key.clone()) {
-                Entry::Vacant(_) => {
-                    panic!("put to {} failed", key)
-                }
+        let (key, val) = url_to_key_val(&url);
+
+        {
+            let mut backend =
+                store.backend.lock().expect("Could not acquire lock");
+            match backend.entry(key.clone()) {
+                Entry::Vacant(_) => panic!("put to {} failed", key),
                 Entry::Occupied(entry) => {
-                    assert_eq!(entry.get(), contents)
+                    let map = entry.get();
+                    match map.get(&val) {
+                        Some(value) => assert_eq!(value, contents),
+                        None => panic!("put to {} failed", key),
+                    }
                 }
-            },
-            Err(error) => panic!("Could not acquire lock: {}", error),
-        };
+            }
+        }
     }
 
     #[test]
     fn get() {
         let store = Store::default();
-        let key = lsp::Url::parse("file:///a/b/c").unwrap();
+        let url = lsp::Url::parse("file:///a/b/c").unwrap();
         let contents = "import \"foo\"";
+        let (key, val) = url_to_key_val(&url);
 
         {
+            let mut map = HashMap::new();
+            map.insert(val, contents.into());
             let mut backend =
                 store.backend.lock().expect("Could not acquire lock");
-            if let Entry::Vacant(entry) = backend.entry(key.clone()) {
-                entry.insert(contents.into());
-            }
+            backend.insert(key, map);
         }
 
-        let result = store.get(&key);
+        let result = store.get(&url);
 
         assert_eq!(
             contents,
@@ -187,19 +365,20 @@ mod test {
     #[test]
     fn remove() {
         let store = Store::default();
-        let key = lsp::Url::parse("file:///a/b/c").unwrap();
+        let url = lsp::Url::parse("file:///a/b/c").unwrap();
         let contents = "import \"foo\"";
+        let (key, val) = url_to_key_val(&url);
 
         {
+            let mut map = HashMap::new();
+            map.insert(val, contents.into());
             let mut backend =
                 store.backend.lock().expect("Could not acquire lock");
-            if let Entry::Vacant(entry) = backend.entry(key.clone()) {
-                entry.insert(contents.into());
-            }
+            backend.insert(key, map);
         }
 
-        store.remove(&key);
-        let result = store.get(&key);
+        store.remove(&url);
+        let result = store.get(&url);
 
         assert!(result.is_err());
     }
@@ -215,8 +394,54 @@ from(bucket: "bucket")
 |> filter(fn: (r) => r.tag == "anTag")"#;
         store.put(&key, contents);
 
-        let result = store.get_package(&key);
+        let result = store.get_semantic_package(&key);
 
         assert!(result.is_ok());
+    }
+
+    #[test]
+    fn get_package_multi_file() {
+        let store = Store::default();
+
+        store.put(
+            &lsp::Url::parse("file:///a/b/a").unwrap(),
+            r#"v = {a: "b"}"#,
+        );
+        let key = lsp::Url::parse("file:///a/b/c").unwrap();
+        let contents = r#"import "foo"
+
+from(bucket: "bucket")
+|> range(start: -15m)
+|> filter(fn: (r) => r.tag == "anTag")"#;
+        store.put(&key, contents);
+
+        let result = store.get_semantic_package(&key).unwrap();
+
+        assert_eq!(2, result.files.len());
+    }
+
+    // XXX: rockstar (03 Mar 2020) - This test should behave differently
+    // after the merge_packages behavior changes to assert package issues
+    // and the semantic check is what raises the errors.
+    #[test]
+    fn get_package_multi_file_separate_packages() {
+        let store = Store::default();
+
+        store.put(
+            &lsp::Url::parse("file:///a/b/a").unwrap(),
+            r#"package b
+v = {a: "b"}"#,
+        );
+        let key = lsp::Url::parse("file:///a/b/c").unwrap();
+        let contents = r#"import "foo"
+
+from(bucket: "bucket")
+|> range(start: -15m)
+|> filter(fn: (r) => r.tag == "anTag")"#;
+        store.put(&key, contents);
+
+        let result = store.get_semantic_package(&key).unwrap();
+
+        assert_eq!(1, result.files.len());
     }
 }

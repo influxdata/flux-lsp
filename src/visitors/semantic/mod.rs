@@ -17,6 +17,11 @@ pub use completion::{
 pub use symbols::SymbolsVisitor;
 
 fn contains_position(node: Node<'_>, pos: lsp::Position) -> bool {
+    if let Node::Package(_) = node {
+        // flux::semantic::nodes::Package is walkable, but when multiple ast files are joined, Package appears to have
+        // a start/end location of 0:0.
+        return false;
+    }
     let start_line = node.loc().start.line - 1;
     let start_col = node.loc().start.column - 1;
     let end_line = node.loc().end.line - 1;
