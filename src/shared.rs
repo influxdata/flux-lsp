@@ -42,8 +42,7 @@ impl FunctionSignature {
     pub fn create_signature(&self) -> String {
         let args: String = self
             .arguments
-            .clone()
-            .into_iter()
+            .iter()
             .map(|x| format!("{}: ${}", x, x))
             .collect::<Vec<String>>()
             .join(" , ");
@@ -57,8 +56,7 @@ impl FunctionSignature {
         &self,
     ) -> Vec<lsp::ParameterInformation> {
         self.arguments
-            .clone()
-            .into_iter()
+            .iter()
             .map(|x| lsp::ParameterInformation {
                 label: lsp::ParameterLabel::Simple(format!("${}", x)),
                 documentation: None,

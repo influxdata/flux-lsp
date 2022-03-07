@@ -281,7 +281,7 @@ from(bucket: "inbucket")
   |> filter(fn: (r) => r["_measurement"] == "activity")
   |> filter(fn: (r) => r["target"] == "crumbs")"#;
 
-        let parsed = parse(&script);
+        let parsed = parse(script);
 
         assert!(parsed.is_object());
     }
@@ -291,7 +291,7 @@ from(bucket: "inbucket")
     fn test_parse_invalid() {
         let script = r#"this isn't flux"#;
 
-        let parsed = parse(&script);
+        let parsed = parse(script);
 
         assert!(parsed.is_object());
     }
@@ -305,7 +305,7 @@ from(bucket: "inbucket")
 
         let script = r#"option task={name:"beetle",every:1h} from(bucket:"inbucket")
 |>range(start:-task.every)|>filter(fn:(r)=>r["_measurement"]=="activity")"#;
-        let parsed = parse(&script);
+        let parsed = parse(script);
 
         let formatted = format_from_js_file(parsed).unwrap();
 
@@ -315,7 +315,7 @@ from(bucket: "inbucket")
     #[wasm_bindgen_test]
     fn test_format_from_js_file_invalid() {
         let script = r#"from(bucket:this isn't flux"#;
-        let parsed = parse(&script);
+        let parsed = parse(script);
 
         if let Err(error) = format_from_js_file(parsed) {
             assert_eq!(

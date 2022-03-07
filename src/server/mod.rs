@@ -153,6 +153,27 @@ pub fn find_stdlib_signatures(
         })
 }
 
+fn parse_semantic_graph(
+    key: &lsp::Url,
+    contents: &str,
+) -> Option<flux::semantic::nodes::Package> {
+    let mut analyzer = match flux::new_semantic_analyzer(
+        flux::semantic::AnalyzerConfig::default(),
+    ) {
+        Ok(a) => a,
+        Err(_) => return None,
+    };
+
+    match analyzer.analyze_source(
+        "".into(),
+        key.clone().into(),
+        contents,
+    ) {
+        Ok((_, pkg)) => Some(pkg),
+        Err(err) => err.value.map(|(_, pkg)| pkg),
+    }
+}
+
 pub struct LspServer {
     client: Arc<Mutex<Option<Client>>>,
     store: store::Store,
@@ -866,6 +887,10 @@ impl LanguageServer for LspServer {
         let key = &params.text_document_position.text_document.uri;
 
         let contents = self.get_document(key)?;
+        let sem_pkg = match parse_semantic_graph(key, &contents) {
+            Some(sem_pkg) => sem_pkg,
+            None => return Ok(None),
+        };
 
         let items = if let Some(ctx) = &params.context {
             match (ctx.trigger_kind, &ctx.trigger_character) {
@@ -874,7 +899,7 @@ impl LanguageServer for LspServer {
                     Some(c),
                 ) => match c.as_str() {
                     "." => completion::find_dot_completions(
-                        params, &contents,
+                        params, &contents, &sem_pkg,
                     ),
                     ":" => {
                         // XXX: rockstar (29 Nov 2021) - This is where argument
@@ -890,19 +915,26 @@ impl LanguageServer for LspServer {
                         Some(c),
                         &params,
                         contents.as_str(),
+                        &sem_pkg,
                     ),
                     _ => completion::find_completions(
                         params,
                         contents.as_str(),
+                        &sem_pkg,
                     ),
                 },
                 _ => completion::find_completions(
                     params,
                     contents.as_str(),
+                    &sem_pkg,
                 ),
             }
         } else {
-            completion::find_completions(params, contents.as_str())
+            completion::find_completions(
+                params,
+                contents.as_str(),
+                &sem_pkg,
+            )
         };
 
         let response = lsp::CompletionResponse::List(items);
@@ -959,24 +991,21 @@ impl LanguageServer for LspServer {
                 }
             };
 
-        let analyzer_result = flux::new_semantic_analyzer(
+        let mut analyzer = match flux::new_semantic_analyzer(
             flux::semantic::AnalyzerConfig::default(),
-        );
-        if analyzer_result.is_err() {
-            return Ok(None);
-        }
-        let mut analyzer =
-            analyzer_result.expect("Previous check failed.");
+        ) {
+            Ok(analyzer) => analyzer,
+            Err(_) => return Ok(None),
+        };
 
-        let analyzed = analyzer.analyze_source(
+        let errors = match analyzer.analyze_source(
             "".into(),
             params.text_document.uri.clone().into(),
             &contents,
-        );
-        if analyzed.is_ok() {
-            return Ok(None);
-        }
-        let errors = analyzed.err().expect("Previous check failed.");
+        ) {
+            Ok(_) => return Ok(None),
+            Err(errors) => errors,
+        };
 
         let relevant: Vec<&flux::semantic::Error> = errors
             .error
