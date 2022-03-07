@@ -228,17 +228,19 @@ fn get_provided_arguments(call: &flux::ast::CallExpr) -> Vec<String> {
 
 fn get_function_params<'a>(
     name: &'a str,
-    functions: Vec<Function>,
+    functions: &'a [Function],
     provided: &'a [String],
-) -> impl Iterator<Item = String> + 'a {
-    functions
-        .into_iter()
-        .filter(move |f| f.name == name)
-        .flat_map(move |f| {
+) -> impl Iterator<Item = (String, Option<MonoType>)> + 'a {
+    functions.iter().filter(move |f| f.name == name).flat_map(
+        move |f| {
             f.params
-                .into_iter()
-                .filter(move |p| !provided.contains(p))
-        })
+                .iter()
+                .filter(move |(k, _)| {
+                    !provided.iter().any(|p| p == k)
+                })
+                .map(|(k, v)| (k.to_owned(), v.to_owned()))
+        },
+    )
 }
 
 fn get_user_functions(
@@ -272,6 +274,7 @@ fn get_object_functions(
 
 fn new_param_completion(
     name: String,
+    typ: Option<&MonoType>,
     trigger: Option<&str>,
 ) -> lsp::CompletionItem {
     let insert_text = if let Some(trigger) = trigger {
@@ -287,7 +290,7 @@ fn new_param_completion(
     lsp::CompletionItem {
         deprecated: None,
         commit_characters: None,
-        detail: None,
+        detail: typ.map(|typ| typ.to_string()),
         label: name,
         additional_text_edits: None,
         filter_text: None,
@@ -1212,7 +1215,7 @@ pub fn find_completions(
                         completion_params.extend(
                             get_function_params(
                                 ident.name.as_str(),
-                                stdlib::get_builtin_functions(),
+                                &stdlib::get_builtin_functions(),
                                 &provided,
                             ),
                         );
@@ -1222,7 +1225,7 @@ pub fn find_completions(
                         completion_params.extend(
                             get_function_params(
                                 ident.name.as_str(),
-                                user_functions,
+                                &user_functions,
                                 &provided,
                             ),
                         );
@@ -1247,7 +1250,7 @@ pub fn find_completions(
                             completion_params.extend(
                                 get_function_params(
                                     key,
-                                    package_functions,
+                                    &package_functions,
                                     &provided,
                                 ),
                             );
@@ -1255,7 +1258,7 @@ pub fn find_completions(
                             completion_params.extend(
                                 get_function_params(
                                     key,
-                                    object_functions,
+                                    &object_functions,
                                     &provided,
                                 ),
                             );
@@ -1271,7 +1274,13 @@ pub fn find_completions(
 
                 items = completion_params
                     .into_iter()
-                    .map(|x| new_param_completion(x, trigger))
+                    .map(|(name, typ)| {
+                        new_param_completion(
+                            name,
+                            typ.as_ref(),
+                            trigger,
+                        )
+                    })
                     .collect();
             }
 

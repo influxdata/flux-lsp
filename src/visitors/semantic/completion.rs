@@ -4,7 +4,6 @@ use flux::semantic::types::MonoType;
 use flux::semantic::walk::{Node, Visitor};
 use lspower::lsp;
 
-use crate::shared::get_argument_names;
 use crate::shared::Function;
 
 fn defined_after(loc: &SourceLocation, pos: lsp::Position) -> bool {
@@ -44,17 +43,8 @@ impl<'a> Visitor<'a> for FunctionFinderVisitor {
             let name = &assgn.id.name;
 
             if let Expression::Function(f) = &assgn.init {
-                if let MonoType::Fun(fun) = &f.typ {
-                    let mut params = get_argument_names(&fun.req);
-                    for opt in get_argument_names(&fun.opt) {
-                        params.push(opt);
-                    }
-
-                    self.functions.push(Function {
-                        name: name.to_string(),
-                        params,
-                    })
-                }
+                self.functions
+                    .push(Function::from_expr(name.to_string(), f));
             }
         }
 
@@ -66,15 +56,10 @@ impl<'a> Visitor<'a> for FunctionFinderVisitor {
                 let name = &assgn.id.name;
                 if let Expression::Function(f) = &assgn.init {
                     if let MonoType::Fun(fun) = &f.typ {
-                        let mut params = get_argument_names(&fun.req);
-                        for opt in get_argument_names(&fun.opt) {
-                            params.push(opt);
-                        }
-
-                        self.functions.push(Function {
-                            name: name.to_string(),
-                            params,
-                        })
+                        self.functions.push(Function::new(
+                            name.to_string(),
+                            fun,
+                        ));
                     }
                 }
             }
@@ -107,18 +92,12 @@ impl<'a> Visitor<'a> for ObjectFunctionFinderVisitor {
 
                         if let Expression::Function(fun) = &prop.value
                         {
-                            let params = fun
-                                .params
-                                .iter()
-                                .map(|p| p.key.name.to_string())
-                                .collect::<Vec<String>>();
-
                             self.results.push(ObjectFunction {
                                 object: object_name.to_string(),
-                                function: Function {
-                                    name: func_name.to_string(),
-                                    params,
-                                },
+                                function: Function::from_expr(
+                                    func_name.to_string(),
+                                    fun,
+                                ),
                             });
 
                             return false;
@@ -140,18 +119,12 @@ impl<'a> Visitor<'a> for ObjectFunctionFinderVisitor {
                             if let Expression::Function(fun) =
                                 &prop.value
                             {
-                                let params = fun
-                                    .params
-                                    .iter()
-                                    .map(|p| p.key.name.to_string())
-                                    .collect::<Vec<String>>();
-
                                 self.results.push(ObjectFunction {
                                     object: object_name.to_string(),
-                                    function: Function {
-                                        name: func_name.to_string(),
-                                        params,
-                                    },
+                                    function: Function::from_expr(
+                                        func_name.to_string(),
+                                        fun,
+                                    ),
                                 });
 
                                 return false;

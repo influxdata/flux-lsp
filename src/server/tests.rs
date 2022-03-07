@@ -2061,24 +2061,28 @@ csv.from(
             {
               "label": "csv",
               "kind": 5,
+              "detail": "string",
               "insertText": "csv: ",
               "insertTextFormat": 2
             },
             {
               "label": "file",
               "kind": 5,
+              "detail": "string",
               "insertText": "file: ",
               "insertTextFormat": 2
             },
             {
               "label": "mode",
               "kind": 5,
+              "detail": "string",
               "insertText": "mode: ",
               "insertTextFormat": 2
             },
             {
               "label": "url",
               "kind": 5,
+              "detail": "string",
               "insertText": "url: ",
               "insertTextFormat": 2
             }
