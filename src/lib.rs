@@ -2,6 +2,8 @@
 #![deny(
     clippy::expect_used,
     clippy::panic,
+    clippy::print_stderr,
+    clippy::print_stdout,
     clippy::unwrap_used,
     clippy::wildcard_imports
 )]
