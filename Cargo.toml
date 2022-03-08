@@ -15,7 +15,7 @@ opt-level = "z"
 lto = true
 
 [features]
-default = ["strict"]
+default = []
 strict = []
 wasm_next = []
 

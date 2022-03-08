@@ -1,5 +1,5 @@
 #![cfg_attr(feature = "strict", deny(warnings))]
-#![deny(
+#![warn(
     clippy::expect_used,
     clippy::panic,
     clippy::unwrap_used,
