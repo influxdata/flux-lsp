@@ -11,7 +11,7 @@ jobs:
           command: cargo fmt --all -- --check
       - run:
           name: "run lint"
-          command: cargo clippy --locked --all -- -Dclippy::all
+          command: cargo clippy --locked --all-features --all -- -Dclippy::all
 
   test:
     docker:
@@ -20,7 +20,7 @@ jobs:
       - checkout
       - run:
           name: "run cargo tests"
-          command: cargo test --locked
+          command: cargo test --locked --all-features
 
   bench-test:
     docker:
@@ -50,7 +50,7 @@ jobs:
     resource_class: large
     steps:
       - checkout
-      - run: cargo build --locked --verbose
+      - run: cargo build --locked --verbose --all-features
 
   wasm-build:
     docker:
