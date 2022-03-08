@@ -2054,17 +2054,41 @@ csv.from(
     let result =
         server.completion(params.clone()).await.unwrap().unwrap();
 
-    let items = match result {
-        lsp::CompletionResponse::List(l) => l.items,
-        _ => unreachable!(),
-    };
-
-    let labels: Vec<&str> =
-        items.iter().map(|item| item.label.as_str()).collect();
-
-    let expected = vec!["csv", "file", "mode", "url"];
-
-    assert_eq!(expected, labels);
+    expect![[r#"
+        {
+          "isIncomplete": false,
+          "items": [
+            {
+              "label": "csv",
+              "kind": 5,
+              "detail": "string",
+              "insertText": "csv: ",
+              "insertTextFormat": 2
+            },
+            {
+              "label": "file",
+              "kind": 5,
+              "detail": "string",
+              "insertText": "file: ",
+              "insertTextFormat": 2
+            },
+            {
+              "label": "mode",
+              "kind": 5,
+              "detail": "string",
+              "insertText": "mode: ",
+              "insertTextFormat": 2
+            },
+            {
+              "label": "url",
+              "kind": 5,
+              "detail": "string",
+              "insertText": "url: ",
+              "insertTextFormat": 2
+            }
+          ]
+        }"#]]
+    .assert_eq(&serde_json::to_string_pretty(&result).unwrap());
 }
 
 #[test]

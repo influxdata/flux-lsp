@@ -1,5 +1,7 @@
 use lspower::lsp;
 
+use flux::semantic::types::MonoType;
+
 pub fn get_package_name(name: &str) -> Option<&str> {
     let items = name.split('/');
     items.last()
@@ -7,10 +9,7 @@ pub fn get_package_name(name: &str) -> Option<&str> {
 
 #[allow(clippy::implicit_hasher)]
 pub fn get_argument_names(
-    args: &std::collections::BTreeMap<
-        String,
-        flux::semantic::types::MonoType,
-    >,
+    args: &std::collections::BTreeMap<String, MonoType>,
 ) -> Vec<String> {
     args.keys().map(String::from).collect()
 }
@@ -18,7 +17,7 @@ pub fn get_argument_names(
 #[derive(Clone)]
 pub struct Function {
     pub name: String,
-    pub params: Vec<String>,
+    pub params: Vec<(String, Option<MonoType>)>,
 }
 
 impl Function {
@@ -26,9 +25,30 @@ impl Function {
         name: String,
         f: &flux::semantic::types::Function,
     ) -> Self {
-        let mut params = get_argument_names(&f.req);
-        params.extend(get_argument_names(&f.opt));
+        let params = f
+            .req
+            .iter()
+            .chain(f.opt.iter())
+            .chain(f.pipe.as_ref().map(|p| (&p.k, &p.v)))
+            .map(|(k, v)| (k.clone(), Some(v.clone())))
+            .collect();
+        Self { name, params }
+    }
 
+    pub(crate) fn from_expr(
+        name: String,
+        expr: &flux::semantic::nodes::FunctionExpr,
+    ) -> Self {
+        let params = expr
+            .params
+            .iter()
+            .map(|p| {
+                (
+                    p.key.name.to_string(),
+                    expr.typ.parameter(&p.key.name).cloned(),
+                )
+            })
+            .collect::<Vec<_>>();
         Self { name, params }
     }
 }
