@@ -17,7 +17,7 @@ use crate::shared::get_argument_names;
 use crate::shared::get_package_name;
 use crate::shared::Function;
 use crate::stdlib;
-use crate::visitors::ast::{CallFinderVisitor, NodeFinderVisitor};
+use crate::visitors::ast::NodeFinderVisitor;
 use crate::visitors::semantic::{
     FunctionFinderVisitor, Import, ImportFinderVisitor,
     ObjectFunctionFinderVisitor,
@@ -31,267 +31,11 @@ struct PackageResult {
     pub full_name: String,
 }
 
-pub fn find_completions(
-    params: lsp::CompletionParams,
-    contents: &str,
-    pkg: &flux::semantic::nodes::Package,
-) -> lsp::CompletionList {
-    let info = CompletionInfo::create(&params, contents, pkg);
-
-    let mut items: Vec<lsp::CompletionItem> = vec![];
-
-    if let Some(info) = info {
-        match info.completion_type {
-            CompletionType::Generic => {
-                let mut stdlib_matches =
-                    get_stdlib_matches(info.ident.as_str(), &info);
-                items.append(&mut stdlib_matches);
-
-                let mut user_matches =
-                    get_user_matches(info, contents, pkg);
-
-                items.append(&mut user_matches);
-            }
-            CompletionType::Bad => {}
-            CompletionType::CallProperty(_func) => {
-                return find_param_completions(
-                    None, &params, contents, pkg,
-                )
-            }
-            CompletionType::Import => {
-                let infos = stdlib::get_package_infos();
-
-                let imports = get_imports(pkg);
-
-                let mut items = vec![];
-                for info in infos {
-                    if !(&imports).iter().any(|x| x.path == info.name)
-                    {
-                        items.push(new_string_arg_completion(
-                            info.path.as_str(),
-                            get_trigger(&params),
-                        ));
-                    }
-                }
-
-                return lsp::CompletionList {
-                    is_incomplete: false,
-                    items,
-                };
-            }
-            CompletionType::ObjectMember(_obj) => {
-                return find_dot_completions(params, contents, pkg);
-            }
-            _ => {}
-        }
-    }
-
-    lsp::CompletionList {
-        is_incomplete: false,
-        items,
-    }
-}
-
-#[derive(Clone, Debug)]
-enum CompletionType {
-    Generic,
-    Logical(flux::ast::Operator),
-    CallProperty(String),
-    ObjectMember(String),
-    Import,
-    Bad,
-}
-
 #[derive(Clone, Debug)]
 struct CompletionInfo {
-    completion_type: CompletionType,
     ident: String,
     position: lsp::Position,
     imports: Vec<Import>,
-}
-
-impl CompletionInfo {
-    fn create(
-        params: &lsp::CompletionParams,
-        source: &str,
-        sem_pkg: &flux::semantic::nodes::Package,
-    ) -> Option<CompletionInfo> {
-        let uri = &params.text_document_position.text_document.uri;
-        let position = params.text_document_position.position;
-
-        let pkg: Package =
-            parse_string(uri.to_string(), source).into();
-        let walker = AstNode::File(&pkg.files[0]);
-        let mut visitor =
-            NodeFinderVisitor::new(move_back(position, 1));
-
-        walk(&mut visitor, walker);
-
-        if let Some(finder_node) = visitor.node {
-            if let Some(parent) = finder_node.parent {
-                match parent.node {
-                    AstNode::MemberExpr(me) => {
-                        if let Expression::Identifier(obj) =
-                            &me.object
-                        {
-                            return Some(CompletionInfo {
-                                completion_type:
-                                    CompletionType::ObjectMember(
-                                        obj.name.clone(),
-                                    ),
-                                ident: obj.name.clone(),
-                                position,
-                                imports: get_imports(sem_pkg),
-                            });
-                        }
-                    }
-                    AstNode::ImportDeclaration(_id) => {
-                        return Some(CompletionInfo {
-                            completion_type: CompletionType::Import,
-                            ident: "".to_string(),
-                            position,
-                            imports: get_imports(sem_pkg),
-                        });
-                    }
-                    AstNode::BinaryExpr(be) => match &be.left {
-                        Expression::Identifier(left) => {
-                            let name = &left.name;
-
-                            return Some(CompletionInfo {
-                                completion_type:
-                                    CompletionType::Logical(
-                                        be.operator.clone(),
-                                    ),
-                                ident: name.clone(),
-                                position,
-                                imports: get_imports(sem_pkg),
-                            });
-                        }
-                        Expression::Member(left) => {
-                            if let Expression::Identifier(ident) =
-                                &left.object
-                            {
-                                let key =
-                                    property_key_str(&left.property);
-
-                                let name =
-                                    format!("{}.{}", ident.name, key);
-
-                                return Some(CompletionInfo {
-                                    completion_type:
-                                        CompletionType::Logical(
-                                            be.operator.clone(),
-                                        ),
-                                    ident: name,
-                                    position,
-                                    imports: get_imports(sem_pkg),
-                                });
-                            }
-                        }
-                        _ => {}
-                    },
-                    _ => {}
-                }
-
-                if let Some(grandparent) = parent.parent {
-                    if let Some(greatgrandparent) = grandparent.parent
-                    {
-                        if let (
-                            AstNode::Property(prop),
-                            AstNode::ObjectExpr(_),
-                            AstNode::CallExpr(call),
-                        ) = (
-                            parent.node,
-                            grandparent.node,
-                            greatgrandparent.node,
-                        ) {
-                            let name = property_key_str(&prop.key);
-
-                            if let Expression::Identifier(func) =
-                                &call.callee
-                            {
-                                return Some(CompletionInfo {
-                                    completion_type:
-                                        CompletionType::CallProperty(
-                                            func.name.clone(),
-                                        ),
-                                    ident: name.to_owned(),
-                                    position,
-                                    imports: get_imports(sem_pkg),
-                                });
-                            }
-                        }
-                    }
-                }
-
-                match finder_node.node {
-                    AstNode::BinaryExpr(be) => {
-                        if let Expression::Identifier(left) = &be.left
-                        {
-                            let name = &left.name;
-
-                            return Some(CompletionInfo {
-                                completion_type:
-                                    CompletionType::Logical(
-                                        be.operator.clone(),
-                                    ),
-                                ident: name.clone(),
-                                position,
-                                imports: get_imports(sem_pkg),
-                            });
-                        }
-                    }
-                    AstNode::Identifier(ident) => {
-                        let name = ident.name.clone();
-                        return Some(CompletionInfo {
-                            completion_type: CompletionType::Generic,
-                            ident: name,
-                            position,
-                            imports: get_imports(sem_pkg),
-                        });
-                    }
-                    AstNode::BadExpr(expr) => {
-                        let name = expr.text.clone();
-                        return Some(CompletionInfo {
-                            completion_type: CompletionType::Bad,
-                            ident: name,
-                            position,
-                            imports: get_imports(sem_pkg),
-                        });
-                    }
-                    AstNode::MemberExpr(mbr) => {
-                        if let Expression::Identifier(ident) =
-                            &mbr.object
-                        {
-                            return Some(CompletionInfo {
-                                completion_type:
-                                    CompletionType::Generic,
-                                ident: ident.name.clone(),
-                                position,
-                                imports: get_imports(sem_pkg),
-                            });
-                        }
-                    }
-                    AstNode::CallExpr(c) => {
-                        if let Some(Expression::Identifier(ident)) =
-                            c.arguments.last()
-                        {
-                            return Some(CompletionInfo {
-                                completion_type:
-                                    CompletionType::Generic,
-                                ident: ident.name.clone(),
-                                position,
-                                imports: get_imports(sem_pkg),
-                            });
-                        }
-                    }
-                    _ => {}
-                }
-            }
-        }
-
-        None
-    }
 }
 
 fn property_key_str(p: &PropertyKey) -> &str {
@@ -307,13 +51,6 @@ fn get_imports(pkg: &flux::semantic::nodes::Package) -> Vec<Import> {
 
     flux::semantic::walk::walk(&mut visitor, walker);
     visitor.imports
-}
-
-fn move_back(position: lsp::Position, count: u32) -> lsp::Position {
-    lsp::Position {
-        line: position.line,
-        character: position.character - count,
-    }
 }
 
 fn get_user_matches(
@@ -333,6 +70,16 @@ fn get_user_matches(
     result
 }
 
+fn get_identifier_matches<'a>(
+    info: CompletionInfo,
+    contents: &'a str,
+    pkg: &'a flux::semantic::nodes::Package,
+) -> impl Iterator<Item = lsp::CompletionItem> + 'a {
+    get_stdlib_matches(info.ident.as_str(), &info)
+        .into_iter()
+        .chain(get_user_matches(info, contents, pkg))
+}
+
 fn get_trigger(params: &lsp::CompletionParams) -> Option<&str> {
     if let Some(context) = &params.context {
         context.trigger_character.as_deref()
@@ -341,42 +88,29 @@ fn get_trigger(params: &lsp::CompletionParams) -> Option<&str> {
     }
 }
 
-pub fn find_dot_completions(
-    params: lsp::CompletionParams,
-    source: &str,
+fn get_dot_completions(
+    info: CompletionInfo,
     pkg: &flux::semantic::nodes::Package,
-) -> lsp::CompletionList {
-    let info = CompletionInfo::create(&params, source, pkg);
+) -> Vec<lsp::CompletionItem> {
+    let mut list = vec![];
+    let name = &info.ident;
+    get_specific_package_functions(
+        &mut list,
+        name.as_str(),
+        &info.imports,
+    );
 
-    if let Some(info) = info {
-        let mut list = vec![];
-        let name = &info.ident;
-        get_specific_package_functions(
-            &mut list,
-            name.as_str(),
-            &info.imports,
-        );
+    let mut items = vec![];
 
-        let mut items = vec![];
-
-        for completable in get_specific_object(&info.ident, pkg) {
-            items.push(completable.completion_item(&info));
-        }
-
-        for item in list {
-            items.push(item.completion_item(&info));
-        }
-
-        return lsp::CompletionList {
-            is_incomplete: false,
-            items,
-        };
+    for completable in get_specific_object(&info.ident, pkg) {
+        items.push(completable.completion_item(&info));
     }
 
-    lsp::CompletionList {
-        is_incomplete: false,
-        items: vec![],
+    for item in list {
+        items.push(item.completion_item(&info));
     }
+
+    items
 }
 
 fn new_string_arg_completion(
@@ -434,80 +168,6 @@ fn get_stdlib_matches(
     }
 
     matches
-}
-
-pub fn find_param_completions(
-    trigger: Option<&str>,
-    params: &lsp::CompletionParams,
-    source: &str,
-    sem_pkg: &flux::semantic::nodes::Package,
-) -> lsp::CompletionList {
-    let uri = &params.text_document_position.text_document.uri;
-    let position = params.text_document_position.position;
-
-    let pkg: Package = parse_string(uri.to_string(), source).into();
-    let walker = AstNode::File(&pkg.files[0]);
-    let mut visitor = CallFinderVisitor::new(move_back(position, 1));
-
-    walk(&mut visitor, walker);
-
-    let mut items: Vec<String> = vec![];
-
-    if let Some(AstNode::CallExpr(call)) = visitor.node {
-        let provided = get_provided_arguments(call);
-
-        match &call.callee {
-            Expression::Identifier(ident) => {
-                items.extend(get_function_params(
-                    ident.name.as_str(),
-                    stdlib::get_builtin_functions(),
-                    &provided,
-                ));
-
-                let user_functions =
-                    get_user_functions(position, sem_pkg);
-                items.extend(get_function_params(
-                    ident.name.as_str(),
-                    user_functions,
-                    &provided,
-                ));
-            }
-            Expression::Member(me) => {
-                if let Expression::Identifier(ident) = &me.object {
-                    let package_functions =
-                        stdlib::get_package_functions(&ident.name);
-
-                    let object_functions = get_object_functions(
-                        ident.name.as_str(),
-                        sem_pkg,
-                    );
-
-                    let key = property_key_str(&me.property);
-
-                    items.extend(get_function_params(
-                        key,
-                        package_functions,
-                        &provided,
-                    ));
-
-                    items.extend(get_function_params(
-                        key,
-                        object_functions,
-                        &provided,
-                    ));
-                }
-            }
-            _ => (),
-        }
-    }
-
-    lsp::CompletionList {
-        is_incomplete: false,
-        items: items
-            .into_iter()
-            .map(|x| new_param_completion(x, trigger))
-            .collect(),
-    }
 }
 
 fn get_specific_package_functions(
@@ -1497,5 +1157,160 @@ impl Completable for UserFunctionResult {
 
     fn matches(&self, text: &str, _info: &CompletionInfo) -> bool {
         fuzzy_match(self.name.as_str(), text)
+    }
+}
+
+pub fn find_completions(
+    params: lsp::CompletionParams,
+    contents: &str,
+    sem_pkg: &flux::semantic::nodes::Package,
+) -> lsp::CompletionList {
+    let uri = &params.text_document_position.text_document.uri;
+    let position = params.text_document_position.position;
+
+    let pkg: Package = parse_string(uri.to_string(), contents).into();
+    let walker = AstNode::File(&pkg.files[0]);
+    let mut visitor = NodeFinderVisitor::new(position);
+
+    walk(&mut visitor, walker);
+
+    let mut items = Vec::new();
+
+    if let Some(finder_node) = visitor.node {
+        match finder_node.node {
+            AstNode::Identifier(id) => {
+                items.extend(get_identifier_matches(
+                    CompletionInfo {
+                        ident: id.name.clone(),
+                        position,
+                        imports: get_imports(sem_pkg),
+                    },
+                    contents,
+                    sem_pkg,
+                ));
+            }
+            AstNode::MemberExpr(member) => {
+                // TODO Handle completion on member accesses on non-identifiers
+                if let Expression::Identifier(ident) = &member.object
+                {
+                    items = get_dot_completions(
+                        CompletionInfo {
+                            ident: ident.name.clone(),
+                            position,
+                            imports: get_imports(sem_pkg),
+                        },
+                        sem_pkg,
+                    );
+                }
+            }
+            AstNode::CallExpr(call) => {
+                let mut completion_params = Vec::new();
+                let provided = get_provided_arguments(call);
+
+                match &call.callee {
+                    Expression::Identifier(ident) => {
+                        completion_params.extend(
+                            get_function_params(
+                                ident.name.as_str(),
+                                stdlib::get_builtin_functions(),
+                                &provided,
+                            ),
+                        );
+
+                        let user_functions =
+                            get_user_functions(position, sem_pkg);
+                        completion_params.extend(
+                            get_function_params(
+                                ident.name.as_str(),
+                                user_functions,
+                                &provided,
+                            ),
+                        );
+                    }
+                    Expression::Member(me) => {
+                        if let Expression::Identifier(ident) =
+                            &me.object
+                        {
+                            let package_functions =
+                                stdlib::get_package_functions(
+                                    &ident.name,
+                                );
+
+                            let object_functions =
+                                get_object_functions(
+                                    ident.name.as_str(),
+                                    sem_pkg,
+                                );
+
+                            let key = property_key_str(&me.property);
+
+                            completion_params.extend(
+                                get_function_params(
+                                    key,
+                                    package_functions,
+                                    &provided,
+                                ),
+                            );
+
+                            completion_params.extend(
+                                get_function_params(
+                                    key,
+                                    object_functions,
+                                    &provided,
+                                ),
+                            );
+                        }
+                    }
+                    _ => (),
+                }
+
+                let trigger =
+                    params.context.as_ref().and_then(|context| {
+                        context.trigger_character.as_deref()
+                    });
+
+                items = completion_params
+                    .into_iter()
+                    .map(|x| new_param_completion(x, trigger))
+                    .collect();
+            }
+
+            AstNode::StringLit(_) => {
+                let parent = finder_node
+                    .parent
+                    .as_ref()
+                    .map(|parent| &parent.node);
+                if let Some(AstNode::ImportDeclaration(_)) = parent {
+                    let infos = stdlib::get_package_infos();
+
+                    let imports = get_imports(sem_pkg);
+
+                    let mut items = vec![];
+                    for info in infos {
+                        if !(&imports)
+                            .iter()
+                            .any(|x| x.path == info.name)
+                        {
+                            items.push(new_string_arg_completion(
+                                info.path.as_str(),
+                                get_trigger(&params),
+                            ));
+                        }
+                    }
+
+                    return lsp::CompletionList {
+                        is_incomplete: false,
+                        items,
+                    };
+                }
+            }
+
+            _ => (),
+        }
+    }
+
+    lsp::CompletionList {
+        is_incomplete: false,
+        items,
     }
 }
