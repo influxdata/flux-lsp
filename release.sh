@@ -40,6 +40,11 @@ cd $TEMPDIR
 git clone git@github.com:influxdata/flux-lsp.git > /dev/null 2>&1
 cd $TEMPDIR/flux-lsp
 
+if [[ ! $(hub ci-status HEAD) ]]; then
+    echo "Build status on master is either incomplete or failing. Please try ag ain after build status is complete."
+    exit 1
+fi
+
 # Bump version
 cargo bump $INCREMENT
 cargo check
@@ -55,8 +60,8 @@ git commit -m "$new_version"
 git push
 
 
-previous_version=`git describe --abbrev=0 ${new_version}^`
-commits=`git log --pretty=oneline ${previous_version}...${new_version} | tail -n +2 | awk '{$1="-"; print }'`
+previous_version=`git tag --sort=-creatordate | sed -n '2 p'`
+commits=`git log --pretty=oneline ${previous_version}..${new_version} | tail -n +2 | awk '{$1="-"; print }'`
 hub release create $new_version -m "Release $new_version
 
 ${commits}"
