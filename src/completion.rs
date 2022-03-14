@@ -1207,81 +1207,18 @@ pub fn find_completions(
                 }
             }
             AstNode::CallExpr(call) => {
-                let mut completion_params = Vec::new();
-                let provided = get_provided_arguments(call);
+                items = complete_call_expr(&params, sem_pkg, call);
+            }
 
-                match &call.callee {
-                    Expression::Identifier(ident) => {
-                        completion_params.extend(
-                            get_function_params(
-                                ident.name.as_str(),
-                                &stdlib::get_builtin_functions(),
-                                &provided,
-                            ),
-                        );
-
-                        let user_functions =
-                            get_user_functions(position, sem_pkg);
-                        completion_params.extend(
-                            get_function_params(
-                                ident.name.as_str(),
-                                &user_functions,
-                                &provided,
-                            ),
-                        );
-                    }
-                    Expression::Member(me) => {
-                        if let Expression::Identifier(ident) =
-                            &me.object
-                        {
-                            let package_functions =
-                                stdlib::get_package_functions(
-                                    &ident.name,
-                                );
-
-                            let object_functions =
-                                get_object_functions(
-                                    ident.name.as_str(),
-                                    sem_pkg,
-                                );
-
-                            let key = property_key_str(&me.property);
-
-                            completion_params.extend(
-                                get_function_params(
-                                    key,
-                                    &package_functions,
-                                    &provided,
-                                ),
-                            );
-
-                            completion_params.extend(
-                                get_function_params(
-                                    key,
-                                    &object_functions,
-                                    &provided,
-                                ),
-                            );
-                        }
-                    }
-                    _ => (),
+            AstNode::ObjectExpr(_) => {
+                let parent = finder_node
+                    .parent
+                    .as_ref()
+                    .map(|parent| &parent.node);
+                if let Some(AstNode::CallExpr(call)) = parent {
+                    items =
+                        complete_call_expr(&params, sem_pkg, call);
                 }
-
-                let trigger =
-                    params.context.as_ref().and_then(|context| {
-                        context.trigger_character.as_deref()
-                    });
-
-                items = completion_params
-                    .into_iter()
-                    .map(|(name, typ)| {
-                        new_param_completion(
-                            name,
-                            typ.as_ref(),
-                            trigger,
-                        )
-                    })
-                    .collect();
             }
 
             AstNode::StringLit(_) => {
@@ -1322,4 +1259,71 @@ pub fn find_completions(
         is_incomplete: false,
         items,
     }
+}
+
+fn complete_call_expr(
+    params: &lsp::CompletionParams,
+    sem_pkg: &flux::semantic::nodes::Package,
+    call: &flux::ast::CallExpr,
+) -> Vec<lsp::CompletionItem> {
+    let position = params.text_document_position.position;
+
+    let mut completion_params = Vec::new();
+    let provided = get_provided_arguments(call);
+
+    match &call.callee {
+        Expression::Identifier(ident) => {
+            completion_params.extend(get_function_params(
+                ident.name.as_str(),
+                &stdlib::get_builtin_functions(),
+                &provided,
+            ));
+
+            let user_functions =
+                get_user_functions(position, sem_pkg);
+            completion_params.extend(get_function_params(
+                ident.name.as_str(),
+                &user_functions,
+                &provided,
+            ));
+        }
+        Expression::Member(me) => {
+            if let Expression::Identifier(ident) = &me.object {
+                let package_functions =
+                    stdlib::get_package_functions(&ident.name);
+
+                let object_functions = get_object_functions(
+                    ident.name.as_str(),
+                    sem_pkg,
+                );
+
+                let key = property_key_str(&me.property);
+
+                completion_params.extend(get_function_params(
+                    key,
+                    &package_functions,
+                    &provided,
+                ));
+
+                completion_params.extend(get_function_params(
+                    key,
+                    &object_functions,
+                    &provided,
+                ));
+            }
+        }
+        _ => (),
+    }
+
+    let trigger = params
+        .context
+        .as_ref()
+        .and_then(|context| context.trigger_character.as_deref());
+
+    completion_params
+        .into_iter()
+        .map(|(name, typ)| {
+            new_param_completion(name, typ.as_ref(), trigger)
+        })
+        .collect()
 }

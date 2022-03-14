@@ -2145,6 +2145,7 @@ async fn test_param_completion_3() {
 
 csv.from(mode: "raw",
                    // ^
+x = 1
 "#;
     let server = create_server();
     open_file(&server, fluxscript.to_string()).await;
