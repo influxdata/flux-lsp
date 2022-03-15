@@ -5,20 +5,20 @@ use std::borrow::Cow;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
-use anyhow::Result;
 use flux::semantic::nodes::ErrorKind as SemanticNodeErrorKind;
 use flux::semantic::{
     nodes::FunctionParameter, nodes::Symbol, types::MonoType, walk,
     ErrorKind,
 };
 use lspower::{
-    jsonrpc::Error as RpcError, jsonrpc::ErrorCode as RpcErrorCode,
     jsonrpc::Result as RpcResult, lsp, Client, LanguageServer,
 };
 
 use crate::{
     completion, shared::FunctionSignature, stdlib, visitors::semantic,
 };
+
+use self::types::LspError;
 
 /// Convert a flux::semantic::walk::Node to a lsp::Location
 /// https://microsoft.github.io/language-server-protocol/specification#location
@@ -214,61 +214,35 @@ impl LspServer {
     async fn publish_diagnostics(&self, key: &lsp::Url, text: &str) {
         // If we have a client back to the editor report any diagnostics found in the document
         if let Some(client) = self.get_client() {
-            match self.compute_diagnostics(key, text) {
-                Ok(diagnostics) => {
-                    client
-                        .publish_diagnostics(
-                            key.clone(),
-                            diagnostics,
-                            None,
-                        )
-                        .await
-                }
-                // TODO(nathanielc): Report errors creating the analyzer to the client
-                Err(e) => log::error!(
-                    "failed to compute diagnostics: {}",
-                    e
-                ),
-            };
-        };
+            let diagnostics = self.compute_diagnostics(key, text);
+            client
+                .publish_diagnostics(key.clone(), diagnostics, None)
+                .await;
+        }
     }
 
     fn compute_diagnostics(
         &self,
         key: &lsp::Url,
-        text: &str,
-    ) -> Result<Vec<lsp::Diagnostic>> {
-        match flux::new_semantic_analyzer(
-            flux::semantic::AnalyzerConfig::default(),
-        ) {
-            Ok(mut analyzer) => {
-                match analyzer.analyze_source(
-                    "".to_string(),
-                    key.to_string(),
-                    text,
-                ) {
-                    // Send back empty list of diagnostics,
-                    // this is important as the client needs to
-                    // explicitly know that all previous diagnostics
-                    // are no longer relevant.
-                    Ok(_) => Ok(Vec::new()),
-                    Err(errors) => Ok(errors
-                        .error
-                        .errors
-                        .iter()
-                        .map(|e| lsp::Diagnostic {
-                            range: e.location.clone().into(),
-                            severity: Some(
-                                lsp::DiagnosticSeverity::ERROR,
-                            ),
-                            source: Some("flux".to_string()),
-                            message: e.error.to_string(),
-                            ..lsp::Diagnostic::default()
-                        })
-                        .collect()),
-                }
-            }
-            Err(e) => Err(e.into()),
+        _text: &str,
+    ) -> Vec<lsp::Diagnostic> {
+        match self.store.get_package_errors(key) {
+            // Send back empty list of diagnostics,
+            // this is important as the client needs to
+            // explicitly know that all previous diagnostics
+            // are no longer relevant.
+            None => vec![],
+            Some(errors) => errors
+                .errors
+                .iter()
+                .map(|e| lsp::Diagnostic {
+                    range: e.location.clone().into(),
+                    severity: Some(lsp::DiagnosticSeverity::ERROR),
+                    source: Some("flux".to_string()),
+                    message: e.error.to_string(),
+                    ..lsp::Diagnostic::default()
+                })
+                .collect(),
         }
     }
 }
@@ -381,11 +355,11 @@ impl LanguageServer for LspServer {
         let mut client = match self.client.lock() {
             Ok(client) => client,
             Err(err) => {
-                return RpcResult::Err(RpcError {
-                    code: RpcErrorCode::InternalError,
-                    message: format!("{}", err),
-                    data: None,
-                })
+                return Err(LspError::InternalError(format!(
+                    "{}",
+                    err
+                ))
+                .into())
             }
         };
         // XXX(nathanielc): Replace the original client with None causing the original to be dropped.
@@ -467,7 +441,7 @@ impl LanguageServer for LspServer {
     ) -> RpcResult<Option<lsp::SignatureHelp>> {
         let key =
             params.text_document_position_params.text_document.uri;
-        let pkg = match self.store.get_package(&key) {
+        let pkg = match self.store.get_semantic_package(&key) {
             Ok(pkg) => pkg,
             Err(err) => return Err(err.into()),
         };
@@ -591,7 +565,7 @@ impl LanguageServer for LspServer {
         params: lsp::FoldingRangeParams,
     ) -> RpcResult<Option<Vec<lsp::FoldingRange>>> {
         let key = params.text_document.uri;
-        let pkg = match self.store.get_package(&key) {
+        let pkg = match self.store.get_semantic_package(&key) {
             Ok(pkg) => pkg,
             Err(err) => return Err(err.into()),
         };
@@ -626,7 +600,7 @@ impl LanguageServer for LspServer {
         params: lsp::DocumentSymbolParams,
     ) -> RpcResult<Option<lsp::DocumentSymbolResponse>> {
         let key = params.text_document.uri;
-        let pkg = match self.store.get_package(&key) {
+        let pkg = match self.store.get_semantic_package(&key) {
             Ok(pkg) => pkg,
             Err(err) => return Err(err.into()),
         };
@@ -663,7 +637,7 @@ impl LanguageServer for LspServer {
     ) -> RpcResult<Option<lsp::GotoDefinitionResponse>> {
         let key =
             params.text_document_position_params.text_document.uri;
-        let pkg = match self.store.get_package(&key) {
+        let pkg = match self.store.get_semantic_package(&key) {
             Ok(pkg) => pkg,
             Err(err) => return Err(err.into()),
         };
@@ -706,7 +680,7 @@ impl LanguageServer for LspServer {
         params: lsp::RenameParams,
     ) -> RpcResult<Option<lsp::WorkspaceEdit>> {
         let key = params.text_document_position.text_document.uri;
-        let pkg = match self.store.get_package(&key) {
+        let pkg = match self.store.get_semantic_package(&key) {
             Ok(pkg) => pkg,
             Err(err) => return Err(err.into()),
         };
@@ -742,7 +716,7 @@ impl LanguageServer for LspServer {
     ) -> RpcResult<Option<Vec<lsp::DocumentHighlight>>> {
         let key =
             params.text_document_position_params.text_document.uri;
-        let pkg = match self.store.get_package(&key) {
+        let pkg = match self.store.get_semantic_package(&key) {
             Ok(pkg) => pkg,
             Err(err) => return Err(err.into()),
         };
@@ -769,7 +743,7 @@ impl LanguageServer for LspServer {
         params: lsp::ReferenceParams,
     ) -> RpcResult<Option<Vec<lsp::Location>>> {
         let key = params.text_document_position.text_document.uri;
-        let pkg = match self.store.get_package(&key) {
+        let pkg = match self.store.get_semantic_package(&key) {
             Ok(pkg) => pkg,
             Err(err) => return Err(err.into()),
         };
@@ -793,7 +767,7 @@ impl LanguageServer for LspServer {
     ) -> RpcResult<Option<lsp::Hover>> {
         let key =
             params.text_document_position_params.text_document.uri;
-        let pkg = match self.store.get_package(&key) {
+        let pkg = match self.store.get_semantic_package(&key) {
             Ok(pkg) => pkg,
             Err(err) => return Err(err.into()),
         };
