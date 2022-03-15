@@ -3,17 +3,16 @@ use criterion::{
     black_box, criterion_group, criterion_main, Criterion,
 };
 use flux_lsp::LspServer;
-use lspower::LanguageServer;
+use tower_lsp::{lsp_types as lsp, LanguageServer};
 
 fn create_server() -> LspServer {
     LspServer::new(None)
 }
 
 fn open_file(server: &LspServer, text: String) {
-    let params = lspower::lsp::DidOpenTextDocumentParams {
-        text_document: lspower::lsp::TextDocumentItem::new(
-            lspower::lsp::Url::parse("file:///home/user/file.flux")
-                .unwrap(),
+    let params = lsp::DidOpenTextDocumentParams {
+        text_document: lsp::TextDocumentItem::new(
+            lsp::Url::parse("file:///home/user/file.flux").unwrap(),
             "flux".to_string(),
             1,
             text,
@@ -30,30 +29,26 @@ sql."#;
     let server = create_server();
     open_file(&server, fluxscript.to_string());
 
-    let params = lspower::lsp::CompletionParams {
-        text_document_position:
-            lspower::lsp::TextDocumentPositionParams {
-                text_document: lspower::lsp::TextDocumentIdentifier {
-                    uri: lspower::lsp::Url::parse(
-                        "file:///home/user/file.flux",
-                    )
+    let params = lsp::CompletionParams {
+        text_document_position: lsp::TextDocumentPositionParams {
+            text_document: lsp::TextDocumentIdentifier {
+                uri: lsp::Url::parse("file:///home/user/file.flux")
                     .unwrap(),
-                },
-                position: lspower::lsp::Position {
-                    line: 2,
-                    character: 3,
-                },
             },
-        work_done_progress_params:
-            lspower::lsp::WorkDoneProgressParams {
-                work_done_token: None,
+            position: lsp::Position {
+                line: 2,
+                character: 3,
             },
-        partial_result_params: lspower::lsp::PartialResultParams {
+        },
+        work_done_progress_params: lsp::WorkDoneProgressParams {
+            work_done_token: None,
+        },
+        partial_result_params: lsp::PartialResultParams {
             partial_result_token: None,
         },
-        context: Some(lspower::lsp::CompletionContext {
+        context: Some(lsp::CompletionContext {
             trigger_kind:
-                lspower::lsp::CompletionTriggerKind::TRIGGER_CHARACTER,
+                lsp::CompletionTriggerKind::TRIGGER_CHARACTER,
             trigger_character: Some(".".to_string()),
         }),
     };
@@ -94,30 +89,25 @@ errorCounts
     let server = create_server();
     open_file(&server, fluxscript.to_string());
 
-    let params = lspower::lsp::CompletionParams {
-        text_document_position:
-            lspower::lsp::TextDocumentPositionParams {
-                text_document: lspower::lsp::TextDocumentIdentifier {
-                    uri: lspower::lsp::Url::parse(
-                        "file:///home/user/file.flux",
-                    )
+    let params = lsp::CompletionParams {
+        text_document_position: lsp::TextDocumentPositionParams {
+            text_document: lsp::TextDocumentIdentifier {
+                uri: lsp::Url::parse("file:///home/user/file.flux")
                     .unwrap(),
-                },
-                position: lspower::lsp::Position {
-                    line: 8,
-                    character: 1,
-                },
             },
-        work_done_progress_params:
-            lspower::lsp::WorkDoneProgressParams {
-                work_done_token: None,
+            position: lsp::Position {
+                line: 8,
+                character: 1,
             },
-        partial_result_params: lspower::lsp::PartialResultParams {
+        },
+        work_done_progress_params: lsp::WorkDoneProgressParams {
+            work_done_token: None,
+        },
+        partial_result_params: lsp::PartialResultParams {
             partial_result_token: None,
         },
-        context: Some(lspower::lsp::CompletionContext {
-            trigger_kind:
-                lspower::lsp::CompletionTriggerKind::INVOKED,
+        context: Some(lsp::CompletionContext {
+            trigger_kind: lsp::CompletionTriggerKind::INVOKED,
             trigger_character: None,
         }),
     };

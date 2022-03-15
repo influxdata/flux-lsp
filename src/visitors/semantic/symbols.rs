@@ -2,7 +2,7 @@
 
 use flux::semantic::nodes::{self, Expression};
 use flux::semantic::walk::{Node, Visitor};
-use lspower::lsp;
+use tower_lsp::lsp_types as lsp;
 
 fn parse_variable_assignment(
     uri: lsp::Url,

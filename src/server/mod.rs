@@ -10,8 +10,9 @@ use flux::semantic::{
     nodes::FunctionParameter, nodes::Symbol, types::MonoType, walk,
     ErrorKind,
 };
-use lspower::{
-    jsonrpc::Result as RpcResult, lsp, Client, LanguageServer,
+use tower_lsp::{
+    jsonrpc::Result as RpcResult, lsp_types as lsp, Client,
+    LanguageServer,
 };
 
 use crate::{
@@ -246,7 +247,7 @@ impl LspServer {
     }
 }
 
-#[lspower::async_trait]
+#[tower_lsp::async_trait]
 impl LanguageServer for LspServer {
     async fn initialize(
         &self,
@@ -497,19 +498,19 @@ impl LanguageServer for LspServer {
         let key = params.text_document.uri;
 
         let contents = self.get_document(&key)?;
-        let mut formatted = match flux::formatter::format(&contents) {
-            Ok(value) => value,
-            Err(err) => {
-                return Err(lspower::jsonrpc::Error {
-                    code: lspower::jsonrpc::ErrorCode::InternalError,
+        let mut formatted =
+            match flux::formatter::format(&contents) {
+                Ok(value) => value,
+                Err(err) => return Err(tower_lsp::jsonrpc::Error {
+                    code:
+                        tower_lsp::jsonrpc::ErrorCode::InternalError,
                     message: format!(
                         "Error formatting document: {}",
                         err
                     ),
                     data: None,
-                })
-            }
-        };
+                }),
+            };
         if let Some(trim_trailing_whitespace) =
             params.options.trim_trailing_whitespace
         {

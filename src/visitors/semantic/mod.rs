@@ -4,7 +4,7 @@ use flux::semantic::{
     nodes::{Expression, Symbol},
     walk::{self, Node, Visitor},
 };
-use lspower::lsp;
+use tower_lsp::lsp_types as lsp;
 
 mod completion;
 mod symbols;
