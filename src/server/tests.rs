@@ -3119,10 +3119,8 @@ async fn compute_diagnostics_multi_file() {
 |> filter(fn: (r) => r.anTag == v.a)"#;
     open_file(&server, fluxscript.into(), Some(&filename)).await;
 
-    let diagnostics = server.compute_diagnostics(
-        &lsp::Url::parse(&filename).unwrap(),
-        &fluxscript,
-    );
+    let diagnostics = server
+        .compute_diagnostics(&lsp::Url::parse(&filename).unwrap());
 
     assert_eq!(
         vec![lsp::Diagnostic {
@@ -3158,10 +3156,8 @@ async fn compute_diagnostics_multi_file() {
     )
     .await;
 
-    let diagnostics_again = server.compute_diagnostics(
-        &lsp::Url::parse(&filename).unwrap(),
-        &fluxscript,
-    );
+    let diagnostics_again = server
+        .compute_diagnostics(&lsp::Url::parse(&filename).unwrap());
 
     assert_eq!(0, diagnostics_again.len());
 }

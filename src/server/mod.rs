@@ -211,10 +211,10 @@ impl LspServer {
     }
 
     // Publish any diagnostics to the client
-    async fn publish_diagnostics(&self, key: &lsp::Url, text: &str) {
+    async fn publish_diagnostics(&self, key: &lsp::Url) {
         // If we have a client back to the editor report any diagnostics found in the document
         if let Some(client) = self.get_client() {
-            let diagnostics = self.compute_diagnostics(key, text);
+            let diagnostics = self.compute_diagnostics(key);
             client
                 .publish_diagnostics(key.clone(), diagnostics, None)
                 .await;
@@ -224,7 +224,6 @@ impl LspServer {
     fn compute_diagnostics(
         &self,
         key: &lsp::Url,
-        _text: &str,
     ) -> Vec<lsp::Diagnostic> {
         match self.store.get_package_errors(key) {
             // Send back empty list of diagnostics,
@@ -376,9 +375,9 @@ impl LanguageServer for LspServer {
     ) -> () {
         let key = params.text_document.uri;
         let value = params.text_document.text;
-        self.publish_diagnostics(&key, value.as_str()).await;
-
         self.store.put(&key, &value);
+
+        self.publish_diagnostics(&key).await;
     }
 
     async fn did_change(
@@ -405,8 +404,7 @@ impl LanguageServer for LspServer {
                 }
                 let new_contents = contents.into_owned();
                 self.store.put(&key, &new_contents.clone());
-                self.publish_diagnostics(&key, new_contents.as_str())
-                    .await;
+                self.publish_diagnostics(&key).await;
             }
             Err(err) => log::error!(
                 "Could not update key: {}\n{:?}",
@@ -423,7 +421,7 @@ impl LanguageServer for LspServer {
         if let Some(text) = params.text {
             let key = params.text_document.uri;
             self.store.put(&key, &text);
-            self.publish_diagnostics(&key, text.as_str()).await;
+            self.publish_diagnostics(&key).await;
         }
     }
 

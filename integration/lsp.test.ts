@@ -113,6 +113,27 @@ describe('LSP Server', () => {
 
         expect(callback).toHaveBeenCalled();
     });
+
+    it('sends lists of diagnostics', async () => {
+        const diagnostics = [];
+        const callback = jest.fn((message) => {
+            const diagnosticMessage = JSON.parse(message);
+            diagnosticMessage.params.diagnostics.forEach(diagnostic => {
+                diagnostics.push(diagnostic);
+            });
+        });
+        server.onMessage(callback);
+        const runner = server.run();
+        await init(server);
+
+        const openRequest = '{"jsonrpc": "2.0", "id": 2, "method": "textDocument/didOpen", "params": { "textDocument": {"uri":"file:///main.flux","languageId":"flux","version":1,"text":"from(bucket: x)"}}}';
+        await server.send(openRequest)
+
+        await shutdown(server, runner);
+
+        expect(callback).toHaveBeenCalled();
+        expect(diagnostics.length).toBe(1);
+    });
 });
 describe('module', () => {
 
