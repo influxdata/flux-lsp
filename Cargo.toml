@@ -41,7 +41,7 @@ console_error_panic_hook = "0.1.7"
 console_log = { version = "0.2", optional = true }
 env_logger = "0.9"
 expect-test = "1.2.2"
-flux = { git = "https://github.com/influxdata/flux", rev = "b027af4f08ba848bb92937f2a79800f60fd8fdd8", features = ["lsp"] }
+flux = { git = "https://github.com/influxdata/flux", tag = "v0.160.0", features = ["lsp"] }
 futures = "0.3.21"
 js-sys = "0.3.56"
 line-col = "0.2.1"
