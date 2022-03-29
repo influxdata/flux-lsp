@@ -97,7 +97,7 @@ fn find_references(
                     Some(n)
                 }
                 walk::Node::Package(_) | walk::Node::File(_)
-                    if is_scope(name, n.clone()) =>
+                    if is_scope(name, *n) =>
                 {
                     Some(n)
                 }
@@ -612,7 +612,7 @@ impl LanguageServer for LspServer {
             params.text_document_position_params.position,
         );
 
-        flux::semantic::walk::walk(&mut visitor, pkg_node.clone());
+        flux::semantic::walk::walk(&mut visitor, pkg_node);
 
         if let Some(node) = visitor.node {
             let node_name = match node {
