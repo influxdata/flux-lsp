@@ -98,7 +98,7 @@ describe('LSP Server', () => {
         await shutdown(server, runner);
     });
 
-    it('sends diagnostics', async () => {
+    it.skip('sends diagnostics', async () => {
         const callback = jest.fn((message) => {
             console.log('callback', message);
         });
@@ -114,7 +114,7 @@ describe('LSP Server', () => {
         expect(callback).toHaveBeenCalled();
     });
 
-    it('sends lists of diagnostics', async () => {
+    it.skip('sends lists of diagnostics', async () => {
         const diagnostics = [];
         const callback = jest.fn((message) => {
             const diagnosticMessage = JSON.parse(message);
