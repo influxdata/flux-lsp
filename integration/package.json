@@ -168,7 +168,7 @@
     "mime-types": "^2.1.31",
     "mimic-fn": "^2.1.0",
     "minimatch": "^3.0.4",
-    "minimist": "^1.2.5",
+    "minimist": "^1.2.6",
     "ms": "^2.1.2",
     "natural-compare": "^1.4.0",
     "node-int64": "^0.4.0",
