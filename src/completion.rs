@@ -11,7 +11,7 @@ use flux::semantic::types::{
 };
 use flux::semantic::walk::Visitor as SemanticVisitor;
 use flux::{imports, prelude};
-use lspower::lsp;
+use tower_lsp::lsp_types as lsp;
 
 use crate::shared::get_argument_names;
 use crate::shared::get_package_name;

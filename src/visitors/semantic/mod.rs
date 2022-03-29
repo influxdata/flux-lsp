@@ -4,7 +4,7 @@ use flux::semantic::{
     nodes::{Expression, Symbol},
     walk::{self, Node, Visitor},
 };
-use lspower::lsp;
+use tower_lsp::lsp_types as lsp;
 
 mod completion;
 mod symbols;
@@ -55,11 +55,11 @@ pub struct NodeFinderVisitor<'a> {
 
 impl<'a> Visitor<'a> for NodeFinderVisitor<'a> {
     fn visit(&mut self, node: Node<'a>) -> bool {
-        let contains = contains_position(node.clone(), self.position);
+        let contains = contains_position(node, self.position);
 
         if contains {
-            self.path.push(node.clone());
-            self.node = Some(node.clone());
+            self.path.push(node);
+            self.node = Some(node);
         }
 
         true
@@ -83,7 +83,7 @@ pub struct IdentFinderVisitor<'a> {
 
 impl<'a> Visitor<'a> for IdentFinderVisitor<'a> {
     fn visit(&mut self, node: walk::Node<'a>) -> bool {
-        match node.clone() {
+        match node {
             walk::Node::MemberExpr(m) => {
                 if let Expression::Identifier(i) = &m.object {
                     if i.name == self.name {
@@ -94,12 +94,12 @@ impl<'a> Visitor<'a> for IdentFinderVisitor<'a> {
             }
             walk::Node::Identifier(n) => {
                 if n.name == self.name {
-                    self.identifiers.push(node.clone());
+                    self.identifiers.push(node);
                 }
             }
             walk::Node::IdentifierExpr(n) => {
                 if n.name == self.name {
-                    self.identifiers.push(node.clone());
+                    self.identifiers.push(node);
                 }
             }
             _ => {}
@@ -168,7 +168,7 @@ pub struct FoldFinderVisitor<'a> {
 impl<'a> Visitor<'a> for FoldFinderVisitor<'a> {
     fn visit(&mut self, node: Node<'a>) -> bool {
         if let Node::Block(_) = node {
-            self.nodes.push(node.clone());
+            self.nodes.push(node);
         }
 
         true

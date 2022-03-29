@@ -2,7 +2,7 @@
 
 use flux::semantic::nodes::{self, Expression};
 use flux::semantic::walk::{Node, Visitor};
-use lspower::lsp;
+use tower_lsp::lsp_types as lsp;
 
 fn parse_variable_assignment(
     uri: lsp::Url,
@@ -240,12 +240,11 @@ impl<'a> Visitor<'a> for SymbolsVisitor<'a> {
     fn visit(&mut self, node: Node<'a>) -> bool {
         let uri = self.uri.clone();
 
-        self.path.push(node.clone());
+        self.path.push(node);
 
         match node {
             Node::VariableAssgn(va) => {
-                let list =
-                    parse_variable_assignment(uri, node.clone(), va);
+                let list = parse_variable_assignment(uri, node, va);
 
                 for si in list {
                     self.symbols.push(si);

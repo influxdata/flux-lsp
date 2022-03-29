@@ -2,8 +2,8 @@
 use std::fs::OpenOptions;
 
 use clap::{App, Arg};
-use lspower::{LspService, Server};
 use simplelog::{CombinedLogger, Config, LevelFilter, WriteLogger};
+use tower_lsp::{LspService, Server};
 
 use flux_lsp::LspServer;
 
@@ -42,8 +42,5 @@ async fn main() {
 
     let (service, messages) =
         LspService::new(|client| LspServer::new(Some(client)));
-    Server::new(stdin, stdout)
-        .interleave(messages)
-        .serve(service)
-        .await;
+    Server::new(stdin, stdout, messages).serve(service).await;
 }

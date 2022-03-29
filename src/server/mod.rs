@@ -3,22 +3,20 @@ mod types;
 
 use std::borrow::Cow;
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
 
 use flux::semantic::nodes::ErrorKind as SemanticNodeErrorKind;
 use flux::semantic::{
     nodes::FunctionParameter, nodes::Symbol, types::MonoType, walk,
     ErrorKind,
 };
-use lspower::{
-    jsonrpc::Result as RpcResult, lsp, Client, LanguageServer,
+use tower_lsp::{
+    jsonrpc::Result as RpcResult, lsp_types as lsp, Client,
+    LanguageServer,
 };
 
 use crate::{
     completion, shared::FunctionSignature, stdlib, visitors::semantic,
 };
-
-use self::types::LspError;
 
 /// Convert a flux::semantic::walk::Node to a lsp::Location
 /// https://microsoft.github.io/language-server-protocol/specification#location
@@ -99,7 +97,7 @@ fn find_references(
                     Some(n)
                 }
                 walk::Node::Package(_) | walk::Node::File(_)
-                    if is_scope(name, n.clone()) =>
+                    if is_scope(name, *n) =>
                 {
                     Some(n)
                 }
@@ -175,31 +173,15 @@ fn parse_semantic_graph(
 }
 
 pub struct LspServer {
-    client: Arc<Mutex<Option<Client>>>,
+    client: Option<Client>,
     store: store::Store,
 }
 
 impl LspServer {
     pub fn new(client: Option<Client>) -> Self {
         Self {
-            client: Arc::new(Mutex::new(client)),
+            client,
             store: store::Store::default(),
-        }
-    }
-
-    // Get the client from out of its arc and mutex.
-    // Note the lspower::Client has a cheap clone method to make it easy
-    // to pass around many instances of the client.
-    //
-    // We leverage that here so we do not have to keep a lock or
-    // an extra reference to the client.
-    fn get_client(&self) -> Option<Client> {
-        match self.client.lock() {
-            Ok(client) => (*client).clone(),
-            Err(err) => {
-                log::error!("failed to get lock on client: {}", err);
-                None
-            }
         }
     }
 
@@ -213,7 +195,7 @@ impl LspServer {
     // Publish any diagnostics to the client
     async fn publish_diagnostics(&self, key: &lsp::Url) {
         // If we have a client back to the editor report any diagnostics found in the document
-        if let Some(client) = self.get_client() {
+        if let Some(client) = &self.client {
             let diagnostics = self.compute_diagnostics(key);
             client
                 .publish_diagnostics(key.clone(), diagnostics, None)
@@ -246,7 +228,7 @@ impl LspServer {
     }
 }
 
-#[lspower::async_trait]
+#[tower_lsp::async_trait]
 impl LanguageServer for LspServer {
     async fn initialize(
         &self,
@@ -351,21 +333,6 @@ impl LanguageServer for LspServer {
     }
 
     async fn shutdown(&self) -> RpcResult<()> {
-        let mut client = match self.client.lock() {
-            Ok(client) => client,
-            Err(err) => {
-                return Err(LspError::InternalError(format!(
-                    "{}",
-                    err
-                ))
-                .into())
-            }
-        };
-        // XXX(nathanielc): Replace the original client with None causing the original to be dropped.
-        // Dropping the client will close its channel allowing the receiving end
-        // to observe the end of the stream.
-        // See PR for simple change to lspower that will simplify this logic https://github.com/silvanshade/lspower/pull/20
-        *client = None;
         Ok(())
     }
 
@@ -497,19 +464,19 @@ impl LanguageServer for LspServer {
         let key = params.text_document.uri;
 
         let contents = self.get_document(&key)?;
-        let mut formatted = match flux::formatter::format(&contents) {
-            Ok(value) => value,
-            Err(err) => {
-                return Err(lspower::jsonrpc::Error {
-                    code: lspower::jsonrpc::ErrorCode::InternalError,
+        let mut formatted =
+            match flux::formatter::format(&contents) {
+                Ok(value) => value,
+                Err(err) => return Err(tower_lsp::jsonrpc::Error {
+                    code:
+                        tower_lsp::jsonrpc::ErrorCode::InternalError,
                     message: format!(
                         "Error formatting document: {}",
                         err
                     ),
                     data: None,
-                })
-            }
-        };
+                }),
+            };
         if let Some(trim_trailing_whitespace) =
             params.options.trim_trailing_whitespace
         {
@@ -645,7 +612,7 @@ impl LanguageServer for LspServer {
             params.text_document_position_params.position,
         );
 
-        flux::semantic::walk::walk(&mut visitor, pkg_node.clone());
+        flux::semantic::walk::walk(&mut visitor, pkg_node);
 
         if let Some(node) = visitor.node {
             let node_name = match node {

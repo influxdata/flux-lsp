@@ -1,5 +1,5 @@
 use flux::ast::walk;
-use lspower::lsp;
+use tower_lsp::lsp_types as lsp;
 
 #[derive(Clone, Debug)]
 pub struct NodeFinderNode<'a> {

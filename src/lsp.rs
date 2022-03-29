@@ -1,5 +1,5 @@
 /// A collection of tools for working with lsp types.
-use lspower::lsp;
+use tower_lsp::lsp_types as lsp;
 
 /// Return true if two Range structs overlap.
 pub fn ranges_overlap(a: &lsp::Range, b: &lsp::Range) -> bool {
@@ -16,7 +16,7 @@ pub fn position_in_range(
 
 #[cfg(test)]
 mod test {
-    use lspower::lsp;
+    use tower_lsp::lsp_types as lsp;
 
     use super::*;
 
