@@ -35,7 +35,7 @@ bench = false
 anyhow = "1.0.56"
 async-std = { version = "1.11.0", features = ["attributes"] }
 async-trait = "0.1.53"
-clap = "2.33.3"
+clap = { version = "3.1.8", features = ["derive"] }
 combinations = "0.1.0"
 console_error_panic_hook = "0.1.7"
 console_log = { version = "0.2", optional = true }

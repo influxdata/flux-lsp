@@ -1,29 +1,24 @@
 #![allow(clippy::unwrap_used)]
 use std::fs::OpenOptions;
 
-use clap::{App, Arg};
+use clap::Parser;
 use simplelog::{CombinedLogger, Config, LevelFilter, WriteLogger};
 use tower_lsp::{LspService, Server};
 
 use flux_lsp::LspServer;
 
+#[derive(Parser)]
+#[clap(author, version, about, long_about = None)]
+struct Args {
+    #[clap(long, short, help = "Path to write a debug log file")]
+    log_file: Option<String>,
+}
+
 #[async_std::main]
 async fn main() {
-    let matches = App::new("flux-lsp")
-        .version("2.0")
-        .author("Flux Developers <flux-developers@influxdata.com>")
-        .about("LSP server for the Flux programming language")
-        .arg(
-            Arg::with_name("log_file")
-                .short("l")
-                .long("log-file")
-                .help("Path to write a debug log file")
-                .takes_value(true),
-        )
-        .get_matches();
+    let matches = Args::parse();
 
-    if matches.is_present("log_file") {
-        let log_path = matches.value_of("log_file").unwrap();
+    if let Some(log_path) = matches.log_file {
         CombinedLogger::init(vec![WriteLogger::new(
             LevelFilter::Debug,
             Config::default(),
