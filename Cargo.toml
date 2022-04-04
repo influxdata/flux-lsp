@@ -33,9 +33,9 @@ bench = false
 
 [dependencies]
 anyhow = "1.0.56"
-async-std = { version = "1.9.0", features = ["attributes"] }
-async-trait = "0.1.50"
-clap = "2.33.3"
+async-std = { version = "1.11.0", features = ["attributes"] }
+async-trait = "0.1.53"
+clap = { version = "3.1.8", features = ["derive"] }
 combinations = "0.1.0"
 console_error_panic_hook = "0.1.7"
 console_log = { version = "0.2", optional = true }
@@ -45,7 +45,7 @@ flux = { git = "https://github.com/influxdata/flux", tag = "v0.160.0", features 
 futures = "0.3.21"
 js-sys = "0.3.56"
 line-col = "0.2.1"
-log = "0.4.14"
+log = "0.4.16"
 serde = { version = "1.0.136", features = ["derive"] }
 serde_json = "1.0.79"
 serde_repr = "0.1.7"
@@ -60,7 +60,7 @@ web-sys = { version = "0.3.56", features = ["console"] }
 [dev-dependencies]
 criterion = "0.3"
 futures = "0.3.15"
-pretty_assertions = "1.2.0"
+pretty_assertions = "1.2.1"
 wasm-bindgen-test = "0.3.29"
 
 [[bench]]
