@@ -41,7 +41,7 @@ console_error_panic_hook = "0.1.7"
 console_log = { version = "0.2", optional = true }
 env_logger = "0.9"
 expect-test = "1.2.2"
-flux = { git = "https://github.com/influxdata/flux", tag = "v0.160.0", features = ["lsp"] }
+flux = { git = "https://github.com/influxdata/flux", tag = "v0.162.0", features = ["lsp"] }
 futures = "0.3.21"
 js-sys = "0.3.56"
 line-col = "0.2.1"
@@ -53,7 +53,7 @@ simplelog = "0.11.2"
 tower-lsp = { version = "=0.16.0", default-features = false, features = ["runtime-agnostic" ] }
 tower-service = { version = "0.3.1" }
 url = "2.2.2"
-wasm-bindgen = "0.2.74"
+wasm-bindgen = { version = "0.2.79", features = ["serde-serialize"] }
 wasm-bindgen-futures = "0.4.29"
 web-sys = { version = "0.3.56", features = ["console"] }
 
