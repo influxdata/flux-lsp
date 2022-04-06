@@ -5,14 +5,14 @@ set -e
 BUILD_MODE=${BUILD_MODE-release}
 
 BUILD_FLAG=""
-BUILD_MODE_ARGS=""
+BUILD_MODE_ARGS="--features wee_alloc"
 case $BUILD_MODE in
     "release")
         BUILD_FLAG="--release"
         ;;
     "dev")
         BUILD_FLAG="--dev"
-        BUILD_MODE_ARGS="--features console_log"
+        BUILD_MODE_ARGS="${BUILD_MODE_ARGS},console_log,console_error_panic_hook"
         ;;
     *)
         echo "Invalid build mode: ${BUILD_MODE}"
@@ -39,6 +39,12 @@ wasm-pack build \
     -- \
     --locked \
     $BUILD_MODE_ARGS
+
+# Strip producers header and some other optional bits.
+wasm-strip pkg-node/flux-lsp-node_bg.wasm
+wasm-opt -Oz -o pkg-node/flux-lsp-node_bg.wasm pkg-node/flux-lsp-node_bg.wasm
+wasm-strip pkg-browser/flux-lsp-browser_bg.wasm
+wasm-opt -Oz -o pkg-browser/flux-lsp-browser_bg.wasm pkg-browser/flux-lsp-browser_bg.wasm
 
 cat pkg-node/package.json | sed s/@influxdata\\/flux-lsp\"/@influxdata\\/flux-lsp-node\"/g > pkg-node/package-new.json
 mv pkg-node/package-new.json pkg-node/package.json

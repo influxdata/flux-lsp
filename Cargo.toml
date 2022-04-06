@@ -8,7 +8,7 @@ description = "LSP support for the flux language"
 repository = "https://github.com/influxdata/flux-lsp"
 
 [package.metadata.wasm-pack.profile.release]
-wasm-opt = ["-Oz", "--enable-mutable-globals"]
+wasm-opt = ["-Oz"]
 
 [profile.release]
 opt-level = "z"
@@ -17,7 +17,6 @@ lto = true
 [features]
 default = []
 strict = []
-wasm_next = []
 
 [lib]
 name = "flux_lsp"
@@ -37,11 +36,11 @@ async-std = { version = "1.11.0", features = ["attributes"] }
 async-trait = "0.1.53"
 clap = { version = "3.1.8", features = ["derive"] }
 combinations = "0.1.0"
-console_error_panic_hook = "0.1.7"
+console_error_panic_hook = { version = "0.1.7", optional = true }
 console_log = { version = "0.2", optional = true }
 env_logger = "0.9"
 expect-test = "1.2.2"
-flux = { git = "https://github.com/influxdata/flux", tag = "v0.162.0", features = ["lsp"] }
+flux = { git = "https://github.com/influxdata/flux", tag = "v0.162.0", features = ["lsp"], default-features = false }
 futures = "0.3.21"
 js-sys = "0.3.56"
 line-col = "0.2.1"
@@ -56,6 +55,7 @@ url = "2.2.2"
 wasm-bindgen = { version = "0.2.79", features = ["serde-serialize"] }
 wasm-bindgen-futures = "0.4.29"
 web-sys = { version = "0.3.56", features = ["console"] }
+wee_alloc = { version = "0.4.5", optional = true }
 
 [dev-dependencies]
 criterion = "0.3"

@@ -81,6 +81,7 @@ pub struct Lsp {
 
 impl Default for Lsp {
     fn default() -> Self {
+        #[cfg(feature = "console_log")]
         console_error_panic_hook::set_once();
 
         let (service, messages) =
