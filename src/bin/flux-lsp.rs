@@ -14,7 +14,7 @@ struct Args {
     log_file: Option<String>,
 }
 
-#[async_std::main]
+#[tokio::main]
 async fn main() {
     let matches = Args::parse();
 
@@ -32,8 +32,8 @@ async fn main() {
     }
 
     log::debug!("Starting lsp client");
-    let stdin = async_std::io::stdin();
-    let stdout = async_std::io::stdout();
+    let stdin = tokio::io::stdin();
+    let stdout = tokio::io::stdout();
 
     let (service, messages) =
         LspService::new(|client| LspServer::new(Some(client)));
