@@ -188,6 +188,7 @@ impl Store {
                 // We do not care if the code is syntactically or semantically correct as this may be
                 // partially written code.
                 skip_checks: true,
+                features: vec![],
             },
         ) {
             Ok(analyzer) => analyzer,
@@ -285,6 +286,7 @@ impl Store {
                 // We do not care if the code is syntactically or semantically correct as this may be
                 // partially written code.
                 skip_checks: true,
+                features: vec![],
             },
         ) {
             Ok(analyzer) => analyzer,

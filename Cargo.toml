@@ -34,15 +34,15 @@ bench = false
 anyhow = "1.0.56"
 async-std = { version = "1.11.0", features = ["attributes"] }
 async-trait = "0.1.53"
-clap = { version = "3.1.8", features = ["derive"] }
+clap = { version = "3.1.9", features = ["derive"] }
 combinations = "0.1.0"
 console_error_panic_hook = { version = "0.1.7", optional = true }
 console_log = { version = "0.2", optional = true }
 env_logger = "0.9"
 expect-test = "1.2.2"
-flux = { git = "https://github.com/influxdata/flux", tag = "v0.163.0", features = ["lsp"], default-features = false }
+flux = { git = "https://github.com/influxdata/flux", tag = "v0.164.1", features = ["lsp"], default-features = false }
 futures = "0.3.21"
-js-sys = "0.3.56"
+js-sys = "0.3.57"
 line-col = "0.2.1"
 log = "0.4.16"
 serde = { version = "1.0.136", features = ["derive"] }
@@ -52,16 +52,16 @@ simplelog = "0.11.2"
 tower-lsp = { version = "=0.16.0", default-features = false, features = ["runtime-agnostic" ] }
 tower-service = { version = "0.3.1" }
 url = "2.2.2"
-wasm-bindgen = { version = "0.2.79", features = ["serde-serialize"] }
-wasm-bindgen-futures = "0.4.29"
-web-sys = { version = "0.3.56", features = ["console"] }
+wasm-bindgen = { version = "0.2.80", features = ["serde-serialize"] }
+wasm-bindgen-futures = "0.4.30"
+web-sys = { version = "0.3.57", features = ["console"] }
 wee_alloc = { version = "0.4.5", optional = true }
 
 [dev-dependencies]
 criterion = "0.3"
 futures = "0.3.15"
 pretty_assertions = "1.2.1"
-wasm-bindgen-test = "0.3.29"
+wasm-bindgen-test = "0.3.30"
 
 [[bench]]
 name = "server"
