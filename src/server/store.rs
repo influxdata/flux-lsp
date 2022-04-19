@@ -125,6 +125,9 @@ impl Store {
                         .map(|key| {
                             (
                                 key.clone(),
+                                // Unwrap is okay here, as the key is retrieved from
+                                // map.keys()
+                                #[allow(clippy::unwrap_used)]
                                 map.get(key).unwrap().clone(),
                             )
                         })
