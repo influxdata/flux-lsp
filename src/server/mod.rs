@@ -988,9 +988,9 @@ impl LanguageServer for LspServer {
                 }
             }
             None
-        }).filter(|action| action.is_some()).map(|action| {
+        }).filter(|action| action.is_some()).flat_map(|action| {
             action.expect("Previous .filter() call failed.")
-        }).flatten().collect();
+        }).collect();
 
         return Ok(Some(actions));
     }
