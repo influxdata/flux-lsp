@@ -48,8 +48,8 @@ log = "0.4.16"
 serde = { version = "1.0.136", features = ["derive"] }
 serde_json = "1.0.79"
 serde_repr = "0.1.7"
-simplelog = "0.11.2"
-tower-lsp = { version = "=0.16.0", default-features = false, features = ["runtime-agnostic" ] }
+simplelog = "0.12.0"
+tower-lsp = { version = "0.17.0", default-features = false, features = ["runtime-agnostic" ] }
 tower-service = { version = "0.3.1" }
 url = "2.2.2"
 wasm-bindgen = { version = "0.2.80", features = ["serde-serialize"] }
