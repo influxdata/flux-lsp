@@ -431,8 +431,6 @@ impl LanguageServer for LspServer {
                         &ident.name,
                         "builtin",
                     ));
-                    // XXX: rockstar (13 Jul 2021) - Add support for user defined
-                    // signatures.
                 } else {
                     log::debug!("signature_help on non-member and non-identifier");
                 }
