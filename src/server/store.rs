@@ -21,6 +21,26 @@ fn url_to_key_val(url: &lsp::Url) -> (String, String) {
     (parent, filename.into())
 }
 
+fn get_analyzer() -> Result<flux::semantic::Analyzer<'static, &'static flux::semantic::import::Packages>, LspError> {
+    match flux::new_semantic_analyzer(
+        flux::semantic::AnalyzerConfig {
+            // Explicitly disable the AST and Semantic checks.
+            // We do not care if the code is syntactically or semantically correct as this may be
+            // partially written code.
+            skip_checks: true,
+            features: vec![],
+        },
+    ) {
+        Ok(analyzer) => Ok(analyzer),
+        Err(err) => {
+            return Err(LspError::InternalError(format!(
+                "{}",
+                err
+            )))
+        }
+    }
+}
+
 /// Store acts as the in-memory storage backend for the LSP server.
 ///
 /// The spec talks specifically about setting versions for files, but isn't
@@ -138,11 +158,7 @@ impl Store {
         }
     }
 
-    pub fn get_semantic_package(
-        &self,
-
-        url: &lsp::Url,
-    ) -> Result<flux::semantic::nodes::Package, LspError> {
+    fn get_ast_package(&self, url: &lsp::Url) -> Result<flux::ast::Package, LspError> {
         let (key, val) = url_to_key_val(url);
         let files = self.get_files(key)?;
 
@@ -184,32 +200,29 @@ impl Store {
         // understand what's happening, but this is not a permanent fix.
         // See: https://github.com/influxdata/flux/issues/4538
         ast_pkg.files.sort_by(|a, b| a.name.cmp(&b.name));
+        Ok(ast_pkg)
+    }
 
-        let mut analyzer = match flux::new_semantic_analyzer(
-            flux::semantic::AnalyzerConfig {
-                // Explicitly disable the AST and Semantic checks.
-                // We do not care if the code is syntactically or semantically correct as this may be
-                // partially written code.
-                skip_checks: true,
-                features: vec![],
-            },
-        ) {
-            Ok(analyzer) => analyzer,
-            Err(err) => {
-                return Err(LspError::InternalError(format!(
-                    "{}",
-                    err
-                )))
-            }
-        };
+    pub fn get_semantic_package(
+        &self,
+
+        url: &lsp::Url,
+    ) -> Result<flux::semantic::nodes::Package, LspError> {
+        let ast_pkg = self.get_ast_package(url)?;
+
+        let mut analyzer = get_analyzer()?;
         match analyzer.analyze_ast(&ast_pkg).map_err(|mut err| {
-            err.error.source = Some(
-                files
-                    .into_iter()
-                    .map(|file| file.1)
-                    .collect::<Vec<String>>()
-                    .join("\n"),
-            );
+            let (key, _val) = url_to_key_val(url);
+            match self.get_files(key) {
+                Ok(files) => err.error.source = Some(
+                    files
+                        .into_iter()
+                        .map(|file| file.1)
+                        .collect::<Vec<String>>()
+                        .join("\n"),
+                ),
+                Err(_) => (),
+            }
             err
         }) {
             Ok((_, pkg)) => Ok(pkg),
@@ -232,80 +245,33 @@ impl Store {
         &self,
         url: &lsp::Url,
     ) -> Option<flux::semantic::FileErrors> {
-        let (key, val) = url_to_key_val(url);
-        let files = match self.get_files(key) {
-            Ok(files) => files,
-            Err(_) => {
-                log::warn!(
-                    "Could not get files/package for key: {}",
-                    url
-                );
+        let ast_pkg = match self.get_ast_package(url) {
+            Ok(pkg) => pkg,
+            Err(err) => {
+                log::error!("{:?}", err);
                 return None;
             }
         };
 
-        // Grab the AST Package corresponding to currently requested package. Merge all
-        // other packages with it that one as root.
-        let mut pkgs: Vec<flux::ast::Package> = files
-            .iter()
-            .map(|source| {
-                flux::parser::parse_string(
-                    source.0.clone(),
-                    &source.1,
-                )
-                .into()
-            })
-            .collect();
-        let mut ast_pkg = match pkgs
-            .iter()
-            .position(|pkg| pkg.files[0].name == val)
-        {
-            Some(idx) => pkgs.remove(idx),
-            None => unreachable!(
-                "File requested was not in list of packages returned"
-            ),
-        };
-
-        for mut pkg in pkgs.into_iter() {
-            if let Err(_error) =
-                flux::merge_packages(&mut ast_pkg, &mut pkg)
-            {
-                // XXX: rockstar (3 Mar 2020) - Currently, this will discard any files that don't
-                // match the source file's package clause. This should really happen at a check state
-                // later, but this is how it works for now.
-                continue;
-            }
-        }
-        // XXX: rockstar (7 Mar 2022) - An ordering of these files has to be deterministic, but
-        // flux itself hasn't really established a mechanism whereby these packages _should_ be ordered.
-        // This hack allows us to make the files ordered deterministically so that the user can at least
-        // understand what's happening, but this is not a permanent fix.
-        // See: https://github.com/influxdata/flux/issues/4538
-        ast_pkg.files.sort_by(|a, b| a.name.cmp(&b.name));
-
-        let mut analyzer = match flux::new_semantic_analyzer(
-            flux::semantic::AnalyzerConfig {
-                // Explicitly disable the AST and Semantic checks.
-                // We do not care if the code is syntactically or semantically correct as this may be
-                // partially written code.
-                skip_checks: true,
-                features: vec![],
-            },
-        ) {
+        let mut analyzer = match get_analyzer(){
             Ok(analyzer) => analyzer,
             Err(err) => {
-                log::error!("{}", err);
+                log::error!("{:?}", err);
                 return None;
             }
         };
         match analyzer.analyze_ast(&ast_pkg).map_err(|mut err| {
-            err.error.source = Some(
-                files
-                    .into_iter()
-                    .map(|file| file.1)
-                    .collect::<Vec<String>>()
-                    .join("\n"),
-            );
+            let (key, _val) = url_to_key_val(url);
+            match self.get_files(key) {
+                Ok(files) => err.error.source = Some(
+                    files
+                        .into_iter()
+                        .map(|file| file.1)
+                        .collect::<Vec<String>>()
+                        .join("\n"),
+                ),
+                Err(_) => (),
+            }
             err
         }) {
             Ok(_) => None,
@@ -425,9 +391,6 @@ from(bucket: "bucket")
         assert_eq!(2, result.files.len());
     }
 
-    // XXX: rockstar (03 Mar 2020) - This test should behave differently
-    // after the merge_packages behavior changes to assert package issues
-    // and the semantic check is what raises the errors.
     #[test]
     fn get_package_multi_file_separate_packages() {
         let store = Store::default();
