@@ -81,7 +81,7 @@ async fn test_initialized() {
     let server_info = result.server_info.unwrap();
 
     assert_eq!(server_info.name, "flux-lsp".to_string());
-    assert_eq!(server_info.version, Some("2.0".to_string()));
+    assert_eq!(server_info.version, Some(env!("CARGO_PKG_VERSION").into()));
 }
 
 #[test]

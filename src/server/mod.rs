@@ -18,6 +18,8 @@ use crate::{
     completion, shared::FunctionSignature, stdlib, visitors::semantic,
 };
 
+const VERSION: &str = env!("CARGO_PKG_VERSION");
+
 /// Convert a flux::semantic::walk::Node to a lsp::Location
 /// https://microsoft.github.io/language-server-protocol/specification#location
 fn node_to_location(
@@ -327,7 +329,7 @@ impl LanguageServer for LspServer {
             },
             server_info: Some(lsp::ServerInfo {
                 name: "flux-lsp".to_string(),
-                version: Some("2.0".to_string()),
+                version: Some(VERSION.into()),
             }),
         })
     }
