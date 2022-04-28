@@ -5,7 +5,7 @@ set -e
 BUILD_MODE=${BUILD_MODE-release}
 
 BUILD_FLAG=""
-BUILD_MODE_ARGS="--features wee_alloc"
+BUILD_MODE_ARGS="--no-default-features --features wasm"
 case $BUILD_MODE in
     "release")
         BUILD_FLAG="--release"
