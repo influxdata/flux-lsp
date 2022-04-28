@@ -1192,7 +1192,7 @@ pub fn find_completions(
                     sem_pkg,
                 ));
             }
-            AstNode::MemberExpr(member) => 
+            AstNode::MemberExpr(member) => {
                 if let Expression::Identifier(ident) = &member.object
                 {
                     items = get_dot_completions(

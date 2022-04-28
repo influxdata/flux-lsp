@@ -308,12 +308,11 @@ async fn test_signature_help_not_opened() {
 #[test]
 async fn test_signature_help() {
     let server = create_server();
-    open_file(&server, "from(".to_string(), None).await;
+    let fluxscript = r#"from(
+                          // ^"#;
+    open_file(&server, fluxscript.into(), None).await;
 
-    // XXX: rockstar (13 Jul 2021) - In the lsp protocol, Position arguments
-    // are indexed from 1, e.g. there is no line number 0. This references
-    // (0, 5) for compatibility with the previous implementation, but should
-    // be updated to (1, 5) at some point.
+
     let params = lsp::SignatureHelpParams {
         context: None,
         text_document_position_params:
@@ -322,7 +321,7 @@ async fn test_signature_help() {
                     lsp::Url::parse("file:///home/user/file.flux")
                         .unwrap(),
                 ),
-                lsp::Position::new(0, 5),
+                position_of(fluxscript),
             ),
         work_done_progress_params: lsp::WorkDoneProgressParams {
             work_done_token: None,
