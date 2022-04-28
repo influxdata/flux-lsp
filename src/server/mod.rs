@@ -765,8 +765,6 @@ impl LanguageServer for LspServer {
                             let func = path.get(path.len() - 3)?;
                             match func {
                                 walk::Node::FunctionExpr(func) => {
-
-                                    // TODO Use MonoType::parameter directly
                                     let field = ident.name.as_str();
                                     match &func.typ {
                                         MonoType::Fun(f) => f.req.get(field).or_else(|| f.opt.get(field)).or_else(|| {
