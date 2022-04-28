@@ -439,10 +439,6 @@ impl LanguageServer for LspServer {
             }
         }
 
-        // XXX: rockstar (12 Jul 2021) - `active_parameter` and `active_signature`
-        // are currently unsupported, as they were unsupported in the previous
-        // version of the server. They should be implemented, as it presents a
-        // much better user interface.
         let response = if signatures.is_empty() {
             None
         } else {
