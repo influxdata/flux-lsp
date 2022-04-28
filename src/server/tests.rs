@@ -1758,13 +1758,6 @@ errorCounts
     );
 }
 
-// TODO: sean (10 Aug 2021) - This test fails unless the line reading
-// `ab = 10` in the flux script is commented out. The error is valid,
-// but the lsp should be able to turn it into a diagnostic notification
-// and continue to provide completion suggestions.
-//
-// An issue has been created for this:
-// https://github.com/influxdata/flux-lsp/issues/290
 #[test]
 async fn test_option_object_members_completion() {
     let fluxscript = r#"import "strings"
@@ -1786,7 +1779,7 @@ option task = {
 task.
  // ^
 
-// ab = 10
+ab = 10
 "#;
     let server = create_server();
     open_file(&server, fluxscript.to_string(), None).await;
