@@ -241,7 +241,7 @@ impl LanguageServer for LspServer {
                 code_lens_provider: None,
                 color_provider: None,
                 completion_provider: Some(lsp::CompletionOptions {
-                    resolve_provider: Some(true),
+                    resolve_provider: None,
                     trigger_characters: Some(vec![
                         ".".to_string(),
                         ":".to_string(),
@@ -799,16 +799,6 @@ impl LanguageServer for LspServer {
             }
         }
         Ok(None)
-    }
-
-    // XXX: rockstar (9 Aug 2021) - This implementation exists here *solely* for
-    // compatibility with the previous server. This behavior is identical to it,
-    // although very clearly kinda useless.
-    async fn completion_resolve(
-        &self,
-        params: lsp::CompletionItem,
-    ) -> RpcResult<lsp::CompletionItem> {
-        Ok(params)
     }
 
     async fn completion(

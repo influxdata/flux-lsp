@@ -1442,23 +1442,6 @@ x = 1
 }
 
 #[test]
-async fn test_completion_resolve() {
-    let fluxscript = r#"import "strings"#;
-    let server = create_server();
-    open_file(&server, fluxscript.to_string(), None).await;
-
-    let params = lsp::CompletionItem::new_simple(
-        "label".to_string(),
-        "detail".to_string(),
-    );
-
-    let result =
-        server.completion_resolve(params.clone()).await.unwrap();
-
-    assert_eq!(params, result);
-}
-
-#[test]
 async fn test_package_completion() {
     let fluxscript = r#"import "sql"
 
