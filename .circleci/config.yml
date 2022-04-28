@@ -73,8 +73,8 @@ jobs:
       - checkout
       - run: |
           BUILD_MODE=release AR=llvm-ar ./wasm-build.sh
-          echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN" > pkg-node/.npmrc
-          echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN" > pkg-browser/.npmrc
+          echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN" > target/pkg-node/.npmrc
+          echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN" > target/pkg-browser/.npmrc
           ./publish.sh
 
 

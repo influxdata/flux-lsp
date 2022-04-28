@@ -1,6 +1,21 @@
 #!/bin/bash
 
+# This script generates the wasm build artifacts, optimizes them, and modifies
+# the corresponding package data. If `BUILD_MODE=dev` is set, some handy
+# tools and libraries are included in the binary for development purposes
+# which would otherwise be inappropriate for the final build.
+#
+# Currently, two separate build artifacts are generated, one for nodejs and one
+# for the browser. This is a by-product of using `wasm-pack`. Eventually, we
+# should be able to use a `--target=all` to generate a single package that is
+# platform agnostic.
+# For more information, see https://github.com/rustwasm/wasm-pack/issues/313
+
 set -e
+
+TARGET_DIR=target
+NODE_DIR=$TARGET_DIR/pkg-node
+BROWSER_DIR=$TARGET_DIR/pkg-browser
 
 BUILD_MODE=${BUILD_MODE-release}
 
@@ -23,8 +38,8 @@ esac
 
 wasm-pack build \
     -t nodejs \
-    -d pkg-node \
-    --out-name flux-lsp-node \
+    -d $NODE_DIR \
+    --out-name flux-node \
     --scope influxdata \
     ${BUILD_FLAG} \
     -- \
@@ -32,8 +47,8 @@ wasm-pack build \
     $BUILD_MODE_ARGS
 wasm-pack build \
     -t browser \
-    -d pkg-browser \
-    --out-name flux-lsp-browser \
+    -d $BROWSER_DIR \
+    --out-name flux-browser \
     --scope influxdata \
     ${BUILD_FLAG} \
     -- \
@@ -41,14 +56,15 @@ wasm-pack build \
     $BUILD_MODE_ARGS
 
 # Strip producers header and some other optional bits.
-wasm-strip pkg-node/flux-lsp-node_bg.wasm
-wasm-opt -Oz -o pkg-node/flux-lsp-node_bg.wasm pkg-node/flux-lsp-node_bg.wasm
-wasm-strip pkg-browser/flux-lsp-browser_bg.wasm
-wasm-opt -Oz -o pkg-browser/flux-lsp-browser_bg.wasm pkg-browser/flux-lsp-browser_bg.wasm
+wasm-strip $NODE_DIR/flux-node_bg.wasm
+wasm-opt -Oz -o $NODE_DIR/flux-node_bg.wasm $NODE_DIR/flux-node_bg.wasm
+wasm-strip $BROWSER_DIR/flux-browser_bg.wasm
+wasm-opt -Oz -o $BROWSER_DIR/flux-browser_bg.wasm $BROWSER_DIR/flux-browser_bg.wasm
 
-cat pkg-node/package.json | sed s/@influxdata\\/flux-lsp\"/@influxdata\\/flux-lsp-node\"/g > pkg-node/package-new.json
-mv pkg-node/package-new.json pkg-node/package.json
+cat $NODE_DIR/package.json | sed s/@influxdata\\/flux-lsp\"/@influxdata\\/flux-node\"/g > $NODE_DIR/package-new.json
+mv $NODE_DIR/package-new.json $NODE_DIR/package.json
+echo "" > $NODE_DIR/README.md
 
-cat pkg-browser/package.json | sed s/@influxdata\\/flux-lsp\"/@influxdata\\/flux-lsp-browser\"/g | sed -e 's/"files": \[/"files": [\
-    "flux-lsp-browser_bg.js",/g' > pkg-browser/package-new.json
-mv pkg-browser/package-new.json pkg-browser/package.json
+cat $BROWSER_DIR/package.json | sed s/@influxdata\\/flux-lsp\"/@influxdata\\/flux-browser\"/g > $BROWSER_DIR/package-new.json
+mv $BROWSER_DIR/package-new.json $BROWSER_DIR/package.json
+echo "" > $BROWSER_DIR/README.md

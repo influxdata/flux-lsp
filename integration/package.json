@@ -279,7 +279,7 @@
   "scripts": {
     "build-wasm-browser": "",
     "build-wasm": "cd .. && BUILD_MODE=dev ./wasm-build.sh",
-    "install-pkg": "npm run build-wasm && npm install --no-save ../pkg-node",
+    "install-pkg": "npm run build-wasm && npm install --no-save ../target/pkg-node",
     "client": "npm run install-pkg && node an-lsp-client.js",
     "test": "npm run install-pkg && jest"
   },

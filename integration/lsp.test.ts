@@ -2,12 +2,12 @@ describe('LSP Server', () => {
     let server;
 
     beforeAll(async () => {
-        const { initLog } = await import('@influxdata/flux-lsp-node');
+        const { initLog } = await import('@influxdata/flux-node');
         initLog();
     });
 
     beforeEach(async () => {
-        const { Lsp } = await import('@influxdata/flux-lsp-node');
+        const { Lsp } = await import('@influxdata/flux-node');
         server = new Lsp();
     });
 
@@ -138,7 +138,7 @@ describe('LSP Server', () => {
 describe('module', () => {
 
     it('can parse Flux source' , async () => {
-        const { parse } = await import('@influxdata/flux-lsp-node');
+        const { parse } = await import('@influxdata/flux-node');
         const ast = parse('x = 1');
         // expect some basic parts of this ast
         expect(ast).toBeDefined();
@@ -149,7 +149,7 @@ describe('module', () => {
     })
 
     it('can format Flux source' , async () => {
-        const { parse, format_from_js_file } = await import('@influxdata/flux-lsp-node');
+        const { parse, format_from_js_file } = await import('@influxdata/flux-node');
         const ast = parse('x = 1');
         // Change AST
         ast.body[0].init.value = '2';
