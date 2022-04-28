@@ -3,7 +3,7 @@
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::path::Path;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, RwLock};
 
 use tower_lsp::lsp_types as lsp;
 
@@ -28,13 +28,13 @@ fn url_to_key_val(url: &lsp::Url) -> (String, String) {
 /// type could be extended to keep track of versions of files, but simplicity
 /// is preferred at this point.
 pub(crate) struct Store {
-    backend: Arc<Mutex<HashMap<String, HashMap<String, String>>>>,
+    backend: Arc<RwLock<HashMap<String, HashMap<String, String>>>>,
 }
 
 impl Default for Store {
     fn default() -> Self {
         Store {
-            backend: Arc::new(Mutex::new(HashMap::new())),
+            backend: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 }
@@ -43,7 +43,7 @@ impl Store {
     pub fn put(&self, url: &lsp::Url, contents: &str) {
         let (key, val) = url_to_key_val(url);
 
-        match self.backend.lock() {
+        match self.backend.write() {
             Ok(mut store) => match store.entry(key) {
                 Entry::Vacant(entry) => {
                     let mut map = HashMap::new();
@@ -67,7 +67,7 @@ impl Store {
     pub fn remove(&self, url: &lsp::Url) {
         let (key, val) = url_to_key_val(url);
 
-        match self.backend.lock() {
+        match self.backend.write() {
             Ok(mut store) => match store.entry(key) {
                 Entry::Vacant(_) => {
                     log::warn!(
@@ -92,20 +92,15 @@ impl Store {
     pub fn get(&self, url: &lsp::Url) -> Result<String, LspError> {
         let (key, val) = url_to_key_val(url);
 
-        match self.backend.lock() {
-            Ok(mut store) => match store.entry(key) {
-                Entry::Vacant(_) => {
-                    Err(LspError::FileNotFound(url.to_string()))
-                }
-                Entry::Occupied(entry) => {
-                    let map = entry.get();
-                    match map.get(&val) {
-                        Some(value) => Ok(value.into()),
-                        None => Err(LspError::FileNotFound(
-                            url.to_string(),
-                        )),
+        match self.backend.read() {
+            Ok(store) => match store.get(&key) {
+                None => Err(LspError::FileNotFound(url.to_string())),
+                Some(entry) => match entry.get(&val) {
+                    Some(value) => Ok(value.into()),
+                    None => {
+                        Err(LspError::FileNotFound(url.to_string()))
                     }
-                }
+                },
             },
             Err(_) => Err(LspError::LockNotAcquired),
         }
@@ -115,12 +110,11 @@ impl Store {
         &self,
         path: String,
     ) -> Result<Vec<(String, String)>, LspError> {
-        match self.backend.lock() {
-            Ok(mut store) => match store.entry(path.clone()) {
-                Entry::Vacant(_) => Err(LspError::FileNotFound(path)),
-                Entry::Occupied(entry) => {
-                    let map = entry.get();
-                    Ok(map
+        match self.backend.read() {
+            Ok(store) => match store.get(&path) {
+                None => Err(LspError::FileNotFound(path)),
+                Some(entry) => {
+                    Ok(entry
                         .keys()
                         .map(|key| {
                             (
@@ -128,7 +122,7 @@ impl Store {
                                 // Unwrap is okay here, as the key is retrieved from
                                 // map.keys()
                                 #[allow(clippy::unwrap_used)]
-                                map.get(key).unwrap().clone(),
+                                entry.get(key).unwrap().clone(),
                             )
                         })
                         .collect())
@@ -329,8 +323,10 @@ mod test {
         let (key, val) = url_to_key_val(&url);
 
         {
-            let mut backend =
-                store.backend.lock().expect("Could not acquire lock");
+            let mut backend = store
+                .backend
+                .write()
+                .expect("Could not acquire lock");
             match backend.entry(key.clone()) {
                 Entry::Vacant(_) => panic!("put to {} failed", key),
                 Entry::Occupied(entry) => {
@@ -354,8 +350,10 @@ mod test {
         {
             let mut map = HashMap::new();
             map.insert(val, contents.into());
-            let mut backend =
-                store.backend.lock().expect("Could not acquire lock");
+            let mut backend = store
+                .backend
+                .write()
+                .expect("Could not acquire lock");
             backend.insert(key, map);
         }
 
@@ -377,8 +375,10 @@ mod test {
         {
             let mut map = HashMap::new();
             map.insert(val, contents.into());
-            let mut backend =
-                store.backend.lock().expect("Could not acquire lock");
+            let mut backend = store
+                .backend
+                .write()
+                .expect("Could not acquire lock");
             backend.insert(key, map);
         }
 
