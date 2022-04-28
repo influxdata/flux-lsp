@@ -3138,9 +3138,6 @@ async fn compute_diagnostics_multi_file() {
         diagnostics
     );
 
-    // Open the adjacent file with the identifier in it.
-    // This has to have a filename that is alphabetically before the previous
-    // one; see the XXX comment in store.rs.
     open_file(
         &server,
         r#"v = {a: "b"}"#.to_string(),
