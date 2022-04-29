@@ -6,8 +6,7 @@ use std::collections::HashMap;
 
 use flux::semantic::nodes::ErrorKind as SemanticNodeErrorKind;
 use flux::semantic::{
-    nodes::FunctionParameter, nodes::Symbol, types::MonoType, walk,
-    ErrorKind,
+    nodes::FunctionParameter, nodes::Symbol, walk, ErrorKind,
 };
 use tower_lsp::{
     jsonrpc::Result as RpcResult, lsp_types as lsp, Client,
@@ -767,25 +766,18 @@ impl LanguageServer for LspServer {
                             let func = path.get(path.len() - 3)?;
                             match func {
                                 walk::Node::FunctionExpr(func) => {
-                                    let field = ident.name.as_str();
-                                    match &func.typ {
-                                        MonoType::Fun(f) => f.req.get(field).or_else(|| f.opt.get(field)).or_else(|| {
-                                            f.pipe
-                                                .as_ref()
-                                                .and_then(|pipe| if pipe.k == field { Some(&pipe.v) } else { None })
-                                        })
-
-                                                .cloned()
-                                        ,
-                                        _ => None,
-                                    }
+                                    func.typ
+                                        .parameter(
+                                            ident.name.as_str(),
+                                        )
+                                        .map(|value| value.clone())
                                 }
-                                _ => None
+                                _ => None,
                             }
                         }
                         _ => None,
                     }
-                },
+                }
                 _ => None,
             });
             if let Some(typ) = hover_type {
