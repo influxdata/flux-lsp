@@ -81,7 +81,10 @@ async fn test_initialized() {
     let server_info = result.server_info.unwrap();
 
     assert_eq!(server_info.name, "flux-lsp".to_string());
-    assert_eq!(server_info.version, Some(env!("CARGO_PKG_VERSION").into()));
+    assert_eq!(
+        server_info.version,
+        Some(env!("CARGO_PKG_VERSION").into())
+    );
 }
 
 #[test]
@@ -311,7 +314,6 @@ async fn test_signature_help() {
     let fluxscript = r#"from(
                           // ^"#;
     open_file(&server, fluxscript.into(), None).await;
-
 
     let params = lsp::SignatureHelpParams {
         context: None,

@@ -21,7 +21,13 @@ fn url_to_key_val(url: &lsp::Url) -> (String, String) {
     (parent, filename.into())
 }
 
-fn get_analyzer() -> Result<flux::semantic::Analyzer<'static, &'static flux::semantic::import::Packages>, LspError> {
+fn get_analyzer() -> Result<
+    flux::semantic::Analyzer<
+        'static,
+        &'static flux::semantic::import::Packages,
+    >,
+    LspError,
+> {
     match flux::new_semantic_analyzer(
         flux::semantic::AnalyzerConfig {
             // Explicitly disable the AST and Semantic checks.
@@ -33,10 +39,7 @@ fn get_analyzer() -> Result<flux::semantic::Analyzer<'static, &'static flux::sem
     ) {
         Ok(analyzer) => Ok(analyzer),
         Err(err) => {
-            return Err(LspError::InternalError(format!(
-                "{}",
-                err
-            )))
+            return Err(LspError::InternalError(format!("{}", err)))
         }
     }
 }
@@ -158,7 +161,10 @@ impl Store {
         }
     }
 
-    fn get_ast_package(&self, url: &lsp::Url) -> Result<flux::ast::Package, LspError> {
+    fn get_ast_package(
+        &self,
+        url: &lsp::Url,
+    ) -> Result<flux::ast::Package, LspError> {
         let (key, val) = url_to_key_val(url);
         let files = self.get_files(key)?;
 
@@ -214,13 +220,15 @@ impl Store {
         match analyzer.analyze_ast(&ast_pkg).map_err(|mut err| {
             let (key, _val) = url_to_key_val(url);
             match self.get_files(key) {
-                Ok(files) => err.error.source = Some(
-                    files
-                        .into_iter()
-                        .map(|file| file.1)
-                        .collect::<Vec<String>>()
-                        .join("\n"),
-                ),
+                Ok(files) => {
+                    err.error.source = Some(
+                        files
+                            .into_iter()
+                            .map(|file| file.1)
+                            .collect::<Vec<String>>()
+                            .join("\n"),
+                    )
+                }
                 Err(_) => (),
             }
             err
@@ -253,7 +261,7 @@ impl Store {
             }
         };
 
-        let mut analyzer = match get_analyzer(){
+        let mut analyzer = match get_analyzer() {
             Ok(analyzer) => analyzer,
             Err(err) => {
                 log::error!("{:?}", err);
@@ -263,13 +271,15 @@ impl Store {
         match analyzer.analyze_ast(&ast_pkg).map_err(|mut err| {
             let (key, _val) = url_to_key_val(url);
             match self.get_files(key) {
-                Ok(files) => err.error.source = Some(
-                    files
-                        .into_iter()
-                        .map(|file| file.1)
-                        .collect::<Vec<String>>()
-                        .join("\n"),
-                ),
+                Ok(files) => {
+                    err.error.source = Some(
+                        files
+                            .into_iter()
+                            .map(|file| file.1)
+                            .collect::<Vec<String>>()
+                            .join("\n"),
+                    )
+                }
                 Err(_) => (),
             }
             err
