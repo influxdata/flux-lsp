@@ -29,13 +29,7 @@ fn get_analyzer() -> Result<
     LspError,
 > {
     match flux::new_semantic_analyzer(
-        flux::semantic::AnalyzerConfig {
-            // Explicitly disable the AST and Semantic checks.
-            // We do not care if the code is syntactically or semantically correct as this may be
-            // partially written code.
-            skip_checks: true,
-            features: vec![],
-        },
+        flux::semantic::AnalyzerConfig::default(),
     ) {
         Ok(analyzer) => Ok(analyzer),
         Err(err) => {
@@ -217,22 +211,7 @@ impl Store {
         let ast_pkg = self.get_ast_package(url)?;
 
         let mut analyzer = get_analyzer()?;
-        match analyzer.analyze_ast(&ast_pkg).map_err(|mut err| {
-            let (key, _val) = url_to_key_val(url);
-            match self.get_files(key) {
-                Ok(files) => {
-                    err.error.source = Some(
-                        files
-                            .into_iter()
-                            .map(|file| file.1)
-                            .collect::<Vec<String>>()
-                            .join("\n"),
-                    )
-                }
-                Err(_) => (),
-            }
-            err
-        }) {
+        match analyzer.analyze_ast(&ast_pkg) {
             Ok((_, pkg)) => Ok(pkg),
             Err(e) => {
                 let error_string = format!("{}", e);
@@ -268,22 +247,7 @@ impl Store {
                 return None;
             }
         };
-        match analyzer.analyze_ast(&ast_pkg).map_err(|mut err| {
-            let (key, _val) = url_to_key_val(url);
-            match self.get_files(key) {
-                Ok(files) => {
-                    err.error.source = Some(
-                        files
-                            .into_iter()
-                            .map(|file| file.1)
-                            .collect::<Vec<String>>()
-                            .join("\n"),
-                    )
-                }
-                Err(_) => (),
-            }
-            err
-        }) {
+        match analyzer.analyze_ast(&ast_pkg) {
             Ok(_) => None,
             Err(errors) => Some(errors.error),
         }
@@ -365,7 +329,7 @@ mod test {
     }
 
     #[test]
-    fn get_package() {
+    fn get_semantic_package() {
         let store = Store::default();
         let key = lsp::Url::parse("file:///a/b/c").unwrap();
         let contents = r#"import "foo"
@@ -421,5 +385,38 @@ from(bucket: "bucket")
         let result = store.get_semantic_package(&key).unwrap();
 
         assert_eq!(1, result.files.len());
+    }
+
+    #[test]
+    fn get_package_errors_no_errors() {
+        let store = Store::default();
+        let key = lsp::Url::parse("file:///a/b/c").unwrap();
+        let contents = r#"from(bucket: "bucket")
+|> range(start: -15m)
+|> filter(fn: (r) => r.tag == "anTag")"#;
+        store.put(&key, contents);
+
+        let result = store.get_package_errors(&key);
+
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn get_package_errors() {
+        let store = Store::default();
+        let key = lsp::Url::parse("file:///a/b/c").unwrap();
+        let contents = r#"import "foo"
+
+from(bucket: "bucket")
+|> range(start: -15m)
+|> filter(fn: (r) => r.tag == "anTag")"#;
+        store.put(&key, contents);
+
+        let result = store.get_package_errors(&key);
+
+        // XXX: rockstar (29 Apr 2022) - fluxcore::errors is private, so asserting
+        // information _about_ the errors is difficult. Asserting that there _are_ errors
+        // is enough, for now.
+        assert!(result.is_some());
     }
 }
