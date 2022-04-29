@@ -81,7 +81,10 @@ async fn test_initialized() {
     let server_info = result.server_info.unwrap();
 
     assert_eq!(server_info.name, "flux-lsp".to_string());
-    assert_eq!(server_info.version, Some("2.0".to_string()));
+    assert_eq!(
+        server_info.version,
+        Some(env!("CARGO_PKG_VERSION").into())
+    );
 }
 
 #[test]
@@ -308,12 +311,10 @@ async fn test_signature_help_not_opened() {
 #[test]
 async fn test_signature_help() {
     let server = create_server();
-    open_file(&server, "from(".to_string(), None).await;
+    let fluxscript = r#"from(
+                          // ^"#;
+    open_file(&server, fluxscript.into(), None).await;
 
-    // XXX: rockstar (13 Jul 2021) - In the lsp protocol, Position arguments
-    // are indexed from 1, e.g. there is no line number 0. This references
-    // (0, 5) for compatibility with the previous implementation, but should
-    // be updated to (1, 5) at some point.
     let params = lsp::SignatureHelpParams {
         context: None,
         text_document_position_params:
@@ -322,7 +323,7 @@ async fn test_signature_help() {
                     lsp::Url::parse("file:///home/user/file.flux")
                         .unwrap(),
                 ),
-                lsp::Position::new(0, 5),
+                position_of(fluxscript),
             ),
         work_done_progress_params: lsp::WorkDoneProgressParams {
             work_done_token: None,
@@ -1443,23 +1444,6 @@ x = 1
 }
 
 #[test]
-async fn test_completion_resolve() {
-    let fluxscript = r#"import "strings"#;
-    let server = create_server();
-    open_file(&server, fluxscript.to_string(), None).await;
-
-    let params = lsp::CompletionItem::new_simple(
-        "label".to_string(),
-        "detail".to_string(),
-    );
-
-    let result =
-        server.completion_resolve(params.clone()).await.unwrap();
-
-    assert_eq!(params, result);
-}
-
-#[test]
 async fn test_package_completion() {
     let fluxscript = r#"import "sql"
 
@@ -1759,13 +1743,6 @@ errorCounts
     );
 }
 
-// TODO: sean (10 Aug 2021) - This test fails unless the line reading
-// `ab = 10` in the flux script is commented out. The error is valid,
-// but the lsp should be able to turn it into a diagnostic notification
-// and continue to provide completion suggestions.
-//
-// An issue has been created for this:
-// https://github.com/influxdata/flux-lsp/issues/290
 #[test]
 async fn test_option_object_members_completion() {
     let fluxscript = r#"import "strings"
@@ -1787,7 +1764,7 @@ option task = {
 task.
  // ^
 
-// ab = 10
+ab = 10
 "#;
     let server = create_server();
     open_file(&server, fluxscript.to_string(), None).await;
@@ -3146,9 +3123,6 @@ async fn compute_diagnostics_multi_file() {
         diagnostics
     );
 
-    // Open the adjacent file with the identifier in it.
-    // This has to have a filename that is alphabetically before the previous
-    // one; see the XXX comment in store.rs.
     open_file(
         &server,
         r#"v = {a: "b"}"#.to_string(),

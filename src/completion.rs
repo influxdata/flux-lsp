@@ -1193,7 +1193,6 @@ pub fn find_completions(
                 ));
             }
             AstNode::MemberExpr(member) => {
-                // TODO Handle completion on member accesses on non-identifiers
                 if let Expression::Identifier(ident) = &member.object
                 {
                     items = get_dot_completions(

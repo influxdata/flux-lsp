@@ -6,8 +6,7 @@ use std::collections::HashMap;
 
 use flux::semantic::nodes::ErrorKind as SemanticNodeErrorKind;
 use flux::semantic::{
-    nodes::FunctionParameter, nodes::Symbol, types::MonoType, walk,
-    ErrorKind,
+    nodes::FunctionParameter, nodes::Symbol, walk, ErrorKind,
 };
 use tower_lsp::{
     jsonrpc::Result as RpcResult, lsp_types as lsp, Client,
@@ -17,6 +16,8 @@ use tower_lsp::{
 use crate::{
     completion, shared::FunctionSignature, stdlib, visitors::semantic,
 };
+
+const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 /// Convert a flux::semantic::walk::Node to a lsp::Location
 /// https://microsoft.github.io/language-server-protocol/specification#location
@@ -241,7 +242,7 @@ impl LanguageServer for LspServer {
                 code_lens_provider: None,
                 color_provider: None,
                 completion_provider: Some(lsp::CompletionOptions {
-                    resolve_provider: Some(true),
+                    resolve_provider: None,
                     trigger_characters: Some(vec![
                         ".".to_string(),
                         ":".to_string(),
@@ -327,7 +328,7 @@ impl LanguageServer for LspServer {
             },
             server_info: Some(lsp::ServerInfo {
                 name: "flux-lsp".to_string(),
-                version: Some("2.0".to_string()),
+                version: Some(VERSION.into()),
             }),
         })
     }
@@ -431,8 +432,6 @@ impl LanguageServer for LspServer {
                         &ident.name,
                         "builtin",
                     ));
-                    // XXX: rockstar (13 Jul 2021) - Add support for user defined
-                    // signatures.
                 } else {
                     log::debug!("signature_help on non-member and non-identifier");
                 }
@@ -441,10 +440,6 @@ impl LanguageServer for LspServer {
             }
         }
 
-        // XXX: rockstar (12 Jul 2021) - `active_parameter` and `active_signature`
-        // are currently unsupported, as they were unsupported in the previous
-        // version of the server. They should be implemented, as it presents a
-        // much better user interface.
         let response = if signatures.is_empty() {
             None
         } else {
@@ -771,27 +766,18 @@ impl LanguageServer for LspServer {
                             let func = path.get(path.len() - 3)?;
                             match func {
                                 walk::Node::FunctionExpr(func) => {
-
-                                    // TODO Use MonoType::parameter directly
-                                    let field = ident.name.as_str();
-                                    match &func.typ {
-                                        MonoType::Fun(f) => f.req.get(field).or_else(|| f.opt.get(field)).or_else(|| {
-                                            f.pipe
-                                                .as_ref()
-                                                .and_then(|pipe| if pipe.k == field { Some(&pipe.v) } else { None })
-                                        })
-
-                                                .cloned()
-                                        ,
-                                        _ => None,
-                                    }
+                                    func.typ
+                                        .parameter(
+                                            ident.name.as_str(),
+                                        )
+                                        .cloned()
                                 }
-                                _ => None
+                                _ => None,
                             }
                         }
                         _ => None,
                     }
-                },
+                }
                 _ => None,
             });
             if let Some(typ) = hover_type {
@@ -807,16 +793,6 @@ impl LanguageServer for LspServer {
             }
         }
         Ok(None)
-    }
-
-    // XXX: rockstar (9 Aug 2021) - This implementation exists here *solely* for
-    // compatibility with the previous server. This behavior is identical to it,
-    // although very clearly kinda useless.
-    async fn completion_resolve(
-        &self,
-        params: lsp::CompletionItem,
-    ) -> RpcResult<lsp::CompletionItem> {
-        Ok(params)
     }
 
     async fn completion(

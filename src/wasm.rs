@@ -1,8 +1,4 @@
 #![allow(clippy::panic)]
-// XXX: rockstar (15 Mar 2022) - rustwasm generates a spurious () at the end of
-// the generated code. This was fixed in mainline, but has not yet had a release.
-// See https://github.com/rustwasm/wasm-bindgen/issues/2774
-#![allow(clippy::unused_unit)]
 
 use std::mem;
 

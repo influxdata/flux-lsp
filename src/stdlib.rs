@@ -146,7 +146,6 @@ pub fn get_package_infos() -> Vec<PackageInfo> {
     result
 }
 
-// TODO Use Record/MonoType::fields from flux
 fn record_fields(
     this: &Record,
 ) -> impl Iterator<Item = &flux::semantic::types::Property> {
