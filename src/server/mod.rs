@@ -770,7 +770,7 @@ impl LanguageServer for LspServer {
                                         .parameter(
                                             ident.name.as_str(),
                                         )
-                                        .map(|value| value.clone())
+                                        .cloned()
                                 }
                                 _ => None,
                             }
