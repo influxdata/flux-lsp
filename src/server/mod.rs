@@ -4,6 +4,7 @@ mod transform;
 mod types;
 
 use std::borrow::Cow;
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
@@ -162,10 +163,29 @@ pub fn find_stdlib_signatures(
         })
 }
 
+#[derive(Default)]
+struct LspServerState {
+    buckets: Vec<String>,
+}
+
+impl LspServerState {
+    // XXX: rockstar (21 Jun 2022) - This `allow` pragma is temporary, until we can add
+    // bucket completion, which is blocked on the completion refactor.
+    #[allow(dead_code)]
+    pub fn buckets(&self) -> &Vec<String> {
+        &self.buckets
+    }
+
+    pub fn set_buckets(&mut self, buckets: Vec<String>) {
+        self.buckets = buckets;
+    }
+}
+
 pub struct LspServer {
     client: Arc<Mutex<Option<Client>>>,
     diagnostics: Vec<Diagnostic>,
     store: store::Store,
+    state: Mutex<RefCell<LspServerState>>,
 }
 
 impl LspServer {
@@ -178,6 +198,9 @@ impl LspServer {
                 super::diagnostics::no_influxdb_identifiers,
             ],
             store: store::Store::default(),
+            state: Mutex::new(
+                RefCell::new(LspServerState::default()),
+            ),
         }
     }
 
@@ -501,6 +524,41 @@ impl LanguageServer for LspServer {
     ) -> () {
         let key = params.text_document.uri;
         self.store.remove(&key);
+    }
+
+    async fn did_change_configuration(
+        &self,
+        params: lsp::DidChangeConfigurationParams,
+    ) -> () {
+        if let serde_json::value::Value::Object(map) = params.settings
+        {
+            if let Some(settings) = map.get("settings") {
+                if let Some(serde_json::value::Value::Array(
+                    buckets,
+                )) = settings.get("buckets")
+                {
+                    match self.state.lock() {
+                        Ok(state) => {
+                            (*state).borrow_mut().set_buckets(
+                                buckets
+                                    .iter()
+                                    .filter(|bucket| {
+                                        bucket.is_string()
+                                    })
+                                    .map(|bucket| {
+                                        #[allow(clippy::unwrap_used)]
+                                        String::from(
+                                            bucket.as_str().unwrap(),
+                                        )
+                                    })
+                                    .collect::<Vec<String>>(),
+                            );
+                        }
+                        Err(err) => log::error!("{}", err),
+                    }
+                }
+            }
+        }
     }
 
     async fn signature_help(

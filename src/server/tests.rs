@@ -4,6 +4,7 @@ use std::collections::{BTreeSet, HashMap};
 use async_std::test;
 use expect_test::expect;
 use lspower::{lsp, LanguageServer};
+use serde_json::json;
 
 use super::*;
 
@@ -3336,4 +3337,25 @@ async fn execute_command_get_function_list() {
           "yield"
         ]"#]]
     .assert_eq(&serde_json::to_string_pretty(&result).unwrap());
+}
+
+/// When the client notifies the server of new buckets, those buckets are
+/// stored and able to be queried.
+#[test]
+async fn workspace_state_buckets() {
+    let server = create_server();
+
+    server.did_change_configuration(lsp::DidChangeConfigurationParams {
+        settings: json!({"settings": {"buckets": ["my-bucket", "your-bucket", "our-bucket"]}})
+    }).await;
+
+    let buckets =
+        server.state.lock().unwrap().borrow().buckets().clone();
+
+    let expected: Vec<String> =
+        vec!["my-bucket", "your-bucket", "our-bucket"]
+            .iter()
+            .map(|item| item.to_string())
+            .collect();
+    assert_eq!(expected, buckets);
 }
