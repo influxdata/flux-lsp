@@ -3136,8 +3136,9 @@ async fn compute_diagnostics_multi_file() {
     assert_eq!(0, diagnostics_again.len());
 }
 
+// Only emit diagnostics related to that specific file.
 #[test]
-async fn compute_diagnostics_multi_file_error_in_another_file() {
+async fn compute_diagnostics_only_on_problem_file() {
     let server = create_server();
 
     let filename: String = "file:///path/to/script.flux".into();
@@ -3145,6 +3146,7 @@ async fn compute_diagnostics_multi_file_error_in_another_file() {
 |> range(start: -100d)
 |> filter(fn: (r) => r.anTag == v.a)"#;
     open_file(&server, fluxscript.into(), Some(&filename)).await;
+    // This file, in the same package, contains an error.
     open_file(
         &server,
         r#"v = a"#.to_string(),
@@ -3155,5 +3157,5 @@ async fn compute_diagnostics_multi_file_error_in_another_file() {
     let diagnostics_again = server
         .compute_diagnostics(&lsp::Url::parse(&filename).unwrap());
 
-    assert_eq!(0, diagnostics_again.len());
+    assert!(diagnostics_again.is_empty());
 }
