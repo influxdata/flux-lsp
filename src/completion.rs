@@ -363,16 +363,6 @@ trait Completable {
     fn matches(&self, text: &str, info: &CompletionInfo) -> bool;
 }
 
-// Reports if the needle has a fuzzy match with the haystack.
-//
-// It is assumed that the haystack is the name of an identifier and the needle is a partial
-// identifier.
-fn fuzzy_match(haystack: &str, needle: &str) -> bool {
-    return haystack
-        .to_lowercase()
-        .contains(needle.to_lowercase().as_str());
-}
-
 impl Completable for PackageResult {
     fn completion_item(
         &self,
@@ -412,7 +402,7 @@ impl Completable for PackageResult {
     }
 
     fn matches(&self, text: &str, _info: &CompletionInfo) -> bool {
-        fuzzy_match(self.name.as_str(), text)
+        self.name.as_str().starts_with(text)
     }
 }
 
@@ -466,7 +456,7 @@ impl Completable for FunctionResult {
 
     fn matches(&self, text: &str, info: &CompletionInfo) -> bool {
         if self.package == PRELUDE_PACKAGE
-            && fuzzy_match(self.name.as_str(), text)
+            && self.name.as_str().starts_with(text)
         {
             return true;
         }
@@ -517,7 +507,7 @@ impl Completable for CompletionVarResult {
     }
 
     fn matches(&self, text: &str, _info: &CompletionInfo) -> bool {
-        fuzzy_match(self.name.as_str(), text)
+        self.name.as_str().starts_with(text)
     }
 }
 
@@ -732,7 +722,7 @@ impl Completable for ImportAliasResult {
     }
 
     fn matches(&self, text: &str, _info: &CompletionInfo) -> bool {
-        fuzzy_match(self.alias.as_str(), text)
+        self.alias.starts_with(text)
     }
 }
 
@@ -1022,7 +1012,7 @@ impl Completable for VarResult {
 
     fn matches(&self, text: &str, info: &CompletionInfo) -> bool {
         if self.package == PRELUDE_PACKAGE
-            && fuzzy_match(self.name.as_str(), text)
+            && self.name.starts_with(text)
         {
             return true;
         }
@@ -1159,7 +1149,7 @@ impl Completable for UserFunctionResult {
     }
 
     fn matches(&self, text: &str, _info: &CompletionInfo) -> bool {
-        fuzzy_match(self.name.as_str(), text)
+        self.name.starts_with(text)
     }
 }
 
