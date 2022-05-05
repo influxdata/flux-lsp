@@ -369,11 +369,12 @@ trait Completable {
 // identifier.
 #[allow(clippy::unwrap_used)]
 fn fuzzy_match(haystack: &str, needle: &str) -> bool {
-    haystack.starts_with(needle) || haystack.contains({
-        let mut chars: Vec<char> = needle.chars().collect();
-        chars[0] = chars[0].to_uppercase().nth(0).unwrap();
-        chars.into_iter().collect::<String>().as_str()
-    })
+    haystack.starts_with(needle)
+        || haystack.contains({
+            let mut chars: Vec<char> = needle.chars().collect();
+            chars[0] = chars[0].to_uppercase().next().unwrap();
+            chars.into_iter().collect::<String>().as_str()
+        })
 }
 
 impl Completable for PackageResult {

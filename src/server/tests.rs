@@ -1841,12 +1841,10 @@ ab = 10
     let got: BTreeSet<&str> =
         items.iter().map(|i| i.label.as_str()).collect();
 
-    let want: BTreeSet<&str> = vec![
-        "contrib/RohanSreerama5/naiveBayesClassifier",
-        "now",
-    ]
-    .drain(..)
-    .collect();
+    let want: BTreeSet<&str> =
+        vec!["contrib/RohanSreerama5/naiveBayesClassifier", "now"]
+            .drain(..)
+            .collect();
 
     assert_eq!(
         want,
