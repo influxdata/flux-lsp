@@ -3135,3 +3135,27 @@ async fn compute_diagnostics_multi_file() {
 
     assert_eq!(0, diagnostics_again.len());
 }
+
+// Only emit diagnostics related to that specific file.
+#[test]
+async fn compute_diagnostics_only_on_problem_file() {
+    let server = create_server();
+
+    let filename: String = "file:///path/to/script.flux".into();
+    let fluxscript = r#"from(bucket: "my-bucket")
+|> range(start: -100d)
+|> filter(fn: (r) => r.anTag == v.a)"#;
+    open_file(&server, fluxscript.into(), Some(&filename)).await;
+    // This file, in the same package, contains an error.
+    open_file(
+        &server,
+        r#"v = a"#.to_string(),
+        Some("file:///path/to/an_vars.flux"),
+    )
+    .await;
+
+    let diagnostics_again = server
+        .compute_diagnostics(&lsp::Url::parse(&filename).unwrap());
+
+    assert!(diagnostics_again.is_empty());
+}

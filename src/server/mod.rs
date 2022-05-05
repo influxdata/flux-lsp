@@ -217,6 +217,19 @@ impl LspServer {
             Some(errors) => errors
                 .errors
                 .iter()
+                .filter(|error| {
+                    // We will never have two files with the same name in a package, so we can
+                    // key off filename to determine whether the error exists in this file or
+                    // elsewhere in the package.
+                    if let Some(file) = &error.location.file {
+                        if let Some(segments) = key.path_segments() {
+                            if let Some(filename) = segments.last() {
+                                return file == filename;
+                            }
+                        }
+                    }
+                    false
+                })
                 .map(|e| lsp::Diagnostic {
                     range: e.location.clone().into(),
                     severity: Some(lsp::DiagnosticSeverity::ERROR),
