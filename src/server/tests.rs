@@ -1693,12 +1693,19 @@ errorCounts
         "chandeMomentumOscillator",
         "columns",
         "contains",
+        "contrib/RohanSreerama5/naiveBayesClassifier",
         "count",
         "cov",
         "covariance",
         "csv",
         "cumulativeSum",
         "experimental/csv",
+        "findColumn",
+        "getColumn",
+        "highestCurrent",
+        "lowestCurrent",
+        "stateCount",
+        "truncateTimeColumn",
     ]
     .drain(..)
     .collect();

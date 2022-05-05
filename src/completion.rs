@@ -363,6 +363,19 @@ trait Completable {
     fn matches(&self, text: &str, info: &CompletionInfo) -> bool;
 }
 
+// Reports if the needle has a fuzzy match with the haystack.
+//
+// It is assumed that the haystack is the name of an identifier and the needle is a partial
+// identifier.
+#[allow(clippy::unwrap_used)]
+fn fuzzy_match(haystack: &str, needle: &str) -> bool {
+    haystack.starts_with(needle) || haystack.contains({
+        let mut chars: Vec<char> = needle.chars().collect();
+        chars[0] = chars[0].to_uppercase().nth(0).unwrap();
+        chars.into_iter().collect::<String>().as_str()
+    })
+}
+
 impl Completable for PackageResult {
     fn completion_item(
         &self,
@@ -402,7 +415,7 @@ impl Completable for PackageResult {
     }
 
     fn matches(&self, text: &str, _info: &CompletionInfo) -> bool {
-        self.name.as_str().starts_with(text)
+        fuzzy_match(&self.name, text)
     }
 }
 
@@ -456,7 +469,7 @@ impl Completable for FunctionResult {
 
     fn matches(&self, text: &str, info: &CompletionInfo) -> bool {
         if self.package == PRELUDE_PACKAGE
-            && self.name.as_str().starts_with(text)
+            && fuzzy_match(&self.name, text)
         {
             return true;
         }
@@ -507,7 +520,7 @@ impl Completable for CompletionVarResult {
     }
 
     fn matches(&self, text: &str, _info: &CompletionInfo) -> bool {
-        self.name.as_str().starts_with(text)
+        fuzzy_match(&self.name, text)
     }
 }
 
@@ -722,7 +735,7 @@ impl Completable for ImportAliasResult {
     }
 
     fn matches(&self, text: &str, _info: &CompletionInfo) -> bool {
-        self.alias.starts_with(text)
+        fuzzy_match(&self.alias, text)
     }
 }
 
@@ -1012,7 +1025,7 @@ impl Completable for VarResult {
 
     fn matches(&self, text: &str, info: &CompletionInfo) -> bool {
         if self.package == PRELUDE_PACKAGE
-            && self.name.starts_with(text)
+            && fuzzy_match(&self.name, text)
         {
             return true;
         }
@@ -1149,7 +1162,7 @@ impl Completable for UserFunctionResult {
     }
 
     fn matches(&self, text: &str, _info: &CompletionInfo) -> bool {
-        self.name.starts_with(text)
+        fuzzy_match(&self.name, text)
     }
 }
 
