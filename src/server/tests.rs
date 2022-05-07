@@ -1719,6 +1719,64 @@ errorCounts
     );
 }
 
+/// This test covers a specific use-case where a user might be trying
+/// to *discover* functions and apis.
+#[test]
+async fn test_variable_completion_2() {
+    let fluxscript = r#"import "strings"
+import "csv"
+
+bayes
+ // ^"#;
+    let server = create_server();
+    open_file(&server, fluxscript.to_string(), None).await;
+
+    let params = lsp::CompletionParams {
+        text_document_position: lsp::TextDocumentPositionParams {
+            text_document: lsp::TextDocumentIdentifier {
+                uri: lsp::Url::parse("file:///home/user/file.flux")
+                    .unwrap(),
+            },
+            position: position_of(&fluxscript),
+        },
+        work_done_progress_params: lsp::WorkDoneProgressParams {
+            work_done_token: None,
+        },
+        partial_result_params: lsp::PartialResultParams {
+            partial_result_token: None,
+        },
+        context: Some(lsp::CompletionContext {
+            trigger_kind: lsp::CompletionTriggerKind::INVOKED,
+            trigger_character: None,
+        }),
+    };
+
+    let result =
+        server.completion(params.clone()).await.unwrap().unwrap();
+
+    let items = match result {
+        lsp::CompletionResponse::List(l) => l.items,
+        _ => unreachable!(),
+    };
+
+    let got: BTreeSet<&str> =
+        items.iter().map(|i| i.label.as_str()).collect();
+
+    let want: BTreeSet<&str> = vec![
+        "contrib/RohanSreerama5/naiveBayesClassifier",
+    ]
+    .drain(..)
+    .collect();
+
+    assert_eq!(
+        want,
+        got,
+        "\nextra:\n {:?}\n missing:\n {:?}\n",
+        got.difference(&want),
+        want.difference(&got)
+    );
+}
+
 #[test]
 async fn test_option_object_members_completion() {
     let fluxscript = r#"import "strings"
