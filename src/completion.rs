@@ -365,16 +365,33 @@ trait Completable {
 
 // Reports if the needle has a fuzzy match with the haystack.
 //
-// It is assumed that the haystack is the name of an identifier and the needle is a partial
-// identifier.
+// This match follows this logic: if the needle is sufficiently small,
+// check to see if the haystack starts with the needle *or* if the needle
+// is found as a camel case word in the haystack. If the needle looks like
+// a full word or more than one word, find the needle, case-insensitively, in
+// the haystack.
 #[allow(clippy::unwrap_used)]
 fn fuzzy_match(haystack: &str, needle: &str) -> bool {
-    haystack.starts_with(needle)
-        || haystack.contains({
-            let mut chars: Vec<char> = needle.chars().collect();
-            chars[0] = chars[0].to_uppercase().next().unwrap();
-            chars.into_iter().collect::<String>().as_str()
-        })
+    // This number seems "magic," and maybe it is, but it seemed a good threshold for "are you
+    // typing a word?"
+    if needle.len() > 3 {
+        haystack
+            .to_lowercase()
+            .contains(needle.to_lowercase().as_str())
+    } else {
+        haystack.starts_with(needle) || {
+            let mut chars = needle.chars();
+            match chars.next() {
+                None => false,
+                Some(letter) => {
+                    let word =
+                        letter.to_uppercase().collect::<String>()
+                            + chars.as_str();
+                    haystack.contains(word.as_str())
+                }
+            }
+        }
+    }
 }
 
 impl Completable for PackageResult {
