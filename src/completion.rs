@@ -13,8 +13,7 @@ use flux::semantic::walk::Visitor as SemanticVisitor;
 use flux::{imports, prelude};
 use tower_lsp::lsp_types as lsp;
 
-use crate::shared::get_argument_names;
-use crate::shared::get_package_name;
+use crate::shared::{get_argument_names, get_optional_argument_names, get_package_name};
 use crate::shared::Function;
 use crate::stdlib;
 use crate::visitors::ast::NodeFinderVisitor;
@@ -328,7 +327,7 @@ fn walk_package(
             match &head.v {
                 MonoType::Fun(f) => {
                     list.push(Box::new(FunctionResult {
-                        name: head.k.clone().into(),
+                        name: head.k.clone().to_string(),
                         package: package.to_string(),
                         signature: stdlib::create_function_signature(
                             f,
@@ -338,13 +337,13 @@ fn walk_package(
                 MonoType::Collection(c) => {
                     if c.collection == CollectionType::Array {
                         push_var_result(
-                            &head.k.clone().into(),
+                            &head.k.clone().to_string(),
                             VarType::Array,
                         )
                     }
                 }
                 MonoType::Builtin(b) => push_var_result(
-                    &head.k.clone().into(),
+                    &head.k.clone().to_string(),
                     VarType::from(*b),
                 ),
                 _ => (),
@@ -776,7 +775,7 @@ fn create_function_result(
                 name: name.into(),
                 package: "self".to_string(),
                 package_name: Some("self".to_string()),
-                optional_args: get_argument_names(&fun.opt),
+                optional_args: get_optional_argument_names(&fun.opt),
                 required_args: get_argument_names(&fun.req),
                 signature: stdlib::create_function_signature(fun),
             });

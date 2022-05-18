@@ -646,9 +646,10 @@ dependencies = [
 [[package]]
 name = "flux"
 version = "0.154.0"
-source = "git+https://github.com/influxdata/flux?tag=v0.165.0#ead736ee677d08df1df73a4aba097f28ae126022"
+source = "git+https://github.com/influxdata/flux?tag=v0.167.0#86757029750fd2c68c6d10a643590cd774a5acdf"
 dependencies = [
  "anyhow",
+ "env_logger",
  "flatbuffers",
  "flux-core",
  "getrandom",
@@ -660,7 +661,7 @@ dependencies = [
 [[package]]
 name = "flux-core"
 version = "0.154.0"
-source = "git+https://github.com/influxdata/flux?tag=v0.165.0#ead736ee677d08df1df73a4aba097f28ae126022"
+source = "git+https://github.com/influxdata/flux?tag=v0.167.0#86757029750fd2c68c6d10a643590cd774a5acdf"
 dependencies = [
  "anyhow",
  "chrono",
