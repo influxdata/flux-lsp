@@ -16,7 +16,10 @@ pub fn get_argument_names(
 
 #[allow(clippy::implicit_hasher)]
 pub fn get_optional_argument_names(
-    args: &std::collections::BTreeMap<String, flux::semantic::types::Argument<MonoType>>,
+    args: &std::collections::BTreeMap<
+        String,
+        flux::semantic::types::Argument<MonoType>,
+    >,
 ) -> Vec<String> {
     args.keys().map(String::from).collect()
 }

@@ -13,8 +13,10 @@ use flux::semantic::walk::Visitor as SemanticVisitor;
 use flux::{imports, prelude};
 use tower_lsp::lsp_types as lsp;
 
-use crate::shared::{get_argument_names, get_optional_argument_names, get_package_name};
 use crate::shared::Function;
+use crate::shared::{
+    get_argument_names, get_optional_argument_names, get_package_name,
+};
 use crate::stdlib;
 use crate::visitors::ast::NodeFinderVisitor;
 use crate::visitors::semantic::{

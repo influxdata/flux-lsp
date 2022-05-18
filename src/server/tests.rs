@@ -1951,8 +1951,8 @@ ab = 10
           "unique",
           "universe",
           "window"
-        ]"#]].assert_eq(&serde_json::to_string_pretty(&got).unwrap());
-
+        ]"#]]
+    .assert_eq(&serde_json::to_string_pretty(&got).unwrap());
 }
 
 #[test]
