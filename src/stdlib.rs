@@ -92,7 +92,7 @@ pub fn create_function_signature(
         .iter()
         .map(|(&k, &v)| Property {
             k: String::from("?") + k,
-            v: get_type_string(v, &mut mapping),
+            v: get_type_string(&v.typ, &mut mapping),
         })
         .collect::<Vec<_>>();
 
@@ -166,7 +166,7 @@ fn walk_package_functions(list: &mut Vec<Function>, t: &MonoType) {
     if let MonoType::Record(record) = t {
         for head in record_fields(record) {
             if let MonoType::Fun(f) = &head.v {
-                list.push(Function::new(head.k.clone().into(), f));
+                list.push(Function::new(head.k.to_string(), f));
             }
         }
     }
@@ -203,7 +203,7 @@ fn walk_functions(
                     get_package_name(package.as_str())
                 {
                     list.push(FunctionInfo::new(
-                        head.k.clone().into(),
+                        head.k.to_string(),
                         f.as_ref(),
                         package_name.into(),
                     ));

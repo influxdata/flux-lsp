@@ -14,6 +14,16 @@ pub fn get_argument_names(
     args.keys().map(String::from).collect()
 }
 
+#[allow(clippy::implicit_hasher)]
+pub fn get_optional_argument_names(
+    args: &std::collections::BTreeMap<
+        String,
+        flux::semantic::types::Argument<MonoType>,
+    >,
+) -> Vec<String> {
+    args.keys().map(String::from).collect()
+}
+
 #[derive(Clone)]
 pub struct Function {
     pub name: String,
@@ -28,7 +38,7 @@ impl Function {
         let params = f
             .req
             .iter()
-            .chain(f.opt.iter())
+            .chain(f.opt.iter().map(|p| (p.0, &p.1.typ)))
             .chain(f.pipe.as_ref().map(|p| (&p.k, &p.v)))
             .map(|(k, v)| (k.clone(), Some(v.clone())))
             .collect();
@@ -102,7 +112,7 @@ impl FunctionInfo {
             name,
             package_name,
             required_args: get_argument_names(&f.req),
-            optional_args: get_argument_names(&f.opt),
+            optional_args: get_optional_argument_names(&f.opt),
         }
     }
 
