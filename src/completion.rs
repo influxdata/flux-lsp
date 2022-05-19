@@ -11,7 +11,7 @@ use flux::semantic::types::{
 };
 use flux::semantic::walk::Visitor as SemanticVisitor;
 use flux::{imports, prelude};
-use tower_lsp::lsp_types as lsp;
+use lspower::lsp;
 
 use crate::shared::Function;
 use crate::shared::{

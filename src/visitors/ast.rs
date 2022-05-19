@@ -1,5 +1,5 @@
 use flux::ast::walk;
-use tower_lsp::lsp_types as lsp;
+use lspower::lsp;
 
 #[derive(Clone, Debug)]
 pub struct NodeFinderNode<'a> {
@@ -24,7 +24,18 @@ impl<'a> NodeFinderVisitor<'a> {
 
 impl<'a> walk::Visitor<'a> for NodeFinderVisitor<'a> {
     fn visit(&mut self, node: walk::Node<'a>) -> bool {
-        let range = lsp::Range::from(node.base().clone().location);
+        // XXX: rockstar (19 May 2022) - flux asks for too new of an lsp-types for `.into` to
+        // work. That doesn't need to be quite so bleeding edge, but that's an issue for flux.
+        let range = lsp::Range {
+            start: lsp::Position {
+                line: node.base().location.start.line - 1,
+                character: node.base().location.start.column - 1,
+            },
+            end: lsp::Position {
+                line: node.base().location.end.line - 1,
+                character: node.base().location.end.column - 1,
+            },
+        };
         if crate::lsp::position_in_range(&self.position, &range) {
             let parent = self.node.clone();
             if let Some(parent) = parent {
@@ -52,7 +63,12 @@ impl From<&flux::ast::Package> for PackageInfo {
     fn from(pkg: &flux::ast::Package) -> Self {
         Self {
             name: pkg.package.clone(),
-            position: pkg.base.location.start.into(),
+            // XXX: rockstar (19 May 2022) - flux asks for too new of an lsp-types for `.into` to
+            // work. That doesn't need to be quite so bleeding edge, but that's an issue for flux.
+            position: lsp::Position {
+                line: pkg.base.location.start.line - 1,
+                character: pkg.base.location.start.column - 1,
+            },
         }
     }
 }

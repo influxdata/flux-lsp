@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use std::path::Path;
 use std::sync::{Arc, RwLock};
 
-use tower_lsp::lsp_types as lsp;
+use lspower::lsp;
 
 use super::types::LspError;
 

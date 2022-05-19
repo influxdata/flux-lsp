@@ -3,7 +3,7 @@ use criterion::{
     black_box, criterion_group, criterion_main, Criterion,
 };
 use flux_lsp::LspServer;
-use tower_lsp::{lsp_types as lsp, LanguageServer};
+use lspower::{lsp, LanguageServer};
 
 fn create_server() -> LspServer {
     LspServer::new(None)

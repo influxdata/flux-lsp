@@ -3,19 +3,21 @@ mod types;
 
 use std::borrow::Cow;
 use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
 
 use flux::semantic::nodes::ErrorKind as SemanticNodeErrorKind;
 use flux::semantic::{
     nodes::FunctionParameter, nodes::Symbol, walk, ErrorKind,
 };
-use tower_lsp::{
-    jsonrpc::Result as RpcResult, lsp_types as lsp, Client,
-    LanguageServer,
+use lspower::{
+    jsonrpc::Result as RpcResult, lsp, Client, LanguageServer,
 };
 
 use crate::{
     completion, shared::FunctionSignature, stdlib, visitors::semantic,
 };
+
+use self::types::LspError;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -25,10 +27,20 @@ fn node_to_location(
     node: &flux::semantic::walk::Node,
     uri: lsp::Url,
 ) -> lsp::Location {
-    let node_location = node.loc().clone();
     lsp::Location {
         uri,
-        range: node_location.into(),
+        // XXX: rockstar (19 May 2022) - flux asks for too new of an lsp-types for `.into` to
+        // work. That doesn't need to be quite so bleeding edge, but that's an issue for flux.
+        range: lsp::Range {
+            start: lsp::Position {
+                line: node.loc().start.line - 1,
+                character: node.loc().start.column - 1,
+            },
+            end: lsp::Position {
+                line: node.loc().end.line - 1,
+                character: node.loc().end.column - 1,
+            },
+        },
     }
 }
 
@@ -174,15 +186,31 @@ fn parse_semantic_graph(
 }
 
 pub struct LspServer {
-    client: Option<Client>,
+    client: Arc<Mutex<Option<Client>>>,
     store: store::Store,
 }
 
 impl LspServer {
     pub fn new(client: Option<Client>) -> Self {
         Self {
-            client,
+            client: Arc::new(Mutex::new(client)),
             store: store::Store::default(),
+        }
+    }
+
+    // Get the client from out of its arc and mutex.
+    // Note the lspower::Client has a cheap clone method to make it easy
+    // to pass around many instances of the client.
+    //
+    // We leverage that here so we do not have to keep a lock or
+    // an extra reference to the client.
+    fn get_client(&self) -> Option<Client> {
+        match self.client.lock() {
+            Ok(client) => (*client).clone(),
+            Err(err) => {
+                log::error!("failed to get lock on client: {}", err);
+                None
+            }
         }
     }
 
@@ -196,7 +224,7 @@ impl LspServer {
     // Publish any diagnostics to the client
     async fn publish_diagnostics(&self, key: &lsp::Url) {
         // If we have a client back to the editor report any diagnostics found in the document
-        if let Some(client) = &self.client {
+        if let Some(client) = &self.get_client() {
             let diagnostics = self.compute_diagnostics(key);
             client
                 .publish_diagnostics(key.clone(), diagnostics, None)
@@ -231,7 +259,18 @@ impl LspServer {
                     false
                 })
                 .map(|e| lsp::Diagnostic {
-                    range: e.location.clone().into(),
+                    // XXX: rockstar (19 May 2022) - flux asks for too new of an lsp-types for `.into` to
+                    // work. That doesn't need to be quite so bleeding edge, but that's an issue for flux.
+                    range: lsp::Range {
+                        start: lsp::Position {
+                            line: e.location.start.line - 1,
+                            character: e.location.start.column - 1,
+                        },
+                        end: lsp::Position {
+                            line: e.location.end.line - 1,
+                            character: e.location.end.column - 1,
+                        },
+                    },
                     severity: Some(lsp::DiagnosticSeverity::ERROR),
                     source: Some("flux".to_string()),
                     message: e.error.to_string(),
@@ -242,7 +281,7 @@ impl LspServer {
     }
 }
 
-#[tower_lsp::async_trait]
+#[lspower::async_trait]
 impl LanguageServer for LspServer {
     async fn initialize(
         &self,
@@ -347,6 +386,20 @@ impl LanguageServer for LspServer {
     }
 
     async fn shutdown(&self) -> RpcResult<()> {
+        // XXX: rockstar (19 May 2022) - This chunk of code will no longer be needed,
+        // when tower-lsp is added again.
+        let mut client = match self.client.lock() {
+            Ok(client) => client,
+            Err(err) => {
+                return Err(LspError::InternalError(format!(
+                    "{}",
+                    err
+                ))
+                .into())
+            }
+        };
+        *client = None;
+
         Ok(())
     }
 
@@ -472,19 +525,19 @@ impl LanguageServer for LspServer {
         let key = params.text_document.uri;
 
         let contents = self.get_document(&key)?;
-        let mut formatted =
-            match flux::formatter::format(&contents) {
-                Ok(value) => value,
-                Err(err) => return Err(tower_lsp::jsonrpc::Error {
-                    code:
-                        tower_lsp::jsonrpc::ErrorCode::InternalError,
+        let mut formatted = match flux::formatter::format(&contents) {
+            Ok(value) => value,
+            Err(err) => {
+                return Err(lspower::jsonrpc::Error {
+                    code: lspower::jsonrpc::ErrorCode::InternalError,
                     message: format!(
                         "Error formatting document: {}",
                         err
                     ),
                     data: None,
-                }),
-            };
+                })
+            }
+        };
         if let Some(trim_trailing_whitespace) =
             params.options.trim_trailing_whitespace
         {
@@ -903,7 +956,19 @@ impl LanguageServer for LspServer {
             .filter(|error| {
                 crate::lsp::ranges_overlap(
                     &params.range,
-                    &error.location.clone().into(),
+                    // XXX: rockstar (19 May 2022) - flux asks for too new of an lsp-types for `.into` to
+                    // work. That doesn't need to be quite so bleeding edge, but that's an issue for flux.
+                    &lsp::Range {
+                        start: lsp::Position {
+                            line: error.location.start.line - 1,
+                            character: error.location.start.column
+                                - 1,
+                        },
+                        end: lsp::Position {
+                            line: error.location.end.line - 1,
+                            character: error.location.end.column - 1,
+                        },
+                    },
                 )
             })
             .collect();

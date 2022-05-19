@@ -3,7 +3,7 @@ use std::collections::{BTreeSet, HashMap};
 
 use async_std::test;
 use expect_test::expect;
-use tower_lsp::{lsp_types as lsp, LanguageServer};
+use lspower::{lsp, LanguageServer};
 
 use super::*;
 

@@ -1,3 +1,5 @@
+use lspower::jsonrpc::{Error, ErrorCode};
+
 #[derive(Debug)]
 pub enum LspError {
     InternalError(String),
@@ -5,30 +7,24 @@ pub enum LspError {
     FileNotFound(String),
 }
 
-impl From<LspError> for tower_lsp::jsonrpc::Error {
+impl From<LspError> for Error {
     fn from(error: LspError) -> Self {
         match error {
-            LspError::InternalError(error) => {
-                tower_lsp::jsonrpc::Error {
-                    code:
-                        tower_lsp::jsonrpc::ErrorCode::InternalError,
-                    message: error,
-                    data: None,
-                }
-            }
-            LspError::LockNotAcquired => tower_lsp::jsonrpc::Error {
-                code: tower_lsp::jsonrpc::ErrorCode::InternalError,
+            LspError::InternalError(error) => Error {
+                code: ErrorCode::InternalError,
+                message: error,
+                data: None,
+            },
+            LspError::LockNotAcquired => Error {
+                code: ErrorCode::InternalError,
                 message: "Could not acquire lock".into(),
                 data: None,
             },
-            LspError::FileNotFound(filename) => {
-                tower_lsp::jsonrpc::Error {
-                    code:
-                        tower_lsp::jsonrpc::ErrorCode::InvalidParams,
-                    message: format!("File not fiend: {}", filename),
-                    data: None,
-                }
-            }
+            LspError::FileNotFound(filename) => Error {
+                code: ErrorCode::InvalidParams,
+                message: format!("File not fiend: {}", filename),
+                data: None,
+            },
         }
     }
 }

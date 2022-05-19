@@ -2,7 +2,7 @@ use flux::ast::SourceLocation;
 use flux::semantic::nodes::Expression;
 use flux::semantic::types::MonoType;
 use flux::semantic::walk::{Node, Visitor};
-use tower_lsp::lsp_types as lsp;
+use lspower::lsp;
 
 use crate::shared::Function;
 
