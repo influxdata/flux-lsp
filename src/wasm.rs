@@ -4,7 +4,7 @@ use std::mem;
 
 use flux::{ast, formatter, parser};
 use futures::prelude::*;
-use tower_lsp::{ClientSocket, LspService};
+use lspower::{LspService, MessageStream};
 use tower_service::Service;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::future_to_promise;
@@ -24,7 +24,7 @@ pub fn initLog() {
 // MessageProcessor calls handlers for recieved messages.
 struct MessageProcessor {
     handlers: Vec<js_sys::Function>,
-    messages: ClientSocket,
+    messages: MessageStream,
     running: bool,
 }
 
@@ -72,7 +72,7 @@ impl MessageProcessor {
 #[wasm_bindgen]
 pub struct Lsp {
     processor: Option<MessageProcessor>,
-    service: LspService<LspServer>,
+    service: LspService,
 }
 
 impl Default for Lsp {
@@ -81,7 +81,7 @@ impl Default for Lsp {
         console_error_panic_hook::set_once();
 
         let (service, messages) =
-            tower_lsp::LspService::new(|client| {
+            lspower::LspService::new(|client| {
                 LspServer::new(Some(client))
             });
         Lsp {
@@ -113,7 +113,7 @@ impl Lsp {
 
     /// Send a message to the server.
     pub fn send(&mut self, msg: String) -> js_sys::Promise {
-        let message: tower_lsp::jsonrpc::Request =
+        let message: lspower::jsonrpc::Incoming =
             match serde_json::from_str(&msg) {
                 Ok(value) => value,
                 Err(err) => {

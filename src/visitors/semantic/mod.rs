@@ -4,7 +4,7 @@ use flux::semantic::{
     nodes::{Expression, Symbol},
     walk::{self, Node, Visitor},
 };
-use tower_lsp::lsp_types as lsp;
+use lspower::lsp;
 
 mod completion;
 mod symbols;
@@ -219,7 +219,18 @@ pub struct PackageNodeFinderVisitor {
 impl<'a> Visitor<'a> for PackageNodeFinderVisitor {
     fn visit(&mut self, node: Node<'a>) -> bool {
         if let Node::PackageClause(n) = node {
-            self.location = Some(n.loc.clone().into());
+            // XXX: rockstar (19 May 2022) - flux asks for too new of an lsp-types for `.into` to
+            // work. That doesn't need to be quite so bleeding edge, but that's an issue for flux.
+            self.location = Some(lsp::Range {
+                start: lsp::Position {
+                    line: n.loc.start.line - 1,
+                    character: n.loc.start.column - 1,
+                },
+                end: lsp::Position {
+                    line: n.loc.end.line - 1,
+                    character: n.loc.end.column - 1,
+                },
+            });
             return false;
         }
         true

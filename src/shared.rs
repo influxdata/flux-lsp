@@ -1,4 +1,4 @@
-use tower_lsp::lsp_types as lsp;
+use lspower::lsp;
 
 use flux::semantic::types::MonoType;
 
