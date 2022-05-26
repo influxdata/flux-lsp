@@ -253,13 +253,17 @@ impl LspServer {
                 // Note: it is important, if no diagnostics exist, that we return an empty
                 // diagnostic list, as that will signal to the client that the diagnostics
                 // have been cleared.
-                let package =
-                    self.store.get_semantic_package(key).unwrap();
-                self.diagnostics
-                    .iter()
-                    .map(|func| func(&package))
-                    .flatten()
-                    .collect::<Vec<lsp::Diagnostic>>()
+                if let Ok(package) =
+                    self.store.get_semantic_package(key)
+                {
+                    return self
+                        .diagnostics
+                        .iter()
+                        .flat_map(|func| func(&package))
+                        .collect::<Vec<lsp::Diagnostic>>();
+                } else {
+                    return vec![];
+                }
             }
             Some(errors) => errors
                 .errors

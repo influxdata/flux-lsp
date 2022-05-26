@@ -19,37 +19,36 @@ impl<'a> flux::semantic::walk::Visitor<'a>
     for ExperimentalDiagnosticVisitor
 {
     fn visit(&mut self, node: WalkNode<'a>) -> bool {
-        if let WalkNode::Package(pkg) = node {
-            // Is there an experimental import in this package? If not,
-            // don't keep going. There's nothing to check here.
-            let mut imports_experimental = false;
-            pkg.files.iter().for_each(|file| {
-                file.imports.iter().for_each(|import| {
-                    if import.path.value.starts_with("experimental") {
-                        imports_experimental = true;
+        match node {
+            WalkNode::Package(pkg) => {
+                // Is there an experimental import in this package? If not,
+                // don't keep going. There's nothing to check here.
+                let mut imports_experimental = false;
+                pkg.files.iter().for_each(|file| {
+                    file.imports.iter().for_each(|import| {
+                        if import.path.value.starts_with("experimental") {
+                            imports_experimental = true;
 
-                        if let Some(alias) = &import.alias {
-                            self.namespaces
-                                .push(format!("{}", alias.name));
-                        } else {
-                            let split: Vec<&str> = import
-                                .path
-                                .value
-                                .split("/")
-                                .collect();
-                            if split.len() > 1 {
-                                self.namespaces.push(
-                                    split.last().unwrap().to_string(),
-                                );
+                            if let Some(alias) = &import.alias {
+                                self.namespaces
+                                    .push(format!("{}", alias.name));
+                            } else {
+                                let split: Vec<&str> = import
+                                    .path
+                                    .value
+                                    .split('/')
+                                    .collect();
+                                if split.len() > 1 {
+                                    if let Some(namespace) = split.last() {
+                                        self.namespaces.push(namespace.to_string());
+                                    }
+                                }
                             }
                         }
-                    }
-                })
-            });
-            return imports_experimental;
-        }
-
-        match node {
+                    })
+                });
+                return imports_experimental;
+            },
             WalkNode::CallExpr(expr) => {
                 match &expr.callee {
                     flux::semantic::nodes::Expression::Identifier(id) => {
@@ -100,56 +99,48 @@ impl<'a> flux::semantic::walk::Visitor<'a>
         true
     }
 }
-
+#[derive(Default)]
 pub struct ContribDiagnosticVisitor {
     namespaces: Vec<String>,
     pub diagnostics: Vec<lsp::Diagnostic>,
-}
-
-impl Default for ContribDiagnosticVisitor {
-    fn default() -> Self {
-        Self {
-            diagnostics: vec![],
-            namespaces: vec![],
-        }
-    }
 }
 
 impl<'a> flux::semantic::walk::Visitor<'a>
     for ContribDiagnosticVisitor
 {
     fn visit(&mut self, node: WalkNode<'a>) -> bool {
-        if let WalkNode::Package(pkg) = node {
-            // Is there an experimental import in this package? If not,
-            // don't keep going. There's nothing to check here.
-            let mut imports_from_contrib = false;
-            pkg.files.iter().for_each(|file| {
-                file.imports.iter().for_each(|import| {
-                    if import.path.value.starts_with("contrib") {
-                        imports_from_contrib = true;
+        match node {
+            WalkNode::Package(pkg) => {
+                // Is there a contrib import in this package? If not,
+                // don't keep going. There's nothing to check here.
+                let mut imports_from_contrib = false;
+                pkg.files.iter().for_each(|file| {
+                    file.imports.iter().for_each(|import| {
+                        if import.path.value.starts_with("contrib") {
+                            imports_from_contrib = true;
 
-                        if let Some(alias) = &import.alias {
-                            self.namespaces
-                                .push(format!("{}", alias.name));
-                        } else {
-                            let split: Vec<&str> = import
-                                .path
-                                .value
-                                .split("/")
-                                .collect();
-                            if split.len() > 1 {
-                                self.namespaces.push(
-                                    split.last().unwrap().to_string(),
-                                );
+                            if let Some(alias) = &import.alias {
+                                self.namespaces
+                                    .push(format!("{}", alias.name));
+                            } else {
+                                let split: Vec<&str> = import
+                                    .path
+                                    .value
+                                    .split('/')
+                                    .collect();
+                                if split.len() > 1 {
+                                    if let Some(namespace) = split.last()
+                                    {
+                                        self.namespaces
+                                            .push(namespace.to_string());
+                                    }
+                                }
                             }
                         }
-                    }
-                })
-            });
-            return imports_from_contrib;
-        }
-
-        match node {
+                    })
+                });
+                return imports_from_contrib;
+            },
             WalkNode::CallExpr(expr) => {
                 match &expr.callee {
                     flux::semantic::nodes::Expression::Identifier(id) => {
