@@ -5,7 +5,9 @@ use lspower::lsp;
 
 use flux::semantic::nodes::Package;
 
-use super::visitors::semantic::ExperimentalDiagnosticVisitor;
+use super::visitors::semantic::{
+    ContribDiagnosticVisitor, ExperimentalDiagnosticVisitor,
+};
 
 /// Provide info about the nature of experimental.
 ///
@@ -19,6 +21,20 @@ pub(crate) fn experimental_lint(
 ) -> Vec<lsp::Diagnostic> {
     let walker = flux::semantic::walk::Node::Package(pkg);
     let mut visitor = ExperimentalDiagnosticVisitor::default();
+
+    flux::semantic::walk::walk(&mut visitor, walker);
+
+    visitor.diagnostics
+}
+
+/// Provide info about the nature of contrib.
+///
+/// The packages in contrib are provided by individual users, and don't carry the
+/// support or compatibility guarantees that the stdlib usually carries. These
+/// functions should be used with caution.
+pub(crate) fn contrib_lint(pkg: &Package) -> Vec<lsp::Diagnostic> {
+    let walker = flux::semantic::walk::Node::Package(pkg);
+    let mut visitor = ContribDiagnosticVisitor::default();
 
     flux::semantic::walk::walk(&mut visitor, walker);
 
@@ -92,6 +108,76 @@ array.concat(
             },
             severity: Some(lsp::DiagnosticSeverity::HINT),
             message: "experimental features can change often or be deleted/moved. Use with caution.".into(),
+            ..lsp::Diagnostic::default()
+        }], diagnostics);
+    }
+
+    #[test]
+    fn contrib_lint_check() {
+        let fluxscript = r#"import "contrib/jsternberg/influxdb"
+
+influxdb.select(
+    from: "example-bucket",
+    start: -1d,
+    stop: now(),
+    m: "example-measurement",
+    fields: [],
+    where: (r) => true,
+    host: "https://example.com",
+    org: "example-org",
+    token: "MySuP3rSecr3Tt0k3n",
+)
+"#;
+        let package = get_package(&fluxscript);
+
+        let diagnostics = contrib_lint(&package);
+
+        assert_eq!(vec![lsp::Diagnostic {
+            range: lsp::Range {
+                start: lsp::Position {
+                    line: 2, character: 0,
+                },
+                end : lsp::Position {
+                    line: 12, character: 1,
+                },
+            },
+            severity: Some(lsp::DiagnosticSeverity::HINT),
+            message: "contrib packages are user-contributed, and do not carry with them the same compatibility guarantees as the standard library. Use with caution.".into(),
+            ..lsp::Diagnostic::default()
+        }], diagnostics);
+    }
+
+    #[test]
+    fn contrib_lint_check_with_alias() {
+        let fluxscript = r#"import influxdb2 "contrib/jsternberg/influxdb"
+
+influxdb2.select(
+    from: "example-bucket",
+    start: -1d,
+    stop: now(),
+    m: "example-measurement",
+    fields: [],
+    where: (r) => true,
+    host: "https://example.com",
+    org: "example-org",
+    token: "MySuP3rSecr3Tt0k3n",
+)
+"#;
+        let package = get_package(&fluxscript);
+
+        let diagnostics = contrib_lint(&package);
+
+        assert_eq!(vec![lsp::Diagnostic {
+            range: lsp::Range {
+                start: lsp::Position {
+                    line: 2, character: 0,
+                },
+                end : lsp::Position {
+                    line: 12, character: 1,
+                },
+            },
+            severity: Some(lsp::DiagnosticSeverity::HINT),
+            message: "contrib packages are user-contributed, and do not carry with them the same compatibility guarantees as the standard library. Use with caution.".into(),
             ..lsp::Diagnostic::default()
         }], diagnostics);
     }

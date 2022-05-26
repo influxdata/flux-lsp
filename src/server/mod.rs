@@ -199,7 +199,10 @@ impl LspServer {
     pub fn new(client: Option<Client>) -> Self {
         Self {
             client: Arc::new(Mutex::new(client)),
-            diagnostics: vec![super::diagnostics::experimental_lint],
+            diagnostics: vec![
+                super::diagnostics::experimental_lint,
+                super::diagnostics::contrib_lint,
+            ],
             store: store::Store::default(),
         }
     }

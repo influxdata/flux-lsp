@@ -14,7 +14,9 @@ mod symbols;
 pub use completion::{
     FunctionFinderVisitor, ObjectFunctionFinderVisitor,
 };
-pub use lint::ExperimentalDiagnosticVisitor;
+pub use lint::{
+    ContribDiagnosticVisitor, ExperimentalDiagnosticVisitor,
+};
 pub use symbols::SymbolsVisitor;
 
 fn contains_position(node: Node<'_>, pos: lsp::Position) -> bool {
