@@ -108,6 +108,8 @@ impl Lsp {
     pub fn onMessage(&mut self, func: js_sys::Function) {
         if let Some(processor) = &mut self.processor {
             processor.on_message(func)
+        } else {
+            panic!("Attempted to add a message handler after running the server. Please attach message handlers before calling `run`.");
         }
     }
 
