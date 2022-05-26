@@ -3153,3 +3153,22 @@ async fn compute_diagnostics_only_on_problem_file() {
 
     assert!(diagnostics_again.is_empty());
 }
+
+#[test]
+async fn compute_diagnostics_non_errors() {
+    let server = create_server();
+
+    let filename: String = "file:///path/to/script.flux".into();
+    let fluxscript = r#"import "experimental"
+        
+from(bucket: "my-bucket")
+|> range(start: -100d)
+|> filter(fn: (r) => r.value == "b")
+|> experimental.to(bucket: "out-bucket", org: "abc123", host: "https://myhost.example.com", token: "123abc")"#;
+    open_file(&server, fluxscript.into(), Some(&filename)).await;
+
+    let diagnostics_again = server
+        .compute_diagnostics(&lsp::Url::parse(&filename).unwrap());
+
+    assert!(!diagnostics_again.is_empty());
+}
