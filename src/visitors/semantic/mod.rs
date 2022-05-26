@@ -7,12 +7,15 @@ use flux::semantic::{
 use lspower::lsp;
 
 mod completion;
-mod symbols;
-
 mod functions;
+mod lint;
+mod symbols;
 
 pub use completion::{
     FunctionFinderVisitor, ObjectFunctionFinderVisitor,
+};
+pub use lint::{
+    ContribDiagnosticVisitor, ExperimentalDiagnosticVisitor,
 };
 pub use symbols::SymbolsVisitor;
 

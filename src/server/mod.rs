@@ -5,7 +5,9 @@ use std::borrow::Cow;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
-use flux::semantic::nodes::ErrorKind as SemanticNodeErrorKind;
+use flux::semantic::nodes::{
+    ErrorKind as SemanticNodeErrorKind, Package as SemanticPackage,
+};
 use flux::semantic::{
     nodes::FunctionParameter, nodes::Symbol, walk, ErrorKind,
 };
@@ -20,6 +22,8 @@ use crate::{
 use self::types::LspError;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
+
+type Diagnostic = fn(&SemanticPackage) -> Vec<lsp::Diagnostic>;
 
 /// Convert a flux::semantic::walk::Node to a lsp::Location
 /// https://microsoft.github.io/language-server-protocol/specification#location
@@ -187,6 +191,7 @@ fn parse_semantic_graph(
 
 pub struct LspServer {
     client: Arc<Mutex<Option<Client>>>,
+    diagnostics: Vec<Diagnostic>,
     store: store::Store,
 }
 
@@ -194,6 +199,10 @@ impl LspServer {
     pub fn new(client: Option<Client>) -> Self {
         Self {
             client: Arc::new(Mutex::new(client)),
+            diagnostics: vec![
+                super::diagnostics::experimental_lint,
+                super::diagnostics::contrib_lint,
+            ],
             store: store::Store::default(),
         }
     }
@@ -237,11 +246,25 @@ impl LspServer {
         key: &lsp::Url,
     ) -> Vec<lsp::Diagnostic> {
         match self.store.get_package_errors(key) {
-            // Send back empty list of diagnostics,
-            // this is important as the client needs to
-            // explicitly know that all previous diagnostics
-            // are no longer relevant.
-            None => vec![],
+            None => {
+                // If there are no semantic package errors, we can check for other
+                // diagnostics.
+                //
+                // Note: it is important, if no diagnostics exist, that we return an empty
+                // diagnostic list, as that will signal to the client that the diagnostics
+                // have been cleared.
+                if let Ok(package) =
+                    self.store.get_semantic_package(key)
+                {
+                    return self
+                        .diagnostics
+                        .iter()
+                        .flat_map(|func| func(&package))
+                        .collect::<Vec<lsp::Diagnostic>>();
+                } else {
+                    return vec![];
+                }
+            }
             Some(errors) => errors
                 .errors
                 .iter()

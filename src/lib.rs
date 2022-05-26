@@ -11,6 +11,7 @@
     clippy::wildcard_imports
 )]
 mod completion;
+mod diagnostics;
 mod lsp;
 mod server;
 mod shared;
