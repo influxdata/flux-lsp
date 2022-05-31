@@ -73,9 +73,39 @@ impl From<&flux::ast::Package> for PackageInfo {
     }
 }
 
-pub(crate) const SEMANTIC_TOKEN_KEYWORD: u32 = 0;
-pub(crate) const SEMANTIC_TOKEN_NUMBER: u32 = 1;
-pub(crate) const SEMANTIC_TOKEN_STRING: u32 = 2;
+macro_rules! semantic_tokens {
+    ($($name: ident => $lsp_name: ident),* $(,)?) => {
+        // C-like enumerations can be casted to 0,1,2 etc in order which is exactly what the
+        // LSP protocal needs for the mapping
+        #[derive(Debug)]
+        #[allow(non_camel_case_types)]
+        pub(crate) enum SemanticToken {
+            $(
+            $name,
+            )*
+        }
+
+        impl SemanticToken {
+            pub(crate) const LSP_MAPPING: &'static [lsp::SemanticTokenType] = &[
+                $(
+                lsp::SemanticTokenType::$lsp_name,
+                )*
+            ];
+        }
+
+        $(
+        pub(crate) const $name: u32 = SemanticToken::$name as u32;
+        )*
+    }
+}
+
+// Constructs an integer <=> string mapping according in accordance to
+// https://microsoft.github.io/language-server-protocol/specifications/specification-3-17/#semanticTokensLegend
+semantic_tokens! {
+    SEMANTIC_TOKEN_KEYWORD => KEYWORD,
+    SEMANTIC_TOKEN_NUMBER => NUMBER,
+    SEMANTIC_TOKEN_STRING => STRING,
+}
 
 #[derive(Clone, Default)]
 pub struct SemanticTokenVisitor {
