@@ -364,15 +364,7 @@ impl LanguageServer for LspServer {
                         work_done_progress: None
                     },
                     legend: lsp::SemanticTokensLegend {
-                        // STOP! Are you adding more token types? Add them
-                        // at the end of this vector, and make sure to add
-                        // a corresponding constant for the token type. For
-                        // more information, see https://microsoft.github.io/language-server-protocol/specifications/specification-3-17/#semanticTokensLegend
-                        token_types: vec![
-                            lsp::SemanticTokenType::KEYWORD,
-                            lsp::SemanticTokenType::NUMBER,
-                            lsp::SemanticTokenType::STRING,
-                        ],
+                        token_types: crate::visitors::ast::SemanticToken::LSP_MAPPING.to_owned(),
                         token_modifiers: vec![],
                     },
                     range: None,
