@@ -4,6 +4,7 @@ use std::collections::{BTreeSet, HashMap};
 use async_std::test;
 use expect_test::expect;
 use lspower::{lsp, LanguageServer};
+use serde_json::json;
 
 use super::*;
 
@@ -3171,4 +3172,54 @@ from(bucket: "my-bucket")
         .compute_diagnostics(&lsp::Url::parse(&filename).unwrap());
 
     assert!(!diagnostics_again.is_empty());
+}
+
+#[test]
+async fn request_else_no_match() {
+    let server = create_server();
+
+    let filename: String = "file:///path/to/script.flux".into();
+    let fluxscript = r#"import "experimental"
+        
+from(bucket: "my-bucket")
+|> range(start: -100d)
+|> filter(fn: (r) => r.value == "b")
+|> experimental.to(bucket: "out-bucket", org: "abc123", host: "https://myhost.example.com", token: "123abc")"#;
+    open_file(&server, fluxscript.into(), Some(&filename)).await;
+
+    let result = server
+        .request_else(
+            "fluxDocument/thisFunctionDoesNotExist",
+            Some(json!(r#"{"param": null}"#)),
+        )
+        .await
+        .unwrap();
+
+    assert!(result.is_none());
+}
+
+#[test]
+async fn request_else_has_match() {
+    let server = create_server();
+
+    let filename: String = "file:///path/to/script.flux".into();
+    let fluxscript = r#"import "experimental"
+        
+from(bucket: "my-bucket")
+|> range(start: -100d)
+|> filter(fn: (r) => r.value == "b")
+|> experimental.to(bucket: "out-bucket", org: "abc123", host: "https://myhost.example.com", token: "123abc")"#;
+    open_file(&server, fluxscript.into(), Some(&filename)).await;
+
+    let params = types::InjectMeasurementParams::default();
+
+    let result = server
+        .request_else(
+            "fluxDocument/injectMeasurement",
+            Some(serde_json::value::to_value(params).unwrap()),
+        )
+        .await
+        .unwrap();
+
+    assert!(result.is_some());
 }

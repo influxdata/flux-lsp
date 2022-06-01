@@ -18,8 +18,7 @@ use lspower::{
 use crate::{
     completion, shared::FunctionSignature, stdlib, visitors::semantic,
 };
-
-use self::types::LspError;
+use types::FluxLanguageServer;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -305,6 +304,28 @@ impl LspServer {
 }
 
 #[lspower::async_trait]
+impl FluxLanguageServer for LspServer {
+    async fn inject_measurement(
+        &self,
+        _params: types::InjectMeasurementParams,
+    ) -> RpcResult<types::InjectMeasurementResult> {
+        Ok(types::InjectMeasurementResult {})
+    }
+    async fn inject_tag(
+        &self,
+        _params: types::InjectTagParams,
+    ) -> RpcResult<types::InjectTagResult> {
+        Ok(types::InjectTagResult {})
+    }
+    async fn inject_tag_value(
+        &self,
+        _params: types::InjectTagValueParams,
+    ) -> RpcResult<types::InjectTagValueResult> {
+        Ok(types::InjectTagValueResult {})
+    }
+}
+
+#[lspower::async_trait]
 impl LanguageServer for LspServer {
     async fn initialize(
         &self,
@@ -406,7 +427,7 @@ impl LanguageServer for LspServer {
         let mut client = match self.client.lock() {
             Ok(client) => client,
             Err(err) => {
-                return Err(LspError::InternalError(format!(
+                return Err(types::LspError::InternalError(format!(
                     "{}",
                     err
                 ))
@@ -1062,6 +1083,103 @@ impl LanguageServer for LspServer {
         }).collect();
 
         return Ok(Some(actions));
+    }
+
+    async fn request_else(
+        &self,
+        method: &str,
+        params: Option<serde_json::Value>,
+    ) -> RpcResult<Option<serde_json::Value>> {
+        match method {
+            "fluxDocument/injectMeasurement" => {
+                if let Some(params) = params.clone() {
+                    if let Ok(params) = serde_json::value::from_value::<
+                        types::InjectMeasurementParams,
+                    >(params)
+                    {
+                        match self.inject_measurement(params).await {
+                            #[allow(clippy::unwrap_used)]
+                            Ok(value) => {
+                                return Ok(Some(
+                                    serde_json::value::to_value(
+                                        value,
+                                    )
+                                    .unwrap(),
+                                ))
+                            }
+                            Err(err) => {
+                                log::error!("{}", err);
+                                return Ok(None);
+                            }
+                        }
+                    }
+                }
+                Err(lspower::jsonrpc::Error::invalid_params(format!(
+                    "Invalid parameters: {:?}",
+                    params
+                )))
+            }
+            "fluxDocument/injectTag" => {
+                if let Some(params) = params.clone() {
+                    if let Ok(params) = serde_json::value::from_value::<
+                        types::InjectTagParams,
+                    >(params)
+                    {
+                        match self.inject_tag(params).await {
+                            #[allow(clippy::unwrap_used)]
+                            Ok(value) => {
+                                return Ok(Some(
+                                    serde_json::value::to_value(
+                                        value,
+                                    )
+                                    .unwrap(),
+                                ))
+                            }
+                            Err(err) => {
+                                log::error!("{}", err);
+                                return Ok(None);
+                            }
+                        }
+                    }
+                }
+                Err(lspower::jsonrpc::Error::invalid_params(format!(
+                    "Invalid parameters: {:?}",
+                    params
+                )))
+            }
+            "fluxDocument/injectTagValue" => {
+                if let Some(params) = params.clone() {
+                    if let Ok(params) = serde_json::value::from_value::<
+                        types::InjectTagValueParams,
+                    >(params)
+                    {
+                        match self.inject_tag_value(params).await {
+                            #[allow(clippy::unwrap_used)]
+                            Ok(value) => {
+                                return Ok(Some(
+                                    serde_json::value::to_value(
+                                        value,
+                                    )
+                                    .unwrap(),
+                                ))
+                            }
+                            Err(err) => {
+                                log::error!("{}", err);
+                                return Ok(None);
+                            }
+                        }
+                    }
+                }
+                Err(lspower::jsonrpc::Error::invalid_params(format!(
+                    "Invalid parameters: {:?}",
+                    params
+                )))
+            }
+            _ => {
+                log::warn!("Unknown custom request: {}", method);
+                Ok(None)
+            }
+        }
     }
 }
 

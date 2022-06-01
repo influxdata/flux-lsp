@@ -1,4 +1,5 @@
 use lspower::jsonrpc::{Error, ErrorCode};
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug)]
 pub enum LspError {
@@ -27,4 +28,44 @@ impl From<LspError> for Error {
             },
         }
     }
+}
+
+#[derive(Default, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InjectMeasurementParams {}
+
+#[derive(Default, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InjectMeasurementResult {}
+
+#[derive(Default, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InjectTagParams {}
+
+#[derive(Default, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InjectTagResult {}
+
+#[derive(Default, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InjectTagValueParams {}
+
+#[derive(Default, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InjectTagValueResult {}
+
+#[lspower::async_trait]
+pub trait FluxLanguageServer: Send + Sync + 'static {
+    async fn inject_measurement(
+        &self,
+        params: InjectMeasurementParams,
+    ) -> lspower::jsonrpc::Result<InjectMeasurementResult>;
+    async fn inject_tag(
+        &self,
+        params: InjectTagParams,
+    ) -> lspower::jsonrpc::Result<InjectTagResult>;
+    async fn inject_tag_value(
+        &self,
+        params: InjectTagValueParams,
+    ) -> lspower::jsonrpc::Result<InjectTagValueResult>;
 }
