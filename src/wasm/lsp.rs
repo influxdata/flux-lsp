@@ -1,11 +1,11 @@
 use std::mem;
 
+use crate::LspServer;
 use futures::prelude::*;
 use lspower::{LspService, MessageStream};
 use tower_service::Service;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::future_to_promise;
-use crate::LspServer;
 
 // MessageProcessor calls handlers for recieved messages.
 struct MessageProcessor {

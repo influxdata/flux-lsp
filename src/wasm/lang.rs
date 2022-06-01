@@ -62,9 +62,7 @@ impl Flux {
     #[wasm_bindgen]
     pub fn is_valid(&self) -> bool {
         let mut analyzer = match flux::new_semantic_analyzer(
-            flux::semantic::AnalyzerConfig {
-                features: vec![],
-            },
+            flux::semantic::AnalyzerConfig { features: vec![] },
         ) {
             Ok(analyzer) => analyzer,
             Err(_) => return false,
