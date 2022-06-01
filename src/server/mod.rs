@@ -94,18 +94,19 @@ fn is_scope(name: &Symbol, n: walk::Node<'_>) -> bool {
     dvisitor.node.is_some()
 }
 
-fn find_references(
+fn find_references<'a>(
     uri: &lsp::Url,
-    result: NodeFinderResult,
+    node: Option<flux::semantic::walk::Node<'a>>,
+    path: Vec<flux::semantic::walk::Node<'a>>
 ) -> Vec<lsp::Location> {
-    if let Some(node) = result.node {
+    if let Some(node) = node {
         let name = match node {
             walk::Node::Identifier(ident) => &ident.name,
             walk::Node::IdentifierExpr(ident) => &ident.name,
             _ => return Vec::new(),
         };
 
-        let mut path_iter = result.path.iter().rev();
+        let mut path_iter = path.iter().rev();
         let scope: walk::Node =
             match path_iter.find_map(|n| match n {
                 walk::Node::FunctionExpr(f)
@@ -494,12 +495,10 @@ impl LanguageServer for LspServer {
         };
 
         let mut signatures = vec![];
-        let node_finder_result = find_node(
-            walk::Node::Package(&pkg),
-            params.text_document_position_params.position,
-        );
+        let mut visitor = semantic::NodeFinderVisitor::new(params.text_document_position_params.position);
+        flux::semantic::walk::walk(&mut visitor, walk::Node::Package(&pkg));
 
-        if let Some(node) = node_finder_result.node {
+        if let Some(node) = visitor.node {
             if let walk::Node::CallExpr(call) = node {
                 let callee = call.callee.clone();
 
@@ -726,12 +725,10 @@ impl LanguageServer for LspServer {
             Err(err) => return Err(err.into()),
         };
 
-        let node = find_node(
-            walk::Node::Package(&pkg),
-            params.text_document_position.position,
-        );
+        let mut visitor = semantic::NodeFinderVisitor::new(params.text_document_position.position);
+        flux::semantic::walk::walk(&mut visitor, walk::Node::Package(&pkg));
 
-        let locations = find_references(&key, node);
+        let locations = find_references(&key, visitor.node, visitor.path);
         let edits = locations
             .iter()
             .map(|location| lsp::TextEdit {
@@ -762,12 +759,10 @@ impl LanguageServer for LspServer {
             Err(err) => return Err(err.into()),
         };
 
-        let node = find_node(
-            walk::Node::Package(&pkg),
-            params.text_document_position_params.position,
-        );
+        let mut visitor = semantic::NodeFinderVisitor::new(params.text_document_position_params.position);
+        flux::semantic::walk::walk(&mut visitor, walk::Node::Package(&pkg));
 
-        let refs = find_references(&key, node);
+        let refs = find_references(&key, visitor.node, visitor.path);
         Ok(Some(
             refs.iter()
                 .map(|r| lsp::DocumentHighlight {
@@ -789,12 +784,10 @@ impl LanguageServer for LspServer {
             Err(err) => return Err(err.into()),
         };
 
-        let node = find_node(
-            walk::Node::Package(&pkg),
-            params.text_document_position.position,
-        );
+        let mut visitor = semantic::NodeFinderVisitor::new(params.text_document_position.position);
+        flux::semantic::walk::walk(&mut visitor, walk::Node::Package(&pkg));
 
-        let references = find_references(&key, node);
+        let references = find_references(&key, visitor.node, visitor.path);
         Ok(if references.is_empty() {
             None
         } else {
@@ -813,12 +806,12 @@ impl LanguageServer for LspServer {
             Err(err) => return Err(err.into()),
         };
 
-        let node_finder_result = find_node(
-            walk::Node::Package(&pkg),
-            params.text_document_position_params.position,
-        );
-        if let Some(node) = node_finder_result.node {
-            let path = &node_finder_result.path;
+        let mut visitor = semantic::NodeFinderVisitor::new(params.text_document_position_params.position);
+    
+        flux::semantic::walk::walk(&mut visitor, walk::Node::Package(&pkg));
+
+        if let Some(node) = visitor.node {
+            let path = &visitor.path;
             let hover_type = node.type_of().or_else(|| match node {
                 walk::Node::Identifier(ident) => {
                     // We hovered over an identifier without an attached type, try to figure
@@ -1063,27 +1056,6 @@ impl LanguageServer for LspServer {
 
         return Ok(Some(actions));
     }
-}
-
-#[derive(Default, Clone)]
-struct NodeFinderResult<'a> {
-    node: Option<flux::semantic::walk::Node<'a>>,
-    path: Vec<flux::semantic::walk::Node<'a>>,
-}
-
-fn find_node(
-    node: flux::semantic::walk::Node<'_>,
-    position: lsp::Position,
-) -> NodeFinderResult<'_> {
-    let mut result = NodeFinderResult::default();
-    let mut visitor = semantic::NodeFinderVisitor::new(position);
-
-    flux::semantic::walk::walk(&mut visitor, node);
-
-    result.node = visitor.node;
-    result.path = visitor.path;
-
-    result
 }
 
 // Url::to_file_path doesn't exist in wasm-unknown-unknown, for kinda
