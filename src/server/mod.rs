@@ -18,7 +18,6 @@ use lspower::{
 use crate::{
     completion, shared::FunctionSignature, stdlib, visitors::semantic,
 };
-use types::FluxLanguageServer;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -188,6 +187,42 @@ fn parse_semantic_graph(
     }
 }
 
+enum LspServerCommand {
+    InjectMeasurement,
+    InjectTag,
+    InjectTagValue,
+}
+
+impl From<String> for LspServerCommand {
+    fn from(value: String) -> Self {
+        match value.as_str() {
+            "injectMeasurement" => {
+                LspServerCommand::InjectMeasurement
+            }
+            "injectTag" => LspServerCommand::InjectTag,
+            "injectTagValue" => LspServerCommand::InjectTagValue,
+            _ => panic!(
+                "Received unknown value for LspServerCommand: {}",
+                value
+            ),
+        }
+    }
+}
+
+impl From<LspServerCommand> for String {
+    fn from(value: LspServerCommand) -> Self {
+        match value {
+            LspServerCommand::InjectMeasurement => {
+                "injectMeasurement".into()
+            }
+            LspServerCommand::InjectTag => "injectTag".into(),
+            LspServerCommand::InjectTagValue => {
+                "injectTagValue".into()
+            }
+        }
+    }
+}
+
 pub struct LspServer {
     client: Arc<Mutex<Option<Client>>>,
     diagnostics: Vec<Diagnostic>,
@@ -304,28 +339,6 @@ impl LspServer {
 }
 
 #[lspower::async_trait]
-impl FluxLanguageServer for LspServer {
-    async fn inject_measurement(
-        &self,
-        _params: types::InjectMeasurementParams,
-    ) -> RpcResult<types::InjectMeasurementResult> {
-        Ok(types::InjectMeasurementResult {})
-    }
-    async fn inject_tag(
-        &self,
-        _params: types::InjectTagParams,
-    ) -> RpcResult<types::InjectTagResult> {
-        Ok(types::InjectTagResult {})
-    }
-    async fn inject_tag_value(
-        &self,
-        _params: types::InjectTagValueParams,
-    ) -> RpcResult<types::InjectTagValueResult> {
-        Ok(types::InjectTagValueResult {})
-    }
-}
-
-#[lspower::async_trait]
 impl LanguageServer for LspServer {
     async fn initialize(
         &self,
@@ -366,7 +379,12 @@ impl LanguageServer for LspServer {
                 document_symbol_provider: Some(lsp::OneOf::Left(
                     true,
                 )),
-                execute_command_provider: None,
+                execute_command_provider: Some(lsp::ExecuteCommandOptions {
+                    commands: vec![LspServerCommand::InjectMeasurement.into(), LspServerCommand::InjectTag.into(), LspServerCommand::InjectTagValue.into()],
+                    work_done_progress_options: lsp::WorkDoneProgressOptions {
+                        work_done_progress: None
+                    }
+                }),
                 experimental: None,
                 folding_range_provider: Some(
                     lsp::FoldingRangeProviderCapability::Simple(true),
@@ -1085,98 +1103,51 @@ impl LanguageServer for LspServer {
         return Ok(Some(actions));
     }
 
-    async fn request_else(
+    async fn execute_command(
         &self,
-        method: &str,
-        params: Option<serde_json::Value>,
+        params: lsp::ExecuteCommandParams,
     ) -> RpcResult<Option<serde_json::Value>> {
-        match method {
-            "fluxDocument/injectMeasurement" => {
-                if let Some(params) = params.clone() {
-                    if let Ok(params) = serde_json::value::from_value::<
-                        types::InjectMeasurementParams,
-                    >(params)
+        if params.arguments.len() != 1
+            || !params.arguments[0].is_object()
+        {
+            // We only support a single object argument. This means all arguments are key/value.
+            return Err(types::LspError::InvalidArguments.into());
+        }
+        match LspServerCommand::from(params.command) {
+            LspServerCommand::InjectMeasurement => {
+                let _params: types::InjectMeasurementParams =
+                    match serde_json::value::from_value(
+                        params.arguments[0].clone(),
+                    )
+                    .unwrap()
                     {
-                        match self.inject_measurement(params).await {
-                            #[allow(clippy::unwrap_used)]
-                            Ok(value) => {
-                                return Ok(Some(
-                                    serde_json::value::to_value(
-                                        value,
-                                    )
-                                    .unwrap(),
-                                ))
-                            }
-                            Err(err) => {
-                                log::error!("{}", err);
-                                return Ok(None);
-                            }
-                        }
-                    }
-                }
-                Err(lspower::jsonrpc::Error::invalid_params(format!(
-                    "Invalid parameters: {:?}",
-                    params
-                )))
+                        Ok(value) => value,
+                        Err(err) => return Err(err),
+                    };
+                Ok(None)
             }
-            "fluxDocument/injectTag" => {
-                if let Some(params) = params.clone() {
-                    if let Ok(params) = serde_json::value::from_value::<
-                        types::InjectTagParams,
-                    >(params)
+            LspServerCommand::InjectTag => {
+                let _params: types::InjectTagParams =
+                    match serde_json::value::from_value(
+                        params.arguments[0].clone(),
+                    )
+                    .unwrap()
                     {
-                        match self.inject_tag(params).await {
-                            #[allow(clippy::unwrap_used)]
-                            Ok(value) => {
-                                return Ok(Some(
-                                    serde_json::value::to_value(
-                                        value,
-                                    )
-                                    .unwrap(),
-                                ))
-                            }
-                            Err(err) => {
-                                log::error!("{}", err);
-                                return Ok(None);
-                            }
-                        }
-                    }
-                }
-                Err(lspower::jsonrpc::Error::invalid_params(format!(
-                    "Invalid parameters: {:?}",
-                    params
-                )))
+                        Ok(value) => value,
+                        Err(err) => return Err(err),
+                    };
+                Ok(None)
             }
-            "fluxDocument/injectTagValue" => {
-                if let Some(params) = params.clone() {
-                    if let Ok(params) = serde_json::value::from_value::<
-                        types::InjectTagValueParams,
-                    >(params)
+            LspServerCommand::InjectTagValue => {
+                let _params: types::InjectTagValueParams =
+                    match serde_json::value::from_value(
+                        params.arguments[0].clone(),
+                    )
+                    .unwrap()
                     {
-                        match self.inject_tag_value(params).await {
-                            #[allow(clippy::unwrap_used)]
-                            Ok(value) => {
-                                return Ok(Some(
-                                    serde_json::value::to_value(
-                                        value,
-                                    )
-                                    .unwrap(),
-                                ))
-                            }
-                            Err(err) => {
-                                log::error!("{}", err);
-                                return Ok(None);
-                            }
-                        }
-                    }
-                }
-                Err(lspower::jsonrpc::Error::invalid_params(format!(
-                    "Invalid parameters: {:?}",
-                    params
-                )))
-            }
-            _ => {
-                log::warn!("Unknown custom request: {}", method);
+                        Ok(value) => value,
+                        Err(err) => return Err(err),
+                    };
                 Ok(None)
             }
         }

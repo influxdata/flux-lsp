@@ -6,6 +6,7 @@ pub enum LspError {
     InternalError(String),
     LockNotAcquired,
     FileNotFound(String),
+    InvalidArguments,
 }
 
 impl From<LspError> for Error {
@@ -26,6 +27,11 @@ impl From<LspError> for Error {
                 message: format!("File not fiend: {}", filename),
                 data: None,
             },
+            LspError::InvalidArguments => Error {
+                code: ErrorCode::InvalidParams,
+                message: format!("Invalid arguments specified."),
+                data: None,
+            },
         }
     }
 }
@@ -36,36 +42,8 @@ pub struct InjectMeasurementParams {}
 
 #[derive(Default, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct InjectMeasurementResult {}
-
-#[derive(Default, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
 pub struct InjectTagParams {}
 
 #[derive(Default, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct InjectTagResult {}
-
-#[derive(Default, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
 pub struct InjectTagValueParams {}
-
-#[derive(Default, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct InjectTagValueResult {}
-
-#[lspower::async_trait]
-pub trait FluxLanguageServer: Send + Sync + 'static {
-    async fn inject_measurement(
-        &self,
-        params: InjectMeasurementParams,
-    ) -> lspower::jsonrpc::Result<InjectMeasurementResult>;
-    async fn inject_tag(
-        &self,
-        params: InjectTagParams,
-    ) -> lspower::jsonrpc::Result<InjectTagResult>;
-    async fn inject_tag_value(
-        &self,
-        params: InjectTagValueParams,
-    ) -> lspower::jsonrpc::Result<InjectTagValueResult>;
-}
