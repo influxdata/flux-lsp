@@ -8,16 +8,12 @@ use std::sync::{Arc, Mutex};
 use flux::semantic::nodes::{
     ErrorKind as SemanticNodeErrorKind, Package as SemanticPackage,
 };
-use flux::semantic::{
-    nodes::FunctionParameter, nodes::Symbol, walk, ErrorKind,
-};
+use flux::semantic::{walk, ErrorKind};
 use lspower::{
     jsonrpc::Result as RpcResult, lsp, Client, LanguageServer,
 };
 
-use crate::{
-    completion, shared::FunctionSignature, stdlib, visitors::semantic,
-};
+use crate::{completion, stdlib, visitors::semantic};
 
 use self::types::LspError;
 
@@ -79,44 +75,40 @@ fn replace_string_in_range(
     contents
 }
 
-fn function_defines(
-    name: &str,
-    params: &[FunctionParameter],
-) -> bool {
-    params.iter().any(|param| param.key.name == name)
-}
-
-fn is_scope(name: &Symbol, n: walk::Node<'_>) -> bool {
-    let mut dvisitor =
-        semantic::DefinitionFinderVisitor::new(name.clone());
-    walk::walk(&mut dvisitor, n);
-
-    dvisitor.node.is_some()
-}
-
-fn find_references(
+fn find_references<'a>(
     uri: &lsp::Url,
-    result: NodeFinderResult,
+    node: Option<flux::semantic::walk::Node<'a>>,
+    path: Vec<flux::semantic::walk::Node<'a>>,
 ) -> Vec<lsp::Location> {
-    if let Some(node) = result.node {
+    if let Some(node) = node {
         let name = match node {
             walk::Node::Identifier(ident) => &ident.name,
             walk::Node::IdentifierExpr(ident) => &ident.name,
             _ => return Vec::new(),
         };
 
-        let mut path_iter = result.path.iter().rev();
+        let mut path_iter = path.iter().rev();
         let scope: walk::Node =
             match path_iter.find_map(|n| match n {
                 walk::Node::FunctionExpr(f)
-                    if function_defines(name, &f.params) =>
+                    if f.params
+                        .iter()
+                        .any(|param| &param.key.name == name) =>
                 {
                     Some(n)
                 }
-                walk::Node::Package(_) | walk::Node::File(_)
-                    if is_scope(name, *n) =>
-                {
-                    Some(n)
+                walk::Node::Package(_) | walk::Node::File(_) => {
+                    let mut visitor =
+                        semantic::DefinitionFinderVisitor::new(
+                            name.clone(),
+                        );
+                    walk::walk(&mut visitor, *n);
+
+                    if visitor.node.is_some() {
+                        Some(n)
+                    } else {
+                        None
+                    }
                 }
                 _ => None,
             }) {
@@ -139,17 +131,6 @@ fn find_references(
     }
 }
 
-fn create_signature_information(
-    fs: FunctionSignature,
-) -> lsp::SignatureInformation {
-    lsp::SignatureInformation {
-        label: fs.create_signature(),
-        parameters: Some(fs.create_parameters()),
-        documentation: None,
-        active_parameter: None,
-    }
-}
-
 pub fn find_stdlib_signatures(
     name: &str,
     package: &str,
@@ -158,35 +139,19 @@ pub fn find_stdlib_signatures(
         .into_iter()
         .filter(|x| x.name == name && x.package_name == package)
         .map(|x| {
-            x.signatures()
-                .into_iter()
-                .map(create_signature_information)
+            x.signatures().into_iter().map(|signature| {
+                lsp::SignatureInformation {
+                    label: signature.create_signature(),
+                    parameters: Some(signature.create_parameters()),
+                    documentation: None,
+                    active_parameter: None,
+                }
+            })
         })
         .fold(vec![], |mut acc, x| {
             acc.extend(x);
             acc
         })
-}
-
-fn parse_semantic_graph(
-    key: &lsp::Url,
-    contents: &str,
-) -> Option<flux::semantic::nodes::Package> {
-    let mut analyzer = match flux::new_semantic_analyzer(
-        flux::semantic::AnalyzerConfig::default(),
-    ) {
-        Ok(a) => a,
-        Err(_) => return None,
-    };
-
-    match analyzer.analyze_source(
-        "".into(),
-        key.clone().into(),
-        contents,
-    ) {
-        Ok((_, pkg)) => Some(pkg),
-        Err(err) => err.value.map(|(_, pkg)| pkg),
-    }
 }
 
 pub struct LspServer {
@@ -494,12 +459,15 @@ impl LanguageServer for LspServer {
         };
 
         let mut signatures = vec![];
-        let node_finder_result = find_node(
-            walk::Node::Package(&pkg),
+        let mut visitor = semantic::NodeFinderVisitor::new(
             params.text_document_position_params.position,
         );
+        flux::semantic::walk::walk(
+            &mut visitor,
+            walk::Node::Package(&pkg),
+        );
 
-        if let Some(node) = node_finder_result.node {
+        if let Some(node) = visitor.node {
             if let walk::Node::CallExpr(call) = node {
                 let callee = call.callee.clone();
 
@@ -726,12 +694,16 @@ impl LanguageServer for LspServer {
             Err(err) => return Err(err.into()),
         };
 
-        let node = find_node(
-            walk::Node::Package(&pkg),
+        let mut visitor = semantic::NodeFinderVisitor::new(
             params.text_document_position.position,
         );
+        flux::semantic::walk::walk(
+            &mut visitor,
+            walk::Node::Package(&pkg),
+        );
 
-        let locations = find_references(&key, node);
+        let locations =
+            find_references(&key, visitor.node, visitor.path);
         let edits = locations
             .iter()
             .map(|location| lsp::TextEdit {
@@ -762,12 +734,15 @@ impl LanguageServer for LspServer {
             Err(err) => return Err(err.into()),
         };
 
-        let node = find_node(
-            walk::Node::Package(&pkg),
+        let mut visitor = semantic::NodeFinderVisitor::new(
             params.text_document_position_params.position,
         );
+        flux::semantic::walk::walk(
+            &mut visitor,
+            walk::Node::Package(&pkg),
+        );
 
-        let refs = find_references(&key, node);
+        let refs = find_references(&key, visitor.node, visitor.path);
         Ok(Some(
             refs.iter()
                 .map(|r| lsp::DocumentHighlight {
@@ -789,12 +764,16 @@ impl LanguageServer for LspServer {
             Err(err) => return Err(err.into()),
         };
 
-        let node = find_node(
-            walk::Node::Package(&pkg),
+        let mut visitor = semantic::NodeFinderVisitor::new(
             params.text_document_position.position,
         );
+        flux::semantic::walk::walk(
+            &mut visitor,
+            walk::Node::Package(&pkg),
+        );
 
-        let references = find_references(&key, node);
+        let references =
+            find_references(&key, visitor.node, visitor.path);
         Ok(if references.is_empty() {
             None
         } else {
@@ -813,12 +792,17 @@ impl LanguageServer for LspServer {
             Err(err) => return Err(err.into()),
         };
 
-        let node_finder_result = find_node(
-            walk::Node::Package(&pkg),
+        let mut visitor = semantic::NodeFinderVisitor::new(
             params.text_document_position_params.position,
         );
-        if let Some(node) = node_finder_result.node {
-            let path = &node_finder_result.path;
+
+        flux::semantic::walk::walk(
+            &mut visitor,
+            walk::Node::Package(&pkg),
+        );
+
+        if let Some(node) = visitor.node {
+            let path = &visitor.path;
             let hover_type = node.type_of().or_else(|| match node {
                 walk::Node::Identifier(ident) => {
                     // We hovered over an identifier without an attached type, try to figure
@@ -883,9 +867,13 @@ impl LanguageServer for LspServer {
         let key = &params.text_document_position.text_document.uri;
 
         let contents = self.get_document(key)?;
-        let sem_pkg = match parse_semantic_graph(key, &contents) {
-            Some(sem_pkg) => sem_pkg,
-            None => return Ok(None),
+        let sem_pkg = match self.store.get_semantic_package(
+            &params.text_document_position.text_document.uri,
+        ) {
+            Ok(pkg) => pkg,
+            Err(err) => {
+                return Err(err.into());
+            }
         };
 
         let items = completion::find_completions(
@@ -1063,27 +1051,6 @@ impl LanguageServer for LspServer {
 
         return Ok(Some(actions));
     }
-}
-
-#[derive(Default, Clone)]
-struct NodeFinderResult<'a> {
-    node: Option<flux::semantic::walk::Node<'a>>,
-    path: Vec<flux::semantic::walk::Node<'a>>,
-}
-
-fn find_node(
-    node: flux::semantic::walk::Node<'_>,
-    position: lsp::Position,
-) -> NodeFinderResult<'_> {
-    let mut result = NodeFinderResult::default();
-    let mut visitor = semantic::NodeFinderVisitor::new(position);
-
-    flux::semantic::walk::walk(&mut visitor, node);
-
-    result.node = visitor.node;
-    result.path = visitor.path;
-
-    result
 }
 
 // Url::to_file_path doesn't exist in wasm-unknown-unknown, for kinda
