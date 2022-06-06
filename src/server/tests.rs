@@ -1322,7 +1322,7 @@ option option_ = 123
         Some(lsp::Hover {
             contents: lsp::HoverContents::Scalar(
                 lsp::MarkedString::String(
-                    "type: (v:int) => int".to_string()
+                    "type: (v: int) => int".to_string()
                 )
             ),
             range: None,
