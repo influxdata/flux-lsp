@@ -200,8 +200,9 @@ impl LspServer {
         Self {
             client: Arc::new(Mutex::new(client)),
             diagnostics: vec![
-                super::diagnostics::experimental_lint,
                 super::diagnostics::contrib_lint,
+                super::diagnostics::experimental_lint,
+                super::diagnostics::no_influxdb_identifiers,
             ],
             store: store::Store::default(),
         }

@@ -191,3 +191,44 @@ impl<'a> flux::semantic::walk::Visitor<'a>
         true
     }
 }
+
+pub struct InfluxDBIdentifierDiagnosticVisitor {
+    names: Vec<String>,
+    pub diagnostics: Vec<lsp::Diagnostic>,
+}
+
+impl Default for InfluxDBIdentifierDiagnosticVisitor {
+    fn default() -> Self {
+        Self {
+            diagnostics: vec![],
+            names: vec!["v".into(), "task".into(), "params".into()],
+        }
+    }
+}
+
+impl<'a> flux::semantic::walk::Visitor<'a>
+    for InfluxDBIdentifierDiagnosticVisitor
+{
+    fn visit(&mut self, node: WalkNode<'a>) -> bool {
+        if let WalkNode::VariableAssgn(assign) = node {
+            if self.names.contains(&assign.id.name.to_string()) {
+                self.diagnostics.push(lsp::Diagnostic {
+                    range: lsp::Range {
+                        start: lsp::Position {
+                            line: assign.id.loc.start.line - 1,
+                            character: assign.id.loc.start.column - 1,
+                        },
+                        end: lsp::Position {
+                            line: assign.id.loc.end.line - 1,
+                            character: assign.id.loc.end.column - 1,
+                        },
+                    },
+                    severity: Some(lsp::DiagnosticSeverity::WARNING),
+                    message: format!("Avoid using `{}` as an identifier name. In some InfluxDB contexts, it may be provided at runtime.", assign.id.name),
+                    ..lsp::Diagnostic::default()
+                });
+            }
+        }
+        true
+    }
+}

@@ -3127,7 +3127,8 @@ async fn compute_diagnostics_multi_file() {
     let diagnostics_again = server
         .compute_diagnostics(&lsp::Url::parse(&filename).unwrap());
 
-    assert_eq!(0, diagnostics_again.len());
+    let expected: Vec<lsp::Diagnostic> = vec![];
+    assert_eq!(expected, diagnostics_again);
 }
 
 // Only emit diagnostics related to that specific file.
