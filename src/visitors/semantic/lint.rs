@@ -3,7 +3,7 @@ use lspower::lsp;
 
 pub struct ExperimentalDiagnosticVisitor {
     namespaces: Vec<String>,
-    pub diagnostics: Vec<lsp::Diagnostic>,
+    pub diagnostics: Vec<(Option<String>, lsp::Diagnostic)>,
 }
 
 impl Default for ExperimentalDiagnosticVisitor {
@@ -53,7 +53,7 @@ impl<'a> flux::semantic::walk::Visitor<'a>
                 match &expr.callee {
                     flux::semantic::nodes::Expression::Identifier(id) => {
                         if self.namespaces.contains(&format!("{}", id.name)) {
-                            self.diagnostics.push(lsp::Diagnostic {
+                            self.diagnostics.push((expr.loc.file.clone(), lsp::Diagnostic {
                                 range: lsp::Range {
                                     start: lsp::Position {
                                         line: expr.loc.start.line - 1,
@@ -67,13 +67,14 @@ impl<'a> flux::semantic::walk::Visitor<'a>
                                 severity: Some(lsp::DiagnosticSeverity::HINT),
                                 message: "experimental features can change often or be deleted/moved. Use with caution.".into(),
                                 ..lsp::Diagnostic::default()
-                            });
+                            }));
                         }
                     }
                     flux::semantic::nodes::Expression::Member(member) => {
                         if let flux::semantic::nodes::Expression::Identifier(id) = &member.object {
                             if self.namespaces.contains(&format!("{}", id.name)) {
-                                self.diagnostics.push(lsp::Diagnostic {
+                                println!("{:?}\n", member.loc);
+                                self.diagnostics.push((expr.loc.file.clone(), lsp::Diagnostic {
                                     range: lsp::Range {
                                         start: lsp::Position {
                                             line: expr.loc.start.line -1,
@@ -87,7 +88,7 @@ impl<'a> flux::semantic::walk::Visitor<'a>
                                     severity: Some(lsp::DiagnosticSeverity::HINT),
                                     message: "experimental features can change often or be deleted/moved. Use with caution.".into(),
                                     ..lsp::Diagnostic::default()
-                                });
+                                }));
                             }
                         }
                     }
@@ -102,7 +103,7 @@ impl<'a> flux::semantic::walk::Visitor<'a>
 #[derive(Default)]
 pub struct ContribDiagnosticVisitor {
     namespaces: Vec<String>,
-    pub diagnostics: Vec<lsp::Diagnostic>,
+    pub diagnostics: Vec<(Option<String>, lsp::Diagnostic)>,
 }
 
 impl<'a> flux::semantic::walk::Visitor<'a>
@@ -145,7 +146,7 @@ impl<'a> flux::semantic::walk::Visitor<'a>
                 match &expr.callee {
                     flux::semantic::nodes::Expression::Identifier(id) => {
                         if self.namespaces.contains(&format!("{}", id.name)) {
-                            self.diagnostics.push(lsp::Diagnostic {
+                            self.diagnostics.push((id.loc.file.clone(), lsp::Diagnostic {
                                 range: lsp::Range {
                                     start: lsp::Position {
                                         line: expr.loc.start.line -1,
@@ -159,13 +160,13 @@ impl<'a> flux::semantic::walk::Visitor<'a>
                                 severity: Some(lsp::DiagnosticSeverity::HINT),
                                 message: "contrib packages are user-contributed, and do not carry with them the same compatibility guarantees as the standard library. Use with caution.".into(),
                                 ..lsp::Diagnostic::default()
-                            });
+                            }));
                         }
                     }
                     flux::semantic::nodes::Expression::Member(member) => {
                         if let flux::semantic::nodes::Expression::Identifier(id) = &member.object {
                             if self.namespaces.contains(&id.name.to_string()) {
-                                self.diagnostics.push(lsp::Diagnostic {
+                                self.diagnostics.push((id.loc.file.clone(), lsp::Diagnostic {
                                     range: lsp::Range {
                                         start: lsp::Position {
                                             line: expr.loc.start.line - 1,
@@ -179,7 +180,7 @@ impl<'a> flux::semantic::walk::Visitor<'a>
                                     severity: Some(lsp::DiagnosticSeverity::HINT),
                                     message: "contrib packages are user-contributed, and do not carry with them the same compatibility guarantees as the standard library. Use with caution.".into(),
                                     ..lsp::Diagnostic::default()
-                                });
+                                }));
                             }
                         }
                     }
@@ -194,7 +195,7 @@ impl<'a> flux::semantic::walk::Visitor<'a>
 
 pub struct InfluxDBIdentifierDiagnosticVisitor {
     names: Vec<String>,
-    pub diagnostics: Vec<lsp::Diagnostic>,
+    pub diagnostics: Vec<(Option<String>, lsp::Diagnostic)>,
 }
 
 impl Default for InfluxDBIdentifierDiagnosticVisitor {
@@ -212,7 +213,7 @@ impl<'a> flux::semantic::walk::Visitor<'a>
     fn visit(&mut self, node: WalkNode<'a>) -> bool {
         if let WalkNode::VariableAssgn(assign) = node {
             if self.names.contains(&assign.id.name.to_string()) {
-                self.diagnostics.push(lsp::Diagnostic {
+                self.diagnostics.push((assign.loc.file.clone(), lsp::Diagnostic {
                     range: lsp::Range {
                         start: lsp::Position {
                             line: assign.id.loc.start.line - 1,
@@ -226,7 +227,7 @@ impl<'a> flux::semantic::walk::Visitor<'a>
                     severity: Some(lsp::DiagnosticSeverity::WARNING),
                     message: format!("Avoid using `{}` as an identifier name. In some InfluxDB contexts, it may be provided at runtime.", assign.id.name),
                     ..lsp::Diagnostic::default()
-                });
+                }));
             }
         }
         true

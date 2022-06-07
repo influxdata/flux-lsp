@@ -3094,26 +3094,29 @@ async fn compute_diagnostics_multi_file() {
         .compute_diagnostics(&lsp::Url::parse(&filename).unwrap());
 
     assert_eq!(
-        vec![lsp::Diagnostic {
-            code: None,
-            code_description: None,
-            data: None,
-            message: "undefined identifier v".into(),
-            range: lsp::Range {
-                start: lsp::Position {
-                    line: 2,
-                    character: 32
+        HashMap::from([(
+            lsp::Url::parse("file:///path/to/script.flux").unwrap(),
+            vec![lsp::Diagnostic {
+                code: None,
+                code_description: None,
+                data: None,
+                message: "undefined identifier v".into(),
+                range: lsp::Range {
+                    start: lsp::Position {
+                        line: 2,
+                        character: 32
+                    },
+                    end: lsp::Position {
+                        line: 2,
+                        character: 33
+                    },
                 },
-                end: lsp::Position {
-                    line: 2,
-                    character: 33
-                },
-            },
-            related_information: None,
-            severity: Some(lsp::DiagnosticSeverity::ERROR),
-            source: Some("flux".into()),
-            tags: None,
-        }],
+                related_information: None,
+                severity: Some(lsp::DiagnosticSeverity::ERROR),
+                source: Some("flux".into()),
+                tags: None,
+            }]
+        ),]),
         diagnostics
     );
 
@@ -3127,32 +3130,26 @@ async fn compute_diagnostics_multi_file() {
     let diagnostics_again = server
         .compute_diagnostics(&lsp::Url::parse(&filename).unwrap());
 
-    let expected: Vec<lsp::Diagnostic> = vec![];
+    let expected: HashMap<lsp::Url, Vec<lsp::Diagnostic>> = HashMap::from([
+        (lsp::Url::parse("file:///path/to/script.flux").unwrap(), vec![]),
+        (lsp::Url::parse("file:///path/to/an_vars.flux").unwrap(), vec![lsp::Diagnostic {
+            range: lsp::Range {
+                start: lsp::Position {
+                    line: 0, character: 0,
+                },
+                end: lsp::Position {
+                    line: 0, character: 1,
+                }
+            },
+            severity: Some(lsp::DiagnosticSeverity::WARNING),
+            message: "Avoid using `v` as an identifier name. In some InfluxDB contexts, it may be provided at runtime.".to_string(),
+            ..lsp::Diagnostic::default()
+        }]),
+    ]);
+
+    // We are interested in the error from the original file being fixed, not in
+    // the lints introduced by the new file.
     assert_eq!(expected, diagnostics_again);
-}
-
-// Only emit diagnostics related to that specific file.
-#[test]
-async fn compute_diagnostics_only_on_problem_file() {
-    let server = create_server();
-
-    let filename: String = "file:///path/to/script.flux".into();
-    let fluxscript = r#"from(bucket: "my-bucket")
-|> range(start: -100d)
-|> filter(fn: (r) => r.anTag == v.a)"#;
-    open_file(&server, fluxscript.into(), Some(&filename)).await;
-    // This file, in the same package, contains an error.
-    open_file(
-        &server,
-        r#"v = a"#.to_string(),
-        Some("file:///path/to/an_vars.flux"),
-    )
-    .await;
-
-    let diagnostics_again = server
-        .compute_diagnostics(&lsp::Url::parse(&filename).unwrap());
-
-    assert!(diagnostics_again.is_empty());
 }
 
 #[test]

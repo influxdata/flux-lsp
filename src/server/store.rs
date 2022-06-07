@@ -123,6 +123,27 @@ impl Store {
         }
     }
 
+    pub fn get_package_urls(&self, url: &lsp::Url) -> Vec<lsp::Url> {
+        let (key, _) = url_to_key_val(url);
+        match self.backend.read() {
+            Ok(store) => match store.get(&key) {
+                None => vec![],
+                Some(files) => files
+                    .keys()
+                    .map(|file| {
+                        #[allow(clippy::unwrap_used)]
+                        lsp::Url::parse(&format!(
+                            "file://{}/{}",
+                            key, file
+                        ))
+                        .unwrap()
+                    })
+                    .collect(),
+            },
+            Err(_) => vec![],
+        }
+    }
+
     fn get_files(
         &self,
         path: String,
