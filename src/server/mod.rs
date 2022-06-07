@@ -327,7 +327,6 @@ impl LspServer {
                         .collect()
                 }
             };
-        println!("{:#?}", diagnostics);
         diagnostics.into_iter().for_each(|(filename, diagnostic)| {
             // XXX: rockstar (5 June 2022) - Can this _ever_ be None? Is a blind unwrap safe?
             if let Some(filename) = filename {

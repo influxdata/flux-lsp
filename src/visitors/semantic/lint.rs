@@ -73,7 +73,6 @@ impl<'a> flux::semantic::walk::Visitor<'a>
                     flux::semantic::nodes::Expression::Member(member) => {
                         if let flux::semantic::nodes::Expression::Identifier(id) = &member.object {
                             if self.namespaces.contains(&format!("{}", id.name)) {
-                                println!("{:?}\n", member.loc);
                                 self.diagnostics.push((expr.loc.file.clone(), lsp::Diagnostic {
                                     range: lsp::Range {
                                         start: lsp::Position {
