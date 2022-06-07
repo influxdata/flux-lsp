@@ -327,6 +327,58 @@ mod test {
     }
 
     #[test]
+    fn get_package_urls_single_file() {
+        let store = Store::default();
+        let url = lsp::Url::parse("file:///a/b/c").unwrap();
+        store.put(&url, "");
+
+        let urls = store.get_package_urls(&url);
+
+        assert_eq!(vec![url,], urls);
+    }
+
+    #[test]
+    fn get_package_urls_twe_files_two_packages() {
+        let store = Store::default();
+        let url = lsp::Url::parse("file:///a/b/c").unwrap();
+        store.put(&url, "");
+        store.put(&lsp::Url::parse("file:///a/c/c").unwrap(), "");
+
+        let urls = store.get_package_urls(&url);
+
+        assert_eq!(vec![url,], urls);
+    }
+
+    #[test]
+    fn get_package_urls_two_files_one_package() {
+        let store = Store::default();
+        let url = lsp::Url::parse("file:///a/b/c").unwrap();
+        let url2 = lsp::Url::parse("file:///a/b/d").unwrap();
+        store.put(&url, "");
+        store.put(&url2, "");
+
+        let mut urls = store.get_package_urls(&url);
+        urls.sort();
+
+        assert_eq!(vec![url, url2], urls);
+    }
+
+    #[test]
+    fn get_package_urls_three_files_two_packages() {
+        let store = Store::default();
+        let url = lsp::Url::parse("file:///a/b/c").unwrap();
+        let url2 = lsp::Url::parse("file:///a/b/d").unwrap();
+        store.put(&url, "");
+        store.put(&url2, "");
+        store.put(&lsp::Url::parse("file:///a/c/c").unwrap(), "");
+
+        let mut urls = store.get_package_urls(&url);
+        urls.sort();
+
+        assert_eq!(vec![url, url2], urls);
+    }
+
+    #[test]
     fn remove() {
         let store = Store::default();
         let url = lsp::Url::parse("file:///a/b/c").unwrap();
