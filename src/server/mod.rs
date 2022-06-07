@@ -233,8 +233,6 @@ impl LspServer {
     }
 
     /// Publish any diagnostics to the client
-    ///
-    /// This
     async fn publish_diagnostics(&self, key: &lsp::Url) {
         // If we have a client back to the editor report any diagnostics found in the document
         if let Some(client) = &self.get_client() {
@@ -248,6 +246,11 @@ impl LspServer {
         }
     }
 
+    /// Compute diagnostics for a package
+    ///
+    /// This function will compute all diagnostics for the same package simultaneously. This
+    /// includes files that don't have any diagnostic messages (an empty list is generated),
+    /// as this is the way the server will signal that previous diagnostic messages have cleared.
     fn compute_diagnostics(
         &self,
         key: &lsp::Url,

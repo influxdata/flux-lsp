@@ -123,6 +123,7 @@ impl Store {
         }
     }
 
+    /// Get urls for all files in a specified file's package.
     pub fn get_package_urls(&self, url: &lsp::Url) -> Vec<lsp::Url> {
         let (key, _) = url_to_key_val(url);
         match self.backend.read() {
