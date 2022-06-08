@@ -19,7 +19,8 @@ use self::types::LspError;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
-type Diagnostic = fn(&SemanticPackage) -> Vec<lsp::Diagnostic>;
+type Diagnostic =
+    fn(&SemanticPackage) -> Vec<(Option<String>, lsp::Diagnostic)>;
 
 /// Convert a flux::semantic::walk::Node to a lsp::Location
 /// https://microsoft.github.io/language-server-protocol/specification#location
@@ -165,8 +166,9 @@ impl LspServer {
         Self {
             client: Arc::new(Mutex::new(client)),
             diagnostics: vec![
-                super::diagnostics::experimental_lint,
                 super::diagnostics::contrib_lint,
+                super::diagnostics::experimental_lint,
+                super::diagnostics::no_influxdb_identifiers,
             ],
             store: store::Store::default(),
         }
@@ -195,58 +197,83 @@ impl LspServer {
         }
     }
 
-    // Publish any diagnostics to the client
+    /// Publish any diagnostics to the client
     async fn publish_diagnostics(&self, key: &lsp::Url) {
         // If we have a client back to the editor report any diagnostics found in the document
         if let Some(client) = &self.get_client() {
-            let diagnostics = self.compute_diagnostics(key);
-            client
-                .publish_diagnostics(key.clone(), diagnostics, None)
-                .await;
+            for (key, diagnostics) in
+                self.compute_diagnostics(key).into_iter()
+            {
+                client
+                    .publish_diagnostics(key, diagnostics, None)
+                    .await;
+            }
         }
     }
 
+    /// Compute diagnostics for a package
+    ///
+    /// This function will compute all diagnostics for the same package simultaneously. This
+    /// includes files that don't have any diagnostic messages (an empty list is generated),
+    /// as this is the way the server will signal that previous diagnostic messages have cleared.
     fn compute_diagnostics(
         &self,
         key: &lsp::Url,
-    ) -> Vec<lsp::Diagnostic> {
-        match self.store.get_package_errors(key) {
-            None => {
-                // If there are no semantic package errors, we can check for other
-                // diagnostics.
-                //
-                // Note: it is important, if no diagnostics exist, that we return an empty
-                // diagnostic list, as that will signal to the client that the diagnostics
-                // have been cleared.
-                if let Ok(package) =
-                    self.store.get_semantic_package(key)
-                {
-                    return self
+    ) -> HashMap<lsp::Url, Vec<lsp::Diagnostic>> {
+        let mut diagnostic_map: HashMap<
+            lsp::Url,
+            Vec<lsp::Diagnostic>,
+        > = self
+            .store
+            .get_package_urls(key)
+            .into_iter()
+            .map(|url| (url, Vec::new()))
+            .collect();
+
+        let diagnostics: Vec<(Option<String>, lsp::Diagnostic)> =
+            match self.store.get_package_errors(key) {
+                None => {
+                    // If there are no semantic package errors, we can check for other
+                    // diagnostics.
+                    //
+                    // Note: it is important, if no diagnostics exist, that we return an empty
+                    // diagnostic list, as that will signal to the client that the diagnostics
+                    // have been cleared.
+                    if let Ok(package) =
+                        self.store.get_semantic_package(key)
+                    {
+                        self
                         .diagnostics
                         .iter()
                         .flat_map(|func| func(&package))
-                        .collect::<Vec<lsp::Diagnostic>>();
-                } else {
-                    return vec![];
-                }
-            }
-            Some(errors) => errors
-                .errors
-                .iter()
-                .filter(|error| {
-                    // We will never have two files with the same name in a package, so we can
-                    // key off filename to determine whether the error exists in this file or
-                    // elsewhere in the package.
-                    if let Some(file) = &error.location.file {
-                        if let Some(segments) = key.path_segments() {
-                            if let Some(filename) = segments.last() {
-                                return file == filename;
-                            }
-                        }
+                        .collect::<Vec<(Option<String>, lsp::Diagnostic)>>()
+                    } else {
+                        vec![]
                     }
-                    false
-                })
-                .map(|e| lsp::Diagnostic {
+                }
+                Some(errors) => {
+                    errors
+                        .errors
+                        .iter()
+                        .filter(|error| {
+                            // We will never have two files with the same name in a package, so we can
+                            // key off filename to determine whether the error exists in this file or
+                            // elsewhere in the package.
+                            if let Some(file) = &error.location.file {
+                                if let Some(segments) =
+                                    key.path_segments()
+                                {
+                                    if let Some(filename) =
+                                        segments.last()
+                                    {
+                                        return file == filename;
+                                    }
+                                }
+                            }
+                            false
+                        })
+                        .map(|e| {
+                            (e.location.file.clone(), lsp::Diagnostic {
                     // XXX: rockstar (19 May 2022) - flux asks for too new of an lsp-types for `.into` to
                     // work. That doesn't need to be quite so bleeding edge, but that's an issue for flux.
                     range: lsp::Range {
@@ -264,8 +291,25 @@ impl LspServer {
                     message: e.error.to_string(),
                     ..lsp::Diagnostic::default()
                 })
-                .collect(),
-        }
+                        })
+                        .collect()
+                }
+            };
+        diagnostics.into_iter().for_each(|(filename, diagnostic)| {
+            // XXX: rockstar (5 June 2022) - Can this _ever_ be None? Is a blind unwrap safe?
+            if let Some(filename) = filename {
+                diagnostic_map
+                    .iter_mut()
+                    .filter(|(url, _)| {
+                        url.to_string().ends_with(&filename)
+                    })
+                    .for_each(|(_, diagnostics)| {
+                        diagnostics.push(diagnostic.clone())
+                    });
+            }
+        });
+
+        diagnostic_map
     }
 }
 

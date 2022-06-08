@@ -123,6 +123,28 @@ impl Store {
         }
     }
 
+    /// Get urls for all files in a specified file's package.
+    pub fn get_package_urls(&self, url: &lsp::Url) -> Vec<lsp::Url> {
+        let (key, _) = url_to_key_val(url);
+        match self.backend.read() {
+            Ok(store) => match store.get(&key) {
+                None => vec![],
+                Some(files) => files
+                    .keys()
+                    .map(|file| {
+                        #[allow(clippy::unwrap_used)]
+                        lsp::Url::parse(&format!(
+                            "file://{}/{}",
+                            key, file
+                        ))
+                        .unwrap()
+                    })
+                    .collect(),
+            },
+            Err(_) => vec![],
+        }
+    }
+
     fn get_files(
         &self,
         path: String,
@@ -303,6 +325,58 @@ mod test {
             contents,
             result.expect("result is unexpectedly None")
         )
+    }
+
+    #[test]
+    fn get_package_urls_single_file() {
+        let store = Store::default();
+        let url = lsp::Url::parse("file:///a/b/c").unwrap();
+        store.put(&url, "");
+
+        let urls = store.get_package_urls(&url);
+
+        assert_eq!(vec![url,], urls);
+    }
+
+    #[test]
+    fn get_package_urls_twe_files_two_packages() {
+        let store = Store::default();
+        let url = lsp::Url::parse("file:///a/b/c").unwrap();
+        store.put(&url, "");
+        store.put(&lsp::Url::parse("file:///a/c/c").unwrap(), "");
+
+        let urls = store.get_package_urls(&url);
+
+        assert_eq!(vec![url,], urls);
+    }
+
+    #[test]
+    fn get_package_urls_two_files_one_package() {
+        let store = Store::default();
+        let url = lsp::Url::parse("file:///a/b/c").unwrap();
+        let url2 = lsp::Url::parse("file:///a/b/d").unwrap();
+        store.put(&url, "");
+        store.put(&url2, "");
+
+        let mut urls = store.get_package_urls(&url);
+        urls.sort();
+
+        assert_eq!(vec![url, url2], urls);
+    }
+
+    #[test]
+    fn get_package_urls_three_files_two_packages() {
+        let store = Store::default();
+        let url = lsp::Url::parse("file:///a/b/c").unwrap();
+        let url2 = lsp::Url::parse("file:///a/b/d").unwrap();
+        store.put(&url, "");
+        store.put(&url2, "");
+        store.put(&lsp::Url::parse("file:///a/c/c").unwrap(), "");
+
+        let mut urls = store.get_package_urls(&url);
+        urls.sort();
+
+        assert_eq!(vec![url, url2], urls);
     }
 
     #[test]

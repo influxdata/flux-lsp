@@ -16,6 +16,7 @@ pub use completion::{
 };
 pub use lint::{
     ContribDiagnosticVisitor, ExperimentalDiagnosticVisitor,
+    InfluxDBIdentifierDiagnosticVisitor,
 };
 pub use symbols::SymbolsVisitor;
 

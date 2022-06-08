@@ -7,6 +7,7 @@ use flux::semantic::nodes::Package;
 
 use super::visitors::semantic::{
     ContribDiagnosticVisitor, ExperimentalDiagnosticVisitor,
+    InfluxDBIdentifierDiagnosticVisitor,
 };
 
 /// Provide info about the nature of experimental.
@@ -18,7 +19,7 @@ use super::visitors::semantic::{
 /// silently and cause headaches for consumers.
 pub(crate) fn experimental_lint(
     pkg: &Package,
-) -> Vec<lsp::Diagnostic> {
+) -> Vec<(Option<String>, lsp::Diagnostic)> {
     let walker = flux::semantic::walk::Node::Package(pkg);
     let mut visitor = ExperimentalDiagnosticVisitor::default();
 
@@ -32,9 +33,22 @@ pub(crate) fn experimental_lint(
 /// The packages in contrib are provided by individual users, and don't carry the
 /// support or compatibility guarantees that the stdlib usually carries. These
 /// functions should be used with caution.
-pub(crate) fn contrib_lint(pkg: &Package) -> Vec<lsp::Diagnostic> {
+pub(crate) fn contrib_lint(
+    pkg: &Package,
+) -> Vec<(Option<String>, lsp::Diagnostic)> {
     let walker = flux::semantic::walk::Node::Package(pkg);
     let mut visitor = ContribDiagnosticVisitor::default();
+
+    flux::semantic::walk::walk(&mut visitor, walker);
+
+    visitor.diagnostics
+}
+
+pub(crate) fn no_influxdb_identifiers(
+    pkg: &Package,
+) -> Vec<(Option<String>, lsp::Diagnostic)> {
+    let walker = flux::semantic::walk::Node::Package(pkg);
+    let mut visitor = InfluxDBIdentifierDiagnosticVisitor::default();
 
     flux::semantic::walk::walk(&mut visitor, walker);
 
@@ -47,7 +61,8 @@ mod tests {
     use super::*;
 
     fn get_package(source: &str) -> flux::semantic::nodes::Package {
-        let ast_pkg = flux::parser::parse_string("".into(), &source);
+        let ast_pkg =
+            flux::parser::parse_string("script.flux".into(), &source);
         let mut analyzer = flux::new_semantic_analyzer(
             flux::semantic::AnalyzerConfig::default(),
         )
@@ -69,7 +84,7 @@ from(bucket: "my-bucket")
 
         let diagnostics = experimental_lint(&package);
 
-        assert_eq!(vec![lsp::Diagnostic {
+        assert_eq!(vec![(Some("script.flux".to_string()), lsp::Diagnostic {
             range: lsp::Range {
                 start: lsp::Position {
                     line: 5, character: 7,
@@ -81,7 +96,7 @@ from(bucket: "my-bucket")
             severity: Some(lsp::DiagnosticSeverity::HINT),
             message: "experimental features can change often or be deleted/moved. Use with caution.".into(),
             ..lsp::Diagnostic::default()
-        }], diagnostics);
+        })], diagnostics);
     }
 
     #[test]
@@ -97,7 +112,7 @@ array.concat(
 
         let diagnostics = experimental_lint(&package);
 
-        assert_eq!(vec![lsp::Diagnostic {
+        assert_eq!(vec![(Some("script.flux".to_string()), lsp::Diagnostic {
             range: lsp::Range {
                 start: lsp::Position {
                     line: 2, character: 0,
@@ -109,7 +124,7 @@ array.concat(
             severity: Some(lsp::DiagnosticSeverity::HINT),
             message: "experimental features can change often or be deleted/moved. Use with caution.".into(),
             ..lsp::Diagnostic::default()
-        }], diagnostics);
+        })], diagnostics);
     }
 
     #[test]
@@ -132,7 +147,7 @@ influxdb.select(
 
         let diagnostics = contrib_lint(&package);
 
-        assert_eq!(vec![lsp::Diagnostic {
+        assert_eq!(vec![(Some("script.flux".to_string()), lsp::Diagnostic {
             range: lsp::Range {
                 start: lsp::Position {
                     line: 2, character: 0,
@@ -144,7 +159,7 @@ influxdb.select(
             severity: Some(lsp::DiagnosticSeverity::HINT),
             message: "contrib packages are user-contributed, and do not carry with them the same compatibility guarantees as the standard library. Use with caution.".into(),
             ..lsp::Diagnostic::default()
-        }], diagnostics);
+        })], diagnostics);
     }
 
     #[test]
@@ -167,7 +182,7 @@ influxdb2.select(
 
         let diagnostics = contrib_lint(&package);
 
-        assert_eq!(vec![lsp::Diagnostic {
+        assert_eq!(vec![(Some("script.flux".to_string()), lsp::Diagnostic {
             range: lsp::Range {
                 start: lsp::Position {
                     line: 2, character: 0,
@@ -179,6 +194,84 @@ influxdb2.select(
             severity: Some(lsp::DiagnosticSeverity::HINT),
             message: "contrib packages are user-contributed, and do not carry with them the same compatibility guarantees as the standard library. Use with caution.".into(),
             ..lsp::Diagnostic::default()
-        }], diagnostics);
+        })], diagnostics);
+    }
+
+    #[test]
+    fn no_influxdb_identifiers_no_v() {
+        let fluxscript = r#"import "strings"
+
+v = {timeRangeStart: -12h, timeRangeStop: 12h}
+
+from(bucket: "my-bucket")
+  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+"#;
+        let package = get_package(&fluxscript);
+
+        let diagnostics = no_influxdb_identifiers(&package);
+
+        assert_eq!(vec![(Some("script.flux".to_string()), lsp::Diagnostic {
+            range: lsp::Range {
+                start: lsp::Position {
+                    line: 2, character: 0,
+                },
+                end : lsp::Position {
+                    line: 2, character: 1,
+                },
+            },
+            severity: Some(lsp::DiagnosticSeverity::WARNING),
+            message: "Avoid using `v` as an identifier name. In some InfluxDB contexts, it may be provided at runtime.".into(),
+            ..lsp::Diagnostic::default()
+        })], diagnostics);
+    }
+
+    #[test]
+    fn no_influxdb_identifiers_no_task() {
+        let fluxscript = r#"import "strings"
+
+task = "abc123"
+"#;
+        let package = get_package(&fluxscript);
+
+        let diagnostics = no_influxdb_identifiers(&package);
+
+        assert_eq!(vec![(Some("script.flux".to_string()), lsp::Diagnostic {
+            range: lsp::Range {
+                start: lsp::Position {
+                    line: 2, character: 0,
+                },
+                end : lsp::Position {
+                    line: 2, character: 4,
+                },
+            },
+            severity: Some(lsp::DiagnosticSeverity::WARNING),
+            message: "Avoid using `task` as an identifier name. In some InfluxDB contexts, it may be provided at runtime.".into(),
+            ..lsp::Diagnostic::default()
+        })], diagnostics);
+    }
+
+    #[test]
+    fn no_influxdb_identifiers_no_params() {
+        let fluxscript = r#"import "strings"
+
+params = "abc123"
+"#;
+        let package = get_package(&fluxscript);
+
+        let diagnostics = no_influxdb_identifiers(&package);
+
+        assert_eq!(vec![(Some("script.flux".to_string()), lsp::Diagnostic {
+            range: lsp::Range {
+                start: lsp::Position {
+                    line: 2, character: 0,
+                },
+                end : lsp::Position {
+                    line: 2, character: 6,
+                },
+            },
+            severity: Some(lsp::DiagnosticSeverity::WARNING),
+            message: "Avoid using `params` as an identifier name. In some InfluxDB contexts, it may be provided at runtime.".into(),
+            ..lsp::Diagnostic::default()
+        })], diagnostics);
     }
 }
