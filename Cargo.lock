@@ -645,7 +645,7 @@ dependencies = [
 [[package]]
 name = "flux"
 version = "0.154.0"
-source = "git+https://github.com/influxdata/flux?tag=v0.170.0#167cfbf4677fd7e9a5de1913254e2b3436aedc81"
+source = "git+https://github.com/influxdata/flux?tag=v0.171.0#f8817e020abb631e7e4216684bb342246d829deb"
 dependencies = [
  "anyhow",
  "env_logger",
@@ -660,7 +660,7 @@ dependencies = [
 [[package]]
 name = "flux-core"
 version = "0.154.0"
-source = "git+https://github.com/influxdata/flux?tag=v0.170.0#167cfbf4677fd7e9a5de1913254e2b3436aedc81"
+source = "git+https://github.com/influxdata/flux?tag=v0.171.0#f8817e020abb631e7e4216684bb342246d829deb"
 dependencies = [
  "anyhow",
  "chrono",
@@ -673,7 +673,7 @@ dependencies = [
  "fnv",
  "libflate",
  "log",
- "lsp-types 0.93.0",
+ "lsp-types 0.92.1",
  "maplit",
  "pretty",
  "regex",
@@ -1043,9 +1043,9 @@ dependencies = [
 
 [[package]]
 name = "lsp-types"
-version = "0.93.0"
+version = "0.92.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "70c74e2173b2b31f8655d33724b4b45ac13f439386f66290f539c22b144c2212"
+checksum = "c79d4897790e8fd2550afa6d6125821edb5716e60e0e285046e070f0f6a06e0e"
 dependencies = [
  "bitflags",
  "serde",
