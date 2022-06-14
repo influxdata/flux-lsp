@@ -3172,3 +3172,41 @@ from(bucket: "my-bucket")
 
     assert!(!diagnostics_again.is_empty());
 }
+
+// All commands require key/value pairs as params, not positional
+/// arguments.
+#[test]
+async fn execute_command_too_many_args() {
+    let server = create_server();
+    let params = lsp::ExecuteCommandParams {
+        command: "notActuallyAValidCommand".into(),
+        arguments: vec![
+            serde_json::value::to_value("arg1").unwrap(),
+            serde_json::value::to_value("arg2").unwrap(),
+        ],
+        work_done_progress_params: lsp::WorkDoneProgressParams {
+            work_done_token: None,
+        },
+    };
+
+    let result = server.execute_command(params).await;
+
+    assert!(result.is_err());
+}
+
+// Attempting to execute a command that doesn't exist results in an Err response.
+#[test]
+async fn execute_command_unknown_command() {
+    let server = create_server();
+    let params = lsp::ExecuteCommandParams {
+        command: "notActuallyAValidCommand".into(),
+        arguments: vec![serde_json::json!({"foo": "bar"})],
+        work_done_progress_params: lsp::WorkDoneProgressParams {
+            work_done_token: None,
+        },
+    };
+
+    let result = server.execute_command(params).await;
+
+    assert!(result.is_err());
+}
