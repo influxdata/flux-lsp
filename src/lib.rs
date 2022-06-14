@@ -28,4 +28,4 @@ extern crate pretty_assertions;
 #[global_allocator]
 static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
-pub use server::LspServer;
+pub use server::{Config, LspServer};

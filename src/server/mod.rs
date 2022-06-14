@@ -200,14 +200,27 @@ impl From<LspServerCommand> for String {
     }
 }
 
+#[derive(Default)]
+pub struct Config {
+    pub flux_features: Vec<flux::semantic::Feature>,
+}
+
 pub struct LspServer {
     client: Arc<Mutex<Option<Client>>>,
     diagnostics: Vec<Diagnostic>,
     store: store::Store,
+    config: Config,
 }
 
 impl LspServer {
     pub fn new(client: Option<Client>) -> Self {
+        Self::with_config(client, Config::default())
+    }
+
+    pub fn with_config(
+        client: Option<Client>,
+        config: Config,
+    ) -> Self {
         Self {
             client: Arc::new(Mutex::new(client)),
             diagnostics: vec![
@@ -215,7 +228,8 @@ impl LspServer {
                 super::diagnostics::experimental_lint,
                 super::diagnostics::no_influxdb_identifiers,
             ],
-            store: store::Store::default(),
+            store: store::Store::new(config.flux_features.clone()),
+            config,
         }
     }
 
@@ -1044,7 +1058,9 @@ impl LanguageServer for LspServer {
             };
 
         let mut analyzer = match flux::new_semantic_analyzer(
-            flux::semantic::AnalyzerConfig::default(),
+            flux::semantic::AnalyzerConfig {
+                features: self.config.flux_features.clone(),
+            },
         ) {
             Ok(analyzer) => analyzer,
             Err(_) => return Ok(None),

@@ -30,6 +30,11 @@ struct Args {
         help = "Path to unix socket when channel is \"unix\" (defaults to /tmp/flux-lsp-sock.unix)"
     )]
     path: Option<String>,
+    #[clap(
+        long,
+        help = "Which features to enable in the flux compiler"
+    )]
+    flux_features: Vec<flux::semantic::Feature>,
 }
 
 #[tokio::main]
@@ -49,8 +54,14 @@ async fn main() {
         .unwrap();
     }
 
-    let (service, messages) =
-        LspService::new(|client| LspServer::new(Some(client)));
+    let (service, messages) = LspService::new(|client| {
+        LspServer::with_config(
+            Some(client),
+            flux_lsp::Config {
+                flux_features: matches.flux_features,
+            },
+        )
+    });
 
     let channel =
         matches.channel.unwrap_or_else(|| "stdio".to_string());

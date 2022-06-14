@@ -21,23 +21,6 @@ fn url_to_key_val(url: &lsp::Url) -> (String, String) {
     (parent, filename.into())
 }
 
-fn get_analyzer() -> Result<
-    flux::semantic::Analyzer<
-        'static,
-        &'static flux::semantic::import::Packages,
-    >,
-    LspError,
-> {
-    match flux::new_semantic_analyzer(
-        flux::semantic::AnalyzerConfig::default(),
-    ) {
-        Ok(analyzer) => Ok(analyzer),
-        Err(err) => {
-            return Err(LspError::InternalError(format!("{}", err)))
-        }
-    }
-}
-
 /// Store acts as the in-memory storage backend for the LSP server.
 ///
 /// The spec talks specifically about setting versions for files, but isn't
@@ -46,17 +29,49 @@ fn get_analyzer() -> Result<
 /// is preferred at this point.
 pub(crate) struct Store {
     backend: Arc<RwLock<HashMap<String, HashMap<String, String>>>>,
+    flux_features: Vec<flux::semantic::Feature>,
 }
 
 impl Default for Store {
     fn default() -> Self {
-        Store {
-            backend: Arc::new(RwLock::new(HashMap::new())),
-        }
+        Self::new(Vec::new())
     }
 }
 
 impl Store {
+    pub(crate) fn new(
+        flux_features: Vec<flux::semantic::Feature>,
+    ) -> Self {
+        Store {
+            backend: Arc::new(RwLock::new(HashMap::new())),
+            flux_features,
+        }
+    }
+
+    fn get_analyzer(
+        &self,
+    ) -> Result<
+        flux::semantic::Analyzer<
+            'static,
+            &'static flux::semantic::import::Packages,
+        >,
+        LspError,
+    > {
+        match flux::new_semantic_analyzer(
+            flux::semantic::AnalyzerConfig {
+                features: self.flux_features.clone(),
+            },
+        ) {
+            Ok(analyzer) => Ok(analyzer),
+            Err(err) => {
+                return Err(LspError::InternalError(format!(
+                    "{}",
+                    err
+                )))
+            }
+        }
+    }
+
     pub fn put(&self, url: &lsp::Url, contents: &str) {
         let (key, val) = url_to_key_val(url);
 
@@ -243,7 +258,7 @@ impl Store {
     ) -> Result<flux::semantic::nodes::Package, LspError> {
         let ast_pkg = self.get_ast_package(url)?;
 
-        let mut analyzer = get_analyzer()?;
+        let mut analyzer = self.get_analyzer()?;
         match analyzer.analyze_ast(&ast_pkg) {
             Ok((_, pkg)) => Ok(pkg),
             Err(e) => {
@@ -273,7 +288,7 @@ impl Store {
             }
         };
 
-        let mut analyzer = match get_analyzer() {
+        let mut analyzer = match self.get_analyzer() {
             Ok(analyzer) => analyzer,
             Err(err) => {
                 log::error!("{:?}", err);
