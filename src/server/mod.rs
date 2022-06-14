@@ -294,11 +294,29 @@ impl LspServer {
                         .diagnostics
                         .errors
                         .iter()
-                        .filter(|error| {
+                        .map(|error| {
+                            (
+                                &error.location,
+                                error.error.to_string(),
+                                lsp::DiagnosticSeverity::ERROR,
+                            )
+                        })
+                        .chain(
+                            errors.diagnostics.warnings.iter().map(
+                                |warning| {
+                                    (
+                                        &warning.location,
+                                        warning.error.to_string(),
+                                        lsp::DiagnosticSeverity::WARNING,
+                                    )
+                                },
+                            ),
+                        )
+                        .filter(|(location, _, _)| {
                             // We will never have two files with the same name in a package, so we can
                             // key off filename to determine whether the error exists in this file or
                             // elsewhere in the package.
-                            if let Some(file) = &error.location.file {
+                            if let Some(file) = &location.file {
                                 if let Some(segments) =
                                     key.path_segments()
                                 {
@@ -311,21 +329,19 @@ impl LspServer {
                             }
                             false
                         })
-                        .map(|e| {
+                        .map(|(location, error, severity)| {
                             let diagnostic = lsp::Diagnostic {
-                                // XXX: rockstar (19 May 2022) - flux asks for too new of an lsp-types for `.into` to
-                                // work. That doesn't need to be quite so bleeding edge, but that's an issue for flux.
                                 range: flux_location_to_lsp(
-                                    &e.location,
+                                    &location,
                                 ),
                                 severity: Some(
-                                    lsp::DiagnosticSeverity::ERROR,
+                                    severity
                                 ),
                                 source: Some("flux".to_string()),
-                                message: e.error.to_string(),
+                                message: error,
                                 ..lsp::Diagnostic::default()
                             };
-                            (e.location.file.clone(), diagnostic)
+                            (location.file.clone(), diagnostic)
                         })
                         .collect()
                 }
