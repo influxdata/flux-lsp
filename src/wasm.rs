@@ -59,7 +59,7 @@ pub fn format_from_js_file(
 }
 
 #[cfg(test)]
-#[allow(clippy::wildcard_imports, clippy::unwrap_used)]
+#[allow(deprecated, clippy::wildcard_imports, clippy::unwrap_used)]
 mod test {
     use wasm_bindgen_test::*;
 
