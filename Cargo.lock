@@ -706,6 +706,7 @@ dependencies = [
  "log",
  "lspower",
  "pretty_assertions",
+ "serde",
  "serde_json",
  "simplelog",
  "tokio",

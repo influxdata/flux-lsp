@@ -171,6 +171,23 @@ impl Store {
         }
     }
 
+    pub fn get_ast_file(
+        &self,
+        url: &lsp::Url,
+    ) -> Result<flux::ast::File, LspError> {
+        let (_, filename) = url_to_key_val(url);
+        let source = match self.get(url) {
+            Ok(value) => value,
+            Err(_err) => {
+                return Err(LspError::FileNotFound(filename))
+            }
+        };
+
+        let file: flux::ast::File =
+            flux::parser::parse_string(filename, &source);
+        Ok(file)
+    }
+
     fn get_ast_package(
         &self,
         url: &lsp::Url,

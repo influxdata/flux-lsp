@@ -1,4 +1,5 @@
 mod store;
+mod transform;
 mod types;
 
 use std::borrow::Cow;
@@ -12,6 +13,7 @@ use flux::semantic::{walk, ErrorKind};
 use lspower::{
     jsonrpc::Result as RpcResult, lsp, Client, LanguageServer,
 };
+use serde::{Deserialize, Serialize};
 
 use crate::{completion, stdlib, visitors::semantic};
 
@@ -153,6 +155,36 @@ pub fn find_stdlib_signatures(
             acc.extend(x);
             acc
         })
+}
+
+enum LspServerCommand {
+    InjectTagValueFilter,
+}
+
+impl TryFrom<String> for LspServerCommand {
+    type Error = String;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        match value.as_str() {
+            "injectTagValueFilter" => {
+                Ok(LspServerCommand::InjectTagValueFilter)
+            }
+            _ => Err(format!(
+                "Received unknown value for LspServerCommand: {}",
+                value
+            )),
+        }
+    }
+}
+
+impl From<LspServerCommand> for String {
+    fn from(value: LspServerCommand) -> Self {
+        match value {
+            LspServerCommand::InjectTagValueFilter => {
+                "injectTagValueFilter".into()
+            }
+        }
+    }
 }
 
 pub struct LspServer {
@@ -354,7 +386,12 @@ impl LanguageServer for LspServer {
                 document_symbol_provider: Some(lsp::OneOf::Left(
                     true,
                 )),
-                execute_command_provider: None,
+                execute_command_provider: Some(lsp::ExecuteCommandOptions {
+                    commands: vec![LspServerCommand::InjectTagValueFilter.into()],
+                    work_done_progress_options: lsp::WorkDoneProgressOptions {
+                        work_done_progress: None,
+                    }
+                }),
                 experimental: None,
                 folding_range_provider: Some(
                     lsp::FoldingRangeProviderCapability::Simple(true),
@@ -1095,6 +1132,120 @@ impl LanguageServer for LspServer {
 
         return Ok(Some(actions));
     }
+
+    async fn execute_command(
+        &self,
+        params: lsp::ExecuteCommandParams,
+    ) -> RpcResult<Option<serde_json::Value>> {
+        if params.arguments.len() != 1
+            || !params.arguments[0].is_object()
+        {
+            // We only want a single argument, which is an object itself. This means that
+            // positional arguments are not supported. We only want kwargs.
+            return Err(
+                LspError::InvalidArguments(params.arguments).into()
+            );
+        }
+        match LspServerCommand::try_from(params.command.clone()) {
+            Ok(LspServerCommand::InjectTagValueFilter) => {
+                let command_params: InjectTagValueFilterParams =
+                    match serde_json::value::from_value(
+                        params.arguments[0].clone(),
+                    ) {
+                        Ok(value) => value,
+                        Err(err) => {
+                            return Err(LspError::InternalError(
+                                format!("{:?}", err),
+                            )
+                            .into())
+                        }
+                    };
+                let file = self.store.get_ast_file(
+                    &command_params.text_document.uri,
+                )?;
+                let transformed =
+                    match transform::inject_tag_value_filter(
+                        &file,
+                        command_params.name,
+                        command_params.value,
+                    ) {
+                        Ok(value) => value,
+                        Err(err) => {
+                            return Err(LspError::InternalError(
+                                format!("{:?}", err),
+                            )
+                            .into())
+                        }
+                    };
+
+                let new_text =
+                    match flux::formatter::convert_to_string(
+                        &transformed,
+                    ) {
+                        Ok(value) => value,
+                        Err(err) => {
+                            return Err(LspError::InternalError(
+                                format!("{:?}", err),
+                            )
+                            .into())
+                        }
+                    };
+                let last_pos =
+                    line_col::LineColLookup::new(&new_text)
+                        .get(new_text.len());
+                let edit = lsp::WorkspaceEdit {
+                    changes: Some(HashMap::from([(
+                        command_params.text_document.uri.clone(),
+                        vec![lsp::TextEdit {
+                            new_text: new_text.clone(),
+                            range: lsp::Range {
+                                start: lsp::Position::default(),
+                                end: lsp::Position {
+                                    line: last_pos.0 as u32,
+                                    character: last_pos.1 as u32,
+                                },
+                            },
+                        }],
+                    )])),
+                    document_changes: None,
+                    change_annotations: None,
+                };
+                if let Some(client) = self.get_client() {
+                    match client.apply_edit(edit, None).await {
+                        Ok(response) => {
+                            if response.applied {
+                                self.store.put(
+                                    &command_params.text_document.uri,
+                                    &new_text,
+                                );
+                            }
+                        }
+                        Err(err) => {
+                            return Err(LspError::InternalError(
+                                format!("{:?}", err),
+                            )
+                            .into())
+                        }
+                    };
+                }
+                Ok(None)
+            }
+            Err(_err) => {
+                return Err(
+                    LspError::InvalidCommand(params.command).into()
+                )
+            }
+        }
+    }
+}
+
+#[derive(Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct InjectTagValueFilterParams {
+    text_document: lsp::TextDocumentIdentifier,
+    bucket: Option<String>,
+    name: String,
+    value: String,
 }
 
 // Url::to_file_path doesn't exist in wasm-unknown-unknown, for kinda

@@ -5,6 +5,8 @@ pub enum LspError {
     InternalError(String),
     LockNotAcquired,
     FileNotFound(String),
+    InvalidArguments(Vec<serde_json::value::Value>),
+    InvalidCommand(String),
 }
 
 impl From<LspError> for Error {
@@ -23,6 +25,22 @@ impl From<LspError> for Error {
             LspError::FileNotFound(filename) => Error {
                 code: ErrorCode::InvalidParams,
                 message: format!("File not fiend: {}", filename),
+                data: None,
+            },
+            LspError::InvalidArguments(value) => Error {
+                code: ErrorCode::InvalidParams,
+                message: format!(
+                    "Invalid parameters supplied: {:?}",
+                    value
+                ),
+                data: None,
+            },
+            LspError::InvalidCommand(command) => Error {
+                code: ErrorCode::InvalidParams,
+                message: format!(
+                    "Unknown command execution: {}",
+                    command
+                ),
                 data: None,
             },
         }
