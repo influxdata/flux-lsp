@@ -32,17 +32,23 @@ fn node_to_location(
 ) -> lsp::Location {
     lsp::Location {
         uri,
-        // XXX: rockstar (19 May 2022) - flux asks for too new of an lsp-types for `.into` to
-        // work. That doesn't need to be quite so bleeding edge, but that's an issue for flux.
-        range: lsp::Range {
-            start: lsp::Position {
-                line: node.loc().start.line - 1,
-                character: node.loc().start.column - 1,
-            },
-            end: lsp::Position {
-                line: node.loc().end.line - 1,
-                character: node.loc().end.column - 1,
-            },
+        range: flux_location_to_lsp(node.loc()),
+    }
+}
+
+fn flux_location_to_lsp(
+    loc: &flux::ast::SourceLocation,
+) -> lsp::Range {
+    // XXX: rockstar (19 May 2022) - flux asks for too new of an lsp-types for `.into` to
+    // work. That doesn't need to be quite so bleeding edge, but that's an issue for flux.
+    lsp::Range {
+        start: lsp::Position {
+            line: loc.start.line - 1,
+            character: loc.start.column - 1,
+        },
+        end: lsp::Position {
+            line: loc.end.line - 1,
+            character: loc.end.column - 1,
         },
     }
 }
@@ -309,16 +315,7 @@ impl LspServer {
                             (e.location.file.clone(), lsp::Diagnostic {
                     // XXX: rockstar (19 May 2022) - flux asks for too new of an lsp-types for `.into` to
                     // work. That doesn't need to be quite so bleeding edge, but that's an issue for flux.
-                    range: lsp::Range {
-                        start: lsp::Position {
-                            line: e.location.start.line - 1,
-                            character: e.location.start.column - 1,
-                        },
-                        end: lsp::Position {
-                            line: e.location.end.line - 1,
-                            character: e.location.end.column - 1,
-                        },
-                    },
+                    range: flux_location_to_lsp(&e.location),
                     severity: Some(lsp::DiagnosticSeverity::ERROR),
                     source: Some("flux".to_string()),
                     message: e.error.to_string(),
@@ -1042,19 +1039,7 @@ impl LanguageServer for LspServer {
             .filter(|error| {
                 crate::lsp::ranges_overlap(
                     &params.range,
-                    // XXX: rockstar (19 May 2022) - flux asks for too new of an lsp-types for `.into` to
-                    // work. That doesn't need to be quite so bleeding edge, but that's an issue for flux.
-                    &lsp::Range {
-                        start: lsp::Position {
-                            line: error.location.start.line - 1,
-                            character: error.location.start.column
-                                - 1,
-                        },
-                        end: lsp::Position {
-                            line: error.location.end.line - 1,
-                            character: error.location.end.column - 1,
-                        },
-                    },
+                    &flux_location_to_lsp(&error.location),
                 )
             })
             .collect();
