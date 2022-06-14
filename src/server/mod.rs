@@ -339,7 +339,7 @@ impl LspServer {
                         .map(|(location, error, severity)| {
                             let diagnostic = lsp::Diagnostic {
                                 range: flux_location_to_lsp(
-                                    &location,
+                                    location,
                                 ),
                                 severity: Some(
                                     severity
