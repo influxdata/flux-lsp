@@ -312,15 +312,20 @@ impl LspServer {
                             false
                         })
                         .map(|e| {
-                            (e.location.file.clone(), lsp::Diagnostic {
-                    // XXX: rockstar (19 May 2022) - flux asks for too new of an lsp-types for `.into` to
-                    // work. That doesn't need to be quite so bleeding edge, but that's an issue for flux.
-                    range: flux_location_to_lsp(&e.location),
-                    severity: Some(lsp::DiagnosticSeverity::ERROR),
-                    source: Some("flux".to_string()),
-                    message: e.error.to_string(),
-                    ..lsp::Diagnostic::default()
-                })
+                            let diagnostic = lsp::Diagnostic {
+                                // XXX: rockstar (19 May 2022) - flux asks for too new of an lsp-types for `.into` to
+                                // work. That doesn't need to be quite so bleeding edge, but that's an issue for flux.
+                                range: flux_location_to_lsp(
+                                    &e.location,
+                                ),
+                                severity: Some(
+                                    lsp::DiagnosticSeverity::ERROR,
+                                ),
+                                source: Some("flux".to_string()),
+                                message: e.error.to_string(),
+                                ..lsp::Diagnostic::default()
+                            };
+                            (e.location.file.clone(), diagnostic)
                         })
                         .collect()
                 }
