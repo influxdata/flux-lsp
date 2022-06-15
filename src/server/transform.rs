@@ -60,30 +60,30 @@ fn make_flux_filter_function(
 
 pub(crate) fn inject_tag_filter(
     file: &ast::File,
-    name: String
+    name: String,
 ) -> Result<ast::File, ()> {
     if let Some(statement) = file
-    .body
-    .iter()
-    .filter(|node| {
-        if let ast::Statement::Expr(_stmt) = node {
-            return true;
-        }
-        false
-    })
-    .last()
-{
-    let mut new_ast = file.clone();
-    new_ast.body.retain(|x| x != statement);
+        .body
+        .iter()
+        .filter(|node| {
+            if let ast::Statement::Expr(_stmt) = node {
+                return true;
+            }
+            false
+        })
+        .last()
+    {
+        let mut new_ast = file.clone();
+        new_ast.body.retain(|x| x != statement);
 
-    let call: &ast::Expression =
-        if let ast::Statement::Expr(expr) = statement {
-            &expr.expression
-        } else {
-            return Err(());
-        };
+        let call: &ast::Expression =
+            if let ast::Statement::Expr(expr) = statement {
+                &expr.expression
+            } else {
+                return Err(());
+            };
 
-    new_ast.body.push(ast::Statement::Expr(
+        new_ast.body.push(ast::Statement::Expr(
         Box::new(ast::ExprStmt {
             base: ast::BaseNode::default(),
             expression: ast::Expression::PipeExpr(Box::new(ast::PipeExpr {
@@ -151,9 +151,9 @@ pub(crate) fn inject_tag_filter(
             }))
         })
     ));
-    return Ok(new_ast);
-}
-Err(())
+        return Ok(new_ast);
+    }
+    Err(())
 }
 
 pub(crate) fn inject_tag_value_filter(
@@ -233,10 +233,14 @@ mod tests {
         let fluxscript = r#"from(bucket: "my-bucket")"#;
         let ast = flux::parser::parse_string("".into(), &fluxscript);
 
-        let transformed = inject_tag_filter(&ast, "cpu".into()).unwrap();
+        let transformed =
+            inject_tag_filter(&ast, "cpu".into()).unwrap();
 
         let expected = r#"from(bucket: "my-bucket") |> filter(fn: (r) => exists r.cpu)"#;
-        assert_eq!(expected, flux::formatter::convert_to_string(&transformed).unwrap());
+        assert_eq!(
+            expected,
+            flux::formatter::convert_to_string(&transformed).unwrap()
+        );
     }
 
     #[test]

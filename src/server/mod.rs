@@ -186,10 +186,10 @@ impl From<LspServerCommand> for String {
         match value {
             LspServerCommand::InjectTagFilter => {
                 "injectTagFilter".into()
-            },
+            }
             LspServerCommand::InjectTagValueFilter => {
                 "injectTagValueFilter".into()
-            },
+            }
         }
     }
 }
@@ -1170,19 +1170,19 @@ impl LanguageServer for LspServer {
                 let file = self.store.get_ast_file(
                     &command_params.text_document.uri,
                 )?;
-                let transformed =
-                    match transform::inject_tag_filter(
-                        &file,
-                        command_params.name,
-                    ) {
-                        Ok(value) => value,
-                        Err(err) => {
-                            return Err(LspError::InternalError(
-                                format!("{:?}", err),
-                            )
-                            .into())
-                        }
-                    };
+                let transformed = match transform::inject_tag_filter(
+                    &file,
+                    command_params.name,
+                ) {
+                    Ok(value) => value,
+                    Err(err) => {
+                        return Err(LspError::InternalError(format!(
+                            "{:?}",
+                            err
+                        ))
+                        .into())
+                    }
+                };
 
                 let new_text =
                     match flux::formatter::convert_to_string(
