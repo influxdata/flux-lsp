@@ -158,6 +158,7 @@ pub fn find_stdlib_signatures(
 }
 
 enum LspServerCommand {
+    InjectTagFilter,
     InjectTagValueFilter,
 }
 
@@ -166,6 +167,9 @@ impl TryFrom<String> for LspServerCommand {
 
     fn try_from(value: String) -> Result<Self, Self::Error> {
         match value.as_str() {
+            "injectTagFilter" => {
+                Ok(LspServerCommand::InjectTagFilter)
+            }
             "injectTagValueFilter" => {
                 Ok(LspServerCommand::InjectTagValueFilter)
             }
@@ -180,6 +184,9 @@ impl TryFrom<String> for LspServerCommand {
 impl From<LspServerCommand> for String {
     fn from(value: LspServerCommand) -> Self {
         match value {
+            LspServerCommand::InjectTagFilter => {
+                "injectTagFilter".into()
+            }
             LspServerCommand::InjectTagValueFilter => {
                 "injectTagValueFilter".into()
             }
@@ -387,7 +394,7 @@ impl LanguageServer for LspServer {
                     true,
                 )),
                 execute_command_provider: Some(lsp::ExecuteCommandOptions {
-                    commands: vec![LspServerCommand::InjectTagValueFilter.into()],
+                    commands: vec![LspServerCommand::InjectTagFilter.into(), LspServerCommand::InjectTagValueFilter.into()],
                     work_done_progress_options: lsp::WorkDoneProgressOptions {
                         work_done_progress: None,
                     }
@@ -1147,6 +1154,88 @@ impl LanguageServer for LspServer {
             );
         }
         match LspServerCommand::try_from(params.command.clone()) {
+            Ok(LspServerCommand::InjectTagFilter) => {
+                let command_params: InjectTagFilterParams =
+                    match serde_json::value::from_value(
+                        params.arguments[0].clone(),
+                    ) {
+                        Ok(value) => value,
+                        Err(err) => {
+                            return Err(LspError::InternalError(
+                                format!("{:?}", err),
+                            )
+                            .into())
+                        }
+                    };
+                let file = self.store.get_ast_file(
+                    &command_params.text_document.uri,
+                )?;
+                let transformed = match transform::inject_tag_filter(
+                    &file,
+                    command_params.name,
+                ) {
+                    Ok(value) => value,
+                    Err(err) => {
+                        return Err(LspError::InternalError(format!(
+                            "{:?}",
+                            err
+                        ))
+                        .into())
+                    }
+                };
+
+                let new_text =
+                    match flux::formatter::convert_to_string(
+                        &transformed,
+                    ) {
+                        Ok(value) => value,
+                        Err(err) => {
+                            return Err(LspError::InternalError(
+                                format!("{:?}", err),
+                            )
+                            .into())
+                        }
+                    };
+                let last_pos =
+                    line_col::LineColLookup::new(&new_text)
+                        .get(new_text.len());
+                let edit = lsp::WorkspaceEdit {
+                    changes: Some(HashMap::from([(
+                        command_params.text_document.uri.clone(),
+                        vec![lsp::TextEdit {
+                            new_text: new_text.clone(),
+                            range: lsp::Range {
+                                start: lsp::Position::default(),
+                                end: lsp::Position {
+                                    line: last_pos.0 as u32,
+                                    character: last_pos.1 as u32,
+                                },
+                            },
+                        }],
+                    )])),
+                    document_changes: None,
+                    change_annotations: None,
+                };
+                if let Some(client) = self.get_client() {
+                    match client.apply_edit(edit, None).await {
+                        Ok(response) => {
+                            if response.applied {
+                                self.store.put(
+                                    &command_params.text_document.uri,
+                                    &new_text,
+                                );
+                            }
+                        }
+                        Err(err) => {
+                            return Err(LspError::InternalError(
+                                format!("{:?}", err),
+                            )
+                            .into())
+                        }
+                    };
+                }
+                Ok(None)
+            }
             Ok(LspServerCommand::InjectTagValueFilter) => {
                 let command_params: InjectTagValueFilterParams =
                     match serde_json::value::from_value(
@@ -1237,6 +1326,14 @@ impl LanguageServer for LspServer {
             }
         }
     }
+}
+
+#[derive(Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct InjectTagFilterParams {
+    text_document: lsp::TextDocumentIdentifier,
+    bucket: Option<String>,
+    name: String,
 }
 
 #[derive(Deserialize, Serialize)]
