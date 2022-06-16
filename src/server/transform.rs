@@ -289,6 +289,72 @@ pub(crate) fn inject_tag_value_filter(
     Err(())
 }
 
+pub(crate) fn inject_measurement_filter(
+    file: &ast::File,
+    name: String,
+) -> Result<ast::File, ()> {
+    if let Some(statement) = file
+        .body
+        .iter()
+        .filter(|node| {
+            if let ast::Statement::Expr(_stmt) = node {
+                return true;
+            }
+            false
+        })
+        .last()
+    {
+        let mut new_ast = file.clone();
+        new_ast.body.retain(|x| x != statement);
+
+        let call: &ast::Expression =
+            if let ast::Statement::Expr(expr) = statement {
+                &expr.expression
+            } else {
+                return Err(());
+            };
+
+        new_ast.body.push(ast::Statement::Expr(
+        Box::new(ast::ExprStmt {
+            base: ast::BaseNode::default(),
+            expression: ast::Expression::PipeExpr(Box::new(ast::PipeExpr {
+                argument: call.clone(),
+                base: ast::BaseNode::default(),
+                call: ast::CallExpr {
+                    arguments: vec![ast::Expression::Object(Box::new(ast::ObjectExpr {
+                        base: ast::BaseNode::default(),
+                        properties: vec![
+                            ast::Property {
+                                base: ast::BaseNode::default(),
+                                key: ast::PropertyKey::Identifier(ast::Identifier {
+                                    base: ast::BaseNode::default(),
+                                    name: "fn".into(),
+                                }),
+                                value: Some(make_flux_filter_function("_measurement".into(), name)),
+                                comma: vec![],
+                                separator: vec![],
+                            }
+                        ],
+                        lbrace: vec![],
+                        rbrace: vec![],
+                        with: None,
+                    }))],
+                    base: ast::BaseNode::default(),
+                    callee: ast::Expression::Identifier(ast::Identifier {
+                        base: ast::BaseNode::default(),
+                        name: "filter".into(),
+                    }),
+                    lparen: vec![],
+                    rparen: vec![],
+                }
+            }))
+        })
+    ));
+        return Ok(new_ast);
+    }
+    Err(())
+}
+
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
@@ -337,6 +403,22 @@ mod tests {
             inject_field_filter(&ast, "myField".into()).unwrap();
 
         let expected = r#"from(bucket: "my-bucket") |> filter(fn: (r) => r._field == "myField")"#;
+        assert_eq!(
+            expected,
+            flux::formatter::convert_to_string(&transformed).unwrap()
+        );
+    }
+
+    #[test]
+    fn test_inject_measurement_filter() {
+        let fluxscript = r#"from(bucket: "my-bucket")"#;
+        let ast = flux::parser::parse_string("".into(), &fluxscript);
+
+        let transformed =
+            inject_measurement_filter(&ast, "myMeasurement".into())
+                .unwrap();
+
+        let expected = r#"from(bucket: "my-bucket") |> filter(fn: (r) => r._measurement == "myMeasurement")"#;
         assert_eq!(
             expected,
             flux::formatter::convert_to_string(&transformed).unwrap()

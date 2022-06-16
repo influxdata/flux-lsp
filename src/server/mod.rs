@@ -169,6 +169,7 @@ enum LspServerCommand {
     InjectTagFilter,
     InjectTagValueFilter,
     InjectFieldFilter,
+    InjectMeasurementFilter,
 }
 
 impl TryFrom<String> for LspServerCommand {
@@ -184,6 +185,9 @@ impl TryFrom<String> for LspServerCommand {
             }
             "injectFieldFilter" => {
                 Ok(LspServerCommand::InjectTagValueFilter)
+            }
+            "injectMeasurementFilter" => {
+                Ok(LspServerCommand::InjectMeasurementFilter)
             }
             _ => Err(format!(
                 "Received unknown value for LspServerCommand: {}",
@@ -204,6 +208,9 @@ impl From<LspServerCommand> for String {
             }
             LspServerCommand::InjectFieldFilter => {
                 "injectFieldFilter".into()
+            }
+            LspServerCommand::InjectMeasurementFilter => {
+                "injectMeasurementFilter".into()
             }
         }
     }
@@ -409,7 +416,7 @@ impl LanguageServer for LspServer {
                     true,
                 )),
                 execute_command_provider: Some(lsp::ExecuteCommandOptions {
-                    commands: vec![LspServerCommand::InjectTagFilter.into(), LspServerCommand::InjectTagValueFilter.into(), LspServerCommand::InjectFieldFilter.into()],
+                    commands: vec![LspServerCommand::InjectTagFilter.into(), LspServerCommand::InjectTagValueFilter.into(), LspServerCommand::InjectFieldFilter.into(), LspServerCommand::InjectMeasurementFilter.into()],
                     work_done_progress_options: lsp::WorkDoneProgressOptions {
                         work_done_progress: None,
                     }
@@ -1416,6 +1423,88 @@ impl LanguageServer for LspServer {
                 }
                 Ok(None)
             }
+            Ok(LspServerCommand::InjectMeasurementFilter) => {
+                let command_params: InjectMeasurementFilterParams =
+                    match serde_json::value::from_value(
+                        params.arguments[0].clone(),
+                    ) {
+                        Ok(value) => value,
+                        Err(err) => {
+                            return Err(LspError::InternalError(
+                                format!("{:?}", err),
+                            )
+                            .into())
+                        }
+                    };
+                let file = self.store.get_ast_file(
+                    &command_params.text_document.uri,
+                )?;
+                let transformed =
+                    match transform::inject_measurement_filter(
+                        &file,
+                        command_params.name,
+                    ) {
+                        Ok(value) => value,
+                        Err(err) => {
+                            return Err(LspError::InternalError(
+                                format!("{:?}", err),
+                            )
+                            .into())
+                        }
+                    };
+
+                let new_text =
+                    match flux::formatter::convert_to_string(
+                        &transformed,
+                    ) {
+                        Ok(value) => value,
+                        Err(err) => {
+                            return Err(LspError::InternalError(
+                                format!("{:?}", err),
+                            )
+                            .into())
+                        }
+                    };
+                let last_pos =
+                    line_col::LineColLookup::new(&new_text)
+                        .get(new_text.len());
+                let edit = lsp::WorkspaceEdit {
+                    changes: Some(HashMap::from([(
+                        command_params.text_document.uri.clone(),
+                        vec![lsp::TextEdit {
+                            new_text: new_text.clone(),
+                            range: lsp::Range {
+                                start: lsp::Position::default(),
+                                end: lsp::Position {
+                                    line: last_pos.0 as u32,
+                                    character: last_pos.1 as u32,
+                                },
+                            },
+                        }],
+                    )])),
+                    document_changes: None,
+                    change_annotations: None,
+                };
+                if let Some(client) = self.get_client() {
+                    match client.apply_edit(edit, None).await {
+                        Ok(response) => {
+                            if response.applied {
+                                self.store.put(
+                                    &command_params.text_document.uri,
+                                    &new_text,
+                                );
+                            }
+                        }
+                        Err(err) => {
+                            return Err(LspError::InternalError(
+                                format!("{:?}", err),
+                            )
+                            .into())
+                        }
+                    };
+                }
+                Ok(None)
+            }
             Err(_err) => {
                 return Err(
                     LspError::InvalidCommand(params.command).into()
@@ -1445,6 +1534,14 @@ struct InjectTagValueFilterParams {
 #[derive(Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct InjectFieldFilterParams {
+    text_document: lsp::TextDocumentIdentifier,
+    bucket: Option<String>,
+    name: String,
+}
+
+#[derive(Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct InjectMeasurementFilterParams {
     text_document: lsp::TextDocumentIdentifier,
     bucket: Option<String>,
     name: String,
