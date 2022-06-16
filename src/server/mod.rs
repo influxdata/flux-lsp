@@ -157,9 +157,18 @@ pub fn find_stdlib_signatures(
         })
 }
 
+// XXX: rockstar (15 Jun 2022) - Clippy will whinge here about every
+// variant of this enum starts with "Inject". I'm not a fan of using
+// the verb "inject" anyway, but this enum will eventually have many
+// different commands that aren't at all about injection; we just happen
+// to have hit the tipping point of enum size for this clippy lint to
+// kick in. We can remove this `allow` when we add something that doesn't
+// start with "Inject".
+#[allow(clippy::enum_variant_names)]
 enum LspServerCommand {
     InjectTagFilter,
     InjectTagValueFilter,
+    InjectFieldFilter,
 }
 
 impl TryFrom<String> for LspServerCommand {
@@ -171,6 +180,9 @@ impl TryFrom<String> for LspServerCommand {
                 Ok(LspServerCommand::InjectTagFilter)
             }
             "injectTagValueFilter" => {
+                Ok(LspServerCommand::InjectTagValueFilter)
+            }
+            "injectFieldFilter" => {
                 Ok(LspServerCommand::InjectTagValueFilter)
             }
             _ => Err(format!(
@@ -189,6 +201,9 @@ impl From<LspServerCommand> for String {
             }
             LspServerCommand::InjectTagValueFilter => {
                 "injectTagValueFilter".into()
+            }
+            LspServerCommand::InjectFieldFilter => {
+                "injectFieldFilter".into()
             }
         }
     }
@@ -394,7 +409,7 @@ impl LanguageServer for LspServer {
                     true,
                 )),
                 execute_command_provider: Some(lsp::ExecuteCommandOptions {
-                    commands: vec![LspServerCommand::InjectTagFilter.into(), LspServerCommand::InjectTagValueFilter.into()],
+                    commands: vec![LspServerCommand::InjectTagFilter.into(), LspServerCommand::InjectTagValueFilter.into(), LspServerCommand::InjectFieldFilter.into()],
                     work_done_progress_options: lsp::WorkDoneProgressOptions {
                         work_done_progress: None,
                     }
@@ -1319,6 +1334,88 @@ impl LanguageServer for LspServer {
                 }
                 Ok(None)
             }
+            Ok(LspServerCommand::InjectFieldFilter) => {
+                let command_params: InjectFieldFilterParams =
+                    match serde_json::value::from_value(
+                        params.arguments[0].clone(),
+                    ) {
+                        Ok(value) => value,
+                        Err(err) => {
+                            return Err(LspError::InternalError(
+                                format!("{:?}", err),
+                            )
+                            .into())
+                        }
+                    };
+                let file = self.store.get_ast_file(
+                    &command_params.text_document.uri,
+                )?;
+                let transformed = match transform::inject_field_filter(
+                    &file,
+                    command_params.name,
+                ) {
+                    Ok(value) => value,
+                    Err(err) => {
+                        return Err(LspError::InternalError(format!(
+                            "{:?}",
+                            err
+                        ))
+                        .into())
+                    }
+                };
+
+                let new_text =
+                    match flux::formatter::convert_to_string(
+                        &transformed,
+                    ) {
+                        Ok(value) => value,
+                        Err(err) => {
+                            return Err(LspError::InternalError(
+                                format!("{:?}", err),
+                            )
+                            .into())
+                        }
+                    };
+                let last_pos =
+                    line_col::LineColLookup::new(&new_text)
+                        .get(new_text.len());
+                let edit = lsp::WorkspaceEdit {
+                    changes: Some(HashMap::from([(
+                        command_params.text_document.uri.clone(),
+                        vec![lsp::TextEdit {
+                            new_text: new_text.clone(),
+                            range: lsp::Range {
+                                start: lsp::Position::default(),
+                                end: lsp::Position {
+                                    line: last_pos.0 as u32,
+                                    character: last_pos.1 as u32,
+                                },
+                            },
+                        }],
+                    )])),
+                    document_changes: None,
+                    change_annotations: None,
+                };
+                if let Some(client) = self.get_client() {
+                    match client.apply_edit(edit, None).await {
+                        Ok(response) => {
+                            if response.applied {
+                                self.store.put(
+                                    &command_params.text_document.uri,
+                                    &new_text,
+                                );
+                            }
+                        }
+                        Err(err) => {
+                            return Err(LspError::InternalError(
+                                format!("{:?}", err),
+                            )
+                            .into())
+                        }
+                    };
+                }
+                Ok(None)
+            }
             Err(_err) => {
                 return Err(
                     LspError::InvalidCommand(params.command).into()
@@ -1343,6 +1440,14 @@ struct InjectTagValueFilterParams {
     bucket: Option<String>,
     name: String,
     value: String,
+}
+
+#[derive(Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct InjectFieldFilterParams {
+    text_document: lsp::TextDocumentIdentifier,
+    bucket: Option<String>,
+    name: String,
 }
 
 // Url::to_file_path doesn't exist in wasm-unknown-unknown, for kinda
