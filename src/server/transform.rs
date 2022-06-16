@@ -415,10 +415,10 @@ mod tests {
         let ast = flux::parser::parse_string("".into(), &fluxscript);
 
         let transformed =
-            inject_field_filter(&ast, "myMeasurement".into())
+            inject_measurement_filter(&ast, "myMeasurement".into())
                 .unwrap();
 
-        let expected = r#"from(bucket: "my-bucket") |> filter(fn: (r) => r._field == "myMeasurement")"#;
+        let expected = r#"from(bucket: "my-bucket") |> filter(fn: (r) => r._measurement == "myMeasurement")"#;
         assert_eq!(
             expected,
             flux::formatter::convert_to_string(&transformed).unwrap()
