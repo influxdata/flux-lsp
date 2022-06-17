@@ -874,7 +874,7 @@ impl LanguageServer for LspServer {
         );
         if let Some(node) = visitor.node {
             let path = &visitor.path;
-            let hover_type = node.type_of().or_else(|| match node {
+            let hover_type = node.type_of().map(|t| t.to_string()).or_else(|| match node {
                 walk::Node::Identifier(ident) => {
                     // We hovered over an identifier without an attached type, try to figure
                     // it out from its context
@@ -882,18 +882,18 @@ impl LanguageServer for LspServer {
                     match parent {
                         // The type of assigned variables is the type of the right hand side
                         walk::Node::VariableAssgn(var) => {
-                            Some(var.init.type_of())
+                            Some(var.init.type_of().to_string())
                         }
                         walk::Node::MemberAssgn(var) => {
-                            Some(var.init.type_of())
+                            Some(var.init.type_of().to_string())
                         }
                         walk::Node::BuiltinStmt(builtin) => {
-                            Some(builtin.typ_expr.expr.clone())
+                            Some(builtin.typ_expr.to_string())
                         }
 
                         // The type of an property identifier is the type of the value
                         walk::Node::Property(property) => {
-                            Some(property.value.type_of())
+                            Some(property.value.type_of().to_string())
                         }
 
                         // The type Function parameters can be derived from the function type
@@ -906,7 +906,7 @@ impl LanguageServer for LspServer {
                                         .parameter(
                                             ident.name.as_str(),
                                         )
-                                        .cloned()
+                                        .map(|t| t.to_string())
                                 }
                                 _ => None,
                             }

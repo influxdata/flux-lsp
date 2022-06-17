@@ -1440,7 +1440,7 @@ x + 1
 #[test]
 async fn test_hover_binding() {
     let fluxscript = r#"x = "asd"
-builtin builtin_ : (v: int) => int
+builtin builtin_ : (v: A) => A where A: Numeric
 option option_ = 123
 1
 "#;
@@ -1472,7 +1472,7 @@ option option_ = 123
         Some(lsp::Hover {
             contents: lsp::HoverContents::Scalar(
                 lsp::MarkedString::String(
-                    "type: (v: int) => int".to_string()
+                    "type: (v: A) => A where A: Numeric".to_string()
                 )
             ),
             range: None,
@@ -3454,7 +3454,7 @@ async fn compute_diagnostics_non_errors() {
 
     let filename: String = "file:///path/to/script.flux".into();
     let fluxscript = r#"import "experimental"
-        
+
 from(bucket: "my-bucket")
 |> range(start: -100d)
 |> filter(fn: (r) => r.value == "b")
