@@ -11,7 +11,11 @@ use flux::ast::Expression as AstExpression;
 use flux::semantic::nodes::{
     ErrorKind as SemanticNodeErrorKind, Package as SemanticPackage,
 };
-use flux::semantic::types::{BuiltinType, CollectionType, MonoType};
+use flux::semantic::sub::{Substitutable, Substituter};
+use flux::semantic::types::{
+    BoundTvar, BoundTvarKinds, BuiltinType, CollectionType, MonoType,
+    PolyType, Tvar,
+};
 use flux::semantic::{walk, ErrorKind};
 use lspower::{
     jsonrpc::Result as RpcResult, lsp, Client, LanguageServer,
@@ -874,48 +878,53 @@ impl LanguageServer for LspServer {
         );
         if let Some(node) = visitor.node {
             let path = &visitor.path;
-            let hover_type = node.type_of().map(|t| t.to_string()).or_else(|| match node {
-                walk::Node::Identifier(ident) => {
-                    // We hovered over an identifier without an attached type, try to figure
-                    // it out from its context
-                    let parent = path.get(path.len() - 2)?;
-                    match parent {
-                        // The type of assigned variables is the type of the right hand side
-                        walk::Node::VariableAssgn(var) => {
-                            Some(var.init.type_of().to_string())
-                        }
-                        walk::Node::MemberAssgn(var) => {
-                            Some(var.init.type_of().to_string())
-                        }
-                        walk::Node::BuiltinStmt(builtin) => {
-                            Some(builtin.typ_expr.to_string())
-                        }
+            let hover_type = node
+                .type_of()
+                .map(|t| include_constraints(path, t).to_string())
+                .or_else(|| match node {
+                    walk::Node::Identifier(ident) => {
+                        // We hovered over an identifier without an attached type, try to figure
+                        // it out from its context
+                        let parent = path.get(path.len() - 2)?;
+                        match parent {
+                            // The type of assigned variables is the type of the right hand side
+                            walk::Node::VariableAssgn(var) => {
+                                Some(var.init.type_of().to_string())
+                            }
+                            walk::Node::MemberAssgn(var) => {
+                                Some(var.init.type_of().to_string())
+                            }
+                            walk::Node::BuiltinStmt(builtin) => {
+                                Some(builtin.typ_expr.to_string())
+                            }
 
-                        // The type of an property identifier is the type of the value
-                        walk::Node::Property(property) => {
-                            Some(property.value.type_of().to_string())
-                        }
+                            // The type of an property identifier is the type of the value
+                            walk::Node::Property(property) => Some(
+                                property.value.type_of().to_string(),
+                            ),
 
-                        // The type Function parameters can be derived from the function type
-                        // stored in the function expression
-                        walk::Node::FunctionParameter(_) => {
-                            let func = path.get(path.len() - 3)?;
-                            match func {
-                                walk::Node::FunctionExpr(func) => {
-                                    func.typ
+                            // The type Function parameters can be derived from the function type
+                            // stored in the function expression
+                            walk::Node::FunctionParameter(_) => {
+                                let func =
+                                    path.get(path.len() - 3)?;
+                                match func {
+                                    walk::Node::FunctionExpr(
+                                        func,
+                                    ) => func
+                                        .typ
                                         .parameter(
                                             ident.name.as_str(),
                                         )
-                                        .map(|t| t.to_string())
+                                        .map(|t| t.to_string()),
+                                    _ => None,
                                 }
-                                _ => None,
                             }
+                            _ => None,
                         }
-                        _ => None,
                     }
-                }
-                _ => None,
-            });
+                    _ => None,
+                });
             if let Some(typ) = hover_type {
                 return Ok(Some(lsp::Hover {
                     contents: lsp::HoverContents::Scalar(
@@ -1677,6 +1686,56 @@ impl LanguageServer for LspServer {
                 )
             }
         }
+    }
+}
+
+// `MonoType`'s extracted from a `Node` in a semantic graph do not contain the constraints directly
+// on them however we can locate the parent variable assignment to the type (`t`) and figure out
+// which constraints apply.
+fn include_constraints(
+    path: &[walk::Node<'_>],
+    t: MonoType,
+) -> PolyType {
+    // Get all constraints that may apply to `t`
+    let all_constraints =
+        path.iter().rev().find_map(|parent| match parent {
+            walk::Node::VariableAssgn(assgn) => {
+                Some(assgn.poly_type_of().cons)
+            }
+            _ => None,
+        });
+
+    let mut constraints = BoundTvarKinds::default();
+    if let Some(all_constraints) = all_constraints {
+        // Pick out the constraints that apply to `t`
+        t.visit(&mut VisitBoundVars(|var| {
+            if let Some(c) = all_constraints.get(&var) {
+                constraints.entry(var).or_insert_with(|| c.clone());
+            }
+        }));
+    }
+    PolyType {
+        vars: Vec::new(),
+        cons: constraints,
+        expr: t,
+    }
+}
+
+struct VisitBoundVars<F>(F);
+impl<F> Substituter for VisitBoundVars<F>
+where
+    F: FnMut(BoundTvar),
+{
+    fn try_apply(&mut self, _var: Tvar) -> Option<MonoType> {
+        None
+    }
+
+    fn try_apply_bound(
+        &mut self,
+        var: BoundTvar,
+    ) -> Option<MonoType> {
+        (self.0)(var);
+        None
     }
 }
 
