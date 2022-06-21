@@ -688,7 +688,7 @@ dependencies = [
 
 [[package]]
 name = "flux-lsp"
-version = "0.8.15"
+version = "0.8.16"
 dependencies = [
  "async-std",
  "async-trait",
