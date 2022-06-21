@@ -133,6 +133,7 @@ describe('LSP Server', () => {
 
         expect(callback).toHaveBeenCalled();
         expect(diagnostics.length).toBe(1);
+        expect(diagnostics[0]).toStrictEqual({"message": "undefined identifier x", "range": {"end": {"character": 14, "line": 0}, "start": {"character": 13, "line": 0}}, "severity": 1, "source": "flux"});
     });
 });
 describe('module', () => {
