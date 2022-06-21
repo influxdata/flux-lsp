@@ -104,6 +104,7 @@ async fn main() {
                 .serve(service)
                 .await;
         }
+        #[allow(clippy::print_stderr)]
         _ => {
             eprintln!(
                 "Unsupported communication channel: {}",

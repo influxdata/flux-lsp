@@ -1195,6 +1195,7 @@ impl LanguageServer for LspServer {
                 let transformed = match transform::inject_tag_filter(
                     &file,
                     command_params.name,
+                    command_params.bucket,
                 ) {
                     Ok(value) => value,
                     Err(err) => {
@@ -1279,6 +1280,7 @@ impl LanguageServer for LspServer {
                         &file,
                         command_params.name,
                         command_params.value,
+                        command_params.bucket,
                     ) {
                         Ok(value) => value,
                         Err(err) => {
@@ -1360,6 +1362,7 @@ impl LanguageServer for LspServer {
                 let transformed = match transform::inject_field_filter(
                     &file,
                     command_params.name,
+                    command_params.bucket,
                 ) {
                     Ok(value) => value,
                     Err(err) => {
@@ -1443,6 +1446,7 @@ impl LanguageServer for LspServer {
                     match transform::inject_measurement_filter(
                         &file,
                         command_params.name,
+                        command_params.bucket,
                     ) {
                         Ok(value) => value,
                         Err(err) => {
@@ -1518,7 +1522,7 @@ impl LanguageServer for LspServer {
 #[serde(rename_all = "camelCase")]
 struct InjectTagFilterParams {
     text_document: lsp::TextDocumentIdentifier,
-    bucket: Option<String>,
+    bucket: String,
     name: String,
 }
 
@@ -1526,7 +1530,7 @@ struct InjectTagFilterParams {
 #[serde(rename_all = "camelCase")]
 struct InjectTagValueFilterParams {
     text_document: lsp::TextDocumentIdentifier,
-    bucket: Option<String>,
+    bucket: String,
     name: String,
     value: String,
 }
@@ -1535,7 +1539,7 @@ struct InjectTagValueFilterParams {
 #[serde(rename_all = "camelCase")]
 struct InjectFieldFilterParams {
     text_document: lsp::TextDocumentIdentifier,
-    bucket: Option<String>,
+    bucket: String,
     name: String,
 }
 
@@ -1543,7 +1547,7 @@ struct InjectFieldFilterParams {
 #[serde(rename_all = "camelCase")]
 struct InjectMeasurementFilterParams {
     text_document: lsp::TextDocumentIdentifier,
-    bucket: Option<String>,
+    bucket: String,
     name: String,
 }
 
