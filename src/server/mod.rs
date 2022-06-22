@@ -1,3 +1,4 @@
+mod commands;
 mod store;
 mod transform;
 mod types;
@@ -13,10 +14,14 @@ use flux::semantic::{walk, ErrorKind};
 use lspower::{
     jsonrpc::Result as RpcResult, lsp, Client, LanguageServer,
 };
-use serde::{Deserialize, Serialize};
 
 use crate::{completion, stdlib, visitors::semantic};
 
+use self::commands::{
+    InjectFieldFilterParams, InjectMeasurementFilterParams,
+    InjectTagFilterParams, InjectTagValueFilterParams,
+    LspServerCommand,
+};
 use self::types::LspError;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -155,65 +160,6 @@ pub fn find_stdlib_signatures(
             acc.extend(x);
             acc
         })
-}
-
-// XXX: rockstar (15 Jun 2022) - Clippy will whinge here about every
-// variant of this enum starts with "Inject". I'm not a fan of using
-// the verb "inject" anyway, but this enum will eventually have many
-// different commands that aren't at all about injection; we just happen
-// to have hit the tipping point of enum size for this clippy lint to
-// kick in. We can remove this `allow` when we add something that doesn't
-// start with "Inject".
-#[allow(clippy::enum_variant_names)]
-enum LspServerCommand {
-    InjectTagFilter,
-    InjectTagValueFilter,
-    InjectFieldFilter,
-    InjectMeasurementFilter,
-}
-
-impl TryFrom<String> for LspServerCommand {
-    type Error = String;
-
-    fn try_from(value: String) -> Result<Self, Self::Error> {
-        match value.as_str() {
-            "injectTagFilter" => {
-                Ok(LspServerCommand::InjectTagFilter)
-            }
-            "injectTagValueFilter" => {
-                Ok(LspServerCommand::InjectTagValueFilter)
-            }
-            "injectFieldFilter" => {
-                Ok(LspServerCommand::InjectTagValueFilter)
-            }
-            "injectMeasurementFilter" => {
-                Ok(LspServerCommand::InjectMeasurementFilter)
-            }
-            _ => Err(format!(
-                "Received unknown value for LspServerCommand: {}",
-                value
-            )),
-        }
-    }
-}
-
-impl From<LspServerCommand> for String {
-    fn from(value: LspServerCommand) -> Self {
-        match value {
-            LspServerCommand::InjectTagFilter => {
-                "injectTagFilter".into()
-            }
-            LspServerCommand::InjectTagValueFilter => {
-                "injectTagValueFilter".into()
-            }
-            LspServerCommand::InjectFieldFilter => {
-                "injectFieldFilter".into()
-            }
-            LspServerCommand::InjectMeasurementFilter => {
-                "injectMeasurementFilter".into()
-            }
-        }
-    }
 }
 
 pub struct LspServer {
@@ -1166,11 +1112,13 @@ impl LanguageServer for LspServer {
         &self,
         params: lsp::ExecuteCommandParams,
     ) -> RpcResult<Option<serde_json::Value>> {
-        if params.arguments.len() != 1
-            || !params.arguments[0].is_object()
+        if params.arguments.len() > 1
+            || (params.arguments.len() == 1
+                && !params.arguments[0].is_object())
         {
-            // We only want a single argument, which is an object itself. This means that
-            // positional arguments are not supported. We only want kwargs.
+            // We want, at most, a single argument, which is an object itself. This means that
+            // positional arguments are not supported. We only want kwargs. Some commands will
+            // take no arguments.
             return Err(
                 LspError::InvalidArguments(params.arguments).into()
             );
@@ -1509,6 +1457,17 @@ impl LanguageServer for LspServer {
                 }
                 Ok(None)
             }
+            Ok(LspServerCommand::GetFunctionList) => {
+                let functions: Vec<String> =
+                    stdlib::get_builtin_functions()
+                        .iter()
+                        .filter(|function| {
+                            !function.name.starts_with('_')
+                        })
+                        .map(|function| function.name.clone())
+                        .collect();
+                Ok(Some(functions.into()))
+            }
             Err(_err) => {
                 return Err(
                     LspError::InvalidCommand(params.command).into()
@@ -1516,39 +1475,6 @@ impl LanguageServer for LspServer {
             }
         }
     }
-}
-
-#[derive(Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct InjectTagFilterParams {
-    text_document: lsp::TextDocumentIdentifier,
-    bucket: String,
-    name: String,
-}
-
-#[derive(Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct InjectTagValueFilterParams {
-    text_document: lsp::TextDocumentIdentifier,
-    bucket: String,
-    name: String,
-    value: String,
-}
-
-#[derive(Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct InjectFieldFilterParams {
-    text_document: lsp::TextDocumentIdentifier,
-    bucket: String,
-    name: String,
-}
-
-#[derive(Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct InjectMeasurementFilterParams {
-    text_document: lsp::TextDocumentIdentifier,
-    bucket: String,
-    name: String,
 }
 
 // Url::to_file_path doesn't exist in wasm-unknown-unknown, for kinda
