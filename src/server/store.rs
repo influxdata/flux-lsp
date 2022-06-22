@@ -45,7 +45,10 @@ fn get_analyzer() -> Result<
 /// type could be extended to keep track of versions of files, but simplicity
 /// is preferred at this point.
 pub(crate) struct Store {
-    backend: Arc<RwLock<HashMap<String, HashMap<String, String>>>>,
+    #[allow(clippy::type_complexity)]
+    backend: Arc<
+        RwLock<HashMap<String, HashMap<String, (String, lsp::Url)>>>,
+    >,
 }
 
 impl Default for Store {
@@ -64,12 +67,12 @@ impl Store {
             Ok(mut store) => match store.entry(key) {
                 Entry::Vacant(entry) => {
                     let mut map = HashMap::new();
-                    map.insert(val, contents.into());
+                    map.insert(val, (contents.into(), url.clone()));
                     entry.insert(map);
                 }
                 Entry::Occupied(mut entry) => {
                     let map = entry.get_mut();
-                    map.insert(val, contents.into());
+                    map.insert(val, (contents.into(), url.clone()));
                 }
             },
             Err(error) => {
@@ -113,7 +116,7 @@ impl Store {
             Ok(store) => match store.get(&key) {
                 None => Err(LspError::FileNotFound(url.to_string())),
                 Some(entry) => match entry.get(&val) {
-                    Some(value) => Ok(value.into()),
+                    Some(value) => Ok(value.0.clone()),
                     None => {
                         Err(LspError::FileNotFound(url.to_string()))
                     }
@@ -130,15 +133,8 @@ impl Store {
             Ok(store) => match store.get(&key) {
                 None => vec![],
                 Some(files) => files
-                    .keys()
-                    .map(|file| {
-                        #[allow(clippy::unwrap_used)]
-                        lsp::Url::parse(&format!(
-                            "file://{}/{}",
-                            key, file
-                        ))
-                        .unwrap()
-                    })
+                    .iter()
+                    .map(|(_file, (_contents, url))| url.clone())
                     .collect(),
             },
             Err(_) => vec![],
@@ -161,7 +157,7 @@ impl Store {
                                 // Unwrap is okay here, as the key is retrieved from
                                 // map.keys()
                                 #[allow(clippy::unwrap_used)]
-                                entry.get(key).unwrap().clone(),
+                                entry.get(key).unwrap().0.clone(),
                             )
                         })
                         .collect())
@@ -311,7 +307,7 @@ mod test {
                 Entry::Occupied(entry) => {
                     let map = entry.get();
                     match map.get(&val) {
-                        Some(value) => assert_eq!(value, contents),
+                        Some(value) => assert_eq!(value.0, contents),
                         None => panic!("put to {} failed", key),
                     }
                 }
@@ -328,7 +324,7 @@ mod test {
 
         {
             let mut map = HashMap::new();
-            map.insert(val, contents.into());
+            map.insert(val, (contents.into(), url.clone()));
             let mut backend = store
                 .backend
                 .write()
@@ -347,7 +343,7 @@ mod test {
     #[test]
     fn get_package_urls_single_file() {
         let store = Store::default();
-        let url = lsp::Url::parse("file:///a/b/c").unwrap();
+        let url = lsp::Url::parse("inmemory:///a/b/c").unwrap();
         store.put(&url, "");
 
         let urls = store.get_package_urls(&url);
@@ -405,7 +401,7 @@ mod test {
 
         {
             let mut map = HashMap::new();
-            map.insert(val, contents.into());
+            map.insert(val, (contents.into(), url.clone()));
             let mut backend = store
                 .backend
                 .write()
