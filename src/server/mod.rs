@@ -17,8 +17,12 @@ use lspower::{
 
 use crate::{completion, stdlib, visitors::semantic};
 
+use self::commands::{
+    InjectFieldFilterParams, InjectMeasurementFilterParams,
+    InjectTagFilterParams, InjectTagValueFilterParams,
+    LspServerCommand,
+};
 use self::types::LspError;
-use self::commands::{InjectTagFilterParams, InjectTagValueFilterParams, InjectMeasurementFilterParams, InjectFieldFilterParams, LspServerCommand};
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -1108,11 +1112,13 @@ impl LanguageServer for LspServer {
         &self,
         params: lsp::ExecuteCommandParams,
     ) -> RpcResult<Option<serde_json::Value>> {
-        if params.arguments.len() != 1
-            || !params.arguments[0].is_object()
+        if params.arguments.len() > 1
+            || (params.arguments.len() == 1
+                && !params.arguments[0].is_object())
         {
-            // We only want a single argument, which is an object itself. This means that
-            // positional arguments are not supported. We only want kwargs.
+            // We want, at most, a single argument, which is an object itself. This means that
+            // positional arguments are not supported. We only want kwargs. Some commands will
+            // take no arguments.
             return Err(
                 LspError::InvalidArguments(params.arguments).into()
             );
@@ -1450,6 +1456,17 @@ impl LanguageServer for LspServer {
                     };
                 }
                 Ok(None)
+            }
+            Ok(LspServerCommand::GetFunctionList) => {
+                let functions: Vec<String> =
+                    stdlib::get_builtin_functions()
+                        .iter()
+                        .filter(|function| {
+                            !function.name.starts_with('_')
+                        })
+                        .map(|function| function.name.clone())
+                        .collect();
+                Ok(Some(functions.into()))
             }
             Err(_err) => {
                 return Err(

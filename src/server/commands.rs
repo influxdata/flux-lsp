@@ -1,19 +1,12 @@
-use serde::{Deserialize, Serialize};
 use lspower::lsp;
+use serde::{Deserialize, Serialize};
 
-// XXX: rockstar (15 Jun 2022) - Clippy will whinge here about every
-// variant of this enum starts with "Inject". I'm not a fan of using
-// the verb "inject" anyway, but this enum will eventually have many
-// different commands that aren't at all about injection; we just happen
-// to have hit the tipping point of enum size for this clippy lint to
-// kick in. We can remove this `allow` when we add something that doesn't
-// start with "Inject".
-#[allow(clippy::enum_variant_names)]
 pub enum LspServerCommand {
     InjectTagFilter,
     InjectTagValueFilter,
     InjectFieldFilter,
     InjectMeasurementFilter,
+    GetFunctionList,
 }
 
 impl TryFrom<String> for LspServerCommand {
@@ -32,6 +25,9 @@ impl TryFrom<String> for LspServerCommand {
             }
             "injectMeasurementFilter" => {
                 Ok(LspServerCommand::InjectMeasurementFilter)
+            }
+            "getFunctionList" => {
+                Ok(LspServerCommand::GetFunctionList)
             }
             _ => Err(format!(
                 "Received unknown value for LspServerCommand: {}",
@@ -56,10 +52,12 @@ impl From<LspServerCommand> for String {
             LspServerCommand::InjectMeasurementFilter => {
                 "injectMeasurementFilter".into()
             }
+            LspServerCommand::GetFunctionList => {
+                "getFunctionList".into()
+            }
         }
     }
 }
-
 
 #[derive(Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
