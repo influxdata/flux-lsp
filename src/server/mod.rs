@@ -957,6 +957,12 @@ impl LanguageServer for LspServer {
         let key = &params.text_document_position.text_document.uri;
 
         let contents = self.get_document(key)?;
+        let ast_pkg = match self.store.get_ast_package(&key) {
+            Ok(pkg) => pkg,
+            Err(err) => {
+                return Err(err.into());
+            }
+        };
         let sem_pkg = match self.store.get_semantic_package(
             &params.text_document_position.text_document.uri,
         ) {
@@ -969,11 +975,11 @@ impl LanguageServer for LspServer {
         let items = completion::find_completions(
             params,
             contents.as_str(),
+            &ast_pkg,
             &sem_pkg,
         );
 
-        let response = lsp::CompletionResponse::List(items);
-        Ok(Some(response))
+        Ok(Some(lsp::CompletionResponse::List(items)))
     }
 
     async fn semantic_tokens_full(

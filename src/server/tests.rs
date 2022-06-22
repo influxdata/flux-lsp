@@ -1445,7 +1445,6 @@ x = 1
 }
 
 #[test]
-#[ignore]
 async fn test_package_completion() {
     let fluxscript = r#"import "sql"
 
@@ -1499,7 +1498,6 @@ sql.
 }
 
 #[test]
-#[ignore]
 async fn test_import_completion() {
     let fluxscript = r#"
 import "
@@ -1632,7 +1630,6 @@ x = 1
 }
 
 #[test]
-#[ignore]
 async fn test_variable_completion() {
     let fluxscript = r#"import "strings"
 import "csv"
@@ -1750,7 +1747,6 @@ errorCounts
 }
 
 #[test]
-#[ignore]
 async fn test_option_object_members_completion() {
     let fluxscript = r#"import "strings"
 import "csv"
@@ -1820,7 +1816,6 @@ ab = 10
 }
 
 #[test]
-#[ignore]
 async fn test_option_function_completion() {
     let fluxscript = r#"import "strings"
 import "csv"
@@ -1964,7 +1959,6 @@ ab = 10
 }
 
 #[test]
-#[ignore]
 async fn test_object_param_completion() {
     let fluxscript = r#"obj = {
     func: (name, age) => name + age
@@ -2014,7 +2008,6 @@ obj.func(
 }
 
 #[test]
-#[ignore]
 async fn test_param_completion() {
     let fluxscript = r#"import "csv"
 
@@ -2086,7 +2079,6 @@ csv.from(
 }
 
 #[test]
-#[ignore]
 async fn test_param_completion_2() {
     let fluxscript = r#"import "csv"
 
@@ -2135,7 +2127,6 @@ csv.from(
 }
 
 #[test]
-#[ignore]
 async fn test_param_completion_3() {
     let fluxscript = r#"import "csv"
 
@@ -2183,7 +2174,6 @@ x = 1
 }
 
 #[test]
-#[ignore]
 async fn test_options_completion() {
     let fluxscript = r#"import "strings"
 import "csv"
@@ -2512,7 +2502,6 @@ async fn test_rename_invalid() {
 // don't add it back in, but also serves as documentation that this was a conscious
 // choice, as the user experience was not good.
 #[test]
-#[ignore]
 async fn test_package_completion_when_it_is_not_imported() {
     let fluxscript = r#"sql"#;
     let server = create_server();
@@ -2564,7 +2553,6 @@ async fn test_package_completion_when_it_is_not_imported() {
 }
 
 #[test]
-#[ignore]
 async fn test_package_completion_when_it_is_imported() {
     let fluxscript = r#"import "sql"
 
