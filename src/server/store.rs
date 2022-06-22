@@ -12,13 +12,13 @@ use super::types::LspError;
 // Url is parsed and validated prior to this function. `unwrap` here
 // is okay.
 #[allow(clippy::unwrap_used)]
-fn url_to_key_val(url: &lsp::Url) -> (String, String) {
+fn url_to_key_val(url: &lsp::Url) -> (String, String, String) {
     let path = Path::new(url.path());
 
     let parent: String = path.parent().unwrap().display().to_string();
     let filename = path.file_name().unwrap().to_str().unwrap();
 
-    (parent, filename.into())
+    (url.scheme().to_owned(), parent, filename.into())
 }
 
 fn get_analyzer() -> Result<
@@ -58,7 +58,7 @@ impl Default for Store {
 
 impl Store {
     pub fn put(&self, url: &lsp::Url, contents: &str) {
-        let (key, val) = url_to_key_val(url);
+        let (_, key, val) = url_to_key_val(url);
 
         match self.backend.write() {
             Ok(mut store) => match store.entry(key) {
@@ -82,7 +82,7 @@ impl Store {
     }
 
     pub fn remove(&self, url: &lsp::Url) {
-        let (key, val) = url_to_key_val(url);
+        let (_, key, val) = url_to_key_val(url);
 
         match self.backend.write() {
             Ok(mut store) => match store.entry(key) {
@@ -107,7 +107,7 @@ impl Store {
     }
 
     pub fn get(&self, url: &lsp::Url) -> Result<String, LspError> {
-        let (key, val) = url_to_key_val(url);
+        let (_, key, val) = url_to_key_val(url);
 
         match self.backend.read() {
             Ok(store) => match store.get(&key) {
@@ -125,7 +125,7 @@ impl Store {
 
     /// Get urls for all files in a specified file's package.
     pub fn get_package_urls(&self, url: &lsp::Url) -> Vec<lsp::Url> {
-        let (key, _) = url_to_key_val(url);
+        let (scheme, key, _) = url_to_key_val(url);
         match self.backend.read() {
             Ok(store) => match store.get(&key) {
                 None => vec![],
@@ -134,8 +134,8 @@ impl Store {
                     .map(|file| {
                         #[allow(clippy::unwrap_used)]
                         lsp::Url::parse(&format!(
-                            "file://{}/{}",
-                            key, file
+                            "{}://{}/{}",
+                            scheme, key, file
                         ))
                         .unwrap()
                     })
@@ -175,7 +175,7 @@ impl Store {
         &self,
         url: &lsp::Url,
     ) -> Result<flux::ast::File, LspError> {
-        let (_, filename) = url_to_key_val(url);
+        let (_, _key, filename) = url_to_key_val(url);
         let source = match self.get(url) {
             Ok(value) => value,
             Err(_err) => {
@@ -192,7 +192,7 @@ impl Store {
         &self,
         url: &lsp::Url,
     ) -> Result<flux::ast::Package, LspError> {
-        let (key, val) = url_to_key_val(url);
+        let (_, key, val) = url_to_key_val(url);
         let files = self.get_files(key)?;
 
         // Grab the AST Package corresponding to currently requested package. Merge all
@@ -299,7 +299,7 @@ mod test {
         let contents = "import \"foo\"";
         store.put(&url, contents);
 
-        let (key, val) = url_to_key_val(&url);
+        let (_, key, val) = url_to_key_val(&url);
 
         {
             let mut backend = store
@@ -324,7 +324,7 @@ mod test {
         let store = Store::default();
         let url = lsp::Url::parse("file:///a/b/c").unwrap();
         let contents = "import \"foo\"";
-        let (key, val) = url_to_key_val(&url);
+        let (_, key, val) = url_to_key_val(&url);
 
         {
             let mut map = HashMap::new();
@@ -401,7 +401,7 @@ mod test {
         let store = Store::default();
         let url = lsp::Url::parse("file:///a/b/c").unwrap();
         let contents = "import \"foo\"";
-        let (key, val) = url_to_key_val(&url);
+        let (_, key, val) = url_to_key_val(&url);
 
         {
             let mut map = HashMap::new();
