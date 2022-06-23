@@ -4,7 +4,6 @@ mod transform;
 mod types;
 
 use std::borrow::Cow;
-use std::cell::RefCell;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
@@ -185,7 +184,7 @@ pub struct LspServer {
     client: Arc<Mutex<Option<Client>>>,
     diagnostics: Vec<Diagnostic>,
     store: store::Store,
-    state: Mutex<RefCell<LspServerState>>,
+    state: Mutex<LspServerState>,
 }
 
 impl LspServer {
@@ -198,9 +197,7 @@ impl LspServer {
                 super::diagnostics::no_influxdb_identifiers,
             ],
             store: store::Store::default(),
-            state: Mutex::new(
-                RefCell::new(LspServerState::default()),
-            ),
+            state: Mutex::new(LspServerState::default()),
         }
     }
 
@@ -538,8 +535,8 @@ impl LanguageServer for LspServer {
                 )) = settings.get("buckets")
                 {
                     match self.state.lock() {
-                        Ok(state) => {
-                            (*state).borrow_mut().set_buckets(
+                        Ok(mut state) => {
+                            state.set_buckets(
                                 buckets
                                     .iter()
                                     .filter(|bucket| {

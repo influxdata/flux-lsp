@@ -3349,8 +3349,7 @@ async fn workspace_state_buckets() {
         settings: json!({"settings": {"buckets": ["my-bucket", "your-bucket", "our-bucket"]}})
     }).await;
 
-    let buckets =
-        server.state.lock().unwrap().borrow().buckets().clone();
+    let buckets = server.state.lock().unwrap().buckets().clone();
 
     let expected: Vec<String> =
         vec!["my-bucket", "your-bucket", "our-bucket"]
