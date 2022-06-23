@@ -21,7 +21,7 @@ impl TryFrom<String> for LspServerCommand {
                 Ok(LspServerCommand::InjectTagValueFilter)
             }
             "injectFieldFilter" => {
-                Ok(LspServerCommand::InjectTagValueFilter)
+                Ok(LspServerCommand::InjectFieldFilter)
             }
             "injectMeasurementFilter" => {
                 Ok(LspServerCommand::InjectMeasurementFilter)
