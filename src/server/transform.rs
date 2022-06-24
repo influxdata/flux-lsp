@@ -6,43 +6,98 @@ use flux::ast;
 use flux::ast::walk;
 
 fn make_from_function(bucket: String) -> ast::Statement {
-    ast::Statement::Expr(Box::new(ast::ExprStmt {
+    let from = ast::CallExpr {
         base: ast::BaseNode::default(),
-        expression: ast::Expression::Call(Box::new(ast::CallExpr {
+        callee: ast::Expression::Identifier(ast::Identifier {
             base: ast::BaseNode::default(),
-            callee: ast::Expression::Identifier(ast::Identifier {
+            name: "from".into(),
+        }),
+        arguments: vec![ast::Expression::Object(Box::new(
+            ast::ObjectExpr {
                 base: ast::BaseNode::default(),
-                name: "from".into(),
-            }),
-            arguments: vec![ast::Expression::Object(Box::new(
-                ast::ObjectExpr {
+                lbrace: vec![],
+                with: None,
+                properties: vec![flux::ast::Property {
                     base: ast::BaseNode::default(),
-                    lbrace: vec![],
-                    with: None,
-                    properties: vec![flux::ast::Property {
-                        base: ast::BaseNode::default(),
-                        key: ast::PropertyKey::Identifier(
-                            ast::Identifier {
+                    key: ast::PropertyKey::Identifier(
+                        ast::Identifier {
+                            base: ast::BaseNode::default(),
+                            name: "bucket".into(),
+                        },
+                    ),
+                    separator: vec![],
+                    value: Some(ast::Expression::StringLit(
+                        ast::StringLit {
+                            base: ast::BaseNode::default(),
+                            value: bucket,
+                        },
+                    )),
+                    comma: vec![],
+                }],
+                rbrace: vec![],
+            },
+        ))],
+        lparen: vec![],
+        rparen: vec![],
+    };
+
+    let range = ast::ExprStmt {
+        base: ast::BaseNode::default(),
+        expression: ast::Expression::PipeExpr(Box::new(
+            ast::PipeExpr {
+                argument: ast::Expression::Call(Box::new(from)),
+                base: ast::BaseNode::default(),
+                call: ast::CallExpr {
+                    arguments: vec![ast::Expression::Object(
+                        Box::new(ast::ObjectExpr {
+                            base: ast::BaseNode::default(),
+                            properties: vec![ast::Property {
                                 base: ast::BaseNode::default(),
-                                name: "bucket".into(),
-                            },
-                        ),
-                        separator: vec![],
-                        value: Some(ast::Expression::StringLit(
-                            ast::StringLit {
-                                base: ast::BaseNode::default(),
-                                value: bucket,
-                            },
-                        )),
-                        comma: vec![],
-                    }],
-                    rbrace: vec![],
+                                key: ast::PropertyKey::Identifier(
+                                    ast::Identifier {
+                                        base: ast::BaseNode::default(
+                                        ),
+                                        name: "start".into(),
+                                    },
+                                ),
+                                value: Some(
+                                    ast::Expression::Duration(
+                                        ast::DurationLit {
+                                            base:
+                                                ast::BaseNode::default(
+                                                ),
+                                            values: vec![
+                                                ast::Duration {
+                                                    magnitude: -15,
+                                                    unit: "m".into(),
+                                                },
+                                            ],
+                                        },
+                                    ),
+                                ),
+                                comma: vec![],
+                                separator: vec![],
+                            }],
+                            lbrace: vec![],
+                            rbrace: vec![],
+                            with: None,
+                        }),
+                    )],
+                    base: ast::BaseNode::default(),
+                    callee: ast::Expression::Identifier(
+                        ast::Identifier {
+                            base: ast::BaseNode::default(),
+                            name: "range".into(),
+                        },
+                    ),
+                    lparen: vec![],
+                    rparen: vec![],
                 },
-            ))],
-            lparen: vec![],
-            rparen: vec![],
-        })),
-    }))
+            },
+        )),
+    };
+
+    ast::Statement::Expr(Box::new(range))
 }
 
 #[derive(Default)]
@@ -508,6 +563,14 @@ a = 0"#;
             }
         );
         assert_eq!(0, ast.body.len());
+
+        ast.body.push(from);
+        let expected =
+            r#"from(bucket: "my-bucket") |> range(start: -15m)"#;
+        assert_eq!(
+            expected,
+            flux::formatter::convert_to_string(&ast).unwrap()
+        );
     }
 
     // When the last `from` call isn't the right bucket, return a new `from` call.
@@ -610,7 +673,7 @@ a = 0"#;
             inject_tag_filter(&ast, "cpu".into(), "my-bucket".into())
                 .unwrap();
 
-        let expected = r#"from(bucket: "my-bucket") |> filter(fn: (r) => exists r.cpu)"#;
+        let expected = r#"from(bucket: "my-bucket") |> range(start: -15m) |> filter(fn: (r) => exists r.cpu)"#;
         assert_eq!(
             expected,
             flux::formatter::convert_to_string(&transformed).unwrap()
@@ -650,7 +713,7 @@ a = 0"#;
         )
         .unwrap();
 
-        let expected = r#"from(bucket: "my-bucket") |> filter(fn: (r) => r.myTag == "myTagValue")"#;
+        let expected = r#"from(bucket: "my-bucket") |> range(start: -15m) |> filter(fn: (r) => r.myTag == "myTagValue")"#;
         assert_eq!(
             expected,
             flux::formatter::convert_to_string(&transformed).unwrap()
