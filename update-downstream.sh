@@ -23,8 +23,13 @@ TEMPDIR=$(mktemp -d -t flux-lsp-release.XXXX)
 echo "Using fresh install in $TEMPDIR"
 cd $TEMPDIR
 
-git clone git@github.com:influxdata/ui.git > /dev/null 2>&1
-git clone git@github.com:influxdata/vsflux.git > /dev/null 2>&1
+if [[ $(ssh -T git@github.com) ]]; then
+  git clone git@github.com:influxdata/ui.git > /dev/null 2>&1
+  git clone git@github.com:influxdata/vsflux.git > /dev/null 2>&1
+else
+  git clone https://github.com/influxdata/ui.git > /dev/null 2>&1
+  git clone https://github.com/influxdata/vsflux.git > /dev/null 2>&1
+fi
 
 cd $TEMPDIR/ui
 git checkout -b build/update-lsp-to-${VERSION}
