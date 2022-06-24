@@ -37,7 +37,12 @@ fi
 TEMPDIR=$(mktemp -d -t flux-release.XXXX)
 echo "Using fresh install in $TEMPDIR"
 cd $TEMPDIR
-git clone git@github.com:influxdata/flux-lsp.git > /dev/null 2>&1
+if [[ $(ssh -T git@github.com) ]]; then
+  git clone git@github.com:influxdata/flux-lsp.git
+else
+  git clone https://github.com/influxdata/flux-lsp.git
+fi
+
 cd $TEMPDIR/flux-lsp
 
 if [[ ! $(hub ci-status HEAD) ]]; then
