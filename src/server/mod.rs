@@ -37,18 +37,7 @@ fn node_to_location(
 ) -> lsp::Location {
     lsp::Location {
         uri,
-        // XXX: rockstar (19 May 2022) - flux asks for too new of an lsp-types for `.into` to
-        // work. That doesn't need to be quite so bleeding edge, but that's an issue for flux.
-        range: lsp::Range {
-            start: lsp::Position {
-                line: node.loc().start.line - 1,
-                character: node.loc().start.column - 1,
-            },
-            end: lsp::Position {
-                line: node.loc().end.line - 1,
-                character: node.loc().end.column - 1,
-            },
-        },
+        range: node.loc().clone().into(),
     }
 }
 
@@ -302,18 +291,7 @@ impl LspServer {
                         })
                         .map(|e| {
                             (e.location.file.clone(), lsp::Diagnostic {
-                    // XXX: rockstar (19 May 2022) - flux asks for too new of an lsp-types for `.into` to
-                    // work. That doesn't need to be quite so bleeding edge, but that's an issue for flux.
-                    range: lsp::Range {
-                        start: lsp::Position {
-                            line: e.location.start.line - 1,
-                            character: e.location.start.column - 1,
-                        },
-                        end: lsp::Position {
-                            line: e.location.end.line - 1,
-                            character: e.location.end.column - 1,
-                        },
-                    },
+                    range: e.location.clone().into(),
                     severity: Some(lsp::DiagnosticSeverity::ERROR),
                     source: Some("flux".to_string()),
                     message: e.error.to_string(),
@@ -1072,19 +1050,7 @@ impl LanguageServer for LspServer {
             .filter(|error| {
                 crate::lsp::ranges_overlap(
                     &params.range,
-                    // XXX: rockstar (19 May 2022) - flux asks for too new of an lsp-types for `.into` to
-                    // work. That doesn't need to be quite so bleeding edge, but that's an issue for flux.
-                    &lsp::Range {
-                        start: lsp::Position {
-                            line: error.location.start.line - 1,
-                            character: error.location.start.column
-                                - 1,
-                        },
-                        end: lsp::Position {
-                            line: error.location.end.line - 1,
-                            character: error.location.end.column - 1,
-                        },
-                    },
+                    &error.location.clone().into(),
                 )
             })
             .collect();

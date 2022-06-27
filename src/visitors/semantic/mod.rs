@@ -26,24 +26,25 @@ fn contains_position(node: Node<'_>, pos: lsp::Position) -> bool {
         // a start/end location of 0:0.
         return false;
     }
-    let start_line = node.loc().start.line - 1;
-    let start_col = node.loc().start.column - 1;
-    let end_line = node.loc().end.line - 1;
-    let end_col = node.loc().end.column - 1;
+    let range: lsp::Range = node.loc().clone().into();
 
-    if pos.line < start_line {
+    if pos.line < range.start.line {
         return false;
     }
 
-    if pos.line > end_line {
+    if pos.line > range.end.line {
         return false;
     }
 
-    if pos.line == start_line && pos.character < start_col {
+    if pos.line == range.start.line
+        && pos.character < range.start.character
+    {
         return false;
     }
 
-    if pos.line == end_line && pos.character > end_col {
+    if pos.line == range.end.line
+        && pos.character > range.end.character
+    {
         return false;
     }
 
@@ -223,18 +224,7 @@ pub struct PackageNodeFinderVisitor {
 impl<'a> Visitor<'a> for PackageNodeFinderVisitor {
     fn visit(&mut self, node: Node<'a>) -> bool {
         if let Node::PackageClause(n) = node {
-            // XXX: rockstar (19 May 2022) - flux asks for too new of an lsp-types for `.into` to
-            // work. That doesn't need to be quite so bleeding edge, but that's an issue for flux.
-            self.location = Some(lsp::Range {
-                start: lsp::Position {
-                    line: n.loc.start.line - 1,
-                    character: n.loc.start.column - 1,
-                },
-                end: lsp::Position {
-                    line: n.loc.end.line - 1,
-                    character: n.loc.end.column - 1,
-                },
-            });
+            self.location = Some(n.loc.clone().into());
             return false;
         }
         true

@@ -24,19 +24,10 @@ impl<'a> NodeFinderVisitor<'a> {
 
 impl<'a> walk::Visitor<'a> for NodeFinderVisitor<'a> {
     fn visit(&mut self, node: walk::Node<'a>) -> bool {
-        // XXX: rockstar (19 May 2022) - flux asks for too new of an lsp-types for `.into` to
-        // work. That doesn't need to be quite so bleeding edge, but that's an issue for flux.
-        let range = lsp::Range {
-            start: lsp::Position {
-                line: node.base().location.start.line - 1,
-                character: node.base().location.start.column - 1,
-            },
-            end: lsp::Position {
-                line: node.base().location.end.line - 1,
-                character: node.base().location.end.column - 1,
-            },
-        };
-        if crate::lsp::position_in_range(&self.position, &range) {
+        if crate::lsp::position_in_range(
+            &self.position,
+            &node.base().location.clone().into(),
+        ) {
             let parent = self.node.clone();
             if let Some(parent) = parent {
                 self.node = Some(NodeFinderNode {
@@ -63,12 +54,7 @@ impl From<&flux::ast::Package> for PackageInfo {
     fn from(pkg: &flux::ast::Package) -> Self {
         Self {
             name: pkg.package.clone(),
-            // XXX: rockstar (19 May 2022) - flux asks for too new of an lsp-types for `.into` to
-            // work. That doesn't need to be quite so bleeding edge, but that's an issue for flux.
-            position: lsp::Position {
-                line: pkg.base.location.start.line - 1,
-                character: pkg.base.location.start.column - 1,
-            },
+            position: pkg.base.location.start.into(),
         }
     }
 }
