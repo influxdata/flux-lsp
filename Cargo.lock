@@ -635,7 +635,7 @@ dependencies = [
 [[package]]
 name = "flux"
 version = "0.154.0"
-source = "git+https://github.com/influxdata/flux?tag=v0.170.0#167cfbf4677fd7e9a5de1913254e2b3436aedc81"
+source = "git+https://github.com/influxdata/flux?tag=v0.172.0#0bd05dd6371b4355ddbacf50a3eae51d5240d026"
 dependencies = [
  "anyhow",
  "env_logger",
@@ -650,7 +650,7 @@ dependencies = [
 [[package]]
 name = "flux-core"
 version = "0.154.0"
-source = "git+https://github.com/influxdata/flux?tag=v0.170.0#167cfbf4677fd7e9a5de1913254e2b3436aedc81"
+source = "git+https://github.com/influxdata/flux?tag=v0.172.0#0bd05dd6371b4355ddbacf50a3eae51d5240d026"
 dependencies = [
  "anyhow",
  "chrono",
@@ -661,9 +661,10 @@ dependencies = [
  "env_logger",
  "flatbuffers",
  "fnv",
+ "indexmap",
  "libflate",
  "log",
- "lsp-types 0.93.0",
+ "lsp-types",
  "maplit",
  "pretty",
  "regex",
@@ -1032,19 +1033,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "lsp-types"
-version = "0.93.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "70c74e2173b2b31f8655d33724b4b45ac13f439386f66290f539c22b144c2212"
-dependencies = [
- "bitflags",
- "serde",
- "serde_json",
- "serde_repr",
- "url",
-]
-
-[[package]]
 name = "lspower"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1059,7 +1047,7 @@ dependencies = [
  "futures",
  "httparse",
  "log",
- "lsp-types 0.91.1",
+ "lsp-types",
  "lspower-macros",
  "serde",
  "serde_json",
