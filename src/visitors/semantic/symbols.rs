@@ -17,16 +17,7 @@ fn parse_variable_assignment(
             name: va.id.name.to_string(),
             location: lsp::Location {
                 uri: uri.clone(),
-                range: lsp::Range {
-                    start: lsp::Position {
-                        line: node.loc().start.line - 1,
-                        character: node.loc().start.column - 1,
-                    },
-                    end: lsp::Position {
-                        line: node.loc().end.line - 1,
-                        character: node.loc().end.column - 1,
-                    },
-                },
+                range: node.loc().clone().into(),
             },
             tags: None,
             deprecated: None,
@@ -39,16 +30,7 @@ fn parse_variable_assignment(
                 name: param.key.name.to_string(),
                 location: lsp::Location {
                     uri: uri.clone(),
-                    range: lsp::Range {
-                        start: lsp::Position {
-                            line: param.loc.start.line - 1,
-                            character: param.loc.start.column - 1,
-                        },
-                        end: lsp::Position {
-                            line: param.loc.end.line - 1,
-                            character: param.loc.end.column - 1,
-                        },
-                    },
+                    range: param.loc.clone().into(),
                 },
                 tags: None,
                 deprecated: None,
@@ -61,16 +43,7 @@ fn parse_variable_assignment(
             name: va.id.name.to_string(),
             location: lsp::Location {
                 uri,
-                range: lsp::Range {
-                    start: lsp::Position {
-                        line: node.loc().start.line - 1,
-                        character: node.loc().start.column - 1,
-                    },
-                    end: lsp::Position {
-                        line: node.loc().end.line - 1,
-                        character: node.loc().end.column - 1,
-                    },
-                },
+                range: node.loc().clone().into(),
             },
             tags: None,
             deprecated: None,
@@ -93,16 +66,7 @@ fn parse_call_expression(
             name: ident.name.to_string(),
             location: lsp::Location {
                 uri: uri.clone(),
-                range: lsp::Range {
-                    start: lsp::Position {
-                        line: c.loc.start.line - 1,
-                        character: c.loc.start.column - 1,
-                    },
-                    end: lsp::Position {
-                        line: c.loc.end.line - 1,
-                        character: c.loc.end.column - 1,
-                    },
-                },
+                range: c.loc.clone().into(),
             },
             tags: None,
             deprecated: None,
@@ -117,16 +81,7 @@ fn parse_call_expression(
                 name: arg.key.name.to_string(),
                 location: lsp::Location {
                     uri: uri.clone(),
-                    range: lsp::Range {
-                        start: lsp::Position {
-                            line: arg.loc.start.line - 1,
-                            character: arg.loc.start.column - 1,
-                        },
-                        end: lsp::Position {
-                            line: arg.loc.end.line - 1,
-                            character: arg.loc.end.column - 1,
-                        },
-                    },
+                    range: arg.loc.clone().into(),
                 },
                 tags: None,
                 deprecated: None,
@@ -138,16 +93,7 @@ fn parse_call_expression(
                 name: arg.key.name.to_string(),
                 location: lsp::Location {
                     uri: uri.clone(),
-                    range: lsp::Range {
-                        start: lsp::Position {
-                            line: arg.loc.start.line - 1,
-                            character: arg.loc.start.column - 1,
-                        },
-                        end: lsp::Position {
-                            line: arg.loc.end.line - 1,
-                            character: arg.loc.end.column - 1,
-                        },
-                    },
+                    range: arg.loc.clone().into(),
                 },
                 tags: None,
                 deprecated: None,
@@ -171,16 +117,7 @@ fn parse_binary_expression(
             name: ident.name.to_string(),
             location: lsp::Location {
                 uri: uri.clone(),
-                range: lsp::Range {
-                    start: lsp::Position {
-                        line: ident.loc.start.line - 1,
-                        character: ident.loc.start.column - 1,
-                    },
-                    end: lsp::Position {
-                        line: ident.loc.end.line - 1,
-                        character: ident.loc.end.column - 1,
-                    },
-                },
+                range: ident.loc.into(),
             },
             tags: None,
             deprecated: None,
@@ -194,16 +131,7 @@ fn parse_binary_expression(
             name: ident.name.to_string(),
             location: lsp::Location {
                 uri,
-                range: lsp::Range {
-                    start: lsp::Position {
-                        line: ident.loc.start.line - 1,
-                        character: ident.loc.start.column - 1,
-                    },
-                    end: lsp::Position {
-                        line: ident.loc.end.line - 1,
-                        character: ident.loc.end.column - 1,
-                    },
-                },
+                range: ident.loc.into(),
             },
             tags: None,
             deprecated: None,
@@ -271,17 +199,7 @@ impl<'a> Visitor<'a> for SymbolsVisitor<'a> {
                         name: source,
                         location: lsp::Location {
                             uri,
-                            range: lsp::Range {
-                                start: lsp::Position {
-                                    line: me.loc.start.line - 1,
-                                    character: me.loc.start.column
-                                        - 1,
-                                },
-                                end: lsp::Position {
-                                    line: me.loc.end.line - 1,
-                                    character: me.loc.end.column - 1,
-                                },
-                            },
+                            range: me.loc.clone().into(),
                         },
                         tags: None,
                         deprecated: None,
@@ -295,16 +213,7 @@ impl<'a> Visitor<'a> for SymbolsVisitor<'a> {
                     name: num.value.to_string(),
                     location: lsp::Location {
                         uri,
-                        range: lsp::Range {
-                            start: lsp::Position {
-                                line: num.loc.start.line - 1,
-                                character: num.loc.start.column - 1,
-                            },
-                            end: lsp::Position {
-                                line: num.loc.end.line - 1,
-                                character: num.loc.end.column - 1,
-                            },
-                        },
+                        range: num.loc.clone().into(),
                     },
                     tags: None,
                     deprecated: None,
@@ -318,16 +227,7 @@ impl<'a> Visitor<'a> for SymbolsVisitor<'a> {
                     name: num.value.to_string(),
                     location: lsp::Location {
                         uri,
-                        range: lsp::Range {
-                            start: lsp::Position {
-                                line: num.loc.start.line - 1,
-                                character: num.loc.start.column - 1,
-                            },
-                            end: lsp::Position {
-                                line: num.loc.end.line - 1,
-                                character: num.loc.end.column - 1,
-                            },
-                        },
+                        range: num.loc.clone().into(),
                     },
                     tags: None,
                     deprecated: None,
@@ -341,16 +241,7 @@ impl<'a> Visitor<'a> for SymbolsVisitor<'a> {
                     name: d.value.to_string(),
                     location: lsp::Location {
                         uri,
-                        range: lsp::Range {
-                            start: lsp::Position {
-                                line: d.loc.start.line - 1,
-                                character: d.loc.start.column - 1,
-                            },
-                            end: lsp::Position {
-                                line: d.loc.end.line - 1,
-                                character: d.loc.end.column - 1,
-                            },
-                        },
+                        range: d.loc.clone().into(),
                     },
                     tags: None,
                     deprecated: None,
@@ -364,16 +255,7 @@ impl<'a> Visitor<'a> for SymbolsVisitor<'a> {
                     name: b.value.to_string(),
                     location: lsp::Location {
                         uri,
-                        range: lsp::Range {
-                            start: lsp::Position {
-                                line: b.loc.start.line - 1,
-                                character: b.loc.start.column - 1,
-                            },
-                            end: lsp::Position {
-                                line: b.loc.end.line - 1,
-                                character: b.loc.end.column - 1,
-                            },
-                        },
+                        range: b.loc.clone().into(),
                     },
                     tags: None,
                     deprecated: None,
@@ -387,16 +269,7 @@ impl<'a> Visitor<'a> for SymbolsVisitor<'a> {
                     name: s.value.clone(),
                     location: lsp::Location {
                         uri,
-                        range: lsp::Range {
-                            start: lsp::Position {
-                                line: s.loc.start.line - 1,
-                                character: s.loc.start.column - 1,
-                            },
-                            end: lsp::Position {
-                                line: s.loc.end.line - 1,
-                                character: s.loc.end.column - 1,
-                            },
-                        },
+                        range: s.loc.clone().into(),
                     },
                     tags: None,
                     deprecated: None,
@@ -410,16 +283,7 @@ impl<'a> Visitor<'a> for SymbolsVisitor<'a> {
                     name: String::from("[]"),
                     location: lsp::Location {
                         uri,
-                        range: lsp::Range {
-                            start: lsp::Position {
-                                line: a.loc.start.line - 1,
-                                character: a.loc.start.column - 1,
-                            },
-                            end: lsp::Position {
-                                line: a.loc.end.line - 1,
-                                character: a.loc.end.column - 1,
-                            },
-                        },
+                        range: a.loc.clone().into(),
                     },
                     tags: None,
                     deprecated: None,
