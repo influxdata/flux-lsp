@@ -61,23 +61,55 @@ fn make_from_function(bucket: String) -> ast::Statement {
                                     },
                                 ),
                                 value: Some(
-                                    ast::Expression::Duration(
-                                        ast::DurationLit {
-                                            base:
-                                                ast::BaseNode::default(
-                                                ),
-                                            values: vec![
-                                                ast::Duration {
-                                                    magnitude: -15,
-                                                    unit: "m".into(),
-                                                },
-                                            ],
-                                        },
-                                    ),
+                                    ast::Expression::Member(Box::new(ast::MemberExpr {
+                                        base: ast::BaseNode::default(),
+                                        lbrack: vec![],
+                                        rbrack: vec![],
+                                        object: ast::Expression::Identifier(
+                                            ast::Identifier {
+                                                base: ast::BaseNode::default(),
+                                                name: "params".into(),
+                                            }
+                                        ),
+                                        property: ast::PropertyKey::Identifier(ast::Identifier {
+                                            base: ast::BaseNode::default(),
+                                            name: "timeRangeStart".into(),
+                                        })
+                                    }))
                                 ),
                                 comma: vec![],
                                 separator: vec![],
-                            }],
+                            },
+                            ast::Property {
+                                base: ast::BaseNode::default(),
+                                key: ast::PropertyKey::Identifier(
+                                    ast::Identifier {
+                                        base: ast::BaseNode::default(
+                                        ),
+                                        name: "stop".into(),
+                                    },
+                                ),
+                                value: Some(
+                                    ast::Expression::Member(Box::new(ast::MemberExpr {
+                                        base: ast::BaseNode::default(),
+                                        lbrack: vec![],
+                                        rbrack: vec![],
+                                        object: ast::Expression::Identifier(
+                                            ast::Identifier {
+                                                base: ast::BaseNode::default(),
+                                                name: "params".into(),
+                                            }
+                                        ),
+                                        property: ast::PropertyKey::Identifier(ast::Identifier {
+                                            base: ast::BaseNode::default(),
+                                            name: "timeRangeStop".into(),
+                                        })
+                                    }))
+                                ),
+                                comma: vec![],
+                                separator: vec![],
+                            }
+                            ],
                             lbrace: vec![],
                             rbrace: vec![],
                             with: None,
@@ -565,8 +597,7 @@ a = 0"#;
         assert_eq!(0, ast.body.len());
 
         ast.body.push(from);
-        let expected =
-            r#"from(bucket: "my-bucket") |> range(start: -15m)"#;
+        let expected = r#"from(bucket: "my-bucket") |> range(start: params.timeRangeStart, stop: params.timeRangeStop)"#;
         assert_eq!(
             expected,
             flux::formatter::convert_to_string(&ast).unwrap()
@@ -673,7 +704,9 @@ a = 0"#;
             inject_tag_filter(&ast, "cpu".into(), "my-bucket".into())
                 .unwrap();
 
-        let expected = r#"from(bucket: "my-bucket") |> range(start: -15m) |> filter(fn: (r) => exists r.cpu)"#;
+        let expected = r#"from(bucket: "my-bucket")
+    |> range(start: params.timeRangeStart, stop: params.timeRangeStop)
+    |> filter(fn: (r) => exists r.cpu)"#;
         assert_eq!(
             expected,
             flux::formatter::convert_to_string(&transformed).unwrap()
@@ -713,7 +746,9 @@ a = 0"#;
         )
         .unwrap();
 
-        let expected = r#"from(bucket: "my-bucket") |> range(start: -15m) |> filter(fn: (r) => r.myTag == "myTagValue")"#;
+        let expected = r#"from(bucket: "my-bucket")
+    |> range(start: params.timeRangeStart, stop: params.timeRangeStop)
+    |> filter(fn: (r) => r.myTag == "myTagValue")"#;
         assert_eq!(
             expected,
             flux::formatter::convert_to_string(&transformed).unwrap()
