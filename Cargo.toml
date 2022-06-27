@@ -38,7 +38,7 @@ clap = { version = "3.1.9", features = ["derive"], optional = true }
 combinations = "0.1.0"
 console_error_panic_hook = { version = "0.1.7", optional = true }
 console_log = { version = "0.2", optional = true }
-flux = { git = "https://github.com/influxdata/flux", tag = "v0.170.0", features = ["lsp"], default-features = false }
+flux = { git = "https://github.com/influxdata/flux", tag = "v0.172.0", features = ["lsp"], default-features = false }
 futures = { version = "0.3.21", optional = true }
 js-sys = { version = "0.3.57", optional = true }
 line-col = "0.2.1"

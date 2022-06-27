@@ -280,6 +280,7 @@ impl LspServer {
                 }
                 Some(errors) => {
                     errors
+                        .diagnostics
                         .errors
                         .iter()
                         .filter(|error| {
@@ -1065,6 +1066,7 @@ impl LanguageServer for LspServer {
 
         let relevant: Vec<&flux::semantic::Error> = errors
             .error
+            .diagnostics
             .errors
             .iter()
             .filter(|error| {
