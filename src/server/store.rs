@@ -29,7 +29,11 @@ fn get_analyzer() -> Result<
     LspError,
 > {
     match flux::new_semantic_analyzer(
-        flux::semantic::AnalyzerConfig::default(),
+        flux::semantic::AnalyzerConfig {
+            features: vec![
+                flux::semantic::Feature::UnusedSymbolWarnings,
+            ],
+        },
     ) {
         Ok(analyzer) => Ok(analyzer),
         Err(err) => {

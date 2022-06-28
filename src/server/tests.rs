@@ -3174,6 +3174,47 @@ from(bucket: "my-bucket")
     assert!(!diagnostics_again.is_empty());
 }
 
+#[test]
+async fn compute_diagnostics_show_warnings() {
+    let server = create_server();
+
+    let filename: String = "file:///path/to/script.flux".into();
+    let fluxscript = r#"from(bucket: "my-bucket")
+|> range(start: -100d)
+|> filter(fn: (r) => r.value == "b")
+|> map(fn: (r) => {
+    unusedVariable = 1200
+    return r
+})"#;
+    open_file(&server, fluxscript.into(), Some(&filename)).await;
+
+    let diagnostics = server
+        .compute_diagnostics(&lsp::Url::parse(&filename).unwrap());
+
+    let expected: HashMap<lsp::Url, Vec<lsp::Diagnostic>> =
+        HashMap::from([(
+            lsp::Url::parse("file:///path/to/script.flux").unwrap(),
+            vec![lsp::Diagnostic {
+                range: lsp::Range {
+                    start: lsp::Position {
+                        line: 0,
+                        character: 0,
+                    },
+                    end: lsp::Position {
+                        line: 0,
+                        character: 1,
+                    },
+                },
+                severity: Some(lsp::DiagnosticSeverity::WARNING),
+                message: "symbol unusedVariable is never used"
+                    .to_string(),
+                ..lsp::Diagnostic::default()
+            }],
+        )]);
+
+    assert_eq!(expected, diagnostics);
+}
+
 // All commands require key/value pairs as params, not positional
 /// arguments.
 #[test]

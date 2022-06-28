@@ -26,7 +26,7 @@ use self::types::LspError;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
-type Diagnostic =
+type DiagnosticFn =
     fn(&SemanticPackage) -> Vec<(Option<String>, lsp::Diagnostic)>;
 
 /// Convert a flux::semantic::walk::Node to a lsp::Location
@@ -151,6 +151,24 @@ pub fn find_stdlib_signatures(
         })
 }
 
+struct Diagnostic<'a> {
+    location: &'a flux::ast::SourceLocation,
+    message: String,
+    severity: lsp::DiagnosticSeverity,
+}
+
+impl<'a> From<Diagnostic<'a>> for lsp::Diagnostic {
+    fn from(diagnostic: Diagnostic) -> Self {
+        lsp::Diagnostic {
+            range: diagnostic.location.clone().into(),
+            severity: Some(diagnostic.severity),
+            source: Some("flux".to_string()),
+            message: diagnostic.message,
+            ..lsp::Diagnostic::default()
+        }
+    }
+}
+
 #[derive(Default)]
 struct LspServerState {
     buckets: Vec<String>,
@@ -171,7 +189,7 @@ impl LspServerState {
 
 pub struct LspServer {
     client: Arc<Mutex<Option<Client>>>,
-    diagnostics: Vec<Diagnostic>,
+    diagnostics: Vec<DiagnosticFn>,
     store: store::Store,
     state: Mutex<LspServerState>,
 }
@@ -272,11 +290,25 @@ impl LspServer {
                         .diagnostics
                         .errors
                         .iter()
-                        .filter(|error| {
+                        .map(|error|
+                            Diagnostic {
+                                location: &error.location,
+                                message: error.error.to_string(),
+                                severity: lsp::DiagnosticSeverity::ERROR,
+                            }
+                        )
+                        .chain(errors.diagnostics.warnings.iter().map(|warning| {
+                            Diagnostic {
+                                location: &warning.location,
+                                message: warning.error.to_string(),
+                                severity: lsp::DiagnosticSeverity::WARNING,
+                            }
+                        }))
+                        .filter(|diagnostic| {
                             // We will never have two files with the same name in a package, so we can
                             // key off filename to determine whether the error exists in this file or
                             // elsewhere in the package.
-                            if let Some(file) = &error.location.file {
+                            if let Some(file) = &diagnostic.location.file {
                                 if let Some(segments) =
                                     key.path_segments()
                                 {
@@ -289,15 +321,7 @@ impl LspServer {
                             }
                             false
                         })
-                        .map(|e| {
-                            (e.location.file.clone(), lsp::Diagnostic {
-                    range: e.location.clone().into(),
-                    severity: Some(lsp::DiagnosticSeverity::ERROR),
-                    source: Some("flux".to_string()),
-                    message: e.error.to_string(),
-                    ..lsp::Diagnostic::default()
-                })
-                        })
+                        .map(|e| (e.location.file.clone(), e.into()))
                         .collect()
                 }
             };
@@ -1027,7 +1051,11 @@ impl LanguageServer for LspServer {
             };
 
         let mut analyzer = match flux::new_semantic_analyzer(
-            flux::semantic::AnalyzerConfig::default(),
+            flux::semantic::AnalyzerConfig {
+                features: vec![
+                    flux::semantic::Feature::UnusedSymbolWarnings,
+                ],
+            },
         ) {
             Ok(analyzer) => analyzer,
             Err(_) => return Ok(None),
