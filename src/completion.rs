@@ -847,7 +847,7 @@ pub fn find_completions(
 ) -> lsp::CompletionList {
     let position = params.text_document_position.position;
 
-    let walker = AstNode::File(&ast_pkg.files[0]);
+    let walker = AstNode::Package(&ast_pkg);
     let mut visitor = NodeFinderVisitor::new(position);
 
     walk(&mut visitor, walker);

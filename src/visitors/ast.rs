@@ -24,6 +24,9 @@ impl<'a> NodeFinderVisitor<'a> {
 
 impl<'a> walk::Visitor<'a> for NodeFinderVisitor<'a> {
     fn visit(&mut self, node: walk::Node<'a>) -> bool {
+        if let walk::Node::Package(_) = node {
+            return true;
+        }
         if crate::lsp::position_in_range(
             &self.position,
             &node.base().location.clone().into(),

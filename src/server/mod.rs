@@ -972,14 +972,18 @@ impl LanguageServer for LspServer {
             }
         };
 
-        let items = completion::find_completions(
+        let completion_list = completion::find_completions(
             params,
             contents.as_str(),
             &ast_pkg,
             &sem_pkg,
         );
 
-        Ok(Some(lsp::CompletionResponse::List(items)))
+        if completion_list.items.is_empty() {
+            Ok(None)
+        } else {
+            Ok(Some(lsp::CompletionResponse::List(completion_list)))
+        }
     }
 
     async fn semantic_tokens_full(
