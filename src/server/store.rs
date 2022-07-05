@@ -184,7 +184,7 @@ impl Store {
         Ok(file)
     }
 
-    fn get_ast_package(
+    pub fn get_ast_package(
         &self,
         url: &lsp::Url,
     ) -> Result<flux::ast::Package, LspError> {
