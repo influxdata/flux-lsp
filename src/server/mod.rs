@@ -980,12 +980,13 @@ impl LanguageServer for LspServer {
         &self,
         params: lsp::SemanticTokensParams,
     ) -> RpcResult<Option<lsp::SemanticTokensResult>> {
-        let key = params.text_document.uri;
-
-        let contents = self.get_document(&key)?;
-        let pkg: flux::ast::Package =
-            flux::parser::parse_string("".into(), contents.as_str())
-                .into();
+        let pkg = match self
+            .store
+            .get_ast_package(&params.text_document.uri)
+        {
+            Ok(pkg) => pkg,
+            Err(err) => return Err(err.into()),
+        };
         let root_node = flux::ast::walk::Node::File(&pkg.files[0]);
 
         let mut visitor =
@@ -1017,33 +1018,15 @@ impl LanguageServer for LspServer {
             return Ok(None);
         }
 
-        let contents =
-            match self.get_document(&params.text_document.uri) {
-                Ok(value) => value,
-                Err(e) => {
-                    log::error!("{}", e);
-                    return Ok(None);
-                }
-            };
-
-        let mut analyzer = match flux::new_semantic_analyzer(
-            flux::semantic::AnalyzerConfig::default(),
-        ) {
-            Ok(analyzer) => analyzer,
-            Err(_) => return Ok(None),
-        };
-
-        let errors = match analyzer.analyze_source(
-            "".into(),
-            params.text_document.uri.clone().into(),
-            &contents,
-        ) {
-            Ok(_) => return Ok(None),
-            Err(errors) => errors,
+        let errors = match self
+            .store
+            .get_package_errors(&params.text_document.uri)
+        {
+            Some(errors) => errors,
+            None => return Ok(None),
         };
 
         let relevant: Vec<&flux::semantic::Error> = errors
-            .error
             .diagnostics
             .errors
             .iter()
@@ -1058,15 +1041,16 @@ impl LanguageServer for LspServer {
             return Ok(None);
         }
 
-        if errors.value.is_none() {
-            return Ok(None);
-        }
-        let (_exports, source) =
-            errors.value.expect("Previous check failed.");
-
+        let pkg = match self
+            .store
+            .get_semantic_package(&params.text_document.uri)
+        {
+            Ok(pkg) => pkg,
+            Err(err) => unreachable!("{:?}", err),
+        };
         let mut visitor =
             semantic::PackageNodeFinderVisitor::default();
-        let walker = walk::Node::Package(&source);
+        let walker = walk::Node::Package(&pkg);
         walk::walk(&mut visitor, walker);
 
         let import_position = match visitor.location {
