@@ -3,13 +3,13 @@ use std::sync::Arc;
 use flux::ast::walk::walk;
 use flux::ast::walk::Node as AstNode;
 use flux::ast::{Expression, PropertyKey};
+use flux::imports;
 use flux::semantic::nodes::CallExpr;
 use flux::semantic::nodes::Expression as SemanticExpression;
 use flux::semantic::types::{
     BuiltinType, CollectionType, MonoType, Record,
 };
 use flux::semantic::walk::Visitor as SemanticVisitor;
-use flux::{imports, prelude};
 use lspower::lsp;
 
 use crate::shared::Function;
@@ -34,11 +34,12 @@ struct PackageResult {
 #[derive(Clone, Debug)]
 struct CompletionInfo {
     ident: String,
-    position: lsp::Position,
     imports: Vec<Import>,
 }
 
-pub fn get_imports(pkg: &flux::semantic::nodes::Package) -> Vec<Import> {
+pub fn get_imports(
+    pkg: &flux::semantic::nodes::Package,
+) -> Vec<Import> {
     let walker = flux::semantic::walk::Node::Package(pkg);
     let mut visitor = ImportFinderVisitor::default();
 
@@ -122,7 +123,7 @@ trait Completable {
 //
 // It is assumed that the haystack is the name of an identifier and the needle is a partial
 // identifier.
-fn fuzzy_match(haystack: &str, needle: &str) -> bool {
+pub fn fuzzy_match(haystack: &str, needle: &str) -> bool {
     return haystack
         .to_lowercase()
         .contains(needle.to_lowercase().as_str());
@@ -273,146 +274,6 @@ impl Completable for CompletionVarResult {
 
     fn matches(&self, text: &str, _info: &CompletionInfo) -> bool {
         fuzzy_match(self.name.as_str(), text)
-    }
-}
-
-struct CompletableFinderVisitor {
-    pos: lsp::Position,
-    completables: Vec<Arc<dyn Completable>>,
-}
-
-impl<'a> SemanticVisitor<'a> for CompletableFinderVisitor {
-    fn visit(
-        &mut self,
-        node: flux::semantic::walk::Node<'a>,
-    ) -> bool {
-        let loc = node.loc();
-
-        // Is the node defined after what we're looking for?
-        if loc.start.line > self.pos.line + 1
-            || (loc.start.line == self.pos.line + 1
-                && loc.start.column > self.pos.character + 1)
-        {
-            return true;
-        }
-
-        match node {
-            flux::semantic::walk::Node::ImportDeclaration(id) => {
-                if let Some(alias) = &id.alias {
-                    self.completables.push(Arc::new(
-                        ImportAliasResult::new(
-                            id.path.value.clone(),
-                            alias.name.to_string(),
-                        ),
-                    ));
-                }
-            }
-
-            flux::semantic::walk::Node::VariableAssgn(assgn) => {
-                let name = &assgn.id.name;
-                if let Some(var_type) = get_var_type(&assgn.init) {
-                    self.completables.push(Arc::new(
-                        CompletionVarResult {
-                            var_type,
-                            name: name.to_string(),
-                        },
-                    ));
-                }
-
-                if let Some(fun) =
-                    create_function_result(name, &assgn.init)
-                {
-                    self.completables.push(Arc::new(fun));
-                }
-            }
-
-            flux::semantic::walk::Node::OptionStmt(opt) => {
-                if let flux::semantic::nodes::Assignment::Variable(
-                    var_assign,
-                ) = &opt.assignment
-                {
-                    let name = &var_assign.id.name;
-                    if let Some(var_type) =
-                        get_var_type(&var_assign.init)
-                    {
-                        self.completables.push(Arc::new(
-                            CompletionVarResult {
-                                name: name.to_string(),
-                                var_type,
-                            },
-                        ));
-
-                        return false;
-                    }
-
-                    if let Some(fun) =
-                        create_function_result(name, &var_assign.init)
-                    {
-                        self.completables.push(Arc::new(fun));
-                        return false;
-                    }
-                }
-            }
-            _ => (),
-        }
-
-        true
-    }
-}
-
-impl CompletableFinderVisitor {
-    fn new(pos: lsp::Position) -> Self {
-        CompletableFinderVisitor {
-            completables: Vec::new(),
-            pos,
-        }
-    }
-}
-
-#[derive(Clone)]
-struct ImportAliasResult {
-    path: String,
-    alias: String,
-}
-
-impl ImportAliasResult {
-    fn new(path: String, alias: String) -> Self {
-        ImportAliasResult { path, alias }
-    }
-}
-
-impl Completable for ImportAliasResult {
-    fn completion_item(
-        &self,
-        _info: &CompletionInfo,
-    ) -> lsp::CompletionItem {
-        lsp::CompletionItem {
-            label: format!("{} (self)", self.alias),
-            additional_text_edits: None,
-            commit_characters: None,
-            deprecated: None,
-            detail: Some("Package".to_string()),
-            documentation: Some(lsp::Documentation::String(format!(
-                "from {}",
-                self.path
-            ))),
-            filter_text: Some(self.alias.clone()),
-            insert_text: Some(self.alias.clone()),
-            insert_text_format: Some(lsp::InsertTextFormat::SNIPPET),
-            kind: Some(lsp::CompletionItemKind::MODULE),
-            preselect: None,
-            sort_text: Some(self.alias.clone()),
-            text_edit: None,
-
-            command: None,
-            data: None,
-            insert_text_mode: None,
-            tags: None,
-        }
-    }
-
-    fn matches(&self, text: &str, _info: &CompletionInfo) -> bool {
-        fuzzy_match(self.alias.as_str(), text)
     }
 }
 
@@ -841,7 +702,6 @@ impl Completable for UserFunctionResult {
 
 pub fn find_completions(
     params: lsp::CompletionParams,
-    contents: &str,
     ast_pkg: &flux::ast::Package,
     sem_pkg: &flux::semantic::nodes::Package,
 ) -> lsp::CompletionList {
@@ -856,149 +716,81 @@ pub fn find_completions(
 
     if let Some(finder_node) = visitor.node {
         match finder_node.node {
-            AstNode::Identifier(id) => {
-                let info = CompletionInfo {
-                    ident: id.name.clone(),
-                    position,
-                    imports: get_imports(sem_pkg),
-                };
-
-                let stdlib_matches = {
-                    let mut matches = vec![];
-                    let completes: Vec<Box<dyn Completable>> = {
-                        let mut list: Vec<Box<dyn Completable>> = vec![];
-                    
-                        // Get stdlib package completables
-                        if let Some(env) = imports() {
-                            for (key, _val) in env.iter() {
-                                if let Some(package_name) = get_package_name(key) {
-                                    list.push(Box::new(PackageResult {
-                                        name: package_name.into(),
-                                        full_name: key.to_string(),
-                                    }));
-                                }
-                            }
-                        }
-                    
-                        // Get builtin completables
-                        if let Some(env) = prelude() {
-                            for (key, val) in env.iter() {
-                                if key.starts_with('_') {
-                                    // Don't allow users to "discover" private-ish functionality.
-                                    continue;
-                                }
-                                let mut push_var_result = |var_type| {
-                                    list.push(Box::new(VarResult {
-                                        name: key.to_string(),
-                                        package: PRELUDE_PACKAGE.to_string(),
-                                        package_name: None,
-                                        var_type,
-                                    }));
-                                };
-                                match &val.expr {
-                                    MonoType::Fun(f) => {
-                                        list.push(Box::new(FunctionResult {
-                                            package: PRELUDE_PACKAGE.to_string(),
-                                            name: key.to_string(),
-                                            signature: stdlib::create_function_signature(
-                                                f,
-                                            ),
-                                        }))
-                                    }
-                                    MonoType::Collection(c) => {
-                                        if c.collection == CollectionType::Array {
-                                            push_var_result(VarType::Array)
-                                        }
-                                    }
-                                    MonoType::Builtin(b) => {
-                                        push_var_result(VarType::from(*b))
-                                    }
-                                    _ => (),
-                                }
-                            }
-                        }
-                    
-                        list
-                    };
-                
-                    for c in completes.iter().filter(|x| x.matches(&id.name, &info)) {
-                        matches.push(c.completion_item(&info));
-                    }
-                
-                    matches
-                };
-
-                items.extend(stdlib_matches.into_iter().chain({
-                    let completables = {
-                        let walker = flux::semantic::walk::Node::Package(sem_pkg);
-                        let mut visitor = CompletableFinderVisitor::new(info.position);
-                    
-                        flux::semantic::walk::walk(&mut visitor, walker);
-                    
-                        visitor.completables
-                    };
-
-                    let mut result: Vec<lsp::CompletionItem> = vec![];
-                    for x in completables {
-                        if x.matches(contents, &info) {
-                            result.push(x.completion_item(&info))
-                        }
-                    }
-                    result
-                }));
-            }
             AstNode::MemberExpr(member) => {
                 if let Expression::Identifier(ident) = &member.object
                 {
                     items = {
                         let info = CompletionInfo {
                             ident: ident.name.clone(),
-                            position,
                             imports: get_imports(sem_pkg),
                         };
 
-                        let mut list: Vec<Box<dyn Completable>> = vec![];
+                        let mut list: Vec<Box<dyn Completable>> =
+                            vec![];
                         let name = &info.ident;
                         if let Some(env) = imports() {
-                            if let Some(import) =
-                                info.imports.iter().find(|x| &x.alias == name)
+                            if let Some(import) = info
+                                .imports
+                                .iter()
+                                .find(|x| &x.alias == name)
                             {
                                 for (key, val) in env.iter() {
                                     if *key == import.path {
-                                        walk_package(key, &mut list, &val.typ().expr);
+                                        walk_package(
+                                            key,
+                                            &mut list,
+                                            &val.typ().expr,
+                                        );
                                     }
                                 }
                             } else {
                                 for (key, val) in env.iter() {
-                                    if let Some(package_name) = get_package_name(key) {
+                                    if let Some(package_name) =
+                                        get_package_name(key)
+                                    {
                                         if package_name == name {
-                                            walk_package(key, &mut list, &val.typ().expr);
+                                            walk_package(
+                                                key,
+                                                &mut list,
+                                                &val.typ().expr,
+                                            );
                                         }
                                     }
                                 }
                             }
                         }
-                    
+
                         let mut items = vec![];
-                    
-                        let walker = flux::semantic::walk::Node::Package(&sem_pkg);
-                        let mut visitor = CompletableObjectFinderVisitor::new(&info.ident);
-                    
-                        flux::semantic::walk::walk(&mut visitor, walker);
-                    
+
+                        let walker =
+                            flux::semantic::walk::Node::Package(
+                                &sem_pkg,
+                            );
+                        let mut visitor =
+                            CompletableObjectFinderVisitor::new(
+                                &info.ident,
+                            );
+
+                        flux::semantic::walk::walk(
+                            &mut visitor,
+                            walker,
+                        );
+
                         for completable in visitor.completables {
-                            items.push(completable.completion_item(&info));
+                            items.push(
+                                completable.completion_item(&info),
+                            );
                         }
-                    
+
                         for item in list {
                             items.push(item.completion_item(&info));
                         }
-                    
+
                         items
                     };
                 }
             }
-            _ => (),
+            _ => unreachable!("This shouldn't happen. Whoops"),
         }
     }
 
@@ -1016,11 +808,20 @@ pub fn complete_call_expr(
     let position = params.text_document_position.position;
 
     let mut completion_params = Vec::new();
-    let provided = if let Some(Expression::Object(obj)) = call.arguments.first() {
-        obj.properties.iter().map(|prop| match &prop.key {
-            flux::ast::PropertyKey::Identifier(identifier) => identifier.name.clone(),
-            flux::ast::PropertyKey::StringLit(literal) => literal.value.clone()
-        }).collect()
+    let provided = if let Some(Expression::Object(obj)) =
+        call.arguments.first()
+    {
+        obj.properties
+            .iter()
+            .map(|prop| match &prop.key {
+                flux::ast::PropertyKey::Identifier(identifier) => {
+                    identifier.name.clone()
+                }
+                flux::ast::PropertyKey::StringLit(literal) => {
+                    literal.value.clone()
+                }
+            })
+            .collect()
     } else {
         vec![]
     };
@@ -1034,11 +835,13 @@ pub fn complete_call_expr(
             ));
 
             let user_functions = {
-                let walker = flux::semantic::walk::Node::Package(sem_pkg);
-                let mut visitor = FunctionFinderVisitor::new(position);
-            
+                let walker =
+                    flux::semantic::walk::Node::Package(sem_pkg);
+                let mut visitor =
+                    FunctionFinderVisitor::new(position);
+
                 flux::semantic::walk::walk(&mut visitor, walker);
-            
+
                 visitor.functions
             };
             completion_params.extend(get_function_params(
@@ -1053,15 +856,19 @@ pub fn complete_call_expr(
                     stdlib::get_package_functions(&ident.name);
 
                 let object_functions: Vec<Function> = {
-                    let walker = flux::semantic::walk::Node::Package(sem_pkg);
-                    let mut visitor = ObjectFunctionFinderVisitor::default();
-                
+                    let walker =
+                        flux::semantic::walk::Node::Package(sem_pkg);
+                    let mut visitor =
+                        ObjectFunctionFinderVisitor::default();
+
                     flux::semantic::walk::walk(&mut visitor, walker);
-                
+
                     visitor
                         .results
                         .into_iter()
-                        .filter(|obj| obj.object == ident.name.as_str())
+                        .filter(|obj| {
+                            obj.object == ident.name.as_str()
+                        })
                         .map(|obj| obj.function)
                         .collect()
                 };
@@ -1095,35 +902,37 @@ pub fn complete_call_expr(
     completion_params
         .into_iter()
         .map(|(name, typ)| {
-                let insert_text = if let Some(trigger) = trigger {
-                    if trigger == "(" {
-                        format!("{}: ", name)
-                    } else {
-                        format!(" {}: ", name)
-                    }
-                } else {
+            let insert_text = if let Some(trigger) = trigger {
+                if trigger == "(" {
                     format!("{}: ", name)
-                };
-            
-                lsp::CompletionItem {
-                    deprecated: None,
-                    commit_characters: None,
-                    detail: typ.map(|typ| typ.to_string()),
-                    label: name,
-                    additional_text_edits: None,
-                    filter_text: None,
-                    insert_text: Some(insert_text),
-                    documentation: None,
-                    sort_text: None,
-                    preselect: None,
-                    insert_text_format: Some(lsp::InsertTextFormat::SNIPPET),
-                    text_edit: None,
-                    kind: Some(lsp::CompletionItemKind::FIELD),
-                    command: None,
-                    data: None,
-                    insert_text_mode: None,
-                    tags: None,
+                } else {
+                    format!(" {}: ", name)
                 }
-            })
+            } else {
+                format!("{}: ", name)
+            };
+
+            lsp::CompletionItem {
+                deprecated: None,
+                commit_characters: None,
+                detail: typ.map(|typ| typ.to_string()),
+                label: name,
+                additional_text_edits: None,
+                filter_text: None,
+                insert_text: Some(insert_text),
+                documentation: None,
+                sort_text: None,
+                preselect: None,
+                insert_text_format: Some(
+                    lsp::InsertTextFormat::SNIPPET,
+                ),
+                text_edit: None,
+                kind: Some(lsp::CompletionItemKind::FIELD),
+                command: None,
+                data: None,
+                insert_text_mode: None,
+                tags: None,
+            }
+        })
         .collect()
 }
