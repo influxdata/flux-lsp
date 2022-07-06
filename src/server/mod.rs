@@ -7,6 +7,7 @@ use std::borrow::Cow;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
+use flux::ast::walk::Node as AstNode;
 use flux::semantic::nodes::{
     ErrorKind as SemanticNodeErrorKind, Package as SemanticPackage,
 };
@@ -972,17 +973,86 @@ impl LanguageServer for LspServer {
             }
         };
 
-        let completion_list = completion::find_completions(
-            params,
-            contents.as_str(),
-            &ast_pkg,
-            &sem_pkg,
-        );
+        let position = params.text_document_position.position.clone();
+        let walker = flux::ast::walk::Node::Package(&ast_pkg);
+        let mut visitor = crate::visitors::ast::NodeFinderVisitor::new(position);
 
-        if completion_list.items.is_empty() {
+        flux::ast::walk::walk(&mut visitor, walker);
+
+        let items = match visitor.node {
+            Some(walk_node) => match walk_node.node {
+                AstNode::CallExpr(call) => {
+                    completion::complete_call_expr(&params, &sem_pkg, call)
+                }
+                AstNode::ObjectExpr(_) => {
+                    let parent = walk_node.parent.as_ref().map(|parent| &parent.node);
+                    match parent {
+                        Some(AstNode::CallExpr(call)) => {
+                            completion::complete_call_expr(&params, &sem_pkg, call)
+                        }
+                        Some(_) => vec![],
+                        None => vec![],
+                    }
+                }
+                AstNode::StringLit(_) => {
+                    let parent = walk_node.parent.as_ref().map(|parent| &parent.node);
+                    match parent {
+                        Some(AstNode::ImportDeclaration(_)) => {
+                            // TODO: WHYYYYYYY
+                            let infos = crate::stdlib::get_package_infos();
+                            let imports = completion::get_imports(&sem_pkg);
+
+                            infos.into_iter().filter(|info| {
+                                !&imports.iter().any(|x| x.path == info.name)
+                            }).map(|info| {
+                                let trigger = if let Some(context) = & params.context {
+                                    context.trigger_character.as_deref()
+                                } else {
+                                    None
+                                };
+                                let insert_text = if trigger == Some("\"") {
+                                    info.path.as_str().to_string()
+                                } else {
+                                    format!(r#""{}""#, info.path.as_str())
+                                };
+                                lsp::CompletionItem {
+                                    label: insert_text.clone(),
+                                    insert_text: Some(insert_text),
+                                    insert_text_format: Some(lsp::InsertTextFormat::SNIPPET),
+                                    kind: Some(lsp::CompletionItemKind::VALUE),
+                                    ..lsp::CompletionItem::default()
+                                }
+                            }).collect()
+                        }
+                        // This is where bucket/measurement/field/tag completion will occur.
+                        Some(_) => vec![],
+                        None => vec![],
+                    }
+                }
+                _ => {
+                    // DELETE THIS
+                    // If you're a reviewer, and this block of code is still here, please request changes
+                    // and then come to my house and slap me in my silly face.
+                    let items = completion::find_completions(
+                        params, contents.as_str(), &ast_pkg, &sem_pkg);
+                    if items.items.is_empty() {
+                        return Ok(None);
+                    } else {
+                        return Ok(Some(lsp::CompletionResponse::List(items)));
+                    }
+                }
+            },
+            None => return Ok(None),
+        };
+        if items.is_empty() {
             Ok(None)
         } else {
-            Ok(Some(lsp::CompletionResponse::List(completion_list)))
+            Ok(Some(lsp::CompletionResponse::List(lsp::CompletionList {
+                // XXX: rockstar (5 Jul 2022) - This should probably always be incomplete, so
+                // we don't leave off to the client to try and figure out what completions to use.
+                is_incomplete: false,
+                items
+            })))
         }
     }
 

@@ -38,7 +38,7 @@ struct CompletionInfo {
     imports: Vec<Import>,
 }
 
-fn get_imports(pkg: &flux::semantic::nodes::Package) -> Vec<Import> {
+pub fn get_imports(pkg: &flux::semantic::nodes::Package) -> Vec<Import> {
     let walker = flux::semantic::walk::Node::Package(pkg);
     let mut visitor = ImportFinderVisitor::default();
 
@@ -998,79 +998,6 @@ pub fn find_completions(
                     };
                 }
             }
-            AstNode::CallExpr(call) => {
-                items = complete_call_expr(&params, sem_pkg, call);
-            }
-
-            AstNode::ObjectExpr(_) => {
-                let parent = finder_node
-                    .parent
-                    .as_ref()
-                    .map(|parent| &parent.node);
-                if let Some(AstNode::CallExpr(call)) = parent {
-                    items =
-                        complete_call_expr(&params, sem_pkg, call);
-                }
-            }
-
-            AstNode::StringLit(_) => {
-                let parent = finder_node
-                    .parent
-                    .as_ref()
-                    .map(|parent| &parent.node);
-                if let Some(AstNode::ImportDeclaration(_)) = parent {
-                    let infos = stdlib::get_package_infos();
-
-                    let imports = get_imports(sem_pkg);
-
-                    let mut items = vec![];
-                    for info in infos {
-                        if !(&imports)
-                            .iter()
-                            .any(|x| x.path == info.name)
-                        {
-                            let trigger = if let Some(context) = &params.context {
-                                context.trigger_character.as_deref()
-                            } else {
-                                None
-                            };
-                            items.push({
-                                let insert_text = if trigger == Some("\"") {
-                                    info.path.as_str().to_string()
-                                } else {
-                                    format!("\"{}\"", info.path.as_str())
-                                };
-                            
-                                lsp::CompletionItem {
-                                    deprecated: None,
-                                    commit_characters: None,
-                                    detail: None,
-                                    label: insert_text.clone(),
-                                    additional_text_edits: None,
-                                    filter_text: None,
-                                    insert_text: Some(insert_text),
-                                    documentation: None,
-                                    sort_text: None,
-                                    preselect: None,
-                                    insert_text_format: Some(lsp::InsertTextFormat::SNIPPET),
-                                    text_edit: None,
-                                    kind: Some(lsp::CompletionItemKind::VALUE),
-                                    command: None,
-                                    data: None,
-                                    insert_text_mode: None,
-                                    tags: None,
-                                }
-                            });
-                        }
-                    }
-
-                    return lsp::CompletionList {
-                        is_incomplete: false,
-                        items,
-                    };
-                }
-            }
-
             _ => (),
         }
     }
@@ -1081,7 +1008,7 @@ pub fn find_completions(
     }
 }
 
-fn complete_call_expr(
+pub fn complete_call_expr(
     params: &lsp::CompletionParams,
     sem_pkg: &flux::semantic::nodes::Package,
     call: &flux::ast::CallExpr,
