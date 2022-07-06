@@ -541,9 +541,7 @@ errorCounts
     };
     let result = server.formatting(params).await.unwrap().unwrap();
 
-    let mut formatted_text =
-        flux::formatter::format(fluxscript).unwrap();
-    formatted_text.push('\n');
+    let formatted_text = flux::formatter::format(fluxscript).unwrap();
     let expected = lsp::TextEdit::new(
         lsp::Range {
             start: lsp::Position {
@@ -1536,6 +1534,7 @@ x = 1
             expect![[r#"
                 [
                     "\"array\"",
+                    "\"bitwise\"",
                     "\"contrib/RohanSreerama5/naiveBayesClassifier\"",
                     "\"contrib/anaisdg/anomalydetection\"",
                     "\"contrib/anaisdg/statsmodels\"",
@@ -1582,6 +1581,7 @@ x = 1
                     "\"experimental/usage\"",
                     "\"generate\"",
                     "\"http\"",
+                    "\"http/requests\"",
                     "\"influxdata/influxdb\"",
                     "\"influxdata/influxdb/monitor\"",
                     "\"influxdata/influxdb/sample\"",
@@ -2246,6 +2246,7 @@ errorCounts
 
     let want: BTreeSet<&str> = vec![
         "aggregateWindow",
+        "bitwise",
         "bottom",
         "buckets",
         "bytes",
@@ -2295,6 +2296,7 @@ errorCounts
         "holtWinters",
         "hourSelection",
         "http",
+        "http/requests",
         "influxdata/influxdb/monitor",
         "influxdata/influxdb/secrets",
         "influxdata/influxdb/tasks",
@@ -2352,6 +2354,7 @@ errorCounts
         "truncateTimeColumn",
         "types",
         "uint",
+        "wideTo",
     ]
     .drain(..)
     .collect();
@@ -3335,6 +3338,7 @@ async fn execute_command_get_function_list() {
           "uint",
           "union",
           "unique",
+          "wideTo",
           "window",
           "yield"
         ]"#]]
