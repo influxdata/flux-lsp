@@ -227,18 +227,6 @@ impl<'a> walk::Visitor<'a> for SemanticTokenVisitor {
                     token_modifiers_bitset: 0,
                 });
             }
-            walk::Node::TestStmt(node) => {
-                let delta_line = node.base.location.start.line;
-                let delta_start = node.base.location.start.column;
-                let length = 4; // Length of "test"
-                self.tokens.push(lsp::SemanticToken {
-                    delta_line,
-                    delta_start,
-                    length,
-                    token_type: SEMANTIC_TOKEN_KEYWORD,
-                    token_modifiers_bitset: 0,
-                });
-            }
             walk::Node::BuiltinStmt(node) => {
                 let delta_line = node.base.location.start.line;
                 let delta_start = node.base.location.start.column;

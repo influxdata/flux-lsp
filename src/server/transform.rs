@@ -597,7 +597,8 @@ a = 0"#;
         assert_eq!(0, ast.body.len());
 
         ast.body.push(from);
-        let expected = r#"from(bucket: "my-bucket") |> range(start: v.timeRangeStart, stop: v.timeRangeStop)"#;
+        let expected = r#"from(bucket: "my-bucket") |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+"#;
         assert_eq!(
             expected,
             flux::formatter::convert_to_string(&ast).unwrap()
@@ -688,7 +689,8 @@ a = 0"#;
             inject_tag_filter(&ast, "cpu".into(), "my-bucket".into())
                 .unwrap();
 
-        let expected = r#"from(bucket: "my-bucket") |> filter(fn: (r) => exists r.cpu)"#;
+        let expected = r#"from(bucket: "my-bucket") |> filter(fn: (r) => exists r.cpu)
+"#;
         assert_eq!(
             expected,
             flux::formatter::convert_to_string(&transformed).unwrap()
@@ -704,7 +706,8 @@ a = 0"#;
             inject_tag_filter(&ast, "cpu".into(), "my-bucket".into())
                 .unwrap();
 
-        let expected = r#"from(bucket: "my-bucket") |> range(start: v.timeRangeStart, stop: v.timeRangeStop) |> filter(fn: (r) => exists r.cpu)"#;
+        let expected = r#"from(bucket: "my-bucket") |> range(start: v.timeRangeStart, stop: v.timeRangeStop) |> filter(fn: (r) => exists r.cpu)
+"#;
         assert_eq!(
             expected,
             flux::formatter::convert_to_string(&transformed).unwrap()
@@ -724,7 +727,8 @@ a = 0"#;
         )
         .unwrap();
 
-        let expected = r#"from(bucket: "my-bucket") |> filter(fn: (r) => r.myTag == "myTagValue")"#;
+        let expected = r#"from(bucket: "my-bucket") |> filter(fn: (r) => r.myTag == "myTagValue")
+"#;
         assert_eq!(
             expected,
             flux::formatter::convert_to_string(&transformed).unwrap()
@@ -746,7 +750,8 @@ a = 0"#;
 
         let expected = r#"from(bucket: "my-bucket")
     |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
-    |> filter(fn: (r) => r.myTag == "myTagValue")"#;
+    |> filter(fn: (r) => r.myTag == "myTagValue")
+"#;
         assert_eq!(
             expected,
             flux::formatter::convert_to_string(&transformed).unwrap()
@@ -765,7 +770,8 @@ a = 0"#;
         )
         .unwrap();
 
-        let expected = r#"from(bucket: "my-bucket") |> filter(fn: (r) => r._field == "myField")"#;
+        let expected = r#"from(bucket: "my-bucket") |> filter(fn: (r) => r._field == "myField")
+"#;
         assert_eq!(
             expected,
             flux::formatter::convert_to_string(&transformed).unwrap()
@@ -784,7 +790,8 @@ a = 0"#;
         )
         .unwrap();
 
-        let expected = r#"from(bucket: "my-bucket") |> filter(fn: (r) => r._measurement == "myMeasurement")"#;
+        let expected = r#"from(bucket: "my-bucket") |> filter(fn: (r) => r._measurement == "myMeasurement")
+"#;
         assert_eq!(
             expected,
             flux::formatter::convert_to_string(&transformed).unwrap()
