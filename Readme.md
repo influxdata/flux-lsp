@@ -13,7 +13,7 @@ An implementation of the [Language Server Protocol](https://microsoft.github.io/
 # Installing command line server
 
 ```
-cargo install --git https://github.com/influxdata/flux-lsp
+cargo install --locked --git https://github.com/influxdata/flux-lsp
 ```
 
 NOTE: previously, `flux-lsp` was installed via `npm`. If you have installed `flux-lsp`
