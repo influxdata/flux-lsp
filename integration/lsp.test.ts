@@ -156,6 +156,6 @@ describe('module', () => {
         ast.body[0].init.value = '2';
         // Format into new source
         const src = format_from_js_file(ast);
-        expect(src).toBe('x = 2');
+        expect(src).toBe('x = 2\n');
     })
 })
