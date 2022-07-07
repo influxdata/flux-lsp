@@ -1015,7 +1015,7 @@ impl LanguageServer for LspServer {
                             }
                         }).collect()
                         } else {
-                            vec![]
+                            return Ok(None);
                         };
 
                     let builtin_completions: Vec<
@@ -1096,7 +1096,7 @@ impl LanguageServer for LspServer {
                             }
                         }).collect()
                     } else {
-                        vec![]
+                        return Ok(None)
                     };
 
                     vec![stdlib_completions, builtin_completions]
@@ -1181,8 +1181,7 @@ impl LanguageServer for LspServer {
                                 &params, &sem_pkg, call,
                             )
                         }
-                        Some(_) => vec![],
-                        None => vec![],
+                        Some(_) | None => return Ok(None),
                     }
                 }
                 AstNode::StringLit(_) => {
@@ -1201,7 +1200,7 @@ impl LanguageServer for LspServer {
                                     (crate::shared::get_package_name(path).expect("Previous filter failed.").into(), path.clone())
                                 }).collect()
                                 } else {
-                                    vec![]
+                                    return Ok(None);
                                 };
                             let imports =
                                 completion::get_imports(&sem_pkg);
@@ -1229,8 +1228,7 @@ impl LanguageServer for LspServer {
                             }).collect()
                         }
                         // This is where bucket/measurement/field/tag completion will occur.
-                        Some(_) => vec![],
-                        None => vec![],
+                        Some(_) | None => return Ok(None),
                     }
                 }
                 _ => return Ok(None),
