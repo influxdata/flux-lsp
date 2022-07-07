@@ -980,10 +980,11 @@ impl LanguageServer for LspServer {
             }
         };
 
-        let position = params.text_document_position.position.clone();
         let walker = flux::ast::walk::Node::Package(&ast_pkg);
         let mut visitor =
-            crate::visitors::ast::NodeFinderVisitor::new(position);
+            crate::visitors::ast::NodeFinderVisitor::new(
+                params.text_document_position.position,
+            );
 
         flux::ast::walk::walk(&mut visitor, walker);
 
@@ -1060,7 +1061,7 @@ impl LanguageServer for LspServer {
                                     lsp::CompletionItem {
                                         label: format!("{} ({})", key, "prelude"),
                                         detail: Some("Array".into()),
-                                        documentation: Some(lsp::Documentation::String(format!("from prelude"))),
+                                        documentation: Some(lsp::Documentation::String("from prelude".into())),
                                         filter_text: Some(key.into()),
                                         insert_text: Some(key.into()),
                                         insert_text_format: Some(
@@ -1089,7 +1090,7 @@ impl LanguageServer for LspServer {
                                             BuiltinType::Regexp => "Regular Expression".into(),
                                             BuiltinType::Time => "Time".into(),
                                         }),
-                                        documentation: Some(lsp::Documentation::String(format!("from prelude"))),
+                                        documentation: Some(lsp::Documentation::String("from prelude".into())),
                                         filter_text: Some(key.into()),
                                         insert_text: Some(key.into()),
                                         insert_text_format: Some(

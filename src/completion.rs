@@ -96,14 +96,14 @@ pub(crate) fn walk_package(
 pub(crate) trait Completable {
     fn completion_item(
         &self,
-        imports: &Vec<Import>,
+        imports: &[Import],
     ) -> lsp::CompletionItem;
 }
 
 impl Completable for FunctionResult {
     fn completion_item(
         &self,
-        imports: &Vec<Import>,
+        imports: &[Import],
     ) -> lsp::CompletionItem {
         let mut additional_text_edits = vec![];
 
@@ -151,7 +151,7 @@ impl Completable for FunctionResult {
 impl Completable for CompletionVarResult {
     fn completion_item(
         &self,
-        _imports: &Vec<Import>,
+        _imports: &[Import],
     ) -> lsp::CompletionItem {
         lsp::CompletionItem {
             label: format!("{} (self)", self.name),
@@ -429,7 +429,7 @@ impl VarResult {
 impl Completable for VarResult {
     fn completion_item(
         &self,
-        _imports: &Vec<Import>,
+        _imports: &[Import],
     ) -> lsp::CompletionItem {
         lsp::CompletionItem {
             label: format!("{} ({})", self.name, self.package),
@@ -553,7 +553,7 @@ impl UserFunctionResult {
 impl Completable for UserFunctionResult {
     fn completion_item(
         &self,
-        _imports: &Vec<Import>,
+        _imports: &[Import],
     ) -> lsp::CompletionItem {
         lsp::CompletionItem {
             label: format!("{} (self)", self.name),
