@@ -1,9 +1,6 @@
 use std::sync::Arc;
 
-use flux::ast::walk::walk;
-use flux::ast::walk::Node as AstNode;
 use flux::ast::{Expression, PropertyKey};
-use flux::imports;
 use flux::semantic::nodes::CallExpr;
 use flux::semantic::nodes::Expression as SemanticExpression;
 use flux::semantic::types::{
@@ -14,10 +11,9 @@ use lspower::lsp;
 
 use crate::shared::Function;
 use crate::shared::{
-    get_argument_names, get_optional_argument_names, get_package_name,
+    get_argument_names, get_optional_argument_names,
 };
 use crate::stdlib;
-use crate::visitors::ast::NodeFinderVisitor;
 use crate::visitors::semantic::{
     FunctionFinderVisitor, Import, ImportFinderVisitor,
     ObjectFunctionFinderVisitor,
@@ -32,9 +28,8 @@ struct PackageResult {
 }
 
 #[derive(Clone, Debug)]
-struct CompletionInfo {
-    ident: String,
-    imports: Vec<Import>,
+pub (crate) struct CompletionInfo {
+    pub imports: Vec<Import>,
 }
 
 pub fn get_imports(
@@ -64,7 +59,7 @@ fn get_function_params<'a>(
     )
 }
 
-fn walk_package(
+pub (crate) fn walk_package(
     package: &str,
     list: &mut Vec<Box<dyn Completable>>,
     t: &MonoType,
@@ -76,8 +71,6 @@ fn walk_package(
                     name: name.to_owned(),
                     var_type,
                     package: package.into(),
-                    package_name: get_package_name(package)
-                        .map(|s| s.to_owned()),
                 }));
             };
 
@@ -111,12 +104,11 @@ fn walk_package(
     }
 }
 
-trait Completable {
+pub(crate) trait Completable {
     fn completion_item(
         &self,
         info: &CompletionInfo,
     ) -> lsp::CompletionItem;
-    fn matches(&self, text: &str, info: &CompletionInfo) -> bool;
 }
 
 // Reports if the needle has a fuzzy match with the haystack.
@@ -165,10 +157,6 @@ impl Completable for PackageResult {
             insert_text_mode: None,
             tags: None,
         }
-    }
-
-    fn matches(&self, text: &str, _info: &CompletionInfo) -> bool {
-        fuzzy_match(self.name.as_str(), text)
     }
 }
 
@@ -219,27 +207,6 @@ impl Completable for FunctionResult {
             tags: None,
         }
     }
-
-    fn matches(&self, text: &str, info: &CompletionInfo) -> bool {
-        if self.package == PRELUDE_PACKAGE
-            && fuzzy_match(self.name.as_str(), text)
-        {
-            return true;
-        }
-
-        if !info.imports.iter().any(|x| self.package == x.path) {
-            return false;
-        }
-
-        if let Some(mtext) = text.strip_suffix('.') {
-            return info
-                .imports
-                .iter()
-                .any(|import| import.alias == mtext);
-        }
-
-        false
-    }
 }
 
 impl Completable for CompletionVarResult {
@@ -271,13 +238,9 @@ impl Completable for CompletionVarResult {
             tags: None,
         }
     }
-
-    fn matches(&self, text: &str, _info: &CompletionInfo) -> bool {
-        fuzzy_match(self.name.as_str(), text)
-    }
 }
 
-fn get_var_type(
+pub fn get_var_type(
     expr: &SemanticExpression,
 ) -> Option<CompletionVarType> {
     if let Some(typ) =
@@ -333,13 +296,13 @@ fn follow_function_pipes(c: &CallExpr) -> &MonoType {
     &c.typ
 }
 
-struct CompletableObjectFinderVisitor<'a> {
+pub (crate) struct CompletableObjectFinderVisitor<'a> {
     name: &'a str,
-    completables: Vec<Arc<dyn Completable>>,
+    pub completables: Vec<Arc<dyn Completable>>,
 }
 
 impl<'a> CompletableObjectFinderVisitor<'a> {
-    fn new(name: &'a str) -> Self {
+    pub fn new(name: &'a str) -> Self {
         CompletableObjectFinderVisitor {
             completables: Vec::new(),
             name,
@@ -463,7 +426,7 @@ struct CompletionVarResult {
 }
 
 #[derive(Clone)]
-enum CompletionVarType {
+pub enum CompletionVarType {
     Int,
     String,
     Array,
@@ -505,7 +468,6 @@ struct VarResult {
     name: String,
     var_type: VarType,
     package: String,
-    package_name: Option<String>,
 }
 
 impl VarResult {
@@ -557,24 +519,6 @@ impl Completable for VarResult {
             insert_text_mode: None,
             tags: None,
         }
-    }
-
-    fn matches(&self, text: &str, info: &CompletionInfo) -> bool {
-        if self.package == PRELUDE_PACKAGE
-            && fuzzy_match(self.name.as_str(), text)
-        {
-            return true;
-        }
-
-        if !info.imports.iter().any(|x| self.package == x.path) {
-            return false;
-        }
-
-        if let Some(mtext) = text.strip_suffix('.') {
-            return Some(mtext.into()) == self.package_name;
-        }
-
-        false
     }
 }
 
@@ -693,110 +637,6 @@ impl Completable for UserFunctionResult {
             insert_text_mode: None,
             tags: None,
         }
-    }
-
-    fn matches(&self, text: &str, _info: &CompletionInfo) -> bool {
-        fuzzy_match(self.name.as_str(), text)
-    }
-}
-
-pub fn find_completions(
-    params: lsp::CompletionParams,
-    ast_pkg: &flux::ast::Package,
-    sem_pkg: &flux::semantic::nodes::Package,
-) -> lsp::CompletionList {
-    let position = params.text_document_position.position;
-
-    let walker = AstNode::Package(&ast_pkg);
-    let mut visitor = NodeFinderVisitor::new(position);
-
-    walk(&mut visitor, walker);
-
-    let mut items = Vec::new();
-
-    if let Some(finder_node) = visitor.node {
-        match finder_node.node {
-            AstNode::MemberExpr(member) => {
-                if let Expression::Identifier(ident) = &member.object
-                {
-                    items = {
-                        let info = CompletionInfo {
-                            ident: ident.name.clone(),
-                            imports: get_imports(sem_pkg),
-                        };
-
-                        let mut list: Vec<Box<dyn Completable>> =
-                            vec![];
-                        let name = &info.ident;
-                        if let Some(env) = imports() {
-                            if let Some(import) = info
-                                .imports
-                                .iter()
-                                .find(|x| &x.alias == name)
-                            {
-                                for (key, val) in env.iter() {
-                                    if *key == import.path {
-                                        walk_package(
-                                            key,
-                                            &mut list,
-                                            &val.typ().expr,
-                                        );
-                                    }
-                                }
-                            } else {
-                                for (key, val) in env.iter() {
-                                    if let Some(package_name) =
-                                        get_package_name(key)
-                                    {
-                                        if package_name == name {
-                                            walk_package(
-                                                key,
-                                                &mut list,
-                                                &val.typ().expr,
-                                            );
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        let mut items = vec![];
-
-                        let walker =
-                            flux::semantic::walk::Node::Package(
-                                &sem_pkg,
-                            );
-                        let mut visitor =
-                            CompletableObjectFinderVisitor::new(
-                                &info.ident,
-                            );
-
-                        flux::semantic::walk::walk(
-                            &mut visitor,
-                            walker,
-                        );
-
-                        for completable in visitor.completables {
-                            items.push(
-                                completable.completion_item(&info),
-                            );
-                        }
-
-                        for item in list {
-                            items.push(item.completion_item(&info));
-                        }
-
-                        items
-                    };
-                }
-            }
-            _ => unreachable!("This shouldn't happen. Whoops"),
-        }
-    }
-
-    lsp::CompletionList {
-        is_incomplete: false,
-        items,
     }
 }
 

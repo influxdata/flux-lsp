@@ -7,6 +7,7 @@ use std::borrow::Cow;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
+use flux::ast::Expression as AstExpression;
 use flux::ast::walk::Node as AstNode;
 use flux::semantic::nodes::{
     ErrorKind as SemanticNodeErrorKind, Package as SemanticPackage,
@@ -1104,6 +1105,68 @@ impl LanguageServer for LspServer {
                         .flatten()
                         .collect()
                 }
+                AstNode::MemberExpr(member) => {
+                    match &member.object {
+                        AstExpression::Identifier(identifier) => {
+                            // XXX: rockstar (6 Jul 2022) - This is the last holdout from the previous
+                            // completion code. There is a bit of indirection/cruft here that can be cleaned
+                            // up when recursive support for member expressions is implemented.
+                            let mut list: Vec<Box<dyn completion::Completable>> = vec![];
+                            if let Some(env) = flux::imports() {
+                                if let Some(import) = completion::get_imports(&sem_pkg)
+                                    .iter()
+                                    .find(|x| x.alias == identifier.name)
+                                {
+                                    for (key, val) in env.iter() {
+                                        if *key == import.path {
+                                            completion::walk_package(
+                                                key,
+                                                &mut list,
+                                                &val.typ().expr,
+                                            );
+                                        }
+                                    }
+                                } else {
+                                    for (key, val) in env.iter() {
+                                        if let Some(package_name) =
+                                            crate::shared::get_package_name(key)
+                                        {
+                                            if package_name == identifier.name {
+                                                completion::walk_package(
+                                                    key,
+                                                    &mut list,
+                                                    &val.typ().expr,
+                                                );
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            let walker =
+                                flux::semantic::walk::Node::Package(
+                                    &sem_pkg,
+                                );
+                            let mut visitor =
+                                completion::CompletableObjectFinderVisitor::new(
+                                    &identifier.name,
+                                );
+                            flux::semantic::walk::walk(
+                                &mut visitor,
+                                walker,
+                            );
+
+                            let info = completion::CompletionInfo {
+                                imports: completion::get_imports(&sem_pkg),
+                            };
+                            vec![
+                                visitor.completables.iter().map(|completable| completable.completion_item(&info)).collect::<Vec<lsp::CompletionItem>>(),
+                                list.iter().map(|completable| completable.completion_item(&info)).collect(),
+                            ].into_iter().flatten().collect()
+                        }
+                        _ => return Ok(None),
+                    }
+                }
                 AstNode::ObjectExpr(_) => {
                     let parent = walk_node
                         .parent
@@ -1126,24 +1189,31 @@ impl LanguageServer for LspServer {
                         .map(|parent| &parent.node);
                     match parent {
                         Some(AstNode::ImportDeclaration(_)) => {
-                            // TODO: WHYYYYYYY
-                            let infos =
-                                crate::stdlib::get_package_infos();
+                            let infos: Vec<(String, String)> = if let Some(env) = flux::imports() {
+                                env.iter().filter(|(path, _val)| {
+                                    crate::shared::get_package_name(path).is_some()
+                                }).map(|(path, _val)| {
+                                    #[allow(clippy::expect_used)]
+                                    (crate::shared::get_package_name(path).expect("Previous filter failed.").into(), path.clone())
+                                }).collect()
+                            } else {
+                                vec![]
+                            };
                             let imports =
                                 completion::get_imports(&sem_pkg);
 
-                            infos.into_iter().filter(|info| {
-                                !&imports.iter().any(|x| x.path == info.name)
-                            }).map(|info| {
+                            infos.into_iter().filter(|(name, _path)| {
+                                !&imports.iter().any(|x| &x.path == name)
+                            }).map(|(_name, path)| {
                                 let trigger = if let Some(context) = & params.context {
                                     context.trigger_character.as_deref()
                                 } else {
                                     None
                                 };
                                 let insert_text = if trigger == Some("\"") {
-                                    info.path.as_str().to_string()
+                                    path.as_str().to_string()
                                 } else {
-                                    format!(r#""{}""#, info.path.as_str())
+                                    format!(r#""{}""#, path.as_str())
                                 };
                                 lsp::CompletionItem {
                                     label: insert_text.clone(),
@@ -1157,18 +1227,6 @@ impl LanguageServer for LspServer {
                         // This is where bucket/measurement/field/tag completion will occur.
                         Some(_) => vec![],
                         None => vec![],
-                    }
-                }
-                AstNode::MemberExpr(_) => {
-                    let items = completion::find_completions(
-                        params, &ast_pkg, &sem_pkg,
-                    );
-                    if items.items.is_empty() {
-                        return Ok(None);
-                    } else {
-                        return Ok(Some(
-                            lsp::CompletionResponse::List(items),
-                        ));
                     }
                 }
                 _ => return Ok(None),
