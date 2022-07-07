@@ -1104,7 +1104,7 @@ impl LanguageServer for LspServer {
                             }
                         }).collect()
                     } else {
-                        return Ok(None)
+                        return Ok(None);
                     };
 
                     vec![stdlib_completions, builtin_completions]
