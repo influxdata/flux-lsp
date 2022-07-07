@@ -7,8 +7,8 @@ use std::borrow::Cow;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
-use flux::ast::Expression as AstExpression;
 use flux::ast::walk::Node as AstNode;
+use flux::ast::Expression as AstExpression;
 use flux::semantic::nodes::{
     ErrorKind as SemanticNodeErrorKind, Package as SemanticPackage,
 };
@@ -1110,11 +1110,16 @@ impl LanguageServer for LspServer {
                             // XXX: rockstar (6 Jul 2022) - This is the last holdout from the previous
                             // completion code. There is a bit of indirection/cruft here that can be cleaned
                             // up when recursive support for member expressions is implemented.
-                            let mut list: Vec<Box<dyn completion::Completable>> = vec![];
+                            let mut list: Vec<
+                                Box<dyn completion::Completable>,
+                            > = vec![];
                             if let Some(env) = flux::imports() {
-                                if let Some(import) = completion::get_imports(&sem_pkg)
-                                    .iter()
-                                    .find(|x| x.alias == identifier.name)
+                                if let Some(import) =
+                                    completion::get_imports(&sem_pkg)
+                                        .iter()
+                                        .find(|x| {
+                                            x.alias == identifier.name
+                                        })
                                 {
                                     for (key, val) in env.iter() {
                                         if *key == import.path {
@@ -1155,7 +1160,8 @@ impl LanguageServer for LspServer {
                                 walker,
                             );
 
-                            let imports = completion::get_imports(&sem_pkg);
+                            let imports =
+                                completion::get_imports(&sem_pkg);
                             vec![
                                 visitor.completables.iter().map(|completable| completable.completion_item(&imports)).collect::<Vec<lsp::CompletionItem>>(),
                                 list.iter().map(|completable| completable.completion_item(&imports)).collect(),
@@ -1186,16 +1192,17 @@ impl LanguageServer for LspServer {
                         .map(|parent| &parent.node);
                     match parent {
                         Some(AstNode::ImportDeclaration(_)) => {
-                            let infos: Vec<(String, String)> = if let Some(env) = flux::imports() {
-                                env.iter().filter(|(path, _val)| {
+                            let infos: Vec<(String, String)> =
+                                if let Some(env) = flux::imports() {
+                                    env.iter().filter(|(path, _val)| {
                                     crate::shared::get_package_name(path).is_some()
                                 }).map(|(path, _val)| {
                                     #[allow(clippy::expect_used)]
                                     (crate::shared::get_package_name(path).expect("Previous filter failed.").into(), path.clone())
                                 }).collect()
-                            } else {
-                                vec![]
-                            };
+                                } else {
+                                    vec![]
+                                };
                             let imports =
                                 completion::get_imports(&sem_pkg);
 

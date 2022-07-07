@@ -48,7 +48,7 @@ fn get_function_params<'a>(
     )
 }
 
-pub (crate) fn walk_package(
+pub(crate) fn walk_package(
     package: &str,
     list: &mut Vec<Box<dyn Completable>>,
     t: &MonoType,
@@ -245,7 +245,7 @@ fn follow_function_pipes(c: &CallExpr) -> &MonoType {
     &c.typ
 }
 
-pub (crate) struct CompletableObjectFinderVisitor<'a> {
+pub(crate) struct CompletableObjectFinderVisitor<'a> {
     name: &'a str,
     pub completables: Vec<Arc<dyn Completable>>,
 }
