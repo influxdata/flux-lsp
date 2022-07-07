@@ -43,7 +43,7 @@ jobs:
       - checkout
       - run:
           name: "run tests"
-          command: wasm-pack test --node -- --locked --no-default-features --features=wasm,strict
+          command: wasm-pack test --node -- --locked --no-default-features --features=wasm
       - run:
           name: "run node integration tests"
           command: cd integration && BUILD_MODE=release npm run test
