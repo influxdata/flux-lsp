@@ -1007,7 +1007,6 @@ impl LanguageServer for LspServer {
                                     key.clone(),
                                 )),
                                 filter_text: Some(package_name.into()),
-                                // Could this be an import alias? See PackageResult Completable impl
                                 insert_text: Some(key.clone()),
                                 insert_text_format: Some(lsp::InsertTextFormat::PLAIN_TEXT),
                                 kind: Some(lsp::CompletionItemKind::MODULE),
@@ -1156,12 +1155,10 @@ impl LanguageServer for LspServer {
                                 walker,
                             );
 
-                            let info = completion::CompletionInfo {
-                                imports: completion::get_imports(&sem_pkg),
-                            };
+                            let imports = completion::get_imports(&sem_pkg);
                             vec![
-                                visitor.completables.iter().map(|completable| completable.completion_item(&info)).collect::<Vec<lsp::CompletionItem>>(),
-                                list.iter().map(|completable| completable.completion_item(&info)).collect(),
+                                visitor.completables.iter().map(|completable| completable.completion_item(&imports)).collect::<Vec<lsp::CompletionItem>>(),
+                                list.iter().map(|completable| completable.completion_item(&imports)).collect(),
                             ].into_iter().flatten().collect()
                         }
                         _ => return Ok(None),

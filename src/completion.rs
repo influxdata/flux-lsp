@@ -21,17 +21,6 @@ use crate::visitors::semantic::{
 
 const PRELUDE_PACKAGE: &str = "prelude";
 
-#[derive(Clone)]
-struct PackageResult {
-    name: String,
-    full_name: String,
-}
-
-#[derive(Clone, Debug)]
-pub (crate) struct CompletionInfo {
-    pub imports: Vec<Import>,
-}
-
 pub fn get_imports(
     pkg: &flux::semantic::nodes::Package,
 ) -> Vec<Import> {
@@ -107,7 +96,7 @@ pub (crate) fn walk_package(
 pub(crate) trait Completable {
     fn completion_item(
         &self,
-        info: &CompletionInfo,
+        imports: &Vec<Import>,
     ) -> lsp::CompletionItem;
 }
 
@@ -121,51 +110,11 @@ pub fn fuzzy_match(haystack: &str, needle: &str) -> bool {
         .contains(needle.to_lowercase().as_str());
 }
 
-impl Completable for PackageResult {
-    fn completion_item(
-        &self,
-        info: &CompletionInfo,
-    ) -> lsp::CompletionItem {
-        let mut insert_text = self.name.clone();
-
-        for import in &info.imports {
-            if self.full_name == import.path {
-                insert_text = import.alias.clone();
-            }
-        }
-
-        lsp::CompletionItem {
-            label: self.full_name.clone(),
-            additional_text_edits: None,
-            commit_characters: None,
-            deprecated: None,
-            detail: Some("Package".to_string()),
-            documentation: Some(lsp::Documentation::String(
-                self.full_name.clone(),
-            )),
-            filter_text: Some(self.name.clone()),
-            insert_text: Some(insert_text),
-            insert_text_format: Some(
-                lsp::InsertTextFormat::PLAIN_TEXT,
-            ),
-            kind: Some(lsp::CompletionItemKind::MODULE),
-            preselect: None,
-            sort_text: Some(self.name.clone()),
-            text_edit: None,
-            command: None,
-            data: None,
-            insert_text_mode: None,
-            tags: None,
-        }
-    }
-}
-
 impl Completable for FunctionResult {
     fn completion_item(
         &self,
-        info: &CompletionInfo,
+        imports: &Vec<Import>,
     ) -> lsp::CompletionItem {
-        let imports = &info.imports;
         let mut additional_text_edits = vec![];
 
         let contains_pkg =
@@ -212,7 +161,7 @@ impl Completable for FunctionResult {
 impl Completable for CompletionVarResult {
     fn completion_item(
         &self,
-        _info: &CompletionInfo,
+        _imports: &Vec<Import>,
     ) -> lsp::CompletionItem {
         lsp::CompletionItem {
             label: format!("{} (self)", self.name),
@@ -490,7 +439,7 @@ impl VarResult {
 impl Completable for VarResult {
     fn completion_item(
         &self,
-        _info: &CompletionInfo,
+        _imports: &Vec<Import>,
     ) -> lsp::CompletionItem {
         lsp::CompletionItem {
             label: format!("{} ({})", self.name, self.package),
@@ -614,7 +563,7 @@ impl UserFunctionResult {
 impl Completable for UserFunctionResult {
     fn completion_item(
         &self,
-        _info: &CompletionInfo,
+        _imports: &Vec<Import>,
     ) -> lsp::CompletionItem {
         lsp::CompletionItem {
             label: format!("{} (self)", self.name),
