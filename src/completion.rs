@@ -100,16 +100,6 @@ pub(crate) trait Completable {
     ) -> lsp::CompletionItem;
 }
 
-// Reports if the needle has a fuzzy match with the haystack.
-//
-// It is assumed that the haystack is the name of an identifier and the needle is a partial
-// identifier.
-pub fn fuzzy_match(haystack: &str, needle: &str) -> bool {
-    return haystack
-        .to_lowercase()
-        .contains(needle.to_lowercase().as_str());
-}
-
 impl Completable for FunctionResult {
     fn completion_item(
         &self,

@@ -957,6 +957,14 @@ impl LanguageServer for LspServer {
         &self,
         params: lsp::CompletionParams,
     ) -> RpcResult<Option<lsp::CompletionResponse>> {
+        // This is the rules for matching whether a string should be part of
+        // the completion matching.
+        let fuzzy_match = |haystack: &str, needle: &str| -> bool {
+            return haystack
+                .to_lowercase()
+                .contains(needle.to_lowercase().as_str());
+        };
+
         let ast_pkg = match self.store.get_ast_package(
             &params.text_document_position.text_document.uri,
         ) {
@@ -993,7 +1001,7 @@ impl LanguageServer for LspServer {
                         if let Some(env) = flux::imports() {
                             env.iter().filter(|(key, _val)| {
                             if let Some(package_name) = crate::shared::get_package_name(key) {
-                                completion::fuzzy_match(package_name, &identifier.name)
+                                fuzzy_match(package_name, &identifier.name)
                             } else {
                                 false
                             }
@@ -1025,7 +1033,7 @@ impl LanguageServer for LspServer {
                             // Don't allow users to "discover" private-ish functionality.
                             // Filter out irrelevent items that won't match.
                             // Only pass expressions that have completion support.
-                            !key.starts_with('_') && completion::fuzzy_match(key, &identifier.name) &&
+                            !key.starts_with('_') && fuzzy_match(key, &identifier.name) &&
                             match &val.expr {
                                 MonoType::Fun(_) | MonoType::Builtin(_) => true,
                                 MonoType::Collection(collection) => collection.collection == CollectionType::Array,
