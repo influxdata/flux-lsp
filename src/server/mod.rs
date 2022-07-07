@@ -1054,10 +1054,6 @@ impl LanguageServer for LspServer {
                                     }
                                 }
                                 MonoType::Collection(_collection) => {
-                                    // name: key
-                                    // package: PRELUDE_PACKAGE
-                                    // package_name: None,
-                                    // var_type VarType::Array
                                     lsp::CompletionItem {
                                         label: format!("{} ({})", key, "prelude"),
                                         detail: Some("Array".into()),
@@ -1073,10 +1069,6 @@ impl LanguageServer for LspServer {
                                     }
                                 }
                                 MonoType::Builtin(builtin) => {
-                                    // name: key
-                                    // package: PRELUDE_PACKAGE
-                                    // package_name: None,
-                                    // var_type VarType::from(*b)
                                     lsp::CompletionItem {
                                         label: format!("{} ({})", key, "prelude"),
                                         detail: Some(match *builtin {
