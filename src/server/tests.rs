@@ -145,6 +145,43 @@ async fn test_did_change() {
 }
 
 #[test]
+async fn test_did_change_multiple() {
+    let server = create_server();
+    open_file(
+        &server,
+        r#"from(bucket: "bucket") |> first()"#.to_string(),
+        None,
+    )
+    .await;
+
+    let params = lsp::DidChangeTextDocumentParams {
+        text_document: lsp::VersionedTextDocumentIdentifier {
+            uri: lsp::Url::parse("file:///home/user/file.flux")
+                .unwrap(),
+            version: -2,
+        },
+        content_changes: vec![
+            lsp::TextDocumentContentChangeEvent {
+                range: None,
+                range_length: None,
+                text: r#"from(bucket: "bucket")"#.to_string(),
+            },
+            lsp::TextDocumentContentChangeEvent {
+                range: None,
+                range_length: None,
+                text: r#"from(bucket: "data")"#.to_string(),
+            },
+        ],
+    };
+
+    server.did_change(params).await;
+
+    let uri = lsp::Url::parse("file:///home/user/file.flux").unwrap();
+    let contents = server.store.get(&uri).unwrap();
+    assert_eq!(r#"from(bucket: "data")"#, contents);
+}
+
+#[test]
 async fn test_did_change_with_range() {
     let server = create_server();
     open_file(
@@ -184,6 +221,67 @@ async fn test_did_change_with_range() {
     let contents = server.store.get(&uri).unwrap();
     assert_eq!(
         r#"from(bucket: "bucket")
+|>  first()"#,
+        contents
+    );
+}
+
+#[test]
+async fn test_did_change_with_multiple_range() {
+    let server = create_server();
+    open_file(
+        &server,
+        r#"from(bucket: "bucket")
+|> last()"#
+            .to_string(),
+        None,
+    )
+    .await;
+
+    let params = lsp::DidChangeTextDocumentParams {
+        text_document: lsp::VersionedTextDocumentIdentifier {
+            uri: lsp::Url::parse("file:///home/user/file.flux")
+                .unwrap(),
+            version: -2,
+        },
+        content_changes: vec![
+            lsp::TextDocumentContentChangeEvent {
+                range: Some(lsp::Range {
+                    start: lsp::Position {
+                        line: 0,
+                        character: 14,
+                    },
+                    end: lsp::Position {
+                        line: 0,
+                        character: 19,
+                    },
+                }),
+                range_length: None,
+                text: r#"data"#.to_string(),
+            },
+            lsp::TextDocumentContentChangeEvent {
+                range: Some(lsp::Range {
+                    start: lsp::Position {
+                        line: 1,
+                        character: 3,
+                    },
+                    end: lsp::Position {
+                        line: 1,
+                        character: 8,
+                    },
+                }),
+                range_length: None,
+                text: r#" first()"#.to_string(),
+            },
+        ],
+    };
+
+    server.did_change(params).await;
+
+    let uri = lsp::Url::parse("file:///home/user/file.flux").unwrap();
+    let contents = server.store.get(&uri).unwrap();
+    assert_eq!(
+        r#"from(bucket: "data")
 |>  first()"#,
         contents
     );

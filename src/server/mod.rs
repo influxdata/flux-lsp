@@ -3,7 +3,6 @@ mod store;
 mod transform;
 mod types;
 
-use std::borrow::Cow;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
@@ -44,12 +43,12 @@ fn node_to_location(
 /// Take a lsp::Range that contains a start and end lsp::Position, find the
 /// indexes of those points in the string, and replace that range with a new string.
 fn replace_string_in_range(
-    mut contents: String,
+    contents: &str,
     range: lsp::Range,
-    new: String,
+    new: &str,
 ) -> String {
     let mut string_range: (usize, usize) = (0, 0);
-    let lookup = line_col::LineColLookup::new(&contents);
+    let lookup = line_col::LineColLookup::new(contents);
     for i in 0..contents.len() {
         let linecol = lookup.get(i);
         if linecol.0 == (range.start.line as usize) + 1
@@ -66,10 +65,11 @@ fn replace_string_in_range(
     }
     if string_range.1 < string_range.0 {
         log::error!("range end not found after range start");
-        return contents;
+        return contents.into();
     }
-    contents.replace_range(string_range.0..string_range.1, &new);
-    contents
+    let mut new_contents: String = contents.into();
+    new_contents.replace_range(string_range.0..string_range.1, new);
+    new_contents
 }
 
 fn find_references<'a>(
@@ -457,21 +457,24 @@ impl LanguageServer for LspServer {
 
         match self.store.get(&key) {
             Ok(value) => {
-                let mut contents = Cow::Borrowed(&value);
-                for change in params.content_changes {
-                    contents = Cow::Owned(
+                // The way the spec reads, if given a list of changes to make, these changes
+                // are made in the order that they are provided, e.g. an straight iteration,
+                // applying each one as given, is the correct process. That means a change later
+                // in the list could overwrite a change made earlier in the list.
+                let new_contents = params
+                    .content_changes
+                    .iter()
+                    .fold(value, |acc, change| {
                         if let Some(range) = change.range {
                             replace_string_in_range(
-                                contents.into_owned(),
+                                &acc,
                                 range,
-                                change.text,
+                                &change.text,
                             )
                         } else {
-                            change.text
-                        },
-                    );
-                }
-                let new_contents = contents.into_owned();
+                            change.text.clone()
+                        }
+                    });
                 self.store.put(&key, &new_contents.clone());
                 self.publish_diagnostics(&key).await;
             }
