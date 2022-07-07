@@ -7,9 +7,12 @@ use std::borrow::Cow;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
+use flux::ast::walk::Node as AstNode;
+use flux::ast::Expression as AstExpression;
 use flux::semantic::nodes::{
     ErrorKind as SemanticNodeErrorKind, Package as SemanticPackage,
 };
+use flux::semantic::types::{BuiltinType, CollectionType, MonoType};
 use flux::semantic::{walk, ErrorKind};
 use lspower::{
     jsonrpc::Result as RpcResult, lsp, Client, LanguageServer,
@@ -954,9 +957,20 @@ impl LanguageServer for LspServer {
         &self,
         params: lsp::CompletionParams,
     ) -> RpcResult<Option<lsp::CompletionResponse>> {
-        let key = &params.text_document_position.text_document.uri;
+        // This is the rules for matching whether a string should be part of
+        // the completion matching.
+        let fuzzy_match = |haystack: &str, needle: &str| -> bool {
+            return haystack
+                .to_lowercase()
+                .contains(needle.to_lowercase().as_str());
+        };
 
-        let contents = self.get_document(key)?;
+        let ast_pkg = match self.store.get_ast_package(
+            &params.text_document_position.text_document.uri,
+        ) {
+            Ok(pkg) => pkg,
+            Err(err) => return Err(err.into()),
+        };
         let sem_pkg = match self.store.get_semantic_package(
             &params.text_document_position.text_document.uri,
         ) {
@@ -966,14 +980,274 @@ impl LanguageServer for LspServer {
             }
         };
 
-        let items = completion::find_completions(
-            params,
-            contents.as_str(),
-            &sem_pkg,
-        );
+        let walker = flux::ast::walk::Node::Package(&ast_pkg);
+        let mut visitor =
+            crate::visitors::ast::NodeFinderVisitor::new(
+                params.text_document_position.position,
+            );
 
-        let response = lsp::CompletionResponse::List(items);
-        Ok(Some(response))
+        flux::ast::walk::walk(&mut visitor, walker);
+
+        let items = match visitor.node {
+            Some(walk_node) => match walk_node.node {
+                AstNode::CallExpr(call) => {
+                    completion::complete_call_expr(
+                        &params, &sem_pkg, call,
+                    )
+                }
+                AstNode::Identifier(identifier) => {
+                    // XXX: rockstar (6 Jul 2022) - This is helping to complete packages that
+                    // have never been imported. That's probably not a great pattern.
+                    let stdlib_completions: Vec<lsp::CompletionItem> =
+                        if let Some(env) = flux::imports() {
+                            env.iter().filter(|(key, _val)| {
+                            if let Some(package_name) = crate::shared::get_package_name(key) {
+                                fuzzy_match(package_name, &identifier.name)
+                            } else {
+                                false
+                            }
+                        }).map(|(key, _val)| {
+                            #[allow(clippy::unwrap_used)]
+                            let package_name = crate::shared::get_package_name(key).unwrap();
+                            lsp::CompletionItem {
+                                label: key.clone(),
+                                detail: Some("Package".into()),
+                                documentation: Some(lsp::Documentation::String(
+                                    key.clone(),
+                                )),
+                                filter_text: Some(package_name.into()),
+                                insert_text: Some(key.clone()),
+                                insert_text_format: Some(lsp::InsertTextFormat::PLAIN_TEXT),
+                                kind: Some(lsp::CompletionItemKind::MODULE),
+                                sort_text: Some(key.clone()),
+                                ..lsp::CompletionItem::default()
+                            }
+                        }).collect()
+                        } else {
+                            return Ok(None);
+                        };
+
+                    let builtin_completions: Vec<
+                        lsp::CompletionItem,
+                    > = if let Some(env) = flux::prelude() {
+                        env.iter().filter(|(key, val)| {
+                            // Don't allow users to "discover" private-ish functionality.
+                            // Filter out irrelevent items that won't match.
+                            // Only pass expressions that have completion support.
+                            !key.starts_with('_') && fuzzy_match(key, &identifier.name) &&
+                            match &val.expr {
+                                MonoType::Fun(_) | MonoType::Builtin(_) => true,
+                                MonoType::Collection(collection) => collection.collection == CollectionType::Array,
+                                _ => false
+                            }
+                        }).map(|(key, val)| {
+                            match &val.expr {
+                                MonoType::Fun(function) => {
+                                    lsp::CompletionItem {
+                                        label: key.into(),
+                                        detail: Some(stdlib::create_function_signature(function)),
+                                        filter_text: Some(key.into()),
+                                        insert_text_format: Some(lsp::InsertTextFormat::SNIPPET),
+                                        kind: Some(lsp::CompletionItemKind::FUNCTION),
+                                        sort_text: Some(key.into()),
+                                        ..lsp::CompletionItem::default()
+                                    }
+                                }
+                                MonoType::Collection(_collection) => {
+                                    lsp::CompletionItem {
+                                        label: format!("{} ({})", key, "prelude"),
+                                        detail: Some("Array".into()),
+                                        documentation: Some(lsp::Documentation::String("from prelude".into())),
+                                        filter_text: Some(key.into()),
+                                        insert_text: Some(key.into()),
+                                        insert_text_format: Some(
+                                            lsp::InsertTextFormat::PLAIN_TEXT
+                                        ),
+                                        kind: Some(lsp::CompletionItemKind::VARIABLE),
+                                        sort_text: Some(format!("{} prelude", key)),
+                                        ..lsp::CompletionItem::default()
+                                    }
+                                }
+                                MonoType::Builtin(builtin) => {
+                                    lsp::CompletionItem {
+                                        label: format!("{} ({})", key, "prelude"),
+                                        detail: Some(match *builtin {
+                                            BuiltinType::String => "String".into(),
+                                            BuiltinType::Int => "Integer".into(),
+                                            BuiltinType::Float => "Float".into(),
+                                            BuiltinType::Bool => "Boolean".into(),
+                                            BuiltinType::Bytes => "Bytes".into(),
+                                            BuiltinType::Duration => "Duration".into(),
+                                            BuiltinType::Uint => "Uint".into(),
+                                            BuiltinType::Regexp => "Regular Expression".into(),
+                                            BuiltinType::Time => "Time".into(),
+                                        }),
+                                        documentation: Some(lsp::Documentation::String("from prelude".into())),
+                                        filter_text: Some(key.into()),
+                                        insert_text: Some(key.into()),
+                                        insert_text_format: Some(
+                                            lsp::InsertTextFormat::PLAIN_TEXT
+                                        ),
+                                        kind: Some(lsp::CompletionItemKind::VARIABLE),
+                                        sort_text: Some(format!("{} prelude", key)),
+                                        ..lsp::CompletionItem::default()
+                                    }
+                                }
+                                _ => unreachable!("Previous filter on expression value failed. Got: {}", val.expr)
+                            }
+                        }).collect()
+                    } else {
+                        return Ok(None);
+                    };
+
+                    vec![stdlib_completions, builtin_completions]
+                        .into_iter()
+                        .flatten()
+                        .collect()
+                }
+                AstNode::MemberExpr(member) => {
+                    match &member.object {
+                        AstExpression::Identifier(identifier) => {
+                            // XXX: rockstar (6 Jul 2022) - This is the last holdout from the previous
+                            // completion code. There is a bit of indirection/cruft here that can be cleaned
+                            // up when recursive support for member expressions is implemented.
+                            let mut list: Vec<
+                                Box<dyn completion::Completable>,
+                            > = vec![];
+                            if let Some(env) = flux::imports() {
+                                if let Some(import) =
+                                    completion::get_imports(&sem_pkg)
+                                        .iter()
+                                        .find(|x| {
+                                            x.alias == identifier.name
+                                        })
+                                {
+                                    for (key, val) in env.iter() {
+                                        if *key == import.path {
+                                            completion::walk_package(
+                                                key,
+                                                &mut list,
+                                                &val.typ().expr,
+                                            );
+                                        }
+                                    }
+                                } else {
+                                    for (key, val) in env.iter() {
+                                        if let Some(package_name) =
+                                            crate::shared::get_package_name(key)
+                                        {
+                                            if package_name == identifier.name {
+                                                completion::walk_package(
+                                                    key,
+                                                    &mut list,
+                                                    &val.typ().expr,
+                                                );
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            let walker =
+                                flux::semantic::walk::Node::Package(
+                                    &sem_pkg,
+                                );
+                            let mut visitor =
+                                completion::CompletableObjectFinderVisitor::new(
+                                    &identifier.name,
+                                );
+                            flux::semantic::walk::walk(
+                                &mut visitor,
+                                walker,
+                            );
+
+                            let imports =
+                                completion::get_imports(&sem_pkg);
+                            vec![
+                                visitor.completables.iter().map(|completable| completable.completion_item(&imports)).collect::<Vec<lsp::CompletionItem>>(),
+                                list.iter().map(|completable| completable.completion_item(&imports)).collect(),
+                            ].into_iter().flatten().collect()
+                        }
+                        _ => return Ok(None),
+                    }
+                }
+                AstNode::ObjectExpr(_) => {
+                    let parent = walk_node
+                        .parent
+                        .as_ref()
+                        .map(|parent| &parent.node);
+                    match parent {
+                        Some(AstNode::CallExpr(call)) => {
+                            completion::complete_call_expr(
+                                &params, &sem_pkg, call,
+                            )
+                        }
+                        Some(_) | None => return Ok(None),
+                    }
+                }
+                AstNode::StringLit(_) => {
+                    let parent = walk_node
+                        .parent
+                        .as_ref()
+                        .map(|parent| &parent.node);
+                    match parent {
+                        Some(AstNode::ImportDeclaration(_)) => {
+                            let infos: Vec<(String, String)> =
+                                if let Some(env) = flux::imports() {
+                                    env.iter().filter(|(path, _val)| {
+                                    crate::shared::get_package_name(path).is_some()
+                                }).map(|(path, _val)| {
+                                    #[allow(clippy::expect_used)]
+                                    (crate::shared::get_package_name(path).expect("Previous filter failed.").into(), path.clone())
+                                }).collect()
+                                } else {
+                                    return Ok(None);
+                                };
+                            let imports =
+                                completion::get_imports(&sem_pkg);
+
+                            infos.into_iter().filter(|(name, _path)| {
+                                !&imports.iter().any(|x| &x.path == name)
+                            }).map(|(_name, path)| {
+                                let trigger = if let Some(context) = & params.context {
+                                    context.trigger_character.as_deref()
+                                } else {
+                                    None
+                                };
+                                let insert_text = if trigger == Some("\"") {
+                                    path.as_str().to_string()
+                                } else {
+                                    format!(r#""{}""#, path.as_str())
+                                };
+                                lsp::CompletionItem {
+                                    label: insert_text.clone(),
+                                    insert_text: Some(insert_text),
+                                    insert_text_format: Some(lsp::InsertTextFormat::SNIPPET),
+                                    kind: Some(lsp::CompletionItemKind::VALUE),
+                                    ..lsp::CompletionItem::default()
+                                }
+                            }).collect()
+                        }
+                        // This is where bucket/measurement/field/tag completion will occur.
+                        Some(_) | None => return Ok(None),
+                    }
+                }
+                _ => return Ok(None),
+            },
+            None => return Ok(None),
+        };
+        if items.is_empty() {
+            Ok(None)
+        } else {
+            Ok(Some(lsp::CompletionResponse::List(
+                lsp::CompletionList {
+                    // XXX: rockstar (5 Jul 2022) - This should probably always be incomplete, so
+                    // we don't leave off to the client to try and figure out what completions to use.
+                    is_incomplete: false,
+                    items,
+                },
+            )))
+        }
     }
 
     async fn semantic_tokens_full(

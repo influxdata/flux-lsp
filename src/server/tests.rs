@@ -1495,6 +1495,60 @@ sql.
     };
 }
 
+/// When completing package member names, support import aliases.
+#[test]
+async fn test_package_completion_with_alias() {
+    let fluxscript = r#"import sekwel "sql"
+
+sekwel.
+   // ^
+"#;
+    let server = create_server();
+    open_file(&server, fluxscript.to_string(), None).await;
+
+    let params = lsp::CompletionParams {
+        text_document_position: lsp::TextDocumentPositionParams {
+            text_document: lsp::TextDocumentIdentifier {
+                uri: lsp::Url::parse("file:///home/user/file.flux")
+                    .unwrap(),
+            },
+            position: position_of(fluxscript),
+        },
+        work_done_progress_params: lsp::WorkDoneProgressParams {
+            work_done_token: None,
+        },
+        partial_result_params: lsp::PartialResultParams {
+            partial_result_token: None,
+        },
+        context: Some(lsp::CompletionContext {
+            trigger_kind:
+                lsp::CompletionTriggerKind::TRIGGER_CHARACTER,
+            trigger_character: Some(".".to_string()),
+        }),
+    };
+
+    let result =
+        server.completion(params.clone()).await.unwrap().unwrap();
+
+    let expected_labels: Vec<String> = vec!["to", "from"]
+        .into_iter()
+        .map(|x| x.into())
+        .collect::<Vec<String>>();
+
+    match result {
+        lsp::CompletionResponse::List(l) => {
+            assert_eq!(
+                expected_labels,
+                l.items
+                    .iter()
+                    .map(|x| x.label.clone())
+                    .collect::<Vec<String>>()
+            );
+        }
+        _ => unreachable!(),
+    };
+}
+
 #[test]
 async fn test_import_completion() {
     let fluxscript = r#"
@@ -1815,6 +1869,9 @@ ab = 10
     assert_eq!(expected, labels);
 }
 
+// XXX: rockstar (6 Jul 2022) - Is this test correct? I think it's not. It's
+// saying that when there's a `now`, and you type `n` it should complete to
+// literally everything? That makes no sense.
 #[test]
 async fn test_option_function_completion() {
     let fluxscript = r#"import "strings"

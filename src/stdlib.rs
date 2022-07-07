@@ -124,28 +124,6 @@ pub fn create_function_signature(
     )
 }
 
-pub struct PackageInfo {
-    pub name: String,
-    pub path: String,
-}
-
-pub fn get_package_infos() -> Vec<PackageInfo> {
-    let mut result: Vec<PackageInfo> = vec![];
-
-    if let Some(env) = imports() {
-        for (path, _val) in env.iter() {
-            if let Some(name) = get_package_name(path) {
-                result.push(PackageInfo {
-                    name: name.into(),
-                    path: path.to_string(),
-                })
-            }
-        }
-    }
-
-    result
-}
-
 fn record_fields(
     this: &Record,
 ) -> impl Iterator<Item = &flux::semantic::types::Property> {
