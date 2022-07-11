@@ -799,15 +799,11 @@ impl LanguageServer for LspServer {
             })
             .collect::<Vec<lsp::TextEdit>>();
 
-        let mut changes = HashMap::new();
-        changes.insert(key, edits);
-
-        let response = lsp::WorkspaceEdit {
-            changes: Some(changes),
+        Ok(Some(lsp::WorkspaceEdit {
+            changes: Some(HashMap::from([(key, edits)])),
             document_changes: None,
             change_annotations: None,
-        };
-        Ok(Some(response))
+        }))
     }
 
     async fn document_highlight(

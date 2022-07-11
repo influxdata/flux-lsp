@@ -9,10 +9,8 @@ fn parse_variable_assignment(
     node: Node,
     va: &nodes::VariableAssgn,
 ) -> Vec<lsp::SymbolInformation> {
-    let mut result = vec![];
-
     if let Expression::Function(f) = va.init.clone() {
-        result.push(lsp::SymbolInformation {
+        vec![lsp::SymbolInformation {
             kind: lsp::SymbolKind::FUNCTION,
             name: va.id.name.to_string(),
             location: lsp::Location {
@@ -22,23 +20,24 @@ fn parse_variable_assignment(
             tags: None,
             deprecated: None,
             container_name: None,
-        });
-
-        for param in f.params {
-            result.push(lsp::SymbolInformation {
+        }]
+        .into_iter()
+        .chain(f.params.into_iter().map(|param| {
+            lsp::SymbolInformation {
                 kind: lsp::SymbolKind::VARIABLE,
                 name: param.key.name.to_string(),
                 location: lsp::Location {
                     uri: uri.clone(),
-                    range: param.loc.clone().into(),
+                    range: param.loc.into(),
                 },
                 tags: None,
                 deprecated: None,
                 container_name: None,
-            });
-        }
+            }
+        }))
+        .collect()
     } else {
-        result.push(lsp::SymbolInformation {
+        vec![lsp::SymbolInformation {
             kind: lsp::SymbolKind::VARIABLE,
             name: va.id.name.to_string(),
             location: lsp::Location {
@@ -48,98 +47,104 @@ fn parse_variable_assignment(
             tags: None,
             deprecated: None,
             container_name: None,
-        })
+        }]
     }
-
-    result
 }
 
 fn parse_call_expression(
     uri: lsp::Url,
     c: &nodes::CallExpr,
 ) -> Vec<lsp::SymbolInformation> {
-    let mut result = vec![];
-
-    if let Expression::Identifier(ident) = c.callee.clone() {
-        result.push(lsp::SymbolInformation {
-            kind: lsp::SymbolKind::FUNCTION,
-            name: ident.name.to_string(),
-            location: lsp::Location {
-                uri: uri.clone(),
-                range: c.loc.clone().into(),
-            },
-            tags: None,
-            deprecated: None,
-            container_name: None,
-        })
-    }
-
-    for arg in c.arguments.clone() {
-        if let Expression::Function(_) = arg.value {
-            result.push(lsp::SymbolInformation {
+    let initial_symbols =
+        if let Expression::Identifier(ident) = c.callee.clone() {
+            vec![lsp::SymbolInformation {
                 kind: lsp::SymbolKind::FUNCTION,
-                name: arg.key.name.to_string(),
+                name: ident.name.to_string(),
                 location: lsp::Location {
                     uri: uri.clone(),
-                    range: arg.loc.clone().into(),
+                    range: c.loc.clone().into(),
                 },
                 tags: None,
                 deprecated: None,
                 container_name: None,
-            });
+            }]
         } else {
-            result.push(lsp::SymbolInformation {
-                kind: lsp::SymbolKind::VARIABLE,
-                name: arg.key.name.to_string(),
-                location: lsp::Location {
-                    uri: uri.clone(),
-                    range: arg.loc.clone().into(),
-                },
-                tags: None,
-                deprecated: None,
-                container_name: None,
-            });
-        }
-    }
+            vec![]
+        };
 
-    result
+    initial_symbols
+        .into_iter()
+        .chain(c.arguments.clone().into_iter().map(|arg| {
+            if let Expression::Function(_) = arg.value {
+                lsp::SymbolInformation {
+                    kind: lsp::SymbolKind::FUNCTION,
+                    name: arg.key.name.to_string(),
+                    location: lsp::Location {
+                        uri: uri.clone(),
+                        range: arg.loc.into(),
+                    },
+                    tags: None,
+                    deprecated: None,
+                    container_name: None,
+                }
+            } else {
+                lsp::SymbolInformation {
+                    kind: lsp::SymbolKind::VARIABLE,
+                    name: arg.key.name.to_string(),
+                    location: lsp::Location {
+                        uri: uri.clone(),
+                        range: arg.loc.into(),
+                    },
+                    tags: None,
+                    deprecated: None,
+                    container_name: None,
+                }
+            }
+        }))
+        .collect()
 }
 
 fn parse_binary_expression(
     uri: lsp::Url,
     be: &nodes::BinaryExpr,
 ) -> Vec<lsp::SymbolInformation> {
-    let mut result = vec![];
-
-    if let Expression::Identifier(ident) = be.left.clone() {
-        result.push(lsp::SymbolInformation {
-            kind: lsp::SymbolKind::VARIABLE,
-            name: ident.name.to_string(),
-            location: lsp::Location {
-                uri: uri.clone(),
-                range: ident.loc.into(),
-            },
-            tags: None,
-            deprecated: None,
-            container_name: None,
-        })
-    }
-
-    if let Expression::Identifier(ident) = be.right.clone() {
-        result.push(lsp::SymbolInformation {
-            kind: lsp::SymbolKind::VARIABLE,
-            name: ident.name.to_string(),
-            location: lsp::Location {
-                uri,
-                range: ident.loc.into(),
-            },
-            tags: None,
-            deprecated: None,
-            container_name: None,
-        })
-    }
-
-    result
+    #[allow(clippy::expect_used)]
+    vec![
+        if let Expression::Identifier(ident) = be.left.clone() {
+            Some(lsp::SymbolInformation {
+                kind: lsp::SymbolKind::VARIABLE,
+                name: ident.name.to_string(),
+                location: lsp::Location {
+                    uri: uri.clone(),
+                    range: ident.loc.into(),
+                },
+                tags: None,
+                deprecated: None,
+                container_name: None,
+            })
+        } else {
+            None
+        },
+        if let Expression::Identifier(ident) = be.right.clone() {
+            Some(lsp::SymbolInformation {
+                kind: lsp::SymbolKind::VARIABLE,
+                name: ident.name.to_string(),
+                location: lsp::Location {
+                    uri,
+                    range: ident.loc.into(),
+                },
+                tags: None,
+                deprecated: None,
+                container_name: None,
+            })
+        } else {
+            None
+        },
+    ]
+    .into_iter()
+    .filter(|item| !item.is_none())
+    .map(|item| item.expect("Previous filter call failed"))
+    .collect()
 }
 
 pub struct SymbolsVisitor<'a> {

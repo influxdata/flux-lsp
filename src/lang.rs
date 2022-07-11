@@ -153,17 +153,22 @@ pub fn get_stdlib_functions() -> Vec<FunctionInfo> {
 }
 
 pub fn get_builtin_functions() -> Vec<Function> {
-    let mut list = vec![];
-
     if let Some(env) = prelude() {
-        for (key, val) in env.iter() {
-            if let MonoType::Fun(f) = &val.expr {
-                list.push(Function::new(key.to_string(), f));
-            }
-        }
+        env.iter()
+            .filter(|(_key, val)| {
+                matches!(&val.expr, MonoType::Fun(_))
+            })
+            .map(|(key, val)| match &val.expr {
+                MonoType::Fun(f) => Function::new(key.into(), f),
+                _ => unreachable!(
+                    "Previous filter call failed. Got: {}",
+                    val.expr
+                ),
+            })
+            .collect()
+    } else {
+        vec![]
     }
-
-    list
 }
 
 pub struct FunctionInfo {
