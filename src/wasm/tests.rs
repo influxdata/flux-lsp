@@ -33,8 +33,8 @@ fn flux_format() {
 
     let formatted = flux.format().unwrap();
 
-    let expected =
-        r#"from(bucket: "my-bucket") |> range(start: -15m)"#;
+    let expected = r#"from(bucket: "my-bucket") |> range(start: -15m)
+"#;
     assert_eq!(expected, formatted);
 }
 
@@ -92,7 +92,8 @@ fn test_format_from_js_file() {
 
 from(bucket: "inbucket")
     |> range(start: -task.every)
-    |> filter(fn: (r) => r["_measurement"] == "activity")"#;
+    |> filter(fn: (r) => r["_measurement"] == "activity")
+"#;
 
     let script = r#"option task={name:"beetle",every:1h} from(bucket:"inbucket")
 |>range(start:-task.every)|>filter(fn:(r)=>r["_measurement"]=="activity")"#;

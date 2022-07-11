@@ -108,7 +108,8 @@ from(bucket: "inbucket")
 
 from(bucket: "inbucket")
     |> range(start: -task.every)
-    |> filter(fn: (r) => r["_measurement"] == "activity")"#;
+    |> filter(fn: (r) => r["_measurement"] == "activity")
+"#;
 
         let script = r#"option task={name:"beetle",every:1h} from(bucket:"inbucket")
 |>range(start:-task.every)|>filter(fn:(r)=>r["_measurement"]=="activity")"#;
