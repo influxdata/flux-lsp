@@ -115,7 +115,6 @@ fn find_references<'a>(
                 Some(n) => n.to_owned(),
                 None => return Vec::new(),
             };
-
         let mut visitor =
             semantic::IdentFinderVisitor::new(name.clone());
         walk::walk(&mut visitor, scope);
@@ -552,14 +551,12 @@ impl LanguageServer for LspServer {
         };
 
         let mut signatures = vec![];
-        let mut visitor = semantic::NodeFinderVisitor::new(
-            params.text_document_position_params.position,
+        let visitor = crate::walk_semantic_package!(
+            semantic::NodeFinderVisitor::new(
+                params.text_document_position_params.position
+            ),
+            pkg
         );
-        flux::semantic::walk::walk(
-            &mut visitor,
-            walk::Node::Package(&pkg),
-        );
-
         if let Some(node) = visitor.node {
             if let walk::Node::CallExpr(call) = node {
                 let callee = call.callee.clone();
@@ -672,23 +669,21 @@ impl LanguageServer for LspServer {
             Err(err) => return Err(err.into()),
         };
 
-        let mut visitor = semantic::FoldFinderVisitor::default();
-        let pkg_node = walk::Node::Package(&pkg);
-
-        walk::walk(&mut visitor, pkg_node);
-
-        let nodes = visitor.nodes;
-
-        let mut results = vec![];
-        for node in nodes {
-            results.push(lsp::FoldingRange {
+        let visitor = crate::walk_semantic_package!(
+            semantic::FoldFinderVisitor::default(),
+            pkg
+        );
+        let results: Vec<lsp::FoldingRange> = visitor
+            .nodes
+            .into_iter()
+            .map(|node| lsp::FoldingRange {
                 start_line: node.loc().start.line,
                 start_character: Some(node.loc().start.column),
                 end_line: node.loc().end.line,
                 end_character: Some(node.loc().end.column),
                 kind: Some(lsp::FoldingRangeKind::Region),
             })
-        }
+            .collect();
 
         Ok(if results.is_empty() {
             None
@@ -707,10 +702,10 @@ impl LanguageServer for LspServer {
             Err(err) => return Err(err.into()),
         };
 
-        let pkg_node = walk::Node::Package(&pkg);
-        let mut visitor = semantic::SymbolsVisitor::new(key);
-        walk::walk(&mut visitor, pkg_node);
-
+        let visitor = crate::walk_semantic_package!(
+            semantic::SymbolsVisitor::new(key),
+            pkg
+        );
         let mut symbols = visitor.symbols;
 
         symbols.sort_by(|a, b| {
@@ -744,13 +739,12 @@ impl LanguageServer for LspServer {
             Err(err) => return Err(err.into()),
         };
 
-        let pkg_node = walk::Node::Package(&pkg);
-        let mut visitor = semantic::NodeFinderVisitor::new(
-            params.text_document_position_params.position,
+        let visitor = crate::walk_semantic_package!(
+            semantic::NodeFinderVisitor::new(
+                params.text_document_position_params.position
+            ),
+            pkg
         );
-
-        flux::semantic::walk::walk(&mut visitor, pkg_node);
-
         if let Some(node) = visitor.node {
             let node_name = match node {
                 walk::Node::Identifier(ident) => &ident.name,
@@ -758,15 +752,12 @@ impl LanguageServer for LspServer {
                 _ => return Ok(None),
             };
 
-            let mut definition_visitor =
+            let definition_visitor = crate::walk_semantic_package!(
                 semantic::DefinitionFinderVisitor::new(
-                    node_name.clone(),
-                );
-            flux::semantic::walk::walk(
-                &mut definition_visitor,
-                pkg_node,
+                    node_name.clone()
+                ),
+                pkg
             );
-
             if let Some(node) = definition_visitor.node {
                 let location = node_to_location(&node, key);
                 return Ok(Some(lsp::GotoDefinitionResponse::from(
@@ -787,14 +778,12 @@ impl LanguageServer for LspServer {
             Err(err) => return Err(err.into()),
         };
 
-        let mut visitor = semantic::NodeFinderVisitor::new(
-            params.text_document_position.position,
+        let visitor = crate::walk_semantic_package!(
+            semantic::NodeFinderVisitor::new(
+                params.text_document_position.position
+            ),
+            pkg
         );
-        flux::semantic::walk::walk(
-            &mut visitor,
-            walk::Node::Package(&pkg),
-        );
-
         let locations =
             find_references(&key, visitor.node, visitor.path);
         let edits = locations
@@ -827,14 +816,12 @@ impl LanguageServer for LspServer {
             Err(err) => return Err(err.into()),
         };
 
-        let mut visitor = semantic::NodeFinderVisitor::new(
-            params.text_document_position_params.position,
+        let visitor = crate::walk_semantic_package!(
+            semantic::NodeFinderVisitor::new(
+                params.text_document_position_params.position
+            ),
+            pkg
         );
-        flux::semantic::walk::walk(
-            &mut visitor,
-            walk::Node::Package(&pkg),
-        );
-
         let refs = find_references(&key, visitor.node, visitor.path);
         Ok(Some(
             refs.iter()
@@ -857,14 +844,12 @@ impl LanguageServer for LspServer {
             Err(err) => return Err(err.into()),
         };
 
-        let mut visitor = semantic::NodeFinderVisitor::new(
-            params.text_document_position.position,
+        let visitor = crate::walk_semantic_package!(
+            semantic::NodeFinderVisitor::new(
+                params.text_document_position.position
+            ),
+            pkg
         );
-        flux::semantic::walk::walk(
-            &mut visitor,
-            walk::Node::Package(&pkg),
-        );
-
         let references =
             find_references(&key, visitor.node, visitor.path);
         Ok(if references.is_empty() {
@@ -885,15 +870,12 @@ impl LanguageServer for LspServer {
             Err(err) => return Err(err.into()),
         };
 
-        let mut visitor = semantic::NodeFinderVisitor::new(
-            params.text_document_position_params.position,
+        let visitor = crate::walk_semantic_package!(
+            semantic::NodeFinderVisitor::new(
+                params.text_document_position_params.position
+            ),
+            pkg
         );
-
-        flux::semantic::walk::walk(
-            &mut visitor,
-            walk::Node::Package(&pkg),
-        );
-
         if let Some(node) = visitor.node {
             let path = &visitor.path;
             let hover_type = node.type_of().or_else(|| match node {
@@ -980,14 +962,12 @@ impl LanguageServer for LspServer {
             }
         };
 
-        let walker = flux::ast::walk::Node::Package(&ast_pkg);
-        let mut visitor =
+        let visitor = crate::walk_ast_package!(
             crate::visitors::ast::NodeFinderVisitor::new(
-                params.text_document_position.position,
-            );
-
-        flux::ast::walk::walk(&mut visitor, walker);
-
+                params.text_document_position.position
+            ),
+            ast_pkg
+        );
         let items = match visitor.node {
             Some(walk_node) => match walk_node.node {
                 AstNode::CallExpr(call) => {
@@ -1148,19 +1128,7 @@ impl LanguageServer for LspServer {
                                 }
                             }
 
-                            let walker =
-                                flux::semantic::walk::Node::Package(
-                                    &sem_pkg,
-                                );
-                            let mut visitor =
-                                completion::CompletableObjectFinderVisitor::new(
-                                    &identifier.name,
-                                );
-                            flux::semantic::walk::walk(
-                                &mut visitor,
-                                walker,
-                            );
-
+                            let visitor = crate::walk_semantic_package!(completion::CompletableObjectFinderVisitor::new(&identifier.name), sem_pkg);
                             let imports =
                                 completion::get_imports(&sem_pkg);
                             vec![
@@ -1261,17 +1229,15 @@ impl LanguageServer for LspServer {
             Ok(pkg) => pkg,
             Err(err) => return Err(err.into()),
         };
-        let root_node = flux::ast::walk::Node::File(&pkg.files[0]);
 
-        let mut visitor =
-            crate::visitors::ast::SemanticTokenVisitor::default();
-
-        flux::ast::walk::walk(&mut visitor, root_node);
-
+        let visitor = crate::walk_ast_package!(
+            crate::visitors::ast::SemanticTokenVisitor::default(),
+            pkg
+        );
         Ok(Some(lsp::SemanticTokensResult::Tokens(
             lsp::SemanticTokens {
                 result_id: None,
-                data: visitor.tokens.clone(),
+                data: visitor.tokens,
             },
         )))
     }
@@ -1322,11 +1288,11 @@ impl LanguageServer for LspServer {
             Ok(pkg) => pkg,
             Err(err) => unreachable!("{:?}", err),
         };
-        let mut visitor =
-            semantic::PackageNodeFinderVisitor::default();
-        let walker = walk::Node::Package(&pkg);
-        walk::walk(&mut visitor, walker);
 
+        let visitor = crate::walk_semantic_package!(
+            semantic::PackageNodeFinderVisitor::default(),
+            pkg
+        );
         let import_position = match visitor.location {
             Some(location) => lsp::Position {
                 line: location.start.line + 1,

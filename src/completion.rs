@@ -24,10 +24,10 @@ const PRELUDE_PACKAGE: &str = "prelude";
 pub fn get_imports(
     pkg: &flux::semantic::nodes::Package,
 ) -> Vec<Import> {
-    let walker = flux::semantic::walk::Node::Package(pkg);
-    let mut visitor = ImportFinderVisitor::default();
-
-    flux::semantic::walk::walk(&mut visitor, walker);
+    let visitor = crate::walk_semantic_package!(
+        ImportFinderVisitor::default(),
+        pkg
+    );
     visitor.imports
 }
 
@@ -614,13 +614,10 @@ pub fn complete_call_expr(
             ));
 
             let user_functions = {
-                let walker =
-                    flux::semantic::walk::Node::Package(sem_pkg);
-                let mut visitor =
-                    FunctionFinderVisitor::new(position);
-
-                flux::semantic::walk::walk(&mut visitor, walker);
-
+                let visitor = crate::walk_semantic_package!(
+                    FunctionFinderVisitor::new(position),
+                    sem_pkg
+                );
                 visitor.functions
             };
             completion_params.extend(get_function_params(
@@ -635,13 +632,10 @@ pub fn complete_call_expr(
                     stdlib::get_package_functions(&ident.name);
 
                 let object_functions: Vec<Function> = {
-                    let walker =
-                        flux::semantic::walk::Node::Package(sem_pkg);
-                    let mut visitor =
-                        ObjectFunctionFinderVisitor::default();
-
-                    flux::semantic::walk::walk(&mut visitor, walker);
-
+                    let visitor = crate::walk_semantic_package!(
+                        ObjectFunctionFinderVisitor::default(),
+                        sem_pkg
+                    );
                     visitor
                         .results
                         .into_iter()
