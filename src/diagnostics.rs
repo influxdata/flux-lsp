@@ -20,11 +20,10 @@ use super::visitors::semantic::{
 pub(crate) fn experimental_lint(
     pkg: &Package,
 ) -> Vec<(Option<String>, lsp::Diagnostic)> {
-    let walker = flux::semantic::walk::Node::Package(pkg);
-    let mut visitor = ExperimentalDiagnosticVisitor::default();
-
-    flux::semantic::walk::walk(&mut visitor, walker);
-
+    let visitor = crate::walk_semantic_package!(
+        ExperimentalDiagnosticVisitor::default(),
+        pkg
+    );
     visitor.diagnostics
 }
 
@@ -36,22 +35,20 @@ pub(crate) fn experimental_lint(
 pub(crate) fn contrib_lint(
     pkg: &Package,
 ) -> Vec<(Option<String>, lsp::Diagnostic)> {
-    let walker = flux::semantic::walk::Node::Package(pkg);
-    let mut visitor = ContribDiagnosticVisitor::default();
-
-    flux::semantic::walk::walk(&mut visitor, walker);
-
+    let visitor = crate::walk_semantic_package!(
+        ContribDiagnosticVisitor::default(),
+        pkg
+    );
     visitor.diagnostics
 }
 
 pub(crate) fn no_influxdb_identifiers(
     pkg: &Package,
 ) -> Vec<(Option<String>, lsp::Diagnostic)> {
-    let walker = flux::semantic::walk::Node::Package(pkg);
-    let mut visitor = InfluxDBIdentifierDiagnosticVisitor::default();
-
-    flux::semantic::walk::walk(&mut visitor, walker);
-
+    let visitor = crate::walk_semantic_package!(
+        InfluxDBIdentifierDiagnosticVisitor::default(),
+        pkg
+    );
     visitor.diagnostics
 }
 
