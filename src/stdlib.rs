@@ -5,22 +5,9 @@ use flux::prelude;
 use flux::semantic::types::{MonoType, Record};
 
 use std::collections::{BTreeMap, HashMap};
-use std::fmt;
 use std::iter::Iterator;
 
 const BUILTIN_PACKAGE: &str = "builtin";
-
-#[derive(Debug, Clone, PartialEq)]
-struct Property {
-    pub k: String,
-    pub v: String,
-}
-
-impl fmt::Display for Property {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}:{}", self.k, self.v)
-    }
-}
 
 struct TVarMap {
     pub mapping: HashMap<flux::semantic::types::Tvar, char>,
@@ -78,10 +65,7 @@ pub fn create_function_signature(
         // Sort args with BTree
         .collect::<BTreeMap<_, _>>()
         .iter()
-        .map(|(&k, &v)| Property {
-            k: k.clone(),
-            v: get_type_string(v, &mut mapping),
-        })
+        .map(|(&k, &v)| (k.clone(), get_type_string(v, &mut mapping)))
         .collect::<Vec<_>>();
 
     let optional = f
@@ -90,24 +74,15 @@ pub fn create_function_signature(
         // Sort args with BTree
         .collect::<BTreeMap<_, _>>()
         .iter()
-        .map(|(&k, &v)| Property {
-            k: String::from("?") + k,
-            v: get_type_string(&v.typ, &mut mapping),
-        })
+        .map(|(&k, &v)| (k.clone(), get_type_string(&v.typ, &mut mapping)))
         .collect::<Vec<_>>();
 
     let pipe = match &f.pipe {
         Some(pipe) => {
             if pipe.k == "<-" {
-                vec![Property {
-                    k: pipe.k.clone(),
-                    v: get_type_string(&pipe.v, &mut mapping),
-                }]
+                vec![(pipe.k.clone(), get_type_string(&pipe.v, &mut mapping))]
             } else {
-                vec![Property {
-                    k: String::from("<-") + &pipe.k,
-                    v: get_type_string(&pipe.v, &mut mapping),
-                }]
+                vec![(format!("<-{}", pipe.k), get_type_string(&pipe.v, &mut mapping))]
             }
         }
         None => vec![],
@@ -117,7 +92,7 @@ pub fn create_function_signature(
         "({}) -> {}",
         pipe.iter()
             .chain(required.iter().chain(optional.iter()))
-            .map(|x| x.to_string())
+            .map(|arg| format!("{}:{}", arg.0, arg.1))
             .collect::<Vec<_>>()
             .join(", "),
         get_type_string(&f.retn, &mut mapping)
