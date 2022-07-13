@@ -17,7 +17,7 @@ use lspower::{
     jsonrpc::Result as RpcResult, lsp, Client, LanguageServer,
 };
 
-use crate::{completion, stdlib, visitors::semantic};
+use crate::{completion, lang, visitors::semantic};
 
 use self::commands::{
     InjectFieldFilterParams, InjectMeasurementFilterParams,
@@ -134,7 +134,7 @@ pub fn find_stdlib_signatures(
     name: &str,
     package: &str,
 ) -> Vec<lsp::SignatureInformation> {
-    stdlib::get_stdlib_functions()
+    lang::get_stdlib_functions()
         .into_iter()
         .filter(|x| x.name == name && x.package_name == package)
         .map(|x| {
@@ -984,14 +984,14 @@ impl LanguageServer for LspServer {
                     let stdlib_completions: Vec<lsp::CompletionItem> =
                         if let Some(env) = flux::imports() {
                             env.iter().filter(|(key, _val)| {
-                            if let Some(package_name) = crate::stdlib::get_package_name(key) {
+                            if let Some(package_name) = lang::get_package_name(key) {
                                 fuzzy_match(package_name, &identifier.name)
                             } else {
                                 false
                             }
                         }).map(|(key, _val)| {
                             #[allow(clippy::unwrap_used)]
-                            let package_name = crate::stdlib::get_package_name(key).unwrap();
+                            let package_name = lang::get_package_name(key).unwrap();
                             lsp::CompletionItem {
                                 label: key.clone(),
                                 detail: Some("Package".into()),
@@ -1028,7 +1028,7 @@ impl LanguageServer for LspServer {
                                 MonoType::Fun(function) => {
                                     lsp::CompletionItem {
                                         label: key.into(),
-                                        detail: Some(stdlib::create_function_signature(function)),
+                                        detail: Some(lang::create_function_signature(function)),
                                         filter_text: Some(key.into()),
                                         insert_text_format: Some(lsp::InsertTextFormat::SNIPPET),
                                         kind: Some(lsp::CompletionItemKind::FUNCTION),
@@ -1117,7 +1117,7 @@ impl LanguageServer for LspServer {
                                 } else {
                                     for (key, val) in env.iter() {
                                         if let Some(package_name) =
-                                            crate::stdlib::get_package_name(key)
+                                            lang::get_package_name(key)
                                         {
                                             if package_name == identifier.name {
                                                 completion::walk_package(
@@ -1166,10 +1166,10 @@ impl LanguageServer for LspServer {
                             let infos: Vec<(String, String)> =
                                 if let Some(env) = flux::imports() {
                                     env.iter().filter(|(path, _val)| {
-                                    crate::stdlib::get_package_name(path).is_some()
+                                    lang::get_package_name(path).is_some()
                                 }).map(|(path, _val)| {
                                     #[allow(clippy::expect_used)]
-                                    (crate::stdlib::get_package_name(path).expect("Previous filter failed.").into(), path.clone())
+                                    (lang::get_package_name(path).expect("Previous filter failed.").into(), path.clone())
                                 }).collect()
                                 } else {
                                     return Ok(None);
@@ -1311,7 +1311,7 @@ impl LanguageServer for LspServer {
                         // When encountering undefined identifiers, check to see if they match a corresponding
                         // package available for import.
                         let imports = flux::imports()?;
-                        let potential_imports: Vec<&String> = imports.iter().filter(|x| match crate::stdlib::get_package_name(x.0) {
+                        let potential_imports: Vec<&String> = imports.iter().filter(|x| match lang::get_package_name(x.0) {
                             Some(name) => name == identifier,
                             None => false,
                         }).map(|x| x.0 ).collect();
@@ -1709,7 +1709,7 @@ impl LanguageServer for LspServer {
             }
             Ok(LspServerCommand::GetFunctionList) => {
                 let functions: Vec<String> =
-                    stdlib::get_builtin_functions()
+                    lang::get_builtin_functions()
                         .iter()
                         .filter(|function| {
                             !function.name.starts_with('_')
