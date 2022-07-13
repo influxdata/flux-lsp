@@ -984,14 +984,14 @@ impl LanguageServer for LspServer {
                     let stdlib_completions: Vec<lsp::CompletionItem> =
                         if let Some(env) = flux::imports() {
                             env.iter().filter(|(key, _val)| {
-                            if let Some(package_name) = crate::shared::get_package_name(key) {
+                            if let Some(package_name) = crate::stdlib::get_package_name(key) {
                                 fuzzy_match(package_name, &identifier.name)
                             } else {
                                 false
                             }
                         }).map(|(key, _val)| {
                             #[allow(clippy::unwrap_used)]
-                            let package_name = crate::shared::get_package_name(key).unwrap();
+                            let package_name = crate::stdlib::get_package_name(key).unwrap();
                             lsp::CompletionItem {
                                 label: key.clone(),
                                 detail: Some("Package".into()),
@@ -1117,7 +1117,7 @@ impl LanguageServer for LspServer {
                                 } else {
                                     for (key, val) in env.iter() {
                                         if let Some(package_name) =
-                                            crate::shared::get_package_name(key)
+                                            crate::stdlib::get_package_name(key)
                                         {
                                             if package_name == identifier.name {
                                                 completion::walk_package(
@@ -1166,10 +1166,10 @@ impl LanguageServer for LspServer {
                             let infos: Vec<(String, String)> =
                                 if let Some(env) = flux::imports() {
                                     env.iter().filter(|(path, _val)| {
-                                    crate::shared::get_package_name(path).is_some()
+                                    crate::stdlib::get_package_name(path).is_some()
                                 }).map(|(path, _val)| {
                                     #[allow(clippy::expect_used)]
-                                    (crate::shared::get_package_name(path).expect("Previous filter failed.").into(), path.clone())
+                                    (crate::stdlib::get_package_name(path).expect("Previous filter failed.").into(), path.clone())
                                 }).collect()
                                 } else {
                                     return Ok(None);
@@ -1311,7 +1311,7 @@ impl LanguageServer for LspServer {
                         // When encountering undefined identifiers, check to see if they match a corresponding
                         // package available for import.
                         let imports = flux::imports()?;
-                        let potential_imports: Vec<&String> = imports.iter().filter(|x| match crate::shared::get_package_name(x.0) {
+                        let potential_imports: Vec<&String> = imports.iter().filter(|x| match crate::stdlib::get_package_name(x.0) {
                             Some(name) => name == identifier,
                             None => false,
                         }).map(|x| x.0 ).collect();

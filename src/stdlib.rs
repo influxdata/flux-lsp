@@ -1,4 +1,4 @@
-use crate::shared::{get_package_name, Function, FunctionInfo};
+use crate::shared::{Function, FunctionInfo};
 
 use flux::imports;
 use flux::prelude;
@@ -8,6 +8,10 @@ use std::collections::BTreeMap;
 use std::iter::Iterator;
 
 const BUILTIN_PACKAGE: &str = "builtin";
+
+pub fn get_package_name(name: &str) -> Option<&str> {
+    name.split('/').last()
+}
 
 pub fn create_function_signature(
     f: &flux::semantic::types::Function,

@@ -2,11 +2,6 @@ use lspower::lsp;
 
 use flux::semantic::types::MonoType;
 
-pub fn get_package_name(name: &str) -> Option<&str> {
-    let items = name.split('/');
-    items.last()
-}
-
 #[allow(clippy::implicit_hasher)]
 pub fn get_argument_names(
     args: &std::collections::BTreeMap<String, MonoType>,

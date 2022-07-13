@@ -1,4 +1,4 @@
-use crate::shared::get_package_name;
+use crate::stdlib::get_package_name;
 
 use flux::semantic::{
     nodes::{Expression, Symbol},
