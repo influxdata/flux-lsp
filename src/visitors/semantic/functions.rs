@@ -6,7 +6,7 @@ use flux::semantic::types::MonoType;
 use flux::semantic::walk::{Node, Visitor};
 use lspower::lsp;
 
-use crate::shared::FunctionInfo;
+use crate::stdlib::FunctionInfo;
 
 pub struct FunctionFinderVisitor {
     pub pos: lsp::Position,

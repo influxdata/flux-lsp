@@ -9,9 +9,8 @@ use flux::semantic::types::{
 use flux::semantic::walk::Visitor as SemanticVisitor;
 use lspower::lsp;
 
-use crate::shared::Function;
-use crate::shared::{
-    get_argument_names, get_optional_argument_names,
+use crate::stdlib::{
+    Function, get_argument_names, get_optional_argument_names,
 };
 use crate::stdlib;
 use crate::visitors::semantic::{
