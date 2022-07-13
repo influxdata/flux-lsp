@@ -9,11 +9,7 @@ use flux::semantic::types::{
 use flux::semantic::walk::Visitor as SemanticVisitor;
 use lspower::lsp;
 
-use crate::shared::Function;
-use crate::shared::{
-    get_argument_names, get_optional_argument_names,
-};
-use crate::stdlib;
+use crate::lang;
 use crate::visitors::semantic::{
     FunctionFinderVisitor, Import, ImportFinderVisitor,
     ObjectFunctionFinderVisitor,
@@ -33,7 +29,7 @@ pub fn get_imports(
 
 fn get_function_params<'a>(
     name: &'a str,
-    functions: &'a [Function],
+    functions: &'a [lang::Function],
     provided: &'a [String],
 ) -> impl Iterator<Item = (String, Option<MonoType>)> + 'a {
     functions.iter().filter(move |f| f.name == name).flat_map(
@@ -68,9 +64,7 @@ pub(crate) fn walk_package(
                     list.push(Box::new(FunctionResult {
                         name: head.k.clone().to_string(),
                         package: package.to_string(),
-                        signature: stdlib::create_function_signature(
-                            f,
-                        ),
+                        signature: lang::create_function_signature(f),
                     }));
                 }
                 MonoType::Collection(c) => {
@@ -217,9 +211,11 @@ fn create_function_result(
         if let MonoType::Fun(fun) = &f.typ {
             return Some(UserFunctionResult {
                 name: name.into(),
-                optional_args: get_optional_argument_names(&fun.opt),
-                required_args: get_argument_names(&fun.req),
-                signature: stdlib::create_function_signature(fun),
+                optional_args: lang::get_optional_argument_names(
+                    &fun.opt,
+                ),
+                required_args: lang::get_argument_names(&fun.req),
+                signature: lang::create_function_signature(fun),
             });
         }
     }
@@ -609,7 +605,7 @@ pub fn complete_call_expr(
         Expression::Identifier(ident) => {
             completion_params.extend(get_function_params(
                 ident.name.as_str(),
-                &stdlib::get_builtin_functions(),
+                &lang::get_builtin_functions(),
                 &provided,
             ));
 
@@ -629,9 +625,9 @@ pub fn complete_call_expr(
         Expression::Member(me) => {
             if let Expression::Identifier(ident) = &me.object {
                 let package_functions =
-                    stdlib::get_package_functions(&ident.name);
+                    lang::get_package_functions(&ident.name);
 
-                let object_functions: Vec<Function> = {
+                let object_functions: Vec<lang::Function> = {
                     let visitor = crate::walk_semantic_package!(
                         ObjectFunctionFinderVisitor::default(),
                         sem_pkg

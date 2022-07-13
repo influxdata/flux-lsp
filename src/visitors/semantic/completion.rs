@@ -4,7 +4,7 @@ use flux::semantic::types::MonoType;
 use flux::semantic::walk::{Node, Visitor};
 use lspower::lsp;
 
-use crate::shared::Function;
+use crate::lang::Function;
 
 fn defined_after(loc: &SourceLocation, pos: lsp::Position) -> bool {
     if loc.start.line > pos.line + 1

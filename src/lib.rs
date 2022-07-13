@@ -9,10 +9,9 @@
 )]
 mod completion;
 mod diagnostics;
+mod lang;
 mod lsp;
 mod server;
-mod shared;
-mod stdlib;
 mod visitors;
 #[cfg(feature = "wasm")]
 mod wasm;
