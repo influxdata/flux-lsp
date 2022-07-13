@@ -1117,9 +1117,13 @@ impl LanguageServer for LspServer {
                                 } else {
                                     for (key, val) in env.iter() {
                                         if let Some(package_name) =
-                                            lang::get_package_name(key)
+                                            lang::get_package_name(
+                                                key,
+                                            )
                                         {
-                                            if package_name == identifier.name {
+                                            if package_name
+                                                == identifier.name
+                                            {
                                                 completion::walk_package(
                                                     key,
                                                     &mut list,

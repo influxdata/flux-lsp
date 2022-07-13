@@ -53,7 +53,7 @@ pub fn create_function_signature(
             .map(|arg| format!("{}:{}", arg.0, arg.1))
             .collect::<Vec<_>>()
             .join(", "),
-        format!("{}", f.retn)
+        f.retn
     )
 }
 

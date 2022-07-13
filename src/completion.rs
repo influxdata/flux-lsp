@@ -64,9 +64,7 @@ pub(crate) fn walk_package(
                     list.push(Box::new(FunctionResult {
                         name: head.k.clone().to_string(),
                         package: package.to_string(),
-                        signature: lang::create_function_signature(
-                            f,
-                        ),
+                        signature: lang::create_function_signature(f),
                     }));
                 }
                 MonoType::Collection(c) => {
@@ -213,7 +211,9 @@ fn create_function_result(
         if let MonoType::Fun(fun) = &f.typ {
             return Some(UserFunctionResult {
                 name: name.into(),
-                optional_args: lang::get_optional_argument_names(&fun.opt),
+                optional_args: lang::get_optional_argument_names(
+                    &fun.opt,
+                ),
                 required_args: lang::get_argument_names(&fun.req),
                 signature: lang::create_function_signature(fun),
             });
