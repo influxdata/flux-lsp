@@ -4,68 +4,21 @@ use flux::imports;
 use flux::prelude;
 use flux::semantic::types::{MonoType, Record};
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
 use std::iter::Iterator;
 
 const BUILTIN_PACKAGE: &str = "builtin";
 
-struct TVarMap {
-    pub mapping: HashMap<flux::semantic::types::Tvar, char>,
-    pub current_letter: char,
-}
-
-impl TVarMap {
-    pub fn default() -> Self {
-        TVarMap {
-            mapping: HashMap::new(),
-            current_letter: 'A',
-        }
-    }
-
-    fn increment(&mut self) {
-        let c = std::char::from_u32(self.current_letter as u32 + 1)
-            .unwrap_or(self.current_letter);
-        self.current_letter = c
-    }
-
-    fn add(&mut self, v: flux::semantic::types::Tvar) -> String {
-        let c = self.current_letter;
-        self.increment();
-        self.mapping.insert(v, c);
-
-        format!("{}", c)
-    }
-
-    pub fn get_letter(
-        &mut self,
-        v: flux::semantic::types::Tvar,
-    ) -> String {
-        if let Some(result) = self.mapping.get(&v) {
-            format!("{}", *result)
-        } else {
-            self.add(v)
-        }
-    }
-}
-
-fn get_type_string(m: &MonoType, map: &mut TVarMap) -> String {
-    if let MonoType::Var(t) = m {
-        return map.get_letter(*t);
-    }
-    format!("{}", m)
-}
-
 pub fn create_function_signature(
     f: &flux::semantic::types::Function,
 ) -> String {
-    let mut mapping = TVarMap::default();
     let required = f
         .req
         .iter()
         // Sort args with BTree
         .collect::<BTreeMap<_, _>>()
         .iter()
-        .map(|(&k, &v)| (k.clone(), get_type_string(v, &mut mapping)))
+        .map(|(&k, &v)| (k.clone(), format!("{}", v)))
         .collect::<Vec<_>>();
 
     let optional = f
@@ -74,15 +27,15 @@ pub fn create_function_signature(
         // Sort args with BTree
         .collect::<BTreeMap<_, _>>()
         .iter()
-        .map(|(&k, &v)| (k.clone(), get_type_string(&v.typ, &mut mapping)))
+        .map(|(&k, &v)| (k.clone(), format!("{}", v.typ)))
         .collect::<Vec<_>>();
 
     let pipe = match &f.pipe {
         Some(pipe) => {
             if pipe.k == "<-" {
-                vec![(pipe.k.clone(), get_type_string(&pipe.v, &mut mapping))]
+                vec![(pipe.k.clone(), format!("{}", pipe.v))]
             } else {
-                vec![(format!("<-{}", pipe.k), get_type_string(&pipe.v, &mut mapping))]
+                vec![(format!("<-{}", pipe.k), format!("{}", pipe.v))]
             }
         }
         None => vec![],
@@ -95,7 +48,7 @@ pub fn create_function_signature(
             .map(|arg| format!("{}:{}", arg.0, arg.1))
             .collect::<Vec<_>>()
             .join(", "),
-        get_type_string(&f.retn, &mut mapping)
+        format!("{}", f.retn)
     )
 }
 
