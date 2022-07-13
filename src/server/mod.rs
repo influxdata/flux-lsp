@@ -87,9 +87,9 @@ fn find_references<'a>(
             _ => return Vec::new(),
         };
 
-        let mut path_iter = path.iter().rev();
-        let scope: walk::Node =
-            match path_iter.find_map(|n| match n {
+        let scope: walk::Node = match path
+            .iter()
+            .map(|n| match n {
                 walk::Node::FunctionExpr(f)
                     if f.params
                         .iter()
@@ -111,10 +111,12 @@ fn find_references<'a>(
                     }
                 }
                 _ => None,
-            }) {
-                Some(n) => n.to_owned(),
-                None => return Vec::new(),
-            };
+            })
+            .next()
+        {
+            Some(Some(n)) => n.to_owned(),
+            _ => return Vec::new(),
+        };
         let mut visitor =
             semantic::IdentFinderVisitor::new(name.clone());
         walk::walk(&mut visitor, scope);
