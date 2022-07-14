@@ -1163,7 +1163,6 @@ impl LanguageServer for LspServer {
                                     lang::STDLIB.iter().filter(|(path, _val)| {
                                     lang::get_package_name(path).is_some()
                                 }).map(|(path, _val)| {
-                                    #[allow(clippy::expect_used)]
                                     (lang::get_package_name(path).expect("Previous filter failed.").into(), path.clone())
                                 }).collect();
                             let imports =
@@ -1237,10 +1236,6 @@ impl LanguageServer for LspServer {
         )))
     }
 
-    // The use of unwrap/expect here is intentional, and should only occur with prior
-    // checks in place. If we were to use nested matchers, it makes the code difficult
-    // to reason about.
-    #[allow(clippy::expect_used)]
     async fn code_action(
         &self,
         params: lsp::CodeActionParams,

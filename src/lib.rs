@@ -1,6 +1,5 @@
 #![cfg_attr(feature = "strict", deny(warnings))]
 #![warn(
-    clippy::expect_used,
     clippy::panic,
     clippy::print_stderr,
     clippy::print_stdout,
