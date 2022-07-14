@@ -1,7 +1,6 @@
 /// Tools for working with the Flux language and APIs for bridging
 /// the gap between Flux language data structures and the needs of the LSP.
 use flux::semantic::types::{MonoType, Record};
-use lazy_static;
 use lspower::lsp;
 
 use std::collections::BTreeMap;

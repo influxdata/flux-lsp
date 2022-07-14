@@ -1010,7 +1010,7 @@ impl LanguageServer for LspServer {
 
                     let builtin_completions: Vec<
                         lsp::CompletionItem,
-                    > =                         lang::PRELUDE.iter().filter(|(key, val)| {
+                    > = lang::PRELUDE.iter().filter(|(key, val)| {
                             // Don't allow users to "discover" private-ish functionality.
                             // Filter out irrelevent items that won't match.
                             // Only pass expressions that have completion support.
@@ -1159,16 +1159,14 @@ impl LanguageServer for LspServer {
                         .map(|parent| &parent.node);
                     match parent {
                         Some(AstNode::ImportDeclaration(_)) => {
-                            let infos: Vec<(String, String)> =
-                                    lang::STDLIB.iter().filter(|(path, _val)| {
-                                    lang::get_package_name(path).is_some()
-                                }).map(|(path, _val)| {
-                                    (lang::get_package_name(path).expect("Previous filter failed.").into(), path.clone())
-                                }).collect();
                             let imports =
                                 completion::get_imports(&sem_pkg);
 
-                            infos.into_iter().filter(|(name, _path)| {
+                            lang::STDLIB.iter().filter(|(path, _val)| {
+                                lang::get_package_name(path).is_some()
+                            }).map(|(path, _val)| {
+                                (lang::get_package_name(path).expect("Previous filter failed.").into(), path.clone())
+                            }).filter(|(name, _path): &(String, String)| {
                                 !&imports.iter().any(|x| &x.path == name)
                             }).map(|(_name, path)| {
                                 let trigger = if let Some(context) = & params.context {
