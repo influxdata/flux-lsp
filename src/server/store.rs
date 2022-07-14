@@ -66,9 +66,10 @@ impl Store {
         match self.backend.write() {
             Ok(mut store) => match store.entry(key) {
                 Entry::Vacant(entry) => {
-                    let mut map = HashMap::new();
-                    map.insert(val, (contents.into(), url.clone()));
-                    entry.insert(map);
+                    entry.insert(HashMap::from([(
+                        val,
+                        (contents.into(), url.clone()),
+                    )]));
                 }
                 Entry::Occupied(mut entry) => {
                     let map = entry.get_mut();

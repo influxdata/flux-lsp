@@ -15,8 +15,6 @@ use crate::visitors::semantic::{
     ObjectFunctionFinderVisitor,
 };
 
-const PRELUDE_PACKAGE: &str = "prelude";
-
 pub fn get_imports(
     pkg: &flux::semantic::nodes::Package,
 ) -> Vec<Import> {
@@ -63,7 +61,6 @@ pub(crate) fn walk_package(
                 MonoType::Fun(f) => {
                     list.push(Box::new(FunctionResult {
                         name: head.k.clone().to_string(),
-                        package: package.to_string(),
                         signature: lang::create_function_signature(f),
                     }));
                 }
@@ -97,32 +94,11 @@ pub(crate) trait Completable {
 impl Completable for FunctionResult {
     fn completion_item(
         &self,
-        imports: &[Import],
+        _imports: &[Import],
     ) -> lsp::CompletionItem {
-        let mut additional_text_edits = vec![];
-
-        let contains_pkg =
-            imports.iter().any(|x| self.package == x.path);
-
-        if !contains_pkg && self.package != PRELUDE_PACKAGE {
-            additional_text_edits.push(lsp::TextEdit {
-                new_text: format!("import \"{}\"\n", self.package),
-                range: lsp::Range {
-                    start: lsp::Position {
-                        line: 0,
-                        character: 0,
-                    },
-                    end: lsp::Position {
-                        line: 0,
-                        character: 0,
-                    },
-                },
-            })
-        }
-
         lsp::CompletionItem {
             label: self.name.clone(),
-            additional_text_edits: Some(additional_text_edits),
+            additional_text_edits: None,
             commit_characters: None,
             deprecated: None,
             detail: Some(self.signature.clone()),
@@ -480,7 +456,6 @@ impl CompletionVarResult {
 #[derive(Clone)]
 struct FunctionResult {
     name: String,
-    package: String,
     signature: String,
 }
 #[derive(Clone)]
@@ -582,7 +557,6 @@ pub fn complete_call_expr(
 ) -> Vec<lsp::CompletionItem> {
     let position = params.text_document_position.position;
 
-    let mut completion_params = Vec::new();
     let provided = if let Some(Expression::Object(obj)) =
         call.arguments.first()
     {
@@ -601,67 +575,79 @@ pub fn complete_call_expr(
         vec![]
     };
 
-    match &call.callee {
-        Expression::Identifier(ident) => {
-            completion_params.extend(get_function_params(
-                ident.name.as_str(),
-                &lang::get_builtin_functions(),
-                &provided,
-            ));
-
-            let user_functions = {
-                let visitor = crate::walk_semantic_package!(
-                    FunctionFinderVisitor::new(position),
-                    sem_pkg
-                );
-                visitor.functions
-            };
-            completion_params.extend(get_function_params(
-                ident.name.as_str(),
-                &user_functions,
-                &provided,
-            ));
-        }
-        Expression::Member(me) => {
-            if let Expression::Identifier(ident) = &me.object {
-                let package_functions =
-                    lang::get_package_functions(&ident.name);
-
-                let object_functions: Vec<lang::Function> = {
+    let completion_params: Vec<(String, Option<MonoType>)> =
+        match &call.callee {
+            Expression::Identifier(ident) => {
+                let user_functions = {
                     let visitor = crate::walk_semantic_package!(
-                        ObjectFunctionFinderVisitor::default(),
+                        FunctionFinderVisitor::new(position),
                         sem_pkg
                     );
-                    visitor
-                        .results
-                        .into_iter()
-                        .filter(|obj| {
-                            obj.object == ident.name.as_str()
-                        })
-                        .map(|obj| obj.function)
-                        .collect()
+                    visitor.functions
                 };
 
-                let key = match &me.property {
-                    PropertyKey::Identifier(i) => &i.name,
-                    PropertyKey::StringLit(l) => &l.value,
-                };
-
-                completion_params.extend(get_function_params(
-                    key,
-                    &package_functions,
-                    &provided,
-                ));
-
-                completion_params.extend(get_function_params(
-                    key,
-                    &object_functions,
-                    &provided,
-                ));
+                vec![
+                    get_function_params(
+                        ident.name.as_str(),
+                        &lang::get_builtin_functions(),
+                        &provided,
+                    ),
+                    get_function_params(
+                        ident.name.as_str(),
+                        &user_functions,
+                        &provided,
+                    ),
+                ]
+                .into_iter()
+                .flatten()
+                .collect()
             }
-        }
-        _ => (),
-    }
+            Expression::Member(me) => {
+                if let Expression::Identifier(ident) = &me.object {
+                    let package_functions =
+                        lang::get_package_functions(&ident.name);
+
+                    let object_functions: Vec<lang::Function> = {
+                        let visitor = crate::walk_semantic_package!(
+                            ObjectFunctionFinderVisitor::default(),
+                            sem_pkg
+                        );
+                        visitor
+                            .results
+                            .into_iter()
+                            .filter(|obj| {
+                                obj.object == ident.name.as_str()
+                            })
+                            .map(|obj| obj.function)
+                            .collect()
+                    };
+
+                    let key = match &me.property {
+                        PropertyKey::Identifier(i) => &i.name,
+                        PropertyKey::StringLit(l) => &l.value,
+                    };
+
+                    vec![
+                        get_function_params(
+                            key,
+                            &package_functions,
+                            &provided,
+                        ),
+                        get_function_params(
+                            key,
+                            &object_functions,
+                            &provided,
+                        ),
+                    ]
+                    .into_iter()
+                    .flatten()
+                    .collect()
+                } else {
+                    return vec![];
+                }
+            }
+            _ => return vec![],
+        };
 
     let trigger = params
         .context
