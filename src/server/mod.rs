@@ -1110,15 +1110,15 @@ impl LanguageServer for LspServer {
                                     }
                                 } else {
                                     for (key, val) in env.iter() {
-                                            if lang::get_package_name(key)
-                                                == identifier.name
-                                            {
-                                                completion::walk_package(
-                                                    key,
-                                                    &mut list,
-                                                    &val.typ().expr,
-                                                );
-                                            }
+                                        if lang::get_package_name(key)
+                                            == identifier.name
+                                        {
+                                            completion::walk_package(
+                                                key,
+                                                &mut list,
+                                                &val.typ().expr,
+                                            );
+                                        }
                                     }
                                 }
                             }

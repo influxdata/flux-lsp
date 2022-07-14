@@ -11,7 +11,9 @@ use std::iter::Iterator;
 const BUILTIN_PACKAGE: &str = "builtin";
 
 pub fn get_package_name(name: &str) -> &str {
-    name.split('/').last().expect("Invalid package path/name supplied")
+    name.split('/')
+        .last()
+        .expect("Invalid package path/name supplied")
 }
 
 pub fn create_function_signature(
@@ -73,31 +75,30 @@ fn record_fields(
     })
 }
 
-fn walk_package_functions(list: &mut Vec<Function>, t: &MonoType) {
-    if let MonoType::Record(record) = t {
-        for head in record_fields(record) {
-            if let MonoType::Fun(f) = &head.v {
-                list.push(Function::new(head.k.to_string(), f));
-            }
-        }
-    }
-}
-
 pub fn get_package_functions(name: &str) -> Vec<Function> {
-    let mut list = vec![];
-
     if let Some(env) = imports() {
-        for (key, val) in env.iter() {
-            if get_package_name(key) == name {
-                walk_package_functions(
-                    &mut list,
-                    &val.typ().expr,
-                );
-            }
-        }
+        env.iter()
+            .filter(|(_key, val)| {
+                matches!(&val.typ().expr, MonoType::Record(_))
+            })
+            .flat_map(|(key, val)| match &val.typ().expr {
+                MonoType::Record(record) => record_fields(record)
+                    .filter(|head| {
+                        matches!(&head.v, MonoType::Fun(_)) && get_package_name(key) == name
+                    })
+                    .map(|head| match &head.v {
+                        MonoType::Fun(f) => {
+                            Function::new(head.k.to_string(), f)
+                        }
+                        _ => unreachable!("Previous filter failed"),
+                    })
+                    .collect::<Vec<Function>>(),
+                _ => unreachable!("Previous filter failer"),
+            })
+            .collect()
+    } else {
+        vec![]
     }
-
-    list
 }
 
 fn walk_functions(
