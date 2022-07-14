@@ -84,7 +84,8 @@ pub fn get_package_functions(name: &str) -> Vec<Function> {
             .flat_map(|(key, val)| match &val.typ().expr {
                 MonoType::Record(record) => record_fields(record)
                     .filter(|head| {
-                        matches!(&head.v, MonoType::Fun(_)) && get_package_name(key) == name
+                        matches!(&head.v, MonoType::Fun(_))
+                            && get_package_name(key) == name
                     })
                     .map(|head| match &head.v {
                         MonoType::Fun(f) => {
@@ -101,50 +102,54 @@ pub fn get_package_functions(name: &str) -> Vec<Function> {
     }
 }
 
-fn walk_functions(
-    package: String,
-    list: &mut Vec<FunctionInfo>,
-    t: &MonoType,
-) {
-    if let MonoType::Record(record) = t {
-        for head in record_fields(record) {
-            if let MonoType::Fun(f) = &head.v {
-                list.push(FunctionInfo::new(
-                    head.k.to_string(),
-                    f.as_ref(),
-                    get_package_name(package.as_str()).into(),
-                ));
-            }
-        }
-    }
-}
-
 pub fn get_stdlib_functions() -> Vec<FunctionInfo> {
-    let mut results = vec![];
-
-    if let Some(env) = prelude() {
-        for (name, val) in env.iter() {
-            if let MonoType::Fun(f) = &val.expr {
-                results.push(FunctionInfo::new(
-                    name.to_string(),
+    let builtins: Vec<FunctionInfo> = if let Some(env) = prelude() {
+        env.iter()
+            .filter(|(_key, val)| {
+                matches!(&val.expr, MonoType::Fun(_))
+            })
+            .map(|(key, val)| match &val.expr {
+                MonoType::Fun(f) => FunctionInfo::new(
+                    key.into(),
                     f.as_ref(),
-                    BUILTIN_PACKAGE.to_string(),
-                ));
-            }
-        }
-    }
+                    BUILTIN_PACKAGE.into(),
+                ),
+                _ => unreachable!("Previous filter failed"),
+            })
+            .collect()
+    } else {
+        vec![]
+    };
 
-    if let Some(imports) = imports() {
-        for (name, val) in imports.iter() {
-            walk_functions(
-                name.to_string(),
-                &mut results,
-                &val.typ().expr,
-            );
-        }
-    }
+    let imported: Vec<FunctionInfo> = if let Some(imports) = imports()
+    {
+        imports
+            .iter()
+            .filter(|(_key, val)| {
+                matches!(&val.typ().expr, MonoType::Record(_))
+            })
+            .flat_map(|(key, val)| match &val.typ().expr {
+                MonoType::Record(record) => record_fields(record)
+                    .filter(|property| {
+                        matches!(&property.v, MonoType::Fun(_))
+                    })
+                    .map(|property| match &property.v {
+                        MonoType::Fun(f) => FunctionInfo::new(
+                            property.k.to_string(),
+                            f.as_ref(),
+                            get_package_name(key).into(),
+                        ),
+                        _ => unreachable!("Previous filter failed"),
+                    })
+                    .collect::<Vec<FunctionInfo>>(),
+                _ => unreachable!("Previous filter failed"),
+            })
+            .collect()
+    } else {
+        vec![]
+    };
 
-    results
+    builtins.into_iter().chain(imported.into_iter()).collect()
 }
 
 pub fn get_builtin_functions() -> Vec<Function> {

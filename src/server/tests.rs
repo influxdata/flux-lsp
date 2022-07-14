@@ -539,17 +539,20 @@ csv.from(
         server.signature_help(params).await.unwrap().unwrap();
 
     let expected_signature_labels: Vec<String> = vec![
-            "from()",
-            "from(csv: $csv)",
-            "from(file: $file)",
-            "from(mode: $mode)",
-            "from(csv: $csv , file: $file)",
-            "from(csv: $csv , mode: $mode)",
-            "from(file: $file , mode: $mode)",
-            "from(csv: $csv , file: $file , mode: $mode)",
-           "from(url: $url)",
-            "from(url: $url)",
-        ].into_iter().map(|x| x.into()).collect::<Vec<String>>();
+        "from()",
+        "from(csv: $csv)",
+        "from(file: $file)",
+        "from(mode: $mode)",
+        "from(csv: $csv , file: $file)",
+        "from(csv: $csv , mode: $mode)",
+        "from(file: $file , mode: $mode)",
+        "from(csv: $csv , file: $file , mode: $mode)",
+        "from(url: $url)",
+        "from(url: $url)",
+    ]
+    .into_iter()
+    .map(|x| x.into())
+    .collect::<Vec<String>>();
 
     assert_eq!(
         expected_signature_labels,
