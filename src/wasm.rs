@@ -1,10 +1,12 @@
 #![allow(clippy::panic)]
 
+#[cfg(feature = "fluxlang")]
 mod lang;
 mod lsp;
 #[cfg(test)]
 mod tests;
 
+#[cfg(feature = "fluxlang")]
 pub use self::lang::Flux;
 pub use self::lsp::Lsp;
 

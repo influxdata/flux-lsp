@@ -13,7 +13,7 @@ jobs:
           name: "run lint"
           command: |
             cargo clippy --locked -- -Dclippy::all
-            cargo clippy --no-default-features --features=wasm
+            cargo clippy --no-default-features --features=wasm,fluxlang
 
   test:
     docker:
@@ -24,7 +24,7 @@ jobs:
           name: "run cargo tests"
           command: |
             cargo test --locked
-            cargo test --no-default-features --features=wasm
+            cargo test --no-default-features --features=wasm,fluxlang
 
   bench-test:
     docker:
@@ -43,7 +43,7 @@ jobs:
       - checkout
       - run:
           name: "run tests"
-          command: wasm-pack test --node -- --locked --no-default-features --features=wasm
+          command: wasm-pack test --node -- --locked --no-default-features --features=wasm,fluxlang
       - run:
           name: "run node integration tests"
           command: cd integration && BUILD_MODE=release npm run test

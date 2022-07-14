@@ -19,6 +19,7 @@ default = ["cmd"]
 strict = []
 cmd = ["clap", "simplelog", "tokio", "tower-service", "lspower/runtime-tokio"]
 wasm = ["futures", "js-sys", "lspower/runtime-agnostic", "tower-service", "wasm-bindgen", "wasm-bindgen-futures", "wee_alloc"]
+fluxlang = []
 
 [lib]
 crate-type = ["cdylib", "rlib"]
