@@ -183,8 +183,7 @@ impl<'a> Visitor<'a> for FoldFinderVisitor<'a> {
 #[derive(Clone, Debug)]
 pub struct Import {
     pub path: String,
-    pub initial_name: Option<String>,
-    pub alias: String,
+    pub name: String,
 }
 
 #[derive(Default)]
@@ -195,20 +194,15 @@ pub struct ImportFinderVisitor {
 impl<'a> Visitor<'a> for ImportFinderVisitor {
     fn visit(&mut self, node: Node<'a>) -> bool {
         if let Node::ImportDeclaration(import) = node {
-            let alias = match import.alias.clone() {
+            let name = match import.alias.clone() {
                 Some(alias) => alias.name.to_string(),
                 None => get_package_name(import.path.value.as_str())
-                    .unwrap_or_default()
                     .to_owned(),
             };
 
             self.imports.push(Import {
                 path: import.path.value.clone(),
-                alias,
-                initial_name: get_package_name(
-                    import.path.value.as_str(),
-                )
-                .map(|s| s.to_owned()),
+                name,
             });
         }
 

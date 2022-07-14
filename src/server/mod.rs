@@ -982,14 +982,10 @@ impl LanguageServer for LspServer {
                     let stdlib_completions: Vec<lsp::CompletionItem> =
                         if let Some(env) = flux::imports() {
                             env.iter().filter(|(key, _val)| {
-                            if let Some(package_name) = lang::get_package_name(key) {
-                                fuzzy_match(package_name, &identifier.name)
-                            } else {
-                                false
-                            }
+                            fuzzy_match(lang::get_package_name(key), &identifier.name)
                         }).map(|(key, _val)| {
                             #[allow(clippy::unwrap_used)]
-                            let package_name = lang::get_package_name(key).unwrap();
+                            let package_name = lang::get_package_name(key);
                             lsp::CompletionItem {
                                 label: key.clone(),
                                 detail: Some("Package".into()),
@@ -1100,7 +1096,7 @@ impl LanguageServer for LspServer {
                                     completion::get_imports(&sem_pkg)
                                         .iter()
                                         .find(|x| {
-                                            x.alias == identifier.name
+                                            x.name == identifier.name
                                         })
                                 {
                                     for (key, val) in env.iter() {
@@ -1114,12 +1110,7 @@ impl LanguageServer for LspServer {
                                     }
                                 } else {
                                     for (key, val) in env.iter() {
-                                        if let Some(package_name) =
-                                            lang::get_package_name(
-                                                key,
-                                            )
-                                        {
-                                            if package_name
+                                            if lang::get_package_name(key)
                                                 == identifier.name
                                             {
                                                 completion::walk_package(
@@ -1128,7 +1119,6 @@ impl LanguageServer for LspServer {
                                                     &val.typ().expr,
                                                 );
                                             }
-                                        }
                                     }
                                 }
                             }
@@ -1167,11 +1157,9 @@ impl LanguageServer for LspServer {
                         Some(AstNode::ImportDeclaration(_)) => {
                             let infos: Vec<(String, String)> =
                                 if let Some(env) = flux::imports() {
-                                    env.iter().filter(|(path, _val)| {
-                                    lang::get_package_name(path).is_some()
-                                }).map(|(path, _val)| {
+                                    env.iter().map(|(path, _val)| {
                                     #[allow(clippy::expect_used)]
-                                    (lang::get_package_name(path).expect("Previous filter failed.").into(), path.clone())
+                                    (lang::get_package_name(path).into(), path.clone())
                                 }).collect()
                                 } else {
                                     return Ok(None);
@@ -1313,10 +1301,7 @@ impl LanguageServer for LspServer {
                         // When encountering undefined identifiers, check to see if they match a corresponding
                         // package available for import.
                         let imports = flux::imports()?;
-                        let potential_imports: Vec<&String> = imports.iter().filter(|x| match lang::get_package_name(x.0) {
-                            Some(name) => name == identifier,
-                            None => false,
-                        }).map(|x| x.0 ).collect();
+                        let potential_imports: Vec<&String> = imports.iter().filter(|x| lang::get_package_name(x.0) == identifier).map(|x| x.0 ).collect();
                         if potential_imports.is_empty() {
                             return None;
                         }

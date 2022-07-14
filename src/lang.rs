@@ -10,8 +10,8 @@ use std::iter::Iterator;
 
 const BUILTIN_PACKAGE: &str = "builtin";
 
-pub fn get_package_name(name: &str) -> Option<&str> {
-    name.split('/').last()
+pub fn get_package_name(name: &str) -> &str {
+    name.split('/').last().expect("Invalid package path/name supplied")
 }
 
 pub fn create_function_signature(
@@ -88,13 +88,11 @@ pub fn get_package_functions(name: &str) -> Vec<Function> {
 
     if let Some(env) = imports() {
         for (key, val) in env.iter() {
-            if let Some(package_name) = get_package_name(key) {
-                if package_name == name {
-                    walk_package_functions(
-                        &mut list,
-                        &val.typ().expr,
-                    );
-                }
+            if get_package_name(key) == name {
+                walk_package_functions(
+                    &mut list,
+                    &val.typ().expr,
+                );
             }
         }
     }
@@ -110,15 +108,11 @@ fn walk_functions(
     if let MonoType::Record(record) = t {
         for head in record_fields(record) {
             if let MonoType::Fun(f) = &head.v {
-                if let Some(package_name) =
-                    get_package_name(package.as_str())
-                {
-                    list.push(FunctionInfo::new(
-                        head.k.to_string(),
-                        f.as_ref(),
-                        package_name.into(),
-                    ));
-                }
+                list.push(FunctionInfo::new(
+                    head.k.to_string(),
+                    f.as_ref(),
+                    get_package_name(package.as_str()).into(),
+                ));
             }
         }
     }
