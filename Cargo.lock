@@ -693,6 +693,7 @@ dependencies = [
  "flux",
  "futures",
  "js-sys",
+ "lazy_static",
  "line-col",
  "log",
  "lspower",

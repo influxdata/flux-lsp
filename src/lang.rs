@@ -1,14 +1,17 @@
 /// Tools for working with the Flux language and APIs for bridging
 /// the gap between Flux language data structures and the needs of the LSP.
-use flux::imports;
 use flux::prelude;
 use flux::semantic::types::{MonoType, Record};
+use lazy_static;
 use lspower::lsp;
 
 use std::collections::BTreeMap;
 use std::iter::Iterator;
 
 const BUILTIN_PACKAGE: &str = "builtin";
+lazy_static::lazy_static! {
+    pub static ref STDLIB: flux::semantic::import::Packages = flux::imports().expect("Could not initialize stdlib.");
+}
 
 pub fn get_package_name(name: &str) -> Option<&str> {
     name.split('/').last()
@@ -86,15 +89,10 @@ fn walk_package_functions(list: &mut Vec<Function>, t: &MonoType) {
 pub fn get_package_functions(name: &str) -> Vec<Function> {
     let mut list = vec![];
 
-    if let Some(env) = imports() {
-        for (key, val) in env.iter() {
-            if let Some(package_name) = get_package_name(key) {
-                if package_name == name {
-                    walk_package_functions(
-                        &mut list,
-                        &val.typ().expr,
-                    );
-                }
+    for (key, val) in STDLIB.iter() {
+        if let Some(package_name) = get_package_name(key) {
+            if package_name == name {
+                walk_package_functions(&mut list, &val.typ().expr);
             }
         }
     }
@@ -139,14 +137,12 @@ pub fn get_stdlib_functions() -> Vec<FunctionInfo> {
         }
     }
 
-    if let Some(imports) = imports() {
-        for (name, val) in imports.iter() {
-            walk_functions(
-                name.to_string(),
-                &mut results,
-                &val.typ().expr,
-            );
-        }
+    for (name, val) in STDLIB.iter() {
+        walk_functions(
+            name.to_string(),
+            &mut results,
+            &val.typ().expr,
+        );
     }
 
     results
