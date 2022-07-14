@@ -1010,8 +1010,7 @@ impl LanguageServer for LspServer {
 
                     let builtin_completions: Vec<
                         lsp::CompletionItem,
-                    > = if let Some(env) = flux::prelude() {
-                        env.iter().filter(|(key, val)| {
+                    > =                         lang::PRELUDE.iter().filter(|(key, val)| {
                             // Don't allow users to "discover" private-ish functionality.
                             // Filter out irrelevent items that won't match.
                             // Only pass expressions that have completion support.
@@ -1076,10 +1075,7 @@ impl LanguageServer for LspServer {
                                 }
                                 _ => unreachable!("Previous filter on expression value failed. Got: {}", val.expr)
                             }
-                        }).collect()
-                    } else {
-                        return Ok(None);
-                    };
+                        }).collect();
 
                     vec![stdlib_completions, builtin_completions]
                         .into_iter()

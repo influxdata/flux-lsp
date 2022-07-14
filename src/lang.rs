@@ -1,6 +1,5 @@
 /// Tools for working with the Flux language and APIs for bridging
 /// the gap between Flux language data structures and the needs of the LSP.
-use flux::prelude;
 use flux::semantic::types::{MonoType, Record};
 use lazy_static;
 use lspower::lsp;
@@ -10,6 +9,7 @@ use std::iter::Iterator;
 
 const BUILTIN_PACKAGE: &str = "builtin";
 lazy_static::lazy_static! {
+    pub static ref PRELUDE: flux::semantic::PackageExports = flux::prelude().expect("Could not initialize prelude.");
     pub static ref STDLIB: flux::semantic::import::Packages = flux::imports().expect("Could not initialize stdlib.");
 }
 
@@ -125,15 +125,13 @@ fn walk_functions(
 pub fn get_stdlib_functions() -> Vec<FunctionInfo> {
     let mut results = vec![];
 
-    if let Some(env) = prelude() {
-        for (name, val) in env.iter() {
-            if let MonoType::Fun(f) = &val.expr {
-                results.push(FunctionInfo::new(
-                    name.to_string(),
-                    f.as_ref(),
-                    BUILTIN_PACKAGE.to_string(),
-                ));
-            }
+    for (name, val) in PRELUDE.iter() {
+        if let MonoType::Fun(f) = &val.expr {
+            results.push(FunctionInfo::new(
+                name.to_string(),
+                f.as_ref(),
+                BUILTIN_PACKAGE.to_string(),
+            ));
         }
     }
 
@@ -149,22 +147,17 @@ pub fn get_stdlib_functions() -> Vec<FunctionInfo> {
 }
 
 pub fn get_builtin_functions() -> Vec<Function> {
-    if let Some(env) = prelude() {
-        env.iter()
-            .filter(|(_key, val)| {
-                matches!(&val.expr, MonoType::Fun(_))
-            })
-            .map(|(key, val)| match &val.expr {
-                MonoType::Fun(f) => Function::new(key.into(), f),
-                _ => unreachable!(
-                    "Previous filter call failed. Got: {}",
-                    val.expr
-                ),
-            })
-            .collect()
-    } else {
-        vec![]
-    }
+    PRELUDE
+        .iter()
+        .filter(|(_key, val)| matches!(&val.expr, MonoType::Fun(_)))
+        .map(|(key, val)| match &val.expr {
+            MonoType::Fun(f) => Function::new(key.into(), f),
+            _ => unreachable!(
+                "Previous filter call failed. Got: {}",
+                val.expr
+            ),
+        })
+        .collect()
 }
 
 pub struct FunctionInfo {
