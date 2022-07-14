@@ -6,8 +6,8 @@ mod lsp;
 #[cfg(test)]
 mod tests;
 
-pub use self::lang::Flux;
 #[cfg(feature = "fluxlang")]
+pub use self::lang::Flux;
 pub use self::lsp::Lsp;
 
 use flux::{ast, formatter, parser};
