@@ -5,14 +5,14 @@ set -e
 BUILD_MODE=${BUILD_MODE-release}
 
 BUILD_FLAG=""
-BUILD_MODE_ARGS="--no-default-features --features wasm"
+BUILD_MODE_ARGS="--no-default-features --features wasm,console_error_panic_hook"
 case $BUILD_MODE in
     "release")
         BUILD_FLAG="--release"
         ;;
     "dev")
         BUILD_FLAG="--dev"
-        BUILD_MODE_ARGS="${BUILD_MODE_ARGS},console_log,console_error_panic_hook"
+        BUILD_MODE_ARGS="${BUILD_MODE_ARGS},console_log"
         ;;
     *)
         echo "Invalid build mode: ${BUILD_MODE}"
