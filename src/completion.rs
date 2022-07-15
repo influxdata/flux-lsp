@@ -25,6 +25,8 @@ pub fn get_imports(
     visitor.imports
 }
 
+//Given a list of functions, filter the functions by name, and then flat map
+// the function parameters
 fn get_function_params<'a>(
     name: &'a str,
     functions: &'a [lang::Function],
@@ -616,9 +618,6 @@ pub fn complete_call_expr(
             }
             Expression::Member(me) => {
                 if let Expression::Identifier(ident) = &me.object {
-                    let package_functions =
-                        lang::get_package_functions(&ident.name);
-
                     let object_functions: Vec<lang::Function> = {
                         let visitor = crate::walk_semantic_package!(
                             ObjectFunctionFinderVisitor::default(),
@@ -639,21 +638,42 @@ pub fn complete_call_expr(
                         PropertyKey::StringLit(l) => &l.value,
                     };
 
-                    vec![
-                        get_function_params(
-                            key,
-                            &package_functions,
-                            &provided,
-                        ),
-                        get_function_params(
+                    let initial_params: Vec<(
+                        String,
+                        Option<MonoType>,
+                    )> = match lang::STDLIB_.package(&ident.name) {
+                        Some(package) => {
+                            match package.function(key) {
+                                Some(function) => function
+                                    .parameters()
+                                    .iter()
+                                    .filter(|(k, _v)| {
+                                        !provided
+                                            .clone()
+                                            .iter()
+                                            .any(|p| p == k)
+                                    })
+                                    .map(|(key, val)| {
+                                        (
+                                            key.to_owned(),
+                                            Some(val.to_owned()),
+                                        )
+                                    })
+                                    .collect(),
+                                None => vec![],
+                            }
+                        }
+                        None => vec![],
+                    };
+
+                    initial_params
+                        .into_iter()
+                        .chain(get_function_params(
                             key,
                             &object_functions,
                             &provided,
-                        ),
-                    ]
-                    .into_iter()
-                    .flatten()
-                    .collect()
+                        ))
+                        .collect()
                 } else {
                     return vec![];
                 }

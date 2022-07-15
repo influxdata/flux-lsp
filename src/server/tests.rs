@@ -2275,13 +2275,6 @@ csv.from(
               "detail": "string",
               "insertText": "mode: ",
               "insertTextFormat": 2
-            },
-            {
-              "label": "url",
-              "kind": 5,
-              "detail": "string",
-              "insertText": "url: ",
-              "insertTextFormat": 2
             }
           ]
         }"#]]
@@ -2331,7 +2324,7 @@ csv.from(
     let labels: Vec<&str> =
         items.iter().map(|item| item.label.as_str()).collect();
 
-    let expected = vec!["csv", "file", "mode", "url"];
+    let expected = vec!["csv", "file", "mode"];
 
     assert_eq!(expected, labels);
 }
@@ -2378,7 +2371,7 @@ x = 1
     let labels: Vec<&str> =
         items.iter().map(|item| item.label.as_str()).collect();
 
-    let expected = vec!["csv", "file", "url"];
+    let expected = vec!["csv", "file"];
 
     assert_eq!(expected, labels);
 }

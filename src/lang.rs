@@ -15,7 +15,7 @@ const BUILTIN_PACKAGE: &str = "builtin";
 lazy_static::lazy_static! {
     pub static ref PRELUDE: flux::semantic::PackageExports = flux::prelude().expect("Could not initialize prelude.");
     pub static ref STDLIB: flux::semantic::import::Packages = flux::imports().expect("Could not initialize stdlib.");
-    static ref STDLIB_: Stdlib = Stdlib(flux::imports().expect("Could not initialize stdlib."));
+    pub static ref STDLIB_: Stdlib = Stdlib(flux::imports().expect("Could not initialize stdlib."));
     pub static ref UNIVERSE: Package = Package::new("universe", flux::prelude().expect("Could not initialize prelude"));
 }
 
@@ -23,11 +23,11 @@ lazy_static::lazy_static! {
 ///
 /// The flux stdlib is a collection of packages, and this interface
 /// provides a method for querying those packages.
-struct Stdlib(flux::semantic::import::Packages);
+pub struct Stdlib(flux::semantic::import::Packages);
 
 impl Stdlib {
     /// Get all packages from the stdlib.
-    fn packages(&self) -> Vec<Package> {
+    pub fn packages(&self) -> Vec<Package> {
         self.0
             .iter()
             .map(|(path, package)| {
@@ -37,7 +37,7 @@ impl Stdlib {
     }
 
     /// Get a package by path from the stdlib.
-    fn package(&self, path: &str) -> Option<Package> {
+    pub fn package(&self, path: &str) -> Option<Package> {
         self.packages()
             .iter()
             .filter(|package| package.path == path)
@@ -116,7 +116,7 @@ impl Package {
 /// The contract here is that all public interfaces here return lsp data
 /// structures. Any deviation from that contract should be considered technical
 /// debt and handled accordingly.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Function_ {
     pub name: String,
     expr: flux::semantic::types::Function,
