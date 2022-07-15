@@ -980,8 +980,7 @@ impl LanguageServer for LspServer {
                     // XXX: rockstar (6 Jul 2022) - This is helping to complete packages that
                     // have never been imported. That's probably not a great pattern.
                     let stdlib_completions: Vec<lsp::CompletionItem> =
-                        if let Some(env) = flux::imports() {
-                            env.iter().filter(|(key, _val)| {
+                        lang::STDLIB.iter().filter(|(key, _val)| {
                             fuzzy_match(lang::get_package_name(key), &identifier.name)
                         }).map(|(key, _val)| {
                             #[allow(clippy::unwrap_used)]
@@ -999,15 +998,11 @@ impl LanguageServer for LspServer {
                                 sort_text: Some(key.clone()),
                                 ..lsp::CompletionItem::default()
                             }
-                        }).collect()
-                        } else {
-                            return Ok(None);
-                        };
+                        }).collect();
 
                     let builtin_completions: Vec<
                         lsp::CompletionItem,
-                    > = if let Some(env) = flux::prelude() {
-                        env.iter().filter(|(key, val)| {
+                    > = lang::PRELUDE.iter().filter(|(key, val)| {
                             // Don't allow users to "discover" private-ish functionality.
                             // Filter out irrelevent items that won't match.
                             // Only pass expressions that have completion support.
@@ -1072,10 +1067,7 @@ impl LanguageServer for LspServer {
                                 }
                                 _ => unreachable!("Previous filter on expression value failed. Got: {}", val.expr)
                             }
-                        }).collect()
-                    } else {
-                        return Ok(None);
-                    };
+                        }).collect();
 
                     vec![stdlib_completions, builtin_completions]
                         .into_iter()
@@ -1091,34 +1083,34 @@ impl LanguageServer for LspServer {
                             let mut list: Vec<
                                 Box<dyn completion::Completable>,
                             > = vec![];
-                            if let Some(env) = flux::imports() {
-                                if let Some(import) =
-                                    completion::get_imports(&sem_pkg)
-                                        .iter()
-                                        .find(|x| {
-                                            x.name == identifier.name
-                                        })
+                            if let Some(import) =
+                                completion::get_imports(&sem_pkg)
+                                    .iter()
+                                    .find(|x| {
+                                        x.name == identifier.name
+                                    })
+                            {
+                                for (key, val) in lang::STDLIB.iter()
                                 {
-                                    for (key, val) in env.iter() {
-                                        if *key == import.path {
-                                            completion::walk_package(
-                                                key,
-                                                &mut list,
-                                                &val.typ().expr,
-                                            );
-                                        }
+                                    if *key == import.path {
+                                        completion::walk_package(
+                                            key,
+                                            &mut list,
+                                            &val.typ().expr,
+                                        );
                                     }
-                                } else {
-                                    for (key, val) in env.iter() {
-                                        if lang::get_package_name(key)
-                                            == identifier.name
-                                        {
-                                            completion::walk_package(
-                                                key,
-                                                &mut list,
-                                                &val.typ().expr,
-                                            );
-                                        }
+                                }
+                            } else {
+                                for (key, val) in lang::STDLIB.iter()
+                                {
+                                    if lang::get_package_name(key)
+                                        == identifier.name
+                                    {
+                                        completion::walk_package(
+                                            key,
+                                            &mut list,
+                                            &val.typ().expr,
+                                        );
                                     }
                                 }
                             }
@@ -1155,19 +1147,12 @@ impl LanguageServer for LspServer {
                         .map(|parent| &parent.node);
                     match parent {
                         Some(AstNode::ImportDeclaration(_)) => {
-                            let infos: Vec<(String, String)> =
-                                if let Some(env) = flux::imports() {
-                                    env.iter().map(|(path, _val)| {
-                                    #[allow(clippy::expect_used)]
-                                    (lang::get_package_name(path).into(), path.clone())
-                                }).collect()
-                                } else {
-                                    return Ok(None);
-                                };
                             let imports =
                                 completion::get_imports(&sem_pkg);
 
-                            infos.into_iter().filter(|(name, _path)| {
+                            lang::STDLIB.iter().map(|(path, _val)| {
+                                (lang::get_package_name(path).into(), path.clone())
+                            }).filter(|(name, _path): &(String, String)| {
                                 !&imports.iter().any(|x| &x.path == name)
                             }).map(|(_name, path)| {
                                 let trigger = if let Some(context) = & params.context {
@@ -1235,10 +1220,6 @@ impl LanguageServer for LspServer {
         )))
     }
 
-    // The use of unwrap/expect here is intentional, and should only occur with prior
-    // checks in place. If we were to use nested matchers, it makes the code difficult
-    // to reason about.
-    #[allow(clippy::expect_used)]
     async fn code_action(
         &self,
         params: lsp::CodeActionParams,
@@ -1300,8 +1281,7 @@ impl LanguageServer for LspServer {
                     SemanticNodeErrorKind::UndefinedIdentifier(identifier) => {
                         // When encountering undefined identifiers, check to see if they match a corresponding
                         // package available for import.
-                        let imports = flux::imports()?;
-                        let potential_imports: Vec<&String> = imports.iter().filter(|x| lang::get_package_name(x.0) == identifier).map(|x| x.0 ).collect();
+                        let potential_imports: Vec<&String> = lang::STDLIB.iter().filter(|x| lang::get_package_name(x.0) == identifier).map(|x| x.0).collect();
                         if potential_imports.is_empty() {
                             return None;
                         }

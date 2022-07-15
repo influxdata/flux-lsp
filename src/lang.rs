@@ -1,7 +1,5 @@
 /// Tools for working with the Flux language and APIs for bridging
 /// the gap between Flux language data structures and the needs of the LSP.
-use flux::imports;
-use flux::prelude;
 use flux::semantic::types::{MonoType, Record};
 use lspower::lsp;
 
@@ -9,6 +7,10 @@ use std::collections::BTreeMap;
 use std::iter::Iterator;
 
 const BUILTIN_PACKAGE: &str = "builtin";
+lazy_static::lazy_static! {
+    pub static ref PRELUDE: flux::semantic::PackageExports = flux::prelude().expect("Could not initialize prelude.");
+    pub static ref STDLIB: flux::semantic::import::Packages = flux::imports().expect("Could not initialize stdlib.");
+}
 
 pub fn get_package_name(name: &str) -> &str {
     name.split('/')
@@ -76,8 +78,7 @@ fn record_fields(
 }
 
 pub fn get_package_functions(name: &str) -> Vec<Function> {
-    if let Some(env) = imports() {
-        env.iter()
+        STDLIB.iter()
             .filter(|(_key, val)| {
                 matches!(&val.typ().expr, MonoType::Record(_))
             })
@@ -97,14 +98,10 @@ pub fn get_package_functions(name: &str) -> Vec<Function> {
                 _ => unreachable!("Previous filter failer"),
             })
             .collect()
-    } else {
-        vec![]
-    }
 }
 
 pub fn get_stdlib_functions() -> Vec<FunctionInfo> {
-    let builtins: Vec<FunctionInfo> = if let Some(env) = prelude() {
-        env.iter()
+    let builtins: Vec<FunctionInfo> = PRELUDE.iter()
             .filter(|(_key, val)| {
                 matches!(&val.expr, MonoType::Fun(_))
             })
@@ -116,14 +113,9 @@ pub fn get_stdlib_functions() -> Vec<FunctionInfo> {
                 ),
                 _ => unreachable!("Previous filter failed"),
             })
-            .collect()
-    } else {
-        vec![]
-    };
+            .collect();
 
-    let imported: Vec<FunctionInfo> = if let Some(imports) = imports()
-    {
-        imports
+    let imported: Vec<FunctionInfo> = STDLIB
             .iter()
             .filter(|(_key, val)| {
                 matches!(&val.typ().expr, MonoType::Record(_))
@@ -144,31 +136,22 @@ pub fn get_stdlib_functions() -> Vec<FunctionInfo> {
                     .collect::<Vec<FunctionInfo>>(),
                 _ => unreachable!("Previous filter failed"),
             })
-            .collect()
-    } else {
-        vec![]
-    };
-
+            .collect();
     builtins.into_iter().chain(imported.into_iter()).collect()
 }
 
 pub fn get_builtin_functions() -> Vec<Function> {
-    if let Some(env) = prelude() {
-        env.iter()
-            .filter(|(_key, val)| {
-                matches!(&val.expr, MonoType::Fun(_))
-            })
-            .map(|(key, val)| match &val.expr {
-                MonoType::Fun(f) => Function::new(key.into(), f),
-                _ => unreachable!(
-                    "Previous filter call failed. Got: {}",
-                    val.expr
-                ),
-            })
-            .collect()
-    } else {
-        vec![]
-    }
+    PRELUDE
+        .iter()
+        .filter(|(_key, val)| matches!(&val.expr, MonoType::Fun(_)))
+        .map(|(key, val)| match &val.expr {
+            MonoType::Fun(f) => Function::new(key.into(), f),
+            _ => unreachable!(
+                "Previous filter call failed. Got: {}",
+                val.expr
+            ),
+        })
+        .collect()
 }
 
 pub struct FunctionInfo {

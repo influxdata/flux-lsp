@@ -15,7 +15,7 @@ use wasm_bindgen::prelude::*;
 
 /// Initialize logging - this requires the "console_log" feature to function,
 /// as this library adds 180k to the wasm binary being shipped.
-#[allow(non_snake_case, dead_code, clippy::expect_used)]
+#[allow(non_snake_case, dead_code)]
 #[wasm_bindgen]
 pub fn initLog() {
     #[cfg(feature = "console_log")]
