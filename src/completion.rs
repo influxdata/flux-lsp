@@ -586,21 +586,33 @@ pub fn complete_call_expr(
                     visitor.functions
                 };
 
-                vec![
-                    get_function_params(
-                        ident.name.as_str(),
-                        &lang::get_builtin_functions(),
-                        &provided,
-                    ),
-                    get_function_params(
+                let initial_params: Vec<(String, Option<MonoType>)> =
+                    match lang::UNIVERSE.function(ident.name.as_str())
+                    {
+                        Some(function) => function
+                            .parameters()
+                            .iter()
+                            .filter(|(k, _)| {
+                                !provided
+                                    .clone()
+                                    .iter()
+                                    .any(|p| p == k)
+                            })
+                            .map(|(k, v)| {
+                                (k.to_owned(), Some(v.to_owned()))
+                            })
+                            .collect(),
+                        None => vec![],
+                    };
+
+                initial_params
+                    .into_iter()
+                    .chain(get_function_params(
                         ident.name.as_str(),
                         &user_functions,
                         &provided,
-                    ),
-                ]
-                .into_iter()
-                .flatten()
-                .collect()
+                    ))
+                    .collect()
             }
             Expression::Member(me) => {
                 if let Expression::Identifier(ident) = &me.object {

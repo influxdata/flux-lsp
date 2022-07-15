@@ -139,7 +139,7 @@ pub fn find_stdlib_signatures(
     lang::get_stdlib_functions()
         .into_iter()
         .filter(|x| x.name == name && x.package_name == package)
-        .map(|x| {
+        .flat_map(|x| {
             x.signatures().into_iter().map(|signature| {
                 lsp::SignatureInformation {
                     label: signature.create_signature(),
@@ -149,10 +149,7 @@ pub fn find_stdlib_signatures(
                 }
             })
         })
-        .fold(vec![], |mut acc, x| {
-            acc.extend(x);
-            acc
-        })
+        .collect()
 }
 
 #[derive(Default)]
@@ -1673,17 +1670,13 @@ impl LanguageServer for LspServer {
                 }
                 Ok(None)
             }
-            Ok(LspServerCommand::GetFunctionList) => {
-                let functions: Vec<String> =
-                    lang::get_builtin_functions()
-                        .iter()
-                        .filter(|function| {
-                            !function.name.starts_with('_')
-                        })
-                        .map(|function| function.name.clone())
-                        .collect();
-                Ok(Some(functions.into()))
-            }
+            Ok(LspServerCommand::GetFunctionList) => Ok(Some(
+                lang::UNIVERSE
+                    .functions()
+                    .iter()
+                    .map(|function| function.name.clone())
+                    .collect(),
+            )),
             Err(_err) => {
                 return Err(
                     LspError::InvalidCommand(params.command).into()
