@@ -983,7 +983,6 @@ impl LanguageServer for LspServer {
                         lang::STDLIB.iter().filter(|(key, _val)| {
                             fuzzy_match(lang::get_package_name(key), &identifier.name)
                         }).map(|(key, _val)| {
-                            #[allow(clippy::unwrap_used)]
                             let package_name = lang::get_package_name(key);
                             lsp::CompletionItem {
                                 label: key.clone(),
