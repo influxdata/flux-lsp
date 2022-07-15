@@ -511,9 +511,9 @@ async fn test_signature_help() {
     assert_eq!(None, result.active_parameter);
 }
 
-/// Test signature help on imported modules
+/// Signature help on stdlib functions is provided.
 #[test]
-async fn test_signature_help_imports() {
+async fn test_signature_help_stdlib() {
     let server = create_server();
     let fluxscript = r#"import "csv"
 csv.from(
