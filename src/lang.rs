@@ -78,66 +78,64 @@ fn record_fields(
 }
 
 pub fn get_package_functions(name: &str) -> Vec<Function> {
-        STDLIB.iter()
-            .filter(|(_key, val)| {
-                matches!(&val.typ().expr, MonoType::Record(_))
-            })
-            .flat_map(|(key, val)| match &val.typ().expr {
-                MonoType::Record(record) => record_fields(record)
-                    .filter(|head| {
-                        matches!(&head.v, MonoType::Fun(_))
-                            && get_package_name(key) == name
-                    })
-                    .map(|head| match &head.v {
-                        MonoType::Fun(f) => {
-                            Function::new(head.k.to_string(), f)
-                        }
-                        _ => unreachable!("Previous filter failed"),
-                    })
-                    .collect::<Vec<Function>>(),
-                _ => unreachable!("Previous filter failer"),
-            })
-            .collect()
+    STDLIB
+        .iter()
+        .filter(|(_key, val)| {
+            matches!(&val.typ().expr, MonoType::Record(_))
+        })
+        .flat_map(|(key, val)| match &val.typ().expr {
+            MonoType::Record(record) => record_fields(record)
+                .filter(|head| {
+                    matches!(&head.v, MonoType::Fun(_))
+                        && get_package_name(key) == name
+                })
+                .map(|head| match &head.v {
+                    MonoType::Fun(f) => {
+                        Function::new(head.k.to_string(), f)
+                    }
+                    _ => unreachable!("Previous filter failed"),
+                })
+                .collect::<Vec<Function>>(),
+            _ => unreachable!("Previous filter failer"),
+        })
+        .collect()
 }
 
 pub fn get_stdlib_functions() -> Vec<FunctionInfo> {
-    let builtins: Vec<FunctionInfo> = PRELUDE.iter()
-            .filter(|(_key, val)| {
-                matches!(&val.expr, MonoType::Fun(_))
-            })
-            .map(|(key, val)| match &val.expr {
-                MonoType::Fun(f) => FunctionInfo::new(
-                    key.into(),
-                    f.as_ref(),
-                    BUILTIN_PACKAGE.into(),
-                ),
-                _ => unreachable!("Previous filter failed"),
-            })
-            .collect();
+    let builtins = PRELUDE
+        .iter()
+        .filter(|(_key, val)| matches!(&val.expr, MonoType::Fun(_)))
+        .map(|(key, val)| match &val.expr {
+            MonoType::Fun(f) => FunctionInfo::new(
+                key.into(),
+                f.as_ref(),
+                BUILTIN_PACKAGE.into(),
+            ),
+            _ => unreachable!("Previous filter failed"),
+        });
 
-    let imported: Vec<FunctionInfo> = STDLIB
-            .iter()
-            .filter(|(_key, val)| {
-                matches!(&val.typ().expr, MonoType::Record(_))
-            })
-            .flat_map(|(key, val)| match &val.typ().expr {
-                MonoType::Record(record) => record_fields(record)
-                    .filter(|property| {
-                        matches!(&property.v, MonoType::Fun(_))
-                    })
-                    .map(|property| match &property.v {
-                        MonoType::Fun(f) => FunctionInfo::new(
-                            property.k.to_string(),
-                            f.as_ref(),
-                            get_package_name(key).into(),
-                        ),
-                        _ => unreachable!("Previous filter failed"),
-                    })
-                    .collect::<Vec<FunctionInfo>>(),
-                _ => unreachable!("Previous filter failed"),
-            })
-            .collect();
-    builtins.into_iter().chain(imported.into_iter()).collect()
+    let imported = STDLIB
+        .iter()
+        .filter(|(_key, val)| {
+            matches!(&val.typ().expr, MonoType::Record(_))
+        })
+        .flat_map(|(key, val)| match &val.typ().expr {
+            MonoType::Record(record) => record_fields(record)
+                .filter(|property| {
+                    matches!(&property.v, MonoType::Fun(_))
+                })
+                .map(|property| match &property.v {
+                    MonoType::Fun(f) => FunctionInfo::new(
+                        property.k.to_string(),
+                        f.as_ref(),
+                        get_package_name(key).into(),
+                    ),
+                    _ => unreachable!("Previous filter failed"),
+                })
+                .collect::<Vec<FunctionInfo>>(),
+            _ => unreachable!("Previous filter failed"),
+        });
+    builtins.chain(imported.into_iter()).collect()
 }
 
 pub fn get_builtin_functions() -> Vec<Function> {
