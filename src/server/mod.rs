@@ -132,26 +132,6 @@ fn find_references<'a>(
     }
 }
 
-pub fn find_stdlib_signatures(
-    name: &str,
-    package: &str,
-) -> Vec<lsp::SignatureInformation> {
-    lang::get_stdlib_functions()
-        .into_iter()
-        .filter(|x| x.name == name && x.package_name == package)
-        .flat_map(|x| {
-            x.signatures().into_iter().map(|signature| {
-                lsp::SignatureInformation {
-                    label: signature.create_signature(),
-                    parameters: Some(signature.create_parameters()),
-                    documentation: None,
-                    active_parameter: None,
-                }
-            })
-        })
-        .collect()
-}
-
 #[derive(Default)]
 struct LspServerState {
     buckets: Vec<String>,
@@ -552,34 +532,47 @@ impl LanguageServer for LspServer {
             Err(err) => return Err(err.into()),
         };
 
-        let mut signatures = vec![];
         let visitor = crate::walk_semantic_package!(
             semantic::NodeFinderVisitor::new(
                 params.text_document_position_params.position
             ),
             pkg
         );
-        if let Some(node) = visitor.node {
+        let signatures: Vec<lsp::SignatureInformation> = if let Some(node) = visitor.node {
             if let walk::Node::CallExpr(call) = node {
                 let callee = call.callee.clone();
 
                 if let flux::semantic::nodes::Expression::Member(member) = callee.clone() {
                     let name = member.property.clone();
                     if let flux::semantic::nodes::Expression::Identifier(ident) = member.object.clone() {
-                        signatures.extend(find_stdlib_signatures(&name, &ident.name));
+                        match lang::STDLIB_.package(&ident.name) {
+                            None => return Ok(None),
+                            Some(package) => match package.function(&name) {
+                                None => return Ok(None),
+                                Some(function) => function.signature_information(),
+                            }
+                        }
+                    } else {
+                        return Ok(None);
                     }
                 } else if let flux::semantic::nodes::Expression::Identifier(ident) = callee {
-                    signatures.extend(find_stdlib_signatures(
-                        &ident.name,
-                        "builtin",
-                    ));
+                    match lang::UNIVERSE.function(&ident.name) {
+                        Some(function) => {
+                            function.signature_information()
+                        }
+                        None => return Ok(None),
+                    }
                 } else {
                     log::debug!("signature_help on non-member and non-identifier");
+                    return Ok(None);
                 }
             } else {
                 log::debug!("signature_help on non-call expression");
+                return Ok(None);
             }
-        }
+        } else {
+            return Ok(None);
+        };
 
         let response = if signatures.is_empty() {
             None

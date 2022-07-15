@@ -5,18 +5,17 @@
 /// things libflux. No other part of this library should
 use std::cmp::Ordering;
 
-use flux::semantic::types::{MonoType, Record};
+use flux::semantic::types::MonoType;
 use lspower::lsp;
 
 use std::collections::BTreeMap;
 use std::iter::Iterator;
 
-const BUILTIN_PACKAGE: &str = "builtin";
 lazy_static::lazy_static! {
     pub static ref PRELUDE: flux::semantic::PackageExports = flux::prelude().expect("Could not initialize prelude.");
     pub static ref STDLIB: flux::semantic::import::Packages = flux::imports().expect("Could not initialize stdlib.");
     pub static ref STDLIB_: Stdlib = Stdlib(flux::imports().expect("Could not initialize stdlib."));
-    pub static ref UNIVERSE: Package = Package::new("universe", flux::prelude().expect("Could not initialize prelude"));
+    pub static ref UNIVERSE: Package = Package::new("builtin", flux::prelude().expect("Could not initialize prelude"));
 }
 
 /// Stdlib serves as the API for querying the flux stdlib.
@@ -142,10 +141,18 @@ impl PartialEq for Function_ {
 impl Eq for Function_ {}
 
 impl Function_ {
-    fn signature_information(
+    pub fn signature_information(
         &self,
     ) -> Vec<lsp::SignatureInformation> {
-        vec![]
+        let info = FunctionInfo::new(self.name.clone(), &self.expr, "lolpackage".into());
+        info.signatures().into_iter().map(|signature| {
+            lsp::SignatureInformation {
+                label: signature.create_signature(),
+                parameters: Some(signature.create_parameters()),
+                documentation: None,
+                active_parameter: None,
+            }
+        }).collect()
     }
 
     pub fn parameters(&self) -> Vec<(String, MonoType)> {
@@ -157,6 +164,7 @@ impl Function_ {
             .map(|(k, v)| (k.clone(), v.clone()))
             .collect()
     }
+
     fn signature(&self) -> String {
         let required = self
             .expr
@@ -251,83 +259,6 @@ pub fn create_function_signature(
             .join(", "),
         f.retn
     )
-}
-
-fn record_fields(
-    this: &Record,
-) -> impl Iterator<Item = &flux::semantic::types::Property> {
-    let mut record = Some(this);
-    std::iter::from_fn(move || match record {
-        Some(Record::Extension { head, tail }) => {
-            match tail {
-                MonoType::Record(tail) => record = Some(tail),
-                _ => record = None,
-            }
-            Some(head)
-        }
-        _ => None,
-    })
-}
-
-pub fn get_package_functions(name: &str) -> Vec<Function> {
-    STDLIB
-        .iter()
-        .filter(|(_key, val)| {
-            matches!(&val.typ().expr, MonoType::Record(_))
-        })
-        .flat_map(|(key, val)| match &val.typ().expr {
-            MonoType::Record(record) => record_fields(record)
-                .filter(|head| {
-                    matches!(&head.v, MonoType::Fun(_))
-                        && get_package_name(key) == name
-                })
-                .map(|head| match &head.v {
-                    MonoType::Fun(f) => {
-                        Function::new(head.k.to_string(), f)
-                    }
-                    _ => unreachable!("Previous filter failed"),
-                })
-                .collect::<Vec<Function>>(),
-            _ => unreachable!("Previous filter failer"),
-        })
-        .collect()
-}
-
-pub fn get_stdlib_functions() -> Vec<FunctionInfo> {
-    let builtins = PRELUDE
-        .iter()
-        .filter(|(_key, val)| matches!(&val.expr, MonoType::Fun(_)))
-        .map(|(key, val)| match &val.expr {
-            MonoType::Fun(f) => FunctionInfo::new(
-                key.into(),
-                f.as_ref(),
-                BUILTIN_PACKAGE.into(),
-            ),
-            _ => unreachable!("Previous filter failed"),
-        });
-
-    let imported = STDLIB
-        .iter()
-        .filter(|(_key, val)| {
-            matches!(&val.typ().expr, MonoType::Record(_))
-        })
-        .flat_map(|(key, val)| match &val.typ().expr {
-            MonoType::Record(record) => record_fields(record)
-                .filter(|property| {
-                    matches!(&property.v, MonoType::Fun(_))
-                })
-                .map(|property| match &property.v {
-                    MonoType::Fun(f) => FunctionInfo::new(
-                        property.k.to_string(),
-                        f.as_ref(),
-                        get_package_name(key).into(),
-                    ),
-                    _ => unreachable!("Previous filter failed"),
-                })
-                .collect::<Vec<FunctionInfo>>(),
-            _ => unreachable!("Previous filter failed"),
-        });
-    builtins.chain(imported.into_iter()).collect()
 }
 
 pub struct FunctionInfo {
@@ -777,7 +708,84 @@ mod tests {
         let from =
             STDLIB_.package("csv").unwrap().function("from").unwrap();
 
-        expect_test::expect![[r#"[]"#]].assert_eq(
+        expect_test::expect![[r#"
+            [
+              {
+                "label": "from()",
+                "parameters": []
+              },
+              {
+                "label": "from(csv: $csv)",
+                "parameters": [
+                  {
+                    "label": "$csv"
+                  }
+                ]
+              },
+              {
+                "label": "from(file: $file)",
+                "parameters": [
+                  {
+                    "label": "$file"
+                  }
+                ]
+              },
+              {
+                "label": "from(mode: $mode)",
+                "parameters": [
+                  {
+                    "label": "$mode"
+                  }
+                ]
+              },
+              {
+                "label": "from(csv: $csv , file: $file)",
+                "parameters": [
+                  {
+                    "label": "$csv"
+                  },
+                  {
+                    "label": "$file"
+                  }
+                ]
+              },
+              {
+                "label": "from(csv: $csv , mode: $mode)",
+                "parameters": [
+                  {
+                    "label": "$csv"
+                  },
+                  {
+                    "label": "$mode"
+                  }
+                ]
+              },
+              {
+                "label": "from(file: $file , mode: $mode)",
+                "parameters": [
+                  {
+                    "label": "$file"
+                  },
+                  {
+                    "label": "$mode"
+                  }
+                ]
+              },
+              {
+                "label": "from(csv: $csv , file: $file , mode: $mode)",
+                "parameters": [
+                  {
+                    "label": "$csv"
+                  },
+                  {
+                    "label": "$file"
+                  },
+                  {
+                    "label": "$mode"
+                  }
+                ]
+              }
+            ]"#]].assert_eq(
             &serde_json::to_string_pretty(
                 &from.signature_information(),
             )

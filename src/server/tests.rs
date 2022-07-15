@@ -547,8 +547,6 @@ csv.from(
         "from(csv: $csv , mode: $mode)",
         "from(file: $file , mode: $mode)",
         "from(csv: $csv , file: $file , mode: $mode)",
-        "from(url: $url)",
-        "from(url: $url)",
     ]
     .into_iter()
     .map(|x| x.into())
