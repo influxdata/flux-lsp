@@ -12,8 +12,10 @@ lazy_static::lazy_static! {
     pub static ref STDLIB: flux::semantic::import::Packages = flux::imports().expect("Could not initialize stdlib.");
 }
 
-pub fn get_package_name(name: &str) -> Option<&str> {
-    name.split('/').last()
+pub fn get_package_name(name: &str) -> &str {
+    name.split('/')
+        .last()
+        .expect("Invalid package path/name supplied")
 }
 
 pub fn create_function_signature(
@@ -75,74 +77,65 @@ fn record_fields(
     })
 }
 
-fn walk_package_functions(list: &mut Vec<Function>, t: &MonoType) {
-    if let MonoType::Record(record) = t {
-        for head in record_fields(record) {
-            if let MonoType::Fun(f) = &head.v {
-                list.push(Function::new(head.k.to_string(), f));
-            }
-        }
-    }
-}
-
 pub fn get_package_functions(name: &str) -> Vec<Function> {
-    let mut list = vec![];
-
-    for (key, val) in STDLIB.iter() {
-        if let Some(package_name) = get_package_name(key) {
-            if package_name == name {
-                walk_package_functions(&mut list, &val.typ().expr);
-            }
-        }
-    }
-
-    list
-}
-
-fn walk_functions(
-    package: String,
-    list: &mut Vec<FunctionInfo>,
-    t: &MonoType,
-) {
-    if let MonoType::Record(record) = t {
-        for head in record_fields(record) {
-            if let MonoType::Fun(f) = &head.v {
-                if let Some(package_name) =
-                    get_package_name(package.as_str())
-                {
-                    list.push(FunctionInfo::new(
-                        head.k.to_string(),
-                        f.as_ref(),
-                        package_name.into(),
-                    ));
-                }
-            }
-        }
-    }
+    STDLIB
+        .iter()
+        .filter(|(_key, val)| {
+            matches!(&val.typ().expr, MonoType::Record(_))
+        })
+        .flat_map(|(key, val)| match &val.typ().expr {
+            MonoType::Record(record) => record_fields(record)
+                .filter(|head| {
+                    matches!(&head.v, MonoType::Fun(_))
+                        && get_package_name(key) == name
+                })
+                .map(|head| match &head.v {
+                    MonoType::Fun(f) => {
+                        Function::new(head.k.to_string(), f)
+                    }
+                    _ => unreachable!("Previous filter failed"),
+                })
+                .collect::<Vec<Function>>(),
+            _ => unreachable!("Previous filter failer"),
+        })
+        .collect()
 }
 
 pub fn get_stdlib_functions() -> Vec<FunctionInfo> {
-    let mut results = vec![];
-
-    for (name, val) in PRELUDE.iter() {
-        if let MonoType::Fun(f) = &val.expr {
-            results.push(FunctionInfo::new(
-                name.to_string(),
+    let builtins = PRELUDE
+        .iter()
+        .filter(|(_key, val)| matches!(&val.expr, MonoType::Fun(_)))
+        .map(|(key, val)| match &val.expr {
+            MonoType::Fun(f) => FunctionInfo::new(
+                key.into(),
                 f.as_ref(),
-                BUILTIN_PACKAGE.to_string(),
-            ));
-        }
-    }
+                BUILTIN_PACKAGE.into(),
+            ),
+            _ => unreachable!("Previous filter failed"),
+        });
 
-    for (name, val) in STDLIB.iter() {
-        walk_functions(
-            name.to_string(),
-            &mut results,
-            &val.typ().expr,
-        );
-    }
-
-    results
+    let imported = STDLIB
+        .iter()
+        .filter(|(_key, val)| {
+            matches!(&val.typ().expr, MonoType::Record(_))
+        })
+        .flat_map(|(key, val)| match &val.typ().expr {
+            MonoType::Record(record) => record_fields(record)
+                .filter(|property| {
+                    matches!(&property.v, MonoType::Fun(_))
+                })
+                .map(|property| match &property.v {
+                    MonoType::Fun(f) => FunctionInfo::new(
+                        property.k.to_string(),
+                        f.as_ref(),
+                        get_package_name(key).into(),
+                    ),
+                    _ => unreachable!("Previous filter failed"),
+                })
+                .collect::<Vec<FunctionInfo>>(),
+            _ => unreachable!("Previous filter failed"),
+        });
+    builtins.chain(imported.into_iter()).collect()
 }
 
 pub fn get_builtin_functions() -> Vec<Function> {

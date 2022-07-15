@@ -511,6 +511,61 @@ async fn test_signature_help() {
     assert_eq!(None, result.active_parameter);
 }
 
+/// Test signature help on imported modules
+#[test]
+async fn test_signature_help_imports() {
+    let server = create_server();
+    let fluxscript = r#"import "csv"
+csv.from(
+      // ^"#;
+    open_file(&server, fluxscript.into(), None).await;
+
+    let params = lsp::SignatureHelpParams {
+        context: None,
+        text_document_position_params:
+            lsp::TextDocumentPositionParams::new(
+                lsp::TextDocumentIdentifier::new(
+                    lsp::Url::parse("file:///home/user/file.flux")
+                        .unwrap(),
+                ),
+                position_of(fluxscript),
+            ),
+        work_done_progress_params: lsp::WorkDoneProgressParams {
+            work_done_token: None,
+        },
+    };
+
+    let result =
+        server.signature_help(params).await.unwrap().unwrap();
+
+    let expected_signature_labels: Vec<String> = vec![
+        "from()",
+        "from(csv: $csv)",
+        "from(file: $file)",
+        "from(mode: $mode)",
+        "from(csv: $csv , file: $file)",
+        "from(csv: $csv , mode: $mode)",
+        "from(file: $file , mode: $mode)",
+        "from(csv: $csv , file: $file , mode: $mode)",
+        "from(url: $url)",
+        "from(url: $url)",
+    ]
+    .into_iter()
+    .map(|x| x.into())
+    .collect::<Vec<String>>();
+
+    assert_eq!(
+        expected_signature_labels,
+        result
+            .signatures
+            .iter()
+            .map(|x| x.label.clone())
+            .collect::<Vec<String>>()
+    );
+    assert_eq!(None, result.active_signature);
+    assert_eq!(None, result.active_parameter);
+}
+
 // If the file hasn't been opened on the server, return an error.
 #[test]
 async fn test_formatting_not_opened() {

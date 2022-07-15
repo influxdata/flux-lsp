@@ -980,16 +980,10 @@ impl LanguageServer for LspServer {
                     // XXX: rockstar (6 Jul 2022) - This is helping to complete packages that
                     // have never been imported. That's probably not a great pattern.
                     let stdlib_completions: Vec<lsp::CompletionItem> =
-                        if let Some(env) = flux::imports() {
-                            env.iter().filter(|(key, _val)| {
-                            if let Some(package_name) = lang::get_package_name(key) {
-                                fuzzy_match(package_name, &identifier.name)
-                            } else {
-                                false
-                            }
+                        lang::STDLIB.iter().filter(|(key, _val)| {
+                            fuzzy_match(lang::get_package_name(key), &identifier.name)
                         }).map(|(key, _val)| {
-                            #[allow(clippy::unwrap_used)]
-                            let package_name = lang::get_package_name(key).unwrap();
+                            let package_name = lang::get_package_name(key);
                             lsp::CompletionItem {
                                 label: key.clone(),
                                 detail: Some("Package".into()),
@@ -1003,10 +997,7 @@ impl LanguageServer for LspServer {
                                 sort_text: Some(key.clone()),
                                 ..lsp::CompletionItem::default()
                             }
-                        }).collect()
-                        } else {
-                            return Ok(None);
-                        };
+                        }).collect();
 
                     let builtin_completions: Vec<
                         lsp::CompletionItem,
@@ -1095,7 +1086,7 @@ impl LanguageServer for LspServer {
                                 completion::get_imports(&sem_pkg)
                                     .iter()
                                     .find(|x| {
-                                        x.alias == identifier.name
+                                        x.name == identifier.name
                                     })
                             {
                                 for (key, val) in lang::STDLIB.iter()
@@ -1111,18 +1102,14 @@ impl LanguageServer for LspServer {
                             } else {
                                 for (key, val) in lang::STDLIB.iter()
                                 {
-                                    if let Some(package_name) =
-                                        lang::get_package_name(key)
+                                    if lang::get_package_name(key)
+                                        == identifier.name
                                     {
-                                        if package_name
-                                            == identifier.name
-                                        {
-                                            completion::walk_package(
-                                                key,
-                                                &mut list,
-                                                &val.typ().expr,
-                                            );
-                                        }
+                                        completion::walk_package(
+                                            key,
+                                            &mut list,
+                                            &val.typ().expr,
+                                        );
                                     }
                                 }
                             }
@@ -1162,10 +1149,8 @@ impl LanguageServer for LspServer {
                             let imports =
                                 completion::get_imports(&sem_pkg);
 
-                            lang::STDLIB.iter().filter(|(path, _val)| {
-                                lang::get_package_name(path).is_some()
-                            }).map(|(path, _val)| {
-                                (lang::get_package_name(path).expect("Previous filter failed.").into(), path.clone())
+                            lang::STDLIB.iter().map(|(path, _val)| {
+                                (lang::get_package_name(path).into(), path.clone())
                             }).filter(|(name, _path): &(String, String)| {
                                 !&imports.iter().any(|x| &x.path == name)
                             }).map(|(_name, path)| {
@@ -1295,10 +1280,7 @@ impl LanguageServer for LspServer {
                     SemanticNodeErrorKind::UndefinedIdentifier(identifier) => {
                         // When encountering undefined identifiers, check to see if they match a corresponding
                         // package available for import.
-                        let potential_imports: Vec<&String> = lang::STDLIB.iter().filter(|x| match lang::get_package_name(x.0) {
-                            Some(name) => name == identifier,
-                            None => false,
-                        }).map(|x| x.0 ).collect();
+                        let potential_imports: Vec<&String> = lang::STDLIB.iter().filter(|x| lang::get_package_name(x.0) == identifier).map(|x| x.0).collect();
                         if potential_imports.is_empty() {
                             return None;
                         }
