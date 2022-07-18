@@ -197,7 +197,11 @@ impl<'a> Visitor<'a> for ImportFinderVisitor {
                 None => {
                     // XXX: rockstar (15 Jul 2022) - This block duplicates effort found
                     // in `lang`.
-                    import.path.value.as_str().split('/')
+                    import
+                        .path
+                        .value
+                        .as_str()
+                        .split('/')
                         .last()
                         .expect("Invalid package path/name supplied")
                         .to_string()

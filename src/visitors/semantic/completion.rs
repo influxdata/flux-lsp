@@ -43,8 +43,10 @@ impl<'a> Visitor<'a> for FunctionFinderVisitor {
             let name = &assgn.id.name;
 
             if let Expression::Function(f) = &assgn.init {
-                self.functions
-                    .push(CompletionFunction::from_expr(name.to_string(), f));
+                self.functions.push(CompletionFunction::from_expr(
+                    name.to_string(),
+                    f,
+                ));
             }
         }
 
@@ -94,10 +96,11 @@ impl<'a> Visitor<'a> for ObjectFunctionFinderVisitor {
                         {
                             self.results.push(ObjectFunction {
                                 object: object_name.to_string(),
-                                function: CompletionFunction::from_expr(
-                                    func_name.to_string(),
-                                    fun,
-                                ),
+                                function:
+                                    CompletionFunction::from_expr(
+                                        func_name.to_string(),
+                                        fun,
+                                    ),
                             });
 
                             return false;
@@ -121,10 +124,11 @@ impl<'a> Visitor<'a> for ObjectFunctionFinderVisitor {
                             {
                                 self.results.push(ObjectFunction {
                                     object: object_name.to_string(),
-                                    function: CompletionFunction::from_expr(
-                                        func_name.to_string(),
-                                        fun,
-                                    ),
+                                    function:
+                                        CompletionFunction::from_expr(
+                                            func_name.to_string(),
+                                            fun,
+                                        ),
                                 });
 
                                 return false;

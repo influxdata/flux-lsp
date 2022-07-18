@@ -25,11 +25,9 @@ pub struct Stdlib(flux::semantic::import::Packages);
 impl Stdlib {
     /// Get all packages from the stdlib.
     pub fn packages(&self) -> impl Iterator<Item = Package> + '_ {
-        self.0
-            .iter()
-            .map(|(path, package)| {
-                Package::new(path, package.clone())
-            })
+        self.0.iter().map(|(path, package)| {
+            Package::new(path, package.clone())
+        })
     }
 
     /// Get a package by path from the stdlib.
@@ -41,16 +39,17 @@ impl Stdlib {
     }
 
     /// Get all packages that fuzzy match on the needle.
-    pub fn fuzzy_matches<'a>(&'a self, needle: &'a str) -> impl Iterator<Item = Package> + '_ {
-        self.packages()
-            .filter(|package| {
-                package
-                    .name
-                    .to_lowercase()
-                    .contains(needle.to_lowercase().as_str())
-            })
+    pub fn fuzzy_matches<'a>(
+        &'a self,
+        needle: &'a str,
+    ) -> impl Iterator<Item = Package> + '_ {
+        self.packages().filter(|package| {
+            package
+                .name
+                .to_lowercase()
+                .contains(needle.to_lowercase().as_str())
+        })
     }
-
 }
 
 /// Package represents a flux package.
@@ -118,7 +117,6 @@ impl Package {
             .map(|function| function.clone())
             .next()
     }
-
 }
 
 /// A flux function struct
@@ -155,19 +153,55 @@ impl PartialEq for Function {
 impl Eq for Function {}
 
 impl Function {
+    /// Get signature information for a flux function.
     pub fn signature_information(
         &self,
     ) -> Vec<lsp::SignatureInformation> {
-        let info = FunctionInfo::new(
-            self.name.clone(),
-            &self.expr,
-            "lolpackage".into(),
-        );
-        info.signatures()
-            .into_iter()
-            .map(|signature| lsp::SignatureInformation {
-                label: signature.create_signature(),
-                parameters: Some(signature.create_parameters()),
+        let required = get_argument_names(&self.expr.req);
+        let optional = get_optional_argument_names(&self.expr.opt);
+        let mut result = vec![required.clone()];
+
+        let mut combos = vec![];
+        let length = optional.len();
+        for i in 1..length {
+            let c: Vec<Vec<String>> =
+                combinations::Combinations::new(optional.clone(), i)
+                    .collect();
+            combos.extend(c);
+        }
+        combos.push(optional.clone());
+
+        for l in combos {
+            let mut arguments = required.clone();
+            arguments.extend(l.clone());
+
+            result.push(arguments);
+        }
+
+        result
+            .into_iter().map(|arguments| lsp::SignatureInformation {
+                label: {
+                    let args = arguments
+                        .iter()
+                        .map(|x| format!("{}: ${}", x, x))
+                        .collect::<Vec<String>>()
+                        .join(" , ");
+
+                    let result = format!("{}({})", self.name, args);
+
+                    result
+                },
+                parameters: Some({
+                    arguments
+                        .iter()
+                        .map(|x| lsp::ParameterInformation {
+                            label: lsp::ParameterLabel::Simple(
+                                format!("${}", x),
+                            ),
+                            documentation: None,
+                        })
+                        .collect()
+                }),
                 documentation: None,
                 active_parameter: None,
             })
@@ -226,92 +260,6 @@ pub fn create_function_signature(
             .join(", "),
         f.retn
     )
-}
-
-pub struct FunctionInfo {
-    pub name: String,
-    pub package_name: String,
-    pub required_args: Vec<String>,
-    pub optional_args: Vec<String>,
-}
-
-impl FunctionInfo {
-    pub fn new(
-        name: String,
-        f: &flux::semantic::types::Function,
-        package_name: String,
-    ) -> Self {
-        FunctionInfo {
-            name,
-            package_name,
-            required_args: get_argument_names(&f.req),
-            optional_args: get_optional_argument_names(&f.opt),
-        }
-    }
-
-    pub fn signatures(&self) -> Vec<FunctionSignature> {
-        let mut result = vec![FunctionSignature {
-            name: self.name.clone(),
-            arguments: self.required_args.clone(),
-        }];
-
-        let mut combos = vec![];
-        let length = self.optional_args.len();
-        for i in 1..length {
-            let c: Vec<Vec<String>> =
-                combinations::Combinations::new(
-                    self.optional_args.clone(),
-                    i,
-                )
-                .collect();
-            combos.extend(c);
-        }
-        combos.push(self.optional_args.clone());
-
-        for l in combos {
-            let mut arguments = self.required_args.clone();
-            arguments.extend(l.clone());
-
-            result.push(FunctionSignature {
-                name: self.name.clone(),
-                arguments,
-            });
-        }
-
-        result
-    }
-}
-
-pub struct FunctionSignature {
-    pub name: String,
-    pub arguments: Vec<String>,
-}
-
-impl FunctionSignature {
-    pub fn create_signature(&self) -> String {
-        let args: String = self
-            .arguments
-            .iter()
-            .map(|x| format!("{}: ${}", x, x))
-            .collect::<Vec<String>>()
-            .join(" , ");
-
-        let result = format!("{}({})", self.name, args);
-
-        result
-    }
-
-    pub fn create_parameters(
-        &self,
-    ) -> Vec<lsp::ParameterInformation> {
-        self.arguments
-            .iter()
-            .map(|x| lsp::ParameterInformation {
-                label: lsp::ParameterLabel::Simple(format!("${}", x)),
-                documentation: None,
-            })
-            .collect()
-    }
 }
 
 #[allow(clippy::implicit_hasher)]

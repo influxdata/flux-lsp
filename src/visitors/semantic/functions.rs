@@ -6,7 +6,29 @@ use flux::semantic::types::MonoType;
 use flux::semantic::walk::{Node, Visitor};
 use lspower::lsp;
 
-use crate::lang::FunctionInfo;
+use crate::lang;
+
+pub struct FunctionInfo {
+    pub name: String,
+    pub package_name: String,
+    pub required_args: Vec<String>,
+    pub optional_args: Vec<String>,
+}
+
+impl FunctionInfo {
+    pub fn new(
+        name: String,
+        f: &flux::semantic::types::Function,
+        package_name: String,
+    ) -> Self {
+        FunctionInfo {
+            name,
+            package_name,
+            required_args: lang::get_argument_names(&f.req),
+            optional_args: lang::get_optional_argument_names(&f.opt),
+        }
+    }
+}
 
 pub struct FunctionFinderVisitor {
     pub pos: lsp::Position,

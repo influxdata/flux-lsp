@@ -724,7 +724,6 @@ pub fn complete_call_expr(
         .collect()
 }
 
-
 #[derive(Clone)]
 pub struct CompletionFunction {
     pub name: String,

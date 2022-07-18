@@ -974,22 +974,32 @@ impl LanguageServer for LspServer {
                     // XXX: rockstar (6 Jul 2022) - This is helping to complete packages that
                     // have never been imported. That's probably not a great pattern.
                     let stdlib_completions: Vec<lsp::CompletionItem> =
-                        lang::STDLIB.fuzzy_matches(&identifier.name)
-                        .map(|package| {
-                            lsp::CompletionItem {
+                        lang::STDLIB
+                            .fuzzy_matches(&identifier.name)
+                            .map(|package| lsp::CompletionItem {
                                 label: package.path.clone(),
                                 detail: Some("Package".into()),
-                                documentation: Some(lsp::Documentation::String(
+                                documentation: Some(
+                                    lsp::Documentation::String(
+                                        package.path.clone(),
+                                    ),
+                                ),
+                                filter_text: Some(
+                                    package.name.clone(),
+                                ),
+                                insert_text: Some(
                                     package.path.clone(),
-                                )),
-                                filter_text: Some(package.name.clone()),
-                                insert_text: Some(package.path.clone()),
-                                insert_text_format: Some(lsp::InsertTextFormat::PLAIN_TEXT),
-                                kind: Some(lsp::CompletionItemKind::MODULE),
+                                ),
+                                insert_text_format: Some(
+                                    lsp::InsertTextFormat::PLAIN_TEXT,
+                                ),
+                                kind: Some(
+                                    lsp::CompletionItemKind::MODULE,
+                                ),
                                 sort_text: Some(package.path.clone()),
                                 ..lsp::CompletionItem::default()
-                            }
-                        }).collect();
+                            })
+                            .collect();
 
                     let builtin_completions: Vec<
                         lsp::CompletionItem,
@@ -1072,18 +1082,25 @@ impl LanguageServer for LspServer {
                                         completion::walk_package(
                                             &package.path,
                                             &mut list,
-                                            &package.exports.typ().expr,
+                                            &package
+                                                .exports
+                                                .typ()
+                                                .expr,
                                         );
                                     }
                                 }
                             } else {
                                 for package in lang::STDLIB.packages()
                                 {
-                                    if package.name == identifier.name {
+                                    if package.name == identifier.name
+                                    {
                                         completion::walk_package(
                                             &package.path,
                                             &mut list,
-                                            &package.exports.typ().expr,
+                                            &package
+                                                .exports
+                                                .typ()
+                                                .expr,
                                         );
                                     }
                                 }
