@@ -1018,7 +1018,7 @@ impl LanguageServer for LspServer {
                                 MonoType::Fun(function) => {
                                     lsp::CompletionItem {
                                         label: key.to_string(),
-                                        detail: Some(lang::create_function_signature(function)),
+                                        detail: Some(completion::create_function_signature(function)),
                                         filter_text: Some(key.to_string()),
                                         insert_text_format: Some(lsp::InsertTextFormat::SNIPPET),
                                         kind: Some(lsp::CompletionItemKind::FUNCTION),

@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use flux::ast::{Expression, PropertyKey};
@@ -63,7 +64,7 @@ pub(crate) fn walk_package(
                 MonoType::Fun(f) => {
                     list.push(Box::new(FunctionResult {
                         name: head.k.clone().to_string(),
-                        signature: lang::create_function_signature(f),
+                        signature: create_function_signature(f),
                     }));
                 }
                 MonoType::Collection(c) => {
@@ -189,11 +190,9 @@ fn create_function_result(
         if let MonoType::Fun(fun) = &f.typ {
             return Some(UserFunctionResult {
                 name: name.into(),
-                optional_args: lang::get_optional_argument_names(
-                    &fun.opt,
-                ),
-                required_args: lang::get_argument_names(&fun.req),
-                signature: lang::create_function_signature(fun),
+                required_args: fun.req.keys().map(String::from).collect(),
+                optional_args: fun.opt.keys().map(String::from).collect(),
+                signature: create_function_signature(fun),
             });
         }
     }
@@ -724,6 +723,7 @@ pub fn complete_call_expr(
         .collect()
 }
 
+
 #[derive(Clone)]
 pub struct CompletionFunction {
     pub name: String,
@@ -761,4 +761,47 @@ impl CompletionFunction {
             .collect::<Vec<_>>();
         Self { name, params }
     }
+}
+
+pub fn create_function_signature(
+    f: &flux::semantic::types::Function,
+) -> String {
+    let required = f
+        .req
+        .iter()
+        // Sort args with BTree
+        .collect::<BTreeMap<_, _>>()
+        .iter()
+        .map(|(&k, &v)| (k.clone(), format!("{}", v)))
+        .collect::<Vec<_>>();
+
+    let optional = f
+        .opt
+        .iter()
+        // Sort args with BTree
+        .collect::<BTreeMap<_, _>>()
+        .iter()
+        .map(|(&k, &v)| (k.clone(), format!("{}", v.typ)))
+        .collect::<Vec<_>>();
+
+    let pipe = match &f.pipe {
+        Some(pipe) => {
+            if pipe.k == "<-" {
+                vec![(pipe.k.clone(), format!("{}", pipe.v))]
+            } else {
+                vec![(format!("<-{}", pipe.k), format!("{}", pipe.v))]
+            }
+        }
+        None => vec![],
+    };
+
+    format!(
+        "({}) -> {}",
+        pipe.iter()
+            .chain(required.iter().chain(optional.iter()))
+            .map(|arg| format!("{}:{}", arg.0, arg.1))
+            .collect::<Vec<_>>()
+            .join(", "),
+        f.retn
+    )
 }

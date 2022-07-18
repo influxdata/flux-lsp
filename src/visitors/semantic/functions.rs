@@ -6,8 +6,6 @@ use flux::semantic::types::MonoType;
 use flux::semantic::walk::{Node, Visitor};
 use lspower::lsp;
 
-use crate::lang;
-
 pub struct FunctionInfo {
     pub name: String,
     pub package_name: String,
@@ -24,8 +22,8 @@ impl FunctionInfo {
         FunctionInfo {
             name,
             package_name,
-            required_args: lang::get_argument_names(&f.req),
-            optional_args: lang::get_optional_argument_names(&f.opt),
+            required_args: f.req.keys().map(String::from).collect(),
+            optional_args: f.opt.keys().map(String::from).collect(),
         }
     }
 }

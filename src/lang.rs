@@ -8,7 +8,6 @@ use std::cmp::Ordering;
 use flux::semantic::types::MonoType;
 use lspower::lsp;
 
-use std::collections::BTreeMap;
 use std::iter::Iterator;
 
 lazy_static::lazy_static! {
@@ -157,8 +156,8 @@ impl Function {
     pub fn signature_information(
         &self,
     ) -> Vec<lsp::SignatureInformation> {
-        let required = get_argument_names(&self.expr.req);
-        let optional = get_optional_argument_names(&self.expr.opt);
+        let required: Vec<String> = self.expr.req.keys().map(String::from).collect();
+        let optional: Vec<String> = self.expr.opt.keys().map(String::from).collect();
         let mut result = vec![required.clone()];
 
         let mut combos = vec![];
@@ -217,66 +216,6 @@ impl Function {
             .map(|(k, v)| (k.clone(), v.clone()))
             .collect()
     }
-}
-
-pub fn create_function_signature(
-    f: &flux::semantic::types::Function,
-) -> String {
-    let required = f
-        .req
-        .iter()
-        // Sort args with BTree
-        .collect::<BTreeMap<_, _>>()
-        .iter()
-        .map(|(&k, &v)| (k.clone(), format!("{}", v)))
-        .collect::<Vec<_>>();
-
-    let optional = f
-        .opt
-        .iter()
-        // Sort args with BTree
-        .collect::<BTreeMap<_, _>>()
-        .iter()
-        .map(|(&k, &v)| (k.clone(), format!("{}", v.typ)))
-        .collect::<Vec<_>>();
-
-    let pipe = match &f.pipe {
-        Some(pipe) => {
-            if pipe.k == "<-" {
-                vec![(pipe.k.clone(), format!("{}", pipe.v))]
-            } else {
-                vec![(format!("<-{}", pipe.k), format!("{}", pipe.v))]
-            }
-        }
-        None => vec![],
-    };
-
-    format!(
-        "({}) -> {}",
-        pipe.iter()
-            .chain(required.iter().chain(optional.iter()))
-            .map(|arg| format!("{}:{}", arg.0, arg.1))
-            .collect::<Vec<_>>()
-            .join(", "),
-        f.retn
-    )
-}
-
-#[allow(clippy::implicit_hasher)]
-pub fn get_argument_names(
-    args: &std::collections::BTreeMap<String, MonoType>,
-) -> Vec<String> {
-    args.keys().map(String::from).collect()
-}
-
-#[allow(clippy::implicit_hasher)]
-pub fn get_optional_argument_names(
-    args: &std::collections::BTreeMap<
-        String,
-        flux::semantic::types::Argument<MonoType>,
-    >,
-) -> Vec<String> {
-    args.keys().map(String::from).collect()
 }
 
 #[cfg(test)]
