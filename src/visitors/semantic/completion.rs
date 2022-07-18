@@ -4,7 +4,7 @@ use flux::semantic::types::MonoType;
 use flux::semantic::walk::{Node, Visitor};
 use lspower::lsp;
 
-use crate::lang::Function;
+use crate::completion::CompletionFunction;
 
 fn defined_after(loc: &SourceLocation, pos: lsp::Position) -> bool {
     if loc.start.line > pos.line + 1
@@ -19,7 +19,7 @@ fn defined_after(loc: &SourceLocation, pos: lsp::Position) -> bool {
 
 pub struct FunctionFinderVisitor {
     pub pos: lsp::Position,
-    pub functions: Vec<Function>,
+    pub functions: Vec<CompletionFunction>,
 }
 
 impl FunctionFinderVisitor {
@@ -44,7 +44,7 @@ impl<'a> Visitor<'a> for FunctionFinderVisitor {
 
             if let Expression::Function(f) = &assgn.init {
                 self.functions
-                    .push(Function::from_expr(name.to_string(), f));
+                    .push(CompletionFunction::from_expr(name.to_string(), f));
             }
         }
 
@@ -56,7 +56,7 @@ impl<'a> Visitor<'a> for FunctionFinderVisitor {
                 let name = &assgn.id.name;
                 if let Expression::Function(f) = &assgn.init {
                     if let MonoType::Fun(fun) = &f.typ {
-                        self.functions.push(Function::new(
+                        self.functions.push(CompletionFunction::new(
                             name.to_string(),
                             fun,
                         ));
@@ -72,7 +72,7 @@ impl<'a> Visitor<'a> for FunctionFinderVisitor {
 #[derive(Clone)]
 pub struct ObjectFunction {
     pub object: String,
-    pub function: Function,
+    pub function: CompletionFunction,
 }
 
 #[derive(Default)]
@@ -94,7 +94,7 @@ impl<'a> Visitor<'a> for ObjectFunctionFinderVisitor {
                         {
                             self.results.push(ObjectFunction {
                                 object: object_name.to_string(),
-                                function: Function::from_expr(
+                                function: CompletionFunction::from_expr(
                                     func_name.to_string(),
                                     fun,
                                 ),
@@ -121,7 +121,7 @@ impl<'a> Visitor<'a> for ObjectFunctionFinderVisitor {
                             {
                                 self.results.push(ObjectFunction {
                                     object: object_name.to_string(),
-                                    function: Function::from_expr(
+                                    function: CompletionFunction::from_expr(
                                         func_name.to_string(),
                                         fun,
                                     ),

@@ -80,16 +80,16 @@ impl Package {
     }
 
     /// Get all functions in the package.
-    pub fn functions(&self) -> Vec<Function_> {
+    pub fn functions(&self) -> Vec<Function> {
         if let MonoType::Record(record) = self.exports.typ().expr {
-            let mut functions: Vec<Function_> = record
+            let mut functions: Vec<Function> = record
                 .fields()
                 .filter(|property| {
                     matches!(&property.v, MonoType::Fun(_))
                         && !property.k.to_string().starts_with('_')
                 })
                 .map(|property| match &property.v {
-                    MonoType::Fun(f) => Function_ {
+                    MonoType::Fun(f) => Function {
                         name: property.k.to_string(),
                         expr: f.as_ref().clone(),
                     },
@@ -111,7 +111,7 @@ impl Package {
     }
 
     /// Get a function by name from the package.
-    pub fn function(&self, name: &str) -> Option<Function_> {
+    pub fn function(&self, name: &str) -> Option<Function> {
         self.functions()
             .iter()
             .filter(|function| function.name == name)
@@ -130,31 +130,31 @@ impl Package {
 /// structures. Any deviation from that contract should be considered technical
 /// debt and handled accordingly.
 #[derive(Clone, Debug)]
-pub struct Function_ {
+pub struct Function {
     pub name: String,
     expr: flux::semantic::types::Function,
 }
 
-impl std::cmp::Ord for Function_ {
+impl std::cmp::Ord for Function {
     fn cmp(&self, other: &Self) -> Ordering {
         self.name.cmp(&other.name)
     }
 }
 
-impl std::cmp::PartialOrd for Function_ {
+impl std::cmp::PartialOrd for Function {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl PartialEq for Function_ {
+impl PartialEq for Function {
     fn eq(&self, other: &Self) -> bool {
         self.name == other.name
     }
 }
-impl Eq for Function_ {}
+impl Eq for Function {}
 
-impl Function_ {
+impl Function {
     pub fn signature_information(
         &self,
     ) -> Vec<lsp::SignatureInformation> {
@@ -381,45 +381,6 @@ pub fn get_optional_argument_names(
     >,
 ) -> Vec<String> {
     args.keys().map(String::from).collect()
-}
-
-#[derive(Clone)]
-pub struct Function {
-    pub name: String,
-    pub params: Vec<(String, Option<MonoType>)>,
-}
-
-impl Function {
-    pub(crate) fn new(
-        name: String,
-        f: &flux::semantic::types::Function,
-    ) -> Self {
-        let params = f
-            .req
-            .iter()
-            .chain(f.opt.iter().map(|p| (p.0, &p.1.typ)))
-            .chain(f.pipe.as_ref().map(|p| (&p.k, &p.v)))
-            .map(|(k, v)| (k.clone(), Some(v.clone())))
-            .collect();
-        Self { name, params }
-    }
-
-    pub(crate) fn from_expr(
-        name: String,
-        expr: &flux::semantic::nodes::FunctionExpr,
-    ) -> Self {
-        let params = expr
-            .params
-            .iter()
-            .map(|p| {
-                (
-                    p.key.name.to_string(),
-                    expr.typ.parameter(&p.key.name).cloned(),
-                )
-            })
-            .collect::<Vec<_>>();
-        Self { name, params }
-    }
 }
 
 #[cfg(test)]

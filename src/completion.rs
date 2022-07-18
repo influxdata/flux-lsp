@@ -29,7 +29,7 @@ pub fn get_imports(
 // the function parameters
 fn get_function_params<'a>(
     name: &'a str,
-    functions: &'a [lang::Function],
+    functions: &'a [CompletionFunction],
     provided: &'a [String],
 ) -> impl Iterator<Item = (String, Option<MonoType>)> + 'a {
     functions.iter().filter(move |f| f.name == name).flat_map(
@@ -618,7 +618,7 @@ pub fn complete_call_expr(
             }
             Expression::Member(me) => {
                 if let Expression::Identifier(ident) = &me.object {
-                    let object_functions: Vec<lang::Function> = {
+                    let object_functions: Vec<CompletionFunction> = {
                         let visitor = crate::walk_semantic_package!(
                             ObjectFunctionFinderVisitor::default(),
                             sem_pkg
@@ -722,4 +722,44 @@ pub fn complete_call_expr(
             }
         })
         .collect()
+}
+
+
+#[derive(Clone)]
+pub struct CompletionFunction {
+    pub name: String,
+    pub params: Vec<(String, Option<MonoType>)>,
+}
+
+impl CompletionFunction {
+    pub(crate) fn new(
+        name: String,
+        f: &flux::semantic::types::Function,
+    ) -> Self {
+        let params = f
+            .req
+            .iter()
+            .chain(f.opt.iter().map(|p| (p.0, &p.1.typ)))
+            .chain(f.pipe.as_ref().map(|p| (&p.k, &p.v)))
+            .map(|(k, v)| (k.clone(), Some(v.clone())))
+            .collect();
+        Self { name, params }
+    }
+
+    pub(crate) fn from_expr(
+        name: String,
+        expr: &flux::semantic::nodes::FunctionExpr,
+    ) -> Self {
+        let params = expr
+            .params
+            .iter()
+            .map(|p| {
+                (
+                    p.key.name.to_string(),
+                    expr.typ.parameter(&p.key.name).cloned(),
+                )
+            })
+            .collect::<Vec<_>>();
+        Self { name, params }
+    }
 }
