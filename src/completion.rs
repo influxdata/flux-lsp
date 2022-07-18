@@ -190,8 +190,16 @@ fn create_function_result(
         if let MonoType::Fun(fun) = &f.typ {
             return Some(UserFunctionResult {
                 name: name.into(),
-                required_args: fun.req.keys().map(String::from).collect(),
-                optional_args: fun.opt.keys().map(String::from).collect(),
+                required_args: fun
+                    .req
+                    .keys()
+                    .map(String::from)
+                    .collect(),
+                optional_args: fun
+                    .opt
+                    .keys()
+                    .map(String::from)
+                    .collect(),
                 signature: create_function_signature(fun),
             });
         }
@@ -722,7 +730,6 @@ pub fn complete_call_expr(
         })
         .collect()
 }
-
 
 #[derive(Clone)]
 pub struct CompletionFunction {

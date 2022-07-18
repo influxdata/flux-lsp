@@ -156,8 +156,10 @@ impl Function {
     pub fn signature_information(
         &self,
     ) -> Vec<lsp::SignatureInformation> {
-        let required: Vec<String> = self.expr.req.keys().map(String::from).collect();
-        let optional: Vec<String> = self.expr.opt.keys().map(String::from).collect();
+        let required: Vec<String> =
+            self.expr.req.keys().map(String::from).collect();
+        let optional: Vec<String> =
+            self.expr.opt.keys().map(String::from).collect();
         let mut result = vec![required.clone()];
 
         let mut combos = vec![];
@@ -178,7 +180,8 @@ impl Function {
         }
 
         result
-            .into_iter().map(|arguments| lsp::SignatureInformation {
+            .into_iter()
+            .map(|arguments| lsp::SignatureInformation {
                 label: {
                     let args = arguments
                         .iter()
