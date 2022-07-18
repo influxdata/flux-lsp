@@ -594,17 +594,6 @@ mod tests {
     }
 
     #[test]
-    fn function_signature() {
-        let from =
-            STDLIB.package("csv").unwrap().function("from").unwrap();
-
-        assert_eq!(
-            "(csv:string, file:string, mode:string) -> stream[A]",
-            from.signature()
-        );
-    }
-
-    #[test]
     fn function_parameters() {
         let from =
             STDLIB.package("csv").unwrap().function("from").unwrap();
