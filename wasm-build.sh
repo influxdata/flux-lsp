@@ -2,6 +2,10 @@
 
 set -e
 
+TARGET_DIR="target/"
+TARGET_NODE_DIR="${TARGET_DIR}pkg-node"
+TARGET_BROWSER_DIR="${TARGET_DIR}pkg-browser"
+
 BUILD_MODE=${BUILD_MODE-release}
 
 BUILD_FLAG=""
@@ -23,7 +27,7 @@ esac
 
 wasm-pack build \
     -t nodejs \
-    -d pkg-node \
+    -d $TARGET_NODE_DIR \
     --out-name flux-lsp-node \
     --scope influxdata \
     ${BUILD_FLAG} \
@@ -31,8 +35,8 @@ wasm-pack build \
     --locked \
     $BUILD_MODE_ARGS
 wasm-pack build \
-    -t browser \
-    -d pkg-browser \
+    -t web \
+    -d $TARGET_BROWSER_DIR \
     --out-name flux-lsp-browser \
     --scope influxdata \
     ${BUILD_FLAG} \
@@ -41,14 +45,14 @@ wasm-pack build \
     $BUILD_MODE_ARGS
 
 # Strip producers header and some other optional bits.
-wasm-strip pkg-node/flux-lsp-node_bg.wasm
-wasm-opt -Oz -o pkg-node/flux-lsp-node_bg.wasm pkg-node/flux-lsp-node_bg.wasm
-wasm-strip pkg-browser/flux-lsp-browser_bg.wasm
-wasm-opt -Oz -o pkg-browser/flux-lsp-browser_bg.wasm pkg-browser/flux-lsp-browser_bg.wasm
+wasm-strip $TARGET_NODE_DIR/flux-lsp-node_bg.wasm
+wasm-opt -Oz -o $TARGET_NODE_DIR/flux-lsp-node_bg.wasm $TARGET_NODE_DIR/flux-lsp-node_bg.wasm
+wasm-strip $TARGET_BROWSER_DIR/flux-lsp-browser_bg.wasm
+wasm-opt -Oz -o $TARGET_BROWSER_DIR/flux-lsp-browser_bg.wasm $TARGET_BROWSER_DIR/flux-lsp-browser_bg.wasm
 
-cat pkg-node/package.json | sed s/@influxdata\\/flux-lsp\"/@influxdata\\/flux-lsp-node\"/g > pkg-node/package-new.json
-mv pkg-node/package-new.json pkg-node/package.json
+cat $TARGET_NODE_DIR/package.json | sed s/@influxdata\\/flux-lsp\"/@influxdata\\/flux-lsp-node\"/g > $TARGET_NODE_DIR/package-new.json
+mv $TARGET_NODE_DIR/package-new.json $TARGET_NODE_DIR/package.json
 
-cat pkg-browser/package.json | sed s/@influxdata\\/flux-lsp\"/@influxdata\\/flux-lsp-browser\"/g | sed -e 's/"files": \[/"files": [\
-    "flux-lsp-browser_bg.js",/g' > pkg-browser/package-new.json
-mv pkg-browser/package-new.json pkg-browser/package.json
+cat $TARGET_BROWSER_DIR/package.json | sed s/@influxdata\\/flux-lsp\"/@influxdata\\/flux-lsp-browser\"/g | sed -e 's/"files": \[/"files": [\
+    "flux-lsp-browser_bg.js",/g' > $TARGET_BROWSER_DIR/package-new.json
+mv $TARGET_BROWSER_DIR/package-new.json $TARGET_BROWSER_DIR/package.json
