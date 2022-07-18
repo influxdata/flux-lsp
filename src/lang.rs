@@ -183,52 +183,6 @@ impl Function {
             .map(|(k, v)| (k.clone(), v.clone()))
             .collect()
     }
-
-    fn signature(&self) -> String {
-        let required = self
-            .expr
-            .req
-            .iter()
-            // Sort args with BTree
-            .collect::<BTreeMap<_, _>>()
-            .iter()
-            .map(|(&k, &v)| (k.clone(), format!("{}", v)))
-            .collect::<Vec<_>>();
-
-        let optional = self
-            .expr
-            .opt
-            .iter()
-            // Sort args with BTree
-            .collect::<BTreeMap<_, _>>()
-            .iter()
-            .map(|(&k, &v)| (k.clone(), format!("{}", v.typ)))
-            .collect::<Vec<_>>();
-
-        let pipe = match &self.expr.pipe {
-            Some(pipe) => {
-                if pipe.k == "<-" {
-                    vec![(pipe.k.clone(), format!("{}", pipe.v))]
-                } else {
-                    vec![(
-                        format!("<-{}", pipe.k),
-                        format!("{}", pipe.v),
-                    )]
-                }
-            }
-            None => vec![],
-        };
-
-        format!(
-            "({}) -> {}",
-            pipe.iter()
-                .chain(required.iter().chain(optional.iter()))
-                .map(|arg| format!("{}:{}", arg.0, arg.1))
-                .collect::<Vec<_>>()
-                .join(", "),
-            self.expr.retn
-        )
-    }
 }
 
 pub fn create_function_signature(
