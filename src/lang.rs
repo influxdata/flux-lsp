@@ -12,9 +12,7 @@ use std::collections::BTreeMap;
 use std::iter::Iterator;
 
 lazy_static::lazy_static! {
-    pub static ref PRELUDE: flux::semantic::PackageExports = flux::prelude().expect("Could not initialize prelude.");
-    pub static ref STDLIB: flux::semantic::import::Packages = flux::imports().expect("Could not initialize stdlib.");
-    pub static ref STDLIB_: Stdlib = Stdlib(flux::imports().expect("Could not initialize stdlib."));
+    pub static ref STDLIB: Stdlib = Stdlib(flux::imports().expect("Could not initialize stdlib."));
     pub static ref UNIVERSE: Package = Package::new("builtin", flux::prelude().expect("Could not initialize prelude"));
 }
 
@@ -26,31 +24,43 @@ pub struct Stdlib(flux::semantic::import::Packages);
 
 impl Stdlib {
     /// Get all packages from the stdlib.
-    pub fn packages(&self) -> Vec<Package> {
+    pub fn packages(&self) -> impl Iterator<Item = Package> + '_ {
         self.0
             .iter()
             .map(|(path, package)| {
                 Package::new(path, package.clone())
             })
-            .collect()
     }
 
     /// Get a package by path from the stdlib.
     pub fn package(&self, path: &str) -> Option<Package> {
         self.packages()
-            .iter()
             .filter(|package| package.path == path)
             .map(|package| package.clone())
             .next()
     }
+
+    /// Get all packages that fuzzy match on the needle.
+    pub fn fuzzy_matches<'a>(&'a self, needle: &'a str) -> impl Iterator<Item = Package> + '_ {
+        self.packages()
+            .filter(|package| {
+                package
+                    .name
+                    .to_lowercase()
+                    .contains(needle.to_lowercase().as_str())
+            })
+    }
+
 }
 
 /// Package represents a flux package.
 #[derive(Debug, Clone)]
 pub struct Package {
-    name: String,
-    path: String,
-    exports: flux::semantic::PackageExports,
+    pub name: String,
+    pub path: String,
+    // XXX: rockstar (15 Jul 2022) - exports probably shouldn't be public, but
+    // for the sake of migration, this is the easiest path forward.
+    pub exports: flux::semantic::PackageExports,
 }
 
 impl Package {
@@ -89,6 +99,9 @@ impl Package {
                 })
                 .collect();
             // Sort the functions into alphabetical order, plz.
+            // XXX: rockstar (15 Jul 2022) - This function currently returns a `Vec` specifically
+            // because of this requirement. It's probably _better_ to sort an iterator, but that
+            // isn't the best idea at the current introduction of this code.
             functions.sort();
             functions
         } else {
@@ -105,6 +118,7 @@ impl Package {
             .map(|function| function.clone())
             .next()
     }
+
 }
 
 /// A flux function struct
@@ -144,15 +158,20 @@ impl Function_ {
     pub fn signature_information(
         &self,
     ) -> Vec<lsp::SignatureInformation> {
-        let info = FunctionInfo::new(self.name.clone(), &self.expr, "lolpackage".into());
-        info.signatures().into_iter().map(|signature| {
-            lsp::SignatureInformation {
+        let info = FunctionInfo::new(
+            self.name.clone(),
+            &self.expr,
+            "lolpackage".into(),
+        );
+        info.signatures()
+            .into_iter()
+            .map(|signature| lsp::SignatureInformation {
                 label: signature.create_signature(),
                 parameters: Some(signature.create_parameters()),
                 documentation: None,
                 active_parameter: None,
-            }
-        }).collect()
+            })
+            .collect()
     }
 
     pub fn parameters(&self) -> Vec<(String, MonoType)> {
@@ -505,9 +524,8 @@ mod tests {
             ]"#]]
         .assert_eq(
             &serde_json::to_string_pretty(
-                &STDLIB_
+                &STDLIB
                     .packages()
-                    .iter()
                     .map(|package| package.path.clone())
                     .collect::<Vec<String>>(),
             )
@@ -647,7 +665,7 @@ mod tests {
     /// All functions from a package can be fetched
     #[test]
     fn csv_package_functions() {
-        let csv = STDLIB_.package("csv").unwrap();
+        let csv = STDLIB.package("csv").unwrap();
 
         let functions = csv.functions();
 
@@ -669,7 +687,7 @@ mod tests {
     #[test]
     fn function_signature() {
         let from =
-            STDLIB_.package("csv").unwrap().function("from").unwrap();
+            STDLIB.package("csv").unwrap().function("from").unwrap();
 
         assert_eq!(
             "(csv:string, file:string, mode:string) -> stream[A]",
@@ -680,7 +698,7 @@ mod tests {
     #[test]
     fn function_parameters() {
         let from =
-            STDLIB_.package("csv").unwrap().function("from").unwrap();
+            STDLIB.package("csv").unwrap().function("from").unwrap();
 
         expect_test::expect![[r#"
             [
@@ -706,7 +724,7 @@ mod tests {
     #[test]
     fn function_signature_information() {
         let from =
-            STDLIB_.package("csv").unwrap().function("from").unwrap();
+            STDLIB.package("csv").unwrap().function("from").unwrap();
 
         expect_test::expect![[r#"
             [

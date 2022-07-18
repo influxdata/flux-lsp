@@ -641,7 +641,7 @@ pub fn complete_call_expr(
                     let initial_params: Vec<(
                         String,
                         Option<MonoType>,
-                    )> = match lang::STDLIB_.package(&ident.name) {
+                    )> = match lang::STDLIB.package(&ident.name) {
                         Some(package) => {
                             match package.function(key) {
                                 Some(function) => function

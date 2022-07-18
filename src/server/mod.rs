@@ -538,14 +538,18 @@ impl LanguageServer for LspServer {
             ),
             pkg
         );
-        let signatures: Vec<lsp::SignatureInformation> = if let Some(node) = visitor.node {
+        let signatures: Vec<lsp::SignatureInformation> = if let Some(
+            node,
+        ) =
+            visitor.node
+        {
             if let walk::Node::CallExpr(call) = node {
                 let callee = call.callee.clone();
 
                 if let flux::semantic::nodes::Expression::Member(member) = callee.clone() {
                     let name = member.property.clone();
                     if let flux::semantic::nodes::Expression::Identifier(ident) = member.object.clone() {
-                        match lang::STDLIB_.package(&ident.name) {
+                        match lang::STDLIB.package(&ident.name) {
                             None => return Ok(None),
                             Some(package) => match package.function(&name) {
                                 None => return Ok(None),
@@ -970,28 +974,26 @@ impl LanguageServer for LspServer {
                     // XXX: rockstar (6 Jul 2022) - This is helping to complete packages that
                     // have never been imported. That's probably not a great pattern.
                     let stdlib_completions: Vec<lsp::CompletionItem> =
-                        lang::STDLIB.iter().filter(|(key, _val)| {
-                            fuzzy_match(lang::get_package_name(key), &identifier.name)
-                        }).map(|(key, _val)| {
-                            let package_name = lang::get_package_name(key);
+                        lang::STDLIB.fuzzy_matches(&identifier.name)
+                        .map(|package| {
                             lsp::CompletionItem {
-                                label: key.clone(),
+                                label: package.path.clone(),
                                 detail: Some("Package".into()),
                                 documentation: Some(lsp::Documentation::String(
-                                    key.clone(),
+                                    package.path.clone(),
                                 )),
-                                filter_text: Some(package_name.into()),
-                                insert_text: Some(key.clone()),
+                                filter_text: Some(package.name.clone()),
+                                insert_text: Some(package.path.clone()),
                                 insert_text_format: Some(lsp::InsertTextFormat::PLAIN_TEXT),
                                 kind: Some(lsp::CompletionItemKind::MODULE),
-                                sort_text: Some(key.clone()),
+                                sort_text: Some(package.path.clone()),
                                 ..lsp::CompletionItem::default()
                             }
                         }).collect();
 
                     let builtin_completions: Vec<
                         lsp::CompletionItem,
-                    > = lang::PRELUDE.iter().filter(|(key, val)| {
+                    > = lang::UNIVERSE.exports.iter().filter(|(key, val)| {
                             // Don't allow users to "discover" private-ish functionality.
                             // Filter out irrelevent items that won't match.
                             // Only pass expressions that have completion support.
@@ -1005,27 +1007,12 @@ impl LanguageServer for LspServer {
                             match &val.expr {
                                 MonoType::Fun(function) => {
                                     lsp::CompletionItem {
-                                        label: key.into(),
+                                        label: key.to_string(),
                                         detail: Some(lang::create_function_signature(function)),
-                                        filter_text: Some(key.into()),
+                                        filter_text: Some(key.to_string()),
                                         insert_text_format: Some(lsp::InsertTextFormat::SNIPPET),
                                         kind: Some(lsp::CompletionItemKind::FUNCTION),
-                                        sort_text: Some(key.into()),
-                                        ..lsp::CompletionItem::default()
-                                    }
-                                }
-                                MonoType::Collection(_collection) => {
-                                    lsp::CompletionItem {
-                                        label: format!("{} ({})", key, "prelude"),
-                                        detail: Some("Array".into()),
-                                        documentation: Some(lsp::Documentation::String("from prelude".into())),
-                                        filter_text: Some(key.into()),
-                                        insert_text: Some(key.into()),
-                                        insert_text_format: Some(
-                                            lsp::InsertTextFormat::PLAIN_TEXT
-                                        ),
-                                        kind: Some(lsp::CompletionItemKind::VARIABLE),
-                                        sort_text: Some(format!("{} prelude", key)),
+                                        sort_text: Some(key.to_string()),
                                         ..lsp::CompletionItem::default()
                                     }
                                 }
@@ -1044,8 +1031,8 @@ impl LanguageServer for LspServer {
                                             BuiltinType::Time => "Time".into(),
                                         }),
                                         documentation: Some(lsp::Documentation::String("from prelude".into())),
-                                        filter_text: Some(key.into()),
-                                        insert_text: Some(key.into()),
+                                        filter_text: Some(key.to_string()),
+                                        insert_text: Some(key.to_string()),
                                         insert_text_format: Some(
                                             lsp::InsertTextFormat::PLAIN_TEXT
                                         ),
@@ -1079,26 +1066,24 @@ impl LanguageServer for LspServer {
                                         x.name == identifier.name
                                     })
                             {
-                                for (key, val) in lang::STDLIB.iter()
+                                for package in lang::STDLIB.packages()
                                 {
-                                    if *key == import.path {
+                                    if package.path == import.path {
                                         completion::walk_package(
-                                            key,
+                                            &package.path,
                                             &mut list,
-                                            &val.typ().expr,
+                                            &package.exports.typ().expr,
                                         );
                                     }
                                 }
                             } else {
-                                for (key, val) in lang::STDLIB.iter()
+                                for package in lang::STDLIB.packages()
                                 {
-                                    if lang::get_package_name(key)
-                                        == identifier.name
-                                    {
+                                    if package.name == identifier.name {
                                         completion::walk_package(
-                                            key,
+                                            &package.path,
                                             &mut list,
-                                            &val.typ().expr,
+                                            &package.exports.typ().expr,
                                         );
                                     }
                                 }
@@ -1139,20 +1124,18 @@ impl LanguageServer for LspServer {
                             let imports =
                                 completion::get_imports(&sem_pkg);
 
-                            lang::STDLIB.iter().map(|(path, _val)| {
-                                (lang::get_package_name(path).into(), path.clone())
-                            }).filter(|(name, _path): &(String, String)| {
-                                !&imports.iter().any(|x| &x.path == name)
-                            }).map(|(_name, path)| {
+                            lang::STDLIB.packages().filter(|package| {
+                                !&imports.iter().any(|x| x.path == package.path)
+                            }).map(|package| {
                                 let trigger = if let Some(context) = & params.context {
                                     context.trigger_character.as_deref()
                                 } else {
                                     None
                                 };
                                 let insert_text = if trigger == Some("\"") {
-                                    path.as_str().to_string()
+                                    package.path.as_str().to_string()
                                 } else {
-                                    format!(r#""{}""#, path.as_str())
+                                    format!(r#""{}""#, package.path.as_str())
                                 };
                                 lsp::CompletionItem {
                                     label: insert_text.clone(),
@@ -1268,16 +1251,16 @@ impl LanguageServer for LspServer {
             if let ErrorKind::Inference(kind) = &error.error {
                 match kind {
                     SemanticNodeErrorKind::UndefinedIdentifier(identifier) => {
-                        // When encountering undefined identifiers, check to see if they match a corresponding
-                        // package available for import.
-                        let potential_imports: Vec<&String> = lang::STDLIB.iter().filter(|x| lang::get_package_name(x.0) == identifier).map(|x| x.0).collect();
+                        // When encountering undefined identifiers, check to see if they match any corresponding
+                        // packages available for import.
+                        let potential_imports: Vec<lang::Package> = lang::STDLIB.fuzzy_matches(identifier).collect();
                         if potential_imports.is_empty() {
                             return None;
                         }
 
-                        let inner_actions: Vec<lsp::CodeActionOrCommand> = potential_imports.iter().map(|package_name| {
+                        let inner_actions: Vec<lsp::CodeActionOrCommand> = potential_imports.iter().map(|package| {
                             lsp::CodeAction {
-                                title: format!("Import `{}`", package_name),
+                                title: format!("Import `{}`", package.path),
                                 kind: Some(lsp::CodeActionKind::QUICKFIX),
                                 diagnostics: None,
                                 edit: Some(lsp::WorkspaceEdit {
@@ -1288,7 +1271,7 @@ impl LanguageServer for LspServer {
                                                     start: import_position,
                                                     end: import_position,
                                                 },
-                                                new_text: format!("import \"{}\"\n", package_name),
+                                                new_text: format!("import \"{}\"\n", package.path),
                                             }
                                         ])
                                     ])),
