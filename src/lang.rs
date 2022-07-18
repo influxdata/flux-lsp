@@ -231,12 +231,6 @@ impl Function {
     }
 }
 
-pub fn get_package_name(name: &str) -> &str {
-    name.split('/')
-        .last()
-        .expect("Invalid package path/name supplied")
-}
-
 pub fn create_function_signature(
     f: &flux::semantic::types::Function,
 ) -> String {
