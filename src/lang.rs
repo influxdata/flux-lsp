@@ -31,10 +31,7 @@ impl Stdlib {
 
     /// Get a package by path from the stdlib.
     pub fn package(&self, path: &str) -> Option<Package> {
-        self.packages()
-            .filter(|package| package.path == path)
-            .map(|package| package.clone())
-            .next()
+        self.packages().find(|package| package.path == path)
     }
 
     /// Get all packages that fuzzy match on the needle.
@@ -112,9 +109,8 @@ impl Package {
     pub fn function(&self, name: &str) -> Option<Function> {
         self.functions()
             .iter()
-            .filter(|function| function.name == name)
-            .map(|function| function.clone())
-            .next()
+            .find(|function| function.name == name)
+            .cloned()
     }
 }
 
@@ -170,7 +166,7 @@ impl Function {
                     .collect();
             combos.extend(c);
         }
-        combos.push(optional.clone());
+        combos.push(optional);
 
         for l in combos {
             let mut arguments = required.clone();

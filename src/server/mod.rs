@@ -996,7 +996,7 @@ impl LanguageServer for LspServer {
                                 kind: Some(
                                     lsp::CompletionItemKind::MODULE,
                                 ),
-                                sort_text: Some(package.path.clone()),
+                                sort_text: Some(package.path),
                                 ..lsp::CompletionItem::default()
                             })
                             .collect();
