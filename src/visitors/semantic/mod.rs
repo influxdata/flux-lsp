@@ -1,5 +1,3 @@
-use crate::lang::get_package_name;
-
 use flux::semantic::{
     nodes::{Expression, Symbol},
     walk::{self, Node, Visitor},
@@ -194,10 +192,20 @@ pub struct ImportFinderVisitor {
 impl<'a> Visitor<'a> for ImportFinderVisitor {
     fn visit(&mut self, node: Node<'a>) -> bool {
         if let Node::ImportDeclaration(import) = node {
-            let name = match import.alias.clone() {
+            let name = match &import.alias {
                 Some(alias) => alias.name.to_string(),
-                None => get_package_name(import.path.value.as_str())
-                    .to_owned(),
+                None => {
+                    // XXX: rockstar (15 Jul 2022) - This block duplicates effort found
+                    // in `lang`.
+                    import
+                        .path
+                        .value
+                        .as_str()
+                        .split('/')
+                        .last()
+                        .expect("Invalid package path/name supplied")
+                        .to_string()
+                }
             };
 
             self.imports.push(Import {
