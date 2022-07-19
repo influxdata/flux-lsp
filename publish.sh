@@ -1,8 +1,10 @@
 #!/bin/bash
+set -o xtrace
 
-cd target/pkg-node
+CWD=`pwd`
+
+cd $CWD/target/pkg-node
 npm publish --access public
-cd ..
 
-cd target/pkg-browser
+cd $CWD/target/pkg-browser
 npm publish --access public
