@@ -65,7 +65,7 @@ jobs:
       - run: BUILD_MODE=release AR=llvm-ar ./wasm-build.sh
 
 
-  deploy:
+  publish:
     docker:
       - image: quay.io/influxdb/wasm-build
     resource_class: large
@@ -74,13 +74,13 @@ jobs:
       - run: |
           BUILD_MODE=release AR=llvm-ar ./wasm-build.sh
           echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN" > target/pkg-node/.npmrc
-          echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN" > target pkg-browser/.npmrc
+          echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN" > target/pkg-browser/.npmrc
           ./publish.sh
 
 
 workflows:
   version: 2.1
-  build-and-test:
+  build-and-test-and-maybe-deploy:
     jobs:
       - lint
       - build
@@ -88,10 +88,14 @@ workflows:
       - test
       - wasm-test
       - bench-test
-
-  build-and-deploy:
-    jobs:
-      - deploy:
+      - publish:
+          requires:
+            - lint
+            - build
+            - wasm-build
+            - test
+            - wasm-test
+            - bench-test
           filters:
             tags:
               only: /^v?([0-9]+\.)+[0-9]+$/
