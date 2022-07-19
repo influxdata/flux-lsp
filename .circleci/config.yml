@@ -82,12 +82,30 @@ workflows:
   version: 2.1
   build-and-test-and-maybe-deploy:
     jobs:
-      - lint
-      - build
-      - wasm-build
-      - test
-      - wasm-test
-      - bench-test
+      - lint:
+          filters:
+            tags:
+              only: /^v?([0-9]+\.)+[0-9]+$/
+      - build:
+          filters:
+            tags:
+              only: /^v?([0-9]+\.)+[0-9]+$/
+      - wasm-build:
+          filters:
+            tags:
+              only: /^v?([0-9]+\.)+[0-9]+$/
+      - test:
+          filters:
+            tags:
+              only: /^v?([0-9]+\.)+[0-9]+$/
+      - wasm-test:
+          filters:
+            tags:
+              only: /^v?([0-9]+\.)+[0-9]+$/
+      - bench-test:
+          filters:
+            tags:
+              only: /^v?([0-9]+\.)+[0-9]+$/
       - publish:
           requires:
             - lint
