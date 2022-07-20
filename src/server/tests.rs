@@ -2020,6 +2020,93 @@ ab = 10
     assert_eq!(expected, labels);
 }
 
+/// Function parameter snippets are returned with the snippet syntax
+/// for completion on a a function already written, e.g. from an
+/// automated process.
+#[test]
+async fn test_function_completion_snippet() {
+    let fluxscript = r#"
+from()
+  // ^"#;
+    let server = create_server();
+    open_file(&server, fluxscript.to_string(), None).await;
+
+    let params = lsp::CompletionParams {
+        text_document_position: lsp::TextDocumentPositionParams {
+            text_document: lsp::TextDocumentIdentifier {
+                uri: lsp::Url::parse("file:///home/user/file.flux")
+                    .unwrap(),
+            },
+            position: position_of(&fluxscript),
+        },
+        work_done_progress_params: lsp::WorkDoneProgressParams {
+            work_done_token: None,
+        },
+        partial_result_params: lsp::PartialResultParams {
+            partial_result_token: None,
+        },
+        context: Some(lsp::CompletionContext {
+            trigger_kind: lsp::CompletionTriggerKind::INVOKED,
+            trigger_character: None,
+        }),
+    };
+
+    let result =
+        server.completion(params.clone()).await.unwrap().unwrap();
+
+    let items = match result {
+        lsp::CompletionResponse::List(l) => l.items,
+        _ => unreachable!(),
+    };
+
+    expect![[r#"
+        [
+          {
+            "label": "bucket",
+            "kind": 5,
+            "detail": "string",
+            "insertText": "bucket: $1",
+            "insertTextFormat": 2
+          },
+          {
+            "label": "bucketID",
+            "kind": 5,
+            "detail": "string",
+            "insertText": "bucketID: $2",
+            "insertTextFormat": 2
+          },
+          {
+            "label": "host",
+            "kind": 5,
+            "detail": "string",
+            "insertText": "host: $3",
+            "insertTextFormat": 2
+          },
+          {
+            "label": "org",
+            "kind": 5,
+            "detail": "string",
+            "insertText": "org: $4",
+            "insertTextFormat": 2
+          },
+          {
+            "label": "orgID",
+            "kind": 5,
+            "detail": "string",
+            "insertText": "orgID: $5",
+            "insertTextFormat": 2
+          },
+          {
+            "label": "token",
+            "kind": 5,
+            "detail": "string",
+            "insertText": "token: $6",
+            "insertTextFormat": 2
+          }
+        ]"#]]
+    .assert_eq(&serde_json::to_string_pretty(&items).unwrap());
+}
+
 // XXX: rockstar (6 Jul 2022) - Is this test correct? I think it's not. It's
 // saying that when there's a `now`, and you type `n` it should complete to
 // literally everything? That makes no sense.
@@ -2257,21 +2344,21 @@ csv.from(
               "label": "csv",
               "kind": 5,
               "detail": "string",
-              "insertText": "csv: ",
+              "insertText": "csv: $1",
               "insertTextFormat": 2
             },
             {
               "label": "file",
               "kind": 5,
               "detail": "string",
-              "insertText": "file: ",
+              "insertText": "file: $2",
               "insertTextFormat": 2
             },
             {
               "label": "mode",
               "kind": 5,
               "detail": "string",
-              "insertText": "mode: ",
+              "insertText": "mode: $3",
               "insertTextFormat": 2
             }
           ]

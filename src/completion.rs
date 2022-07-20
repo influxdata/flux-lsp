@@ -695,15 +695,16 @@ pub fn complete_call_expr(
 
     completion_params
         .into_iter()
-        .map(|(name, typ)| {
+        .enumerate()
+        .map(|(index, (name, typ))| {
             let insert_text = if let Some(trigger) = trigger {
                 if trigger == "(" {
-                    format!("{}: ", name)
+                    format!("{}: ${}", name, index + 1)
                 } else {
-                    format!(" {}: ", name)
+                    format!(" {}: ${}", name, index + 1)
                 }
             } else {
-                format!("{}: ", name)
+                format!("{}: ${}", name, index + 1)
             };
 
             lsp::CompletionItem {
