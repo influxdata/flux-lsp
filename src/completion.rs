@@ -697,14 +697,17 @@ pub fn complete_call_expr(
         .into_iter()
         .enumerate()
         .map(|(index, (name, typ))| {
-            let insert_text = if let Some(trigger) = trigger {
-                if trigger == "(" {
-                    format!("{}: ${}", name, index + 1)
-                } else {
-                    format!(" {}: ${}", name, index + 1)
+            let snippet_blurb = match typ {
+                Some(MonoType::STRING) => {
+                    format!(r#""${}""#, index + 1)
                 }
-            } else {
-                format!("{}: ${}", name, index + 1)
+                _ => format!("${}", index + 1),
+            };
+            let insert_text = match trigger {
+                Some("(") | None => {
+                    format!("{}: {}", name, snippet_blurb)
+                }
+                Some(_) => format!(" {}: {}", name, snippet_blurb),
             };
 
             lsp::CompletionItem {
