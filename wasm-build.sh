@@ -35,7 +35,7 @@ wasm-pack build \
     --locked \
     $BUILD_MODE_ARGS
 wasm-pack build \
-    -t web \
+    -t bundler \
     -d $TARGET_BROWSER_DIR \
     --out-name flux-lsp-browser \
     --scope influxdata \
