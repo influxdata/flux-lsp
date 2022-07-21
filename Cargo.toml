@@ -1,6 +1,6 @@
 [package]
 name = "flux-lsp"
-version = "0.8.21"
+version = "0.8.27"
 authors = ["Flux Developers <flux-developers@influxdata.com>"]
 edition = "2021"
 license = "MIT"
@@ -39,7 +39,7 @@ clap = { version = "3.1.9", features = ["derive"], optional = true }
 combinations = "0.1.0"
 console_error_panic_hook = { version = "0.1.7", optional = true }
 console_log = { version = "0.2", optional = true }
-flux = { git = "https://github.com/influxdata/flux", tag = "v0.174.0", features = ["lsp"], default-features = false }
+flux = { git = "https://github.com/influxdata/flux", rev = "e811f6c8", features = ["lsp"], default-features = false }
 futures = { version = "0.3.21", optional = true }
 js-sys = { version = "0.3.57", optional = true }
 lazy_static = "1.4.0"

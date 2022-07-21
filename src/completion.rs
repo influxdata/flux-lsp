@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use flux::ast::{Expression, PropertyKey};
@@ -25,9 +26,11 @@ pub fn get_imports(
     visitor.imports
 }
 
+//Given a list of functions, filter the functions by name, and then flat map
+// the function parameters
 fn get_function_params<'a>(
     name: &'a str,
-    functions: &'a [lang::Function],
+    functions: &'a [CompletionFunction],
     provided: &'a [String],
 ) -> impl Iterator<Item = (String, Option<MonoType>)> + 'a {
     functions.iter().filter(move |f| f.name == name).flat_map(
@@ -61,7 +64,7 @@ pub(crate) fn walk_package(
                 MonoType::Fun(f) => {
                     list.push(Box::new(FunctionResult {
                         name: head.k.clone().to_string(),
-                        signature: lang::create_function_signature(f),
+                        signature: create_function_signature(f),
                     }));
                 }
                 MonoType::Collection(c) => {
@@ -187,11 +190,17 @@ fn create_function_result(
         if let MonoType::Fun(fun) = &f.typ {
             return Some(UserFunctionResult {
                 name: name.into(),
-                optional_args: lang::get_optional_argument_names(
-                    &fun.opt,
-                ),
-                required_args: lang::get_argument_names(&fun.req),
-                signature: lang::create_function_signature(fun),
+                required_args: fun
+                    .req
+                    .keys()
+                    .map(String::from)
+                    .collect(),
+                optional_args: fun
+                    .opt
+                    .keys()
+                    .map(String::from)
+                    .collect(),
+                signature: create_function_signature(fun),
             });
         }
     }
@@ -586,28 +595,37 @@ pub fn complete_call_expr(
                     visitor.functions
                 };
 
-                vec![
-                    get_function_params(
-                        ident.name.as_str(),
-                        &lang::get_builtin_functions(),
-                        &provided,
-                    ),
-                    get_function_params(
+                let initial_params: Vec<(String, Option<MonoType>)> =
+                    match lang::UNIVERSE.function(ident.name.as_str())
+                    {
+                        Some(function) => function
+                            .parameters()
+                            .iter()
+                            .filter(|(k, _)| {
+                                !provided
+                                    .clone()
+                                    .iter()
+                                    .any(|p| p == k)
+                            })
+                            .map(|(k, v)| {
+                                (k.to_owned(), Some(v.to_owned()))
+                            })
+                            .collect(),
+                        None => vec![],
+                    };
+
+                initial_params
+                    .into_iter()
+                    .chain(get_function_params(
                         ident.name.as_str(),
                         &user_functions,
                         &provided,
-                    ),
-                ]
-                .into_iter()
-                .flatten()
-                .collect()
+                    ))
+                    .collect()
             }
             Expression::Member(me) => {
                 if let Expression::Identifier(ident) = &me.object {
-                    let package_functions =
-                        lang::get_package_functions(&ident.name);
-
-                    let object_functions: Vec<lang::Function> = {
+                    let object_functions: Vec<CompletionFunction> = {
                         let visitor = crate::walk_semantic_package!(
                             ObjectFunctionFinderVisitor::default(),
                             sem_pkg
@@ -627,21 +645,42 @@ pub fn complete_call_expr(
                         PropertyKey::StringLit(l) => &l.value,
                     };
 
-                    vec![
-                        get_function_params(
-                            key,
-                            &package_functions,
-                            &provided,
-                        ),
-                        get_function_params(
+                    let initial_params: Vec<(
+                        String,
+                        Option<MonoType>,
+                    )> = match lang::STDLIB.package(&ident.name) {
+                        Some(package) => {
+                            match package.function(key) {
+                                Some(function) => function
+                                    .parameters()
+                                    .iter()
+                                    .filter(|(k, _v)| {
+                                        !provided
+                                            .clone()
+                                            .iter()
+                                            .any(|p| p == k)
+                                    })
+                                    .map(|(key, val)| {
+                                        (
+                                            key.to_owned(),
+                                            Some(val.to_owned()),
+                                        )
+                                    })
+                                    .collect(),
+                                None => vec![],
+                            }
+                        }
+                        None => vec![],
+                    };
+
+                    initial_params
+                        .into_iter()
+                        .chain(get_function_params(
                             key,
                             &object_functions,
                             &provided,
-                        ),
-                    ]
-                    .into_iter()
-                    .flatten()
-                    .collect()
+                        ))
+                        .collect()
                 } else {
                     return vec![];
                 }
@@ -656,15 +695,16 @@ pub fn complete_call_expr(
 
     completion_params
         .into_iter()
-        .map(|(name, typ)| {
+        .enumerate()
+        .map(|(index, (name, typ))| {
             let insert_text = if let Some(trigger) = trigger {
                 if trigger == "(" {
-                    format!("{}: ", name)
+                    format!("{}: ${}", name, index + 1)
                 } else {
-                    format!(" {}: ", name)
+                    format!(" {}: ${}", name, index + 1)
                 }
             } else {
-                format!("{}: ", name)
+                format!("{}: ${}", name, index + 1)
             };
 
             lsp::CompletionItem {
@@ -690,4 +730,86 @@ pub fn complete_call_expr(
             }
         })
         .collect()
+}
+
+#[derive(Clone)]
+pub struct CompletionFunction {
+    pub name: String,
+    pub params: Vec<(String, Option<MonoType>)>,
+}
+
+impl CompletionFunction {
+    pub(crate) fn new(
+        name: String,
+        f: &flux::semantic::types::Function,
+    ) -> Self {
+        let params = f
+            .req
+            .iter()
+            .chain(f.opt.iter().map(|p| (p.0, &p.1.typ)))
+            .chain(f.pipe.as_ref().map(|p| (&p.k, &p.v)))
+            .map(|(k, v)| (k.clone(), Some(v.clone())))
+            .collect();
+        Self { name, params }
+    }
+
+    pub(crate) fn from_expr(
+        name: String,
+        expr: &flux::semantic::nodes::FunctionExpr,
+    ) -> Self {
+        let params = expr
+            .params
+            .iter()
+            .map(|p| {
+                (
+                    p.key.name.to_string(),
+                    expr.typ.parameter(&p.key.name).cloned(),
+                )
+            })
+            .collect::<Vec<_>>();
+        Self { name, params }
+    }
+}
+
+pub fn create_function_signature(
+    f: &flux::semantic::types::Function,
+) -> String {
+    let required = f
+        .req
+        .iter()
+        // Sort args with BTree
+        .collect::<BTreeMap<_, _>>()
+        .iter()
+        .map(|(&k, &v)| (k.clone(), format!("{}", v)))
+        .collect::<Vec<_>>();
+
+    let optional = f
+        .opt
+        .iter()
+        // Sort args with BTree
+        .collect::<BTreeMap<_, _>>()
+        .iter()
+        .map(|(&k, &v)| (k.clone(), format!("{}", v.typ)))
+        .collect::<Vec<_>>();
+
+    let pipe = match &f.pipe {
+        Some(pipe) => {
+            if pipe.k == "<-" {
+                vec![(pipe.k.clone(), format!("{}", pipe.v))]
+            } else {
+                vec![(format!("<-{}", pipe.k), format!("{}", pipe.v))]
+            }
+        }
+        None => vec![],
+    };
+
+    format!(
+        "({}) -> {}",
+        pipe.iter()
+            .chain(required.iter().chain(optional.iter()))
+            .map(|arg| format!("{}:{}", arg.0, arg.1))
+            .collect::<Vec<_>>()
+            .join(", "),
+        f.retn
+    )
 }

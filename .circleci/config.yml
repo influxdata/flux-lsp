@@ -65,7 +65,7 @@ jobs:
       - run: BUILD_MODE=release AR=llvm-ar ./wasm-build.sh
 
 
-  deploy:
+  publish:
     docker:
       - image: quay.io/influxdb/wasm-build
     resource_class: large
@@ -74,24 +74,46 @@ jobs:
       - run: |
           BUILD_MODE=release AR=llvm-ar ./wasm-build.sh
           echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN" > target/pkg-node/.npmrc
-          echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN" > target pkg-browser/.npmrc
+          echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN" > target/pkg-browser/.npmrc
           ./publish.sh
 
 
 workflows:
   version: 2.1
-  build-and-test:
+  build-and-test-and-maybe-deploy:
     jobs:
-      - lint
-      - build
-      - wasm-build
-      - test
-      - wasm-test
-      - bench-test
-
-  build-and-deploy:
-    jobs:
-      - deploy:
+      - lint:
+          filters:
+            tags:
+              only: /^v?([0-9]+\.)+[0-9]+$/
+      - build:
+          filters:
+            tags:
+              only: /^v?([0-9]+\.)+[0-9]+$/
+      - wasm-build:
+          filters:
+            tags:
+              only: /^v?([0-9]+\.)+[0-9]+$/
+      - test:
+          filters:
+            tags:
+              only: /^v?([0-9]+\.)+[0-9]+$/
+      - wasm-test:
+          filters:
+            tags:
+              only: /^v?([0-9]+\.)+[0-9]+$/
+      - bench-test:
+          filters:
+            tags:
+              only: /^v?([0-9]+\.)+[0-9]+$/
+      - publish:
+          requires:
+            - lint
+            - build
+            - wasm-build
+            - test
+            - wasm-test
+            - bench-test
           filters:
             tags:
               only: /^v?([0-9]+\.)+[0-9]+$/
