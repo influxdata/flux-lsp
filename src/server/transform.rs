@@ -680,12 +680,6 @@ a = 0"#;
         assert_eq!(0, ast.body.len());
     }
 
-    // When the last `from(...) | range(...) | filter(...)` call isn't the right bucket,
-    // add `yield(...)` before return a new `from` call.
-
-    // When the last `from(...) | range(...)` call isn't the right bucket,
-    // add `filter(...) |> yield(...)` before return a new `from` call.
-
     #[test]
     fn test_inject_tag_key() {
         let fluxscript = r#"from(bucket: "my-bucket")"#;
@@ -797,6 +791,67 @@ a = 0"#;
         .unwrap();
 
         let expected = r#"from(bucket: "my-bucket") |> filter(fn: (r) => r._measurement == "myMeasurement")
+"#;
+        assert_eq!(
+            expected,
+            flux::formatter::convert_to_string(&transformed).unwrap()
+        );
+    }
+
+    // When the last `from(...) | range(...) | filter(...)` call isn't the right bucket,
+    // add `yield(...)` before return a new `from` call.
+    #[test]
+    fn test_inject_measurement_filter_append_yield() {
+        let fluxscript = r#"from(bucket: "my-bucket")
+    |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+    |> filter(fn: (r) => r._measurement == "test")
+"#;
+        let ast = flux::parser::parse_string("".into(), &fluxscript);
+
+        let transformed = inject_measurement_filter(
+            &ast,
+            "myMeasurement".into(),
+            "my-new-bucket".into(),
+        )
+        .unwrap();
+
+        let expected = r#"from(bucket: "my-bucket")
+    |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+    |> filter(fn: (r) => r._measurement == "test")
+    |> yield(name: "my-bucket-a")
+from(bucket: "my-new-bucket")
+    |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+    |> filter(fn: (r) => r._measurement == "myMeasurement")
+"#;
+        assert_eq!(
+            expected,
+            flux::formatter::convert_to_string(&transformed).unwrap()
+        );
+    }
+
+    // When the last `from(...) | range(...)` call isn't the right bucket,
+    // add `filter(...) |> yield(...)` before return a new `from` call.
+    #[test]
+    fn test_inject_measurement_filter_append_filter_yield() {
+        let fluxscript = r#"from(bucket: "my-bucket")
+    |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+"#;
+        let ast = flux::parser::parse_string("".into(), &fluxscript);
+
+        let transformed = inject_measurement_filter(
+            &ast,
+            "myMeasurement".into(),
+            "my-new-bucket".into(),
+        )
+        .unwrap();
+
+        let expected = r#"from(bucket: "my-bucket")
+    |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+    |> filter(fn: (r) => r._measurement == "test")
+    |> yield(name: "my-bucket-a")
+from(bucket: "my-new-bucket")
+    |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+    |> filter(fn: (r) => r._measurement == "myMeasurement")
 "#;
         assert_eq!(
             expected,
