@@ -545,18 +545,60 @@ pub(crate) fn inject_measurement_filter(
     let mut ast = file.clone();
 
     let call: ast::Expression = if let ast::Statement::Expr(expr) =
-        find_the_from(&mut ast, bucket)
+        find_the_from(&mut ast, bucket.clone())
     {
         expr.expression
     } else {
         return Err(());
     };
 
-    ast.body.push(ast::Statement::Expr(Box::new(ast::ExprStmt {
+    // TODO (chunchun): if the last expression is yield, pop it
+
+    let filter_expr =
+        ast::Expression::PipeExpr(Box::new(ast::PipeExpr {
+            argument: call,
+            base: ast::BaseNode::default(),
+            call: ast::CallExpr {
+                arguments: vec![ast::Expression::Object(Box::new(
+                    ast::ObjectExpr {
+                        base: ast::BaseNode::default(),
+                        properties: vec![ast::Property {
+                            base: ast::BaseNode::default(),
+                            key: ast::PropertyKey::Identifier(
+                                ast::Identifier {
+                                    base: ast::BaseNode::default(),
+                                    name: "fn".into(),
+                                },
+                            ),
+                            value: Some(make_flux_filter_function(
+                                "_measurement".into(),
+                                name,
+                            )),
+                            comma: vec![],
+                            separator: vec![],
+                        }],
+                        lbrace: vec![],
+                        rbrace: vec![],
+                        with: None,
+                    },
+                ))],
+                base: ast::BaseNode::default(),
+                callee: ast::Expression::Identifier(
+                    ast::Identifier {
+                        base: ast::BaseNode::default(),
+                        name: "filter".into(),
+                    },
+                ),
+                lparen: vec![],
+                rparen: vec![],
+            },
+        }));
+
+    let yield_expr = ast::ExprStmt {
         base: ast::BaseNode::default(),
         expression: ast::Expression::PipeExpr(Box::new(
             ast::PipeExpr {
-                argument: call,
+                argument: filter_expr,
                 base: ast::BaseNode::default(),
                 call: ast::CallExpr {
                     arguments: vec![ast::Expression::Object(
@@ -568,13 +610,21 @@ pub(crate) fn inject_measurement_filter(
                                     ast::Identifier {
                                         base: ast::BaseNode::default(
                                         ),
-                                        name: "fn".into(),
+                                        name: "name".into(),
                                     },
                                 ),
                                 value: Some(
-                                    make_flux_filter_function(
-                                        "_measurement".into(),
-                                        name,
+                                    ast::Expression::StringLit(
+                                        ast::StringLit {
+                                            base:
+                                                ast::BaseNode::default(
+                                                ),
+                                            value: format!(
+                                                "{}-{}",
+                                                bucket,
+                                                ast.body.len(),
+                                            ),
+                                        },
                                     ),
                                 ),
                                 comma: vec![],
@@ -589,7 +639,7 @@ pub(crate) fn inject_measurement_filter(
                     callee: ast::Expression::Identifier(
                         ast::Identifier {
                             base: ast::BaseNode::default(),
-                            name: "filter".into(),
+                            name: "yield".into(),
                         },
                     ),
                     lparen: vec![],
@@ -597,7 +647,9 @@ pub(crate) fn inject_measurement_filter(
                 },
             },
         )),
-    })));
+    };
+
+    ast.body.push(ast::Statement::Expr(Box::new(yield_expr)));
 
     Ok(ast)
 }
