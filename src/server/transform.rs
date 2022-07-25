@@ -171,12 +171,76 @@ impl<'a> walk::Visitor<'a> for FromBucketVisitor {
     }
 }
 
+// append yield(...) at the end of the statement
+fn generate_yield(call: ast::Expression) -> ast::ExprStmt {
+    // if the last expression is a yield(...), do nothing
+
+    // if last expression is filter(...), append yield(...)
+
+    // if last expressio is range(...), append filter(...) |> yield(...)
+
+    let yield_expr = ast::ExprStmt {
+        base: ast::BaseNode::default(),
+        expression: ast::Expression::PipeExpr(Box::new(
+            ast::PipeExpr {
+                argument: call,
+                base: ast::BaseNode::default(),
+                call: ast::CallExpr {
+                    // yield(name: "my-bucket-a")
+                    arguments: vec![ast::Expression::Object(
+                        Box::new(ast::ObjectExpr {
+                            base: ast::BaseNode::default(),
+                            properties: vec![ast::Property {
+                                base: ast::BaseNode::default(),
+                                key: ast::PropertyKey::Identifier(
+                                    ast::Identifier {
+                                        base: ast::BaseNode::default(
+                                        ),
+                                        name: "name".into(),
+                                    },
+                                ),
+                                value: Some(
+                                    ast::Expression::StringLit(
+                                        ast::StringLit {
+                                            base:
+                                                ast::BaseNode::default(
+                                                ),
+                                            value: "my-bucket-a"
+                                                .into(),
+                                        },
+                                    ),
+                                ),
+                                comma: vec![],
+                                separator: vec![],
+                            }],
+                            lbrace: vec![],
+                            rbrace: vec![],
+                            with: None,
+                        }),
+                    )],
+                    base: ast::BaseNode::default(),
+                    callee: ast::Expression::Identifier(
+                        ast::Identifier {
+                            base: ast::BaseNode::default(),
+                            name: "yield".into(),
+                        },
+                    ),
+                    lparen: vec![],
+                    rparen: vec![],
+                },
+            },
+        )),
+    };
+    yield_expr
+}
+
 /// Find the correct `from` expression in a query ast
 ///
-/// The logic follows this: we _only_ ever want to look at the last expression
+/// The logic follows this: we _only_ ever want to look at the last statement
 /// in a query ast. Is it a `from` expression? Does it match the specified bucket?
 /// If that expression is found, pull that expression out of the query and return
-/// it. Otherwise, create a new `from() |> range()` expression and return it.
+/// it. Otherwise, append `yield()` or `filter() |> yield()` to the old statement,
+/// and create a new `from() |> range()` statement and return it.
 ///
 /// Why only the last one? Unless we're adding information about cursor position, we
 /// have to make a choice on where the insertion needs to be. That choice is explicitly
@@ -498,6 +562,11 @@ pub(crate) fn inject_measurement_filter(
     } else {
         return Err(());
     };
+
+    // TODO (chunchun): check if need to append yield(...) to the last statment
+    ast.body.push(ast::Statement::Expr(Box::new(generate_yield(
+        call.clone(),
+    ))));
 
     ast.body.push(ast::Statement::Expr(Box::new(ast::ExprStmt {
         base: ast::BaseNode::default(),
