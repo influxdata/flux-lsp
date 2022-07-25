@@ -5,7 +5,7 @@
 use flux::ast;
 use flux::ast::walk;
 
-fn make_from_function(bucket: String) -> ast::Statement {
+fn make_from_function(bucket: String, num: usize) -> ast::Statement {
     let from = ast::CallExpr {
         base: ast::BaseNode::default(),
         callee: ast::Expression::Identifier(ast::Identifier {
@@ -29,7 +29,7 @@ fn make_from_function(bucket: String) -> ast::Statement {
                     value: Some(ast::Expression::StringLit(
                         ast::StringLit {
                             base: ast::BaseNode::default(),
-                            value: bucket,
+                            value: bucket.clone(),
                         },
                     )),
                     comma: vec![],
@@ -41,9 +41,7 @@ fn make_from_function(bucket: String) -> ast::Statement {
         rparen: vec![],
     };
 
-    let range = ast::ExprStmt {
-        base: ast::BaseNode::default(),
-        expression: ast::Expression::PipeExpr(Box::new(
+    let range = ast::Expression::PipeExpr(Box::new(
             ast::PipeExpr {
                 argument: ast::Expression::Call(Box::new(from)),
                 base: ast::BaseNode::default(),
@@ -126,10 +124,64 @@ fn make_from_function(bucket: String) -> ast::Statement {
                     rparen: vec![],
                 },
             },
+        ))
+    ;
+
+    let yield_expr = ast::ExprStmt {
+        base: ast::BaseNode::default(),
+        expression: ast::Expression::PipeExpr(Box::new(
+            ast::PipeExpr {
+                argument: range,
+                base: ast::BaseNode::default(),
+                call: ast::CallExpr {
+                    arguments: vec![ast::Expression::Object(
+                        Box::new(ast::ObjectExpr {
+                            base: ast::BaseNode::default(),
+                            properties: vec![ast::Property {
+                                base: ast::BaseNode::default(),
+                                key: ast::PropertyKey::Identifier(
+                                    ast::Identifier {
+                                        base: ast::BaseNode::default(
+                                        ),
+                                        name: "name".into(),
+                                    },
+                                ),
+                                value: Some(
+                                    ast::Expression::StringLit(
+                                        ast::StringLit {
+                                            base:
+                                                ast::BaseNode::default(
+                                                ),
+                                            value: format!(
+                                                "{}-{}",
+                                                bucket, num
+                                            ),
+                                        },
+                                    ),
+                                ),
+                                comma: vec![],
+                                separator: vec![],
+                            }],
+                            lbrace: vec![],
+                            rbrace: vec![],
+                            with: None,
+                        }),
+                    )],
+                    base: ast::BaseNode::default(),
+                    callee: ast::Expression::Identifier(
+                        ast::Identifier {
+                            base: ast::BaseNode::default(),
+                            name: "yield".into(),
+                        },
+                    ),
+                    lparen: vec![],
+                    rparen: vec![],
+                },
+            },
         )),
     };
 
-    ast::Statement::Expr(Box::new(range))
+    ast::Statement::Expr(Box::new(yield_expr))
 }
 
 #[derive(Default)]
@@ -171,69 +223,6 @@ impl<'a> walk::Visitor<'a> for FromBucketVisitor {
     }
 }
 
-// append yield(...) at the end of the statement
-fn generate_yield(call: ast::Expression) -> ast::ExprStmt {
-    // if the last expression is a yield(...), do nothing
-
-    // if last expression is filter(...), append yield(...)
-
-    // if last expressio is range(...), append filter(...) |> yield(...)
-
-    let yield_expr = ast::ExprStmt {
-        base: ast::BaseNode::default(),
-        expression: ast::Expression::PipeExpr(Box::new(
-            ast::PipeExpr {
-                argument: call,
-                base: ast::BaseNode::default(),
-                call: ast::CallExpr {
-                    // yield(name: "my-bucket-a")
-                    arguments: vec![ast::Expression::Object(
-                        Box::new(ast::ObjectExpr {
-                            base: ast::BaseNode::default(),
-                            properties: vec![ast::Property {
-                                base: ast::BaseNode::default(),
-                                key: ast::PropertyKey::Identifier(
-                                    ast::Identifier {
-                                        base: ast::BaseNode::default(
-                                        ),
-                                        name: "name".into(),
-                                    },
-                                ),
-                                value: Some(
-                                    ast::Expression::StringLit(
-                                        ast::StringLit {
-                                            base:
-                                                ast::BaseNode::default(
-                                                ),
-                                            value: "my-bucket-a"
-                                                .into(),
-                                        },
-                                    ),
-                                ),
-                                comma: vec![],
-                                separator: vec![],
-                            }],
-                            lbrace: vec![],
-                            rbrace: vec![],
-                            with: None,
-                        }),
-                    )],
-                    base: ast::BaseNode::default(),
-                    callee: ast::Expression::Identifier(
-                        ast::Identifier {
-                            base: ast::BaseNode::default(),
-                            name: "yield".into(),
-                        },
-                    ),
-                    lparen: vec![],
-                    rparen: vec![],
-                },
-            },
-        )),
-    };
-    yield_expr
-}
-
 /// Find the correct `from` expression in a query ast
 ///
 /// The logic follows this: we _only_ ever want to look at the last statement
@@ -269,13 +258,13 @@ fn find_the_from(
                 }
 
                 file.body.push(last_statement);
-                make_from_function(bucket)
+                make_from_function(bucket, file.body.len())
             } else {
                 file.body.push(last_statement);
-                make_from_function(bucket)
+                make_from_function(bucket, file.body.len())
             }
         }
-        None => make_from_function(bucket),
+        None => make_from_function(bucket, file.body.len()),
     }
 }
 
@@ -562,11 +551,6 @@ pub(crate) fn inject_measurement_filter(
     } else {
         return Err(());
     };
-
-    // TODO (chunchun): check if need to append yield(...) to the last statment
-    ast.body.push(ast::Statement::Expr(Box::new(generate_yield(
-        call.clone(),
-    ))));
 
     ast.body.push(ast::Statement::Expr(Box::new(ast::ExprStmt {
         base: ast::BaseNode::default(),
@@ -917,10 +901,10 @@ from(bucket: "my-new-bucket")
         let expected = r#"from(bucket: "my-bucket")
     |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
     |> filter(fn: (r) => r._measurement == "test")
-    |> yield(name: "my-bucket-a")
-from(bucket: "my-new-bucket")
+    from(bucket: "my-new-bucket")
     |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
     |> filter(fn: (r) => r._measurement == "myMeasurement")
+    |> yield(name: "my-new-bucket-1")
 "#;
         assert_eq!(
             expected,
