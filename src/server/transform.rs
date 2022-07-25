@@ -228,8 +228,8 @@ impl<'a> walk::Visitor<'a> for FromBucketVisitor {
 /// The logic follows this: we _only_ ever want to look at the last statement
 /// in a query ast. Is it a `from` expression? Does it match the specified bucket?
 /// If that expression is found, pull that expression out of the query and return
-/// it. Otherwise, append `yield()` or `filter() |> yield()` to the old statement,
-/// and create a new `from() |> range()` statement and return it.
+/// it. Otherwise, Otherwise, create a new `from() |> range() |> yield()` statement
+/// and return it.
 ///
 /// Why only the last one? Unless we're adding information about cursor position, we
 /// have to make a choice on where the insertion needs to be. That choice is explicitly
@@ -598,6 +598,7 @@ pub(crate) fn inject_measurement_filter(
             },
         )),
     })));
+
     Ok(ast)
 }
 
@@ -871,10 +872,10 @@ a = 0"#;
         let expected = r#"from(bucket: "my-bucket")
     |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
     |> filter(fn: (r) => r._measurement == "test")
-    |> yield(name: "my-bucket-a")
 from(bucket: "my-new-bucket")
     |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
     |> filter(fn: (r) => r._measurement == "myMeasurement")
+    |> yield(name: "my-new-bucket-1")
 "#;
         assert_eq!(
             expected,
