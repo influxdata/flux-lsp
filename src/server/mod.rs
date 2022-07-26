@@ -165,6 +165,7 @@ impl LspServer {
                 super::diagnostics::contrib_lint,
                 super::diagnostics::experimental_lint,
                 super::diagnostics::no_influxdb_identifiers,
+                super::diagnostics::prefer_camel_case,
             ],
             store: store::Store::default(),
             state: Mutex::new(LspServerState::default()),
