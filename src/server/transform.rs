@@ -223,6 +223,27 @@ impl<'a> walk::Visitor<'a> for FromBucketVisitor {
     }
 }
 
+// check if the last expression is "yield"
+fn has_yield(statement: ast::Expression) -> bool {
+    match statement {
+        ast::Expression::PipeExpr(pipe_expr) => {
+            let call = pipe_expr.call.clone();
+            if let ast::Expression::Identifier(identifier) =
+                &call.callee
+            {
+                if identifier.name == "yield" {
+                    true
+                } else {
+                    false
+                }
+            } else {
+                false
+            }
+        }
+        _ => false,
+    }
+}
+
 /// Find the correct `from` expression in a query ast
 ///
 /// The logic follows this: we _only_ ever want to look at the last statement
@@ -552,7 +573,10 @@ pub(crate) fn inject_measurement_filter(
         return Err(());
     };
 
-    // TODO (chunchun): if the last expression is yield, pop it
+    let last_statement: ast::Expression = call.clone();
+    if has_yield(last_statement) {
+        // TODO (chunchun): remove the yield
+    }
 
     let filter_expr =
         ast::Expression::PipeExpr(Box::new(ast::PipeExpr {
