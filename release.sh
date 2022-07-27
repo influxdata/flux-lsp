@@ -10,6 +10,10 @@
 # execution before running it.
 set -e
 
+if [[ "${DEBUG:-0}" == "1" ]]; then
+    set -x
+fi
+
 # Controls how the version is bumped.
 # Set INCREMENT to one of: major, minor or patch
 # Defaults to patch if unset.
@@ -37,14 +41,13 @@ fi
 TEMPDIR=$(mktemp -d -t flux-release.XXXX)
 echo "Using fresh install in $TEMPDIR"
 cd $TEMPDIR
-if [[ $(ssh -T git@github.com) ]]; then
+if [[ $(ssh -T git@github.com 2>&1 > /dev/null) ]]; then
   git clone git@github.com:influxdata/flux-lsp.git > /dev/null 2>&1
 else
   git clone https://github.com/influxdata/flux-lsp.git > /dev/null 2>&1
 fi
 
 cd $TEMPDIR/flux-lsp
-
 if [[ ! $(hub ci-status HEAD) ]]; then
     echo "Build status on master is either incomplete or failing. Please try ag ain after build status is complete."
     exit 1
@@ -58,14 +61,17 @@ new_version=$(cargo pkgid | cut -d# -f2 | cut -d: -f2)
 # Commit and tag release
 git add Cargo.toml
 git add Cargo.lock
+git commit -m "release: $new_version"
 # Note: Using an annotated tag (-a) is important so that we can reliably find
 # the previous version tag.
 git tag -a -m "$new_version" "$new_version"
-git commit -m "$new_version"
 git push
 
 
 previous_version=`git tag --sort=-creatordate | sed -n '2 p'`
+# The tail step here ignores the commit that is the release, so we don't have a changelog that also
+# contains, e.g. "release: 0.10.55". We already know it's a release, that's why we're constructing release
+# notes.
 commits=`git log --pretty=oneline ${previous_version}..${new_version} | tail -n +2 | awk '{$1="-"; print }'`
 hub release create $new_version -m "Release $new_version
 
