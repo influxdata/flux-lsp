@@ -66,6 +66,8 @@ fn make_yield_function(
     }
 }
 
+/// This will return the ast equivalent of
+/// `from(bucket: "{bucket}") |> range(start: v.timeRangeStart, stop: v.timeRangeStop) |> yield(name: "{bucket}-{length_of_ast}")`
 fn make_from_function(bucket: String, num: usize) -> ast::Statement {
     let from = ast::CallExpr {
         base: ast::BaseNode::default(),
