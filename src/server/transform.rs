@@ -67,6 +67,47 @@ fn make_yield_function(
 }
 
 /// This will return the ast equivalent of
+/// `filter(fn: (r) => {value})`
+fn make_filter_function(
+    argument: ast::Expression,
+    value: Option<ast::Expression>,
+) -> ast::Expression {
+    ast::Expression::PipeExpr(Box::new(ast::PipeExpr {
+        argument,
+        base: ast::BaseNode::default(),
+        call: ast::CallExpr {
+            arguments: vec![ast::Expression::Object(Box::new(
+                ast::ObjectExpr {
+                    base: ast::BaseNode::default(),
+                    properties: vec![ast::Property {
+                        base: ast::BaseNode::default(),
+                        key: ast::PropertyKey::Identifier(
+                            ast::Identifier {
+                                base: ast::BaseNode::default(),
+                                name: "fn".into(),
+                            },
+                        ),
+                        value,
+                        comma: vec![],
+                        separator: vec![],
+                    }],
+                    lbrace: vec![],
+                    rbrace: vec![],
+                    with: None,
+                },
+            ))],
+            base: ast::BaseNode::default(),
+            callee: ast::Expression::Identifier(ast::Identifier {
+                base: ast::BaseNode::default(),
+                name: "filter".into(),
+            }),
+            lparen: vec![],
+            rparen: vec![],
+        },
+    }))
+}
+
+/// This will return the ast equivalent of
 /// `from(bucket: "{bucket}") |> range(start: v.timeRangeStart, stop: v.timeRangeStop) |> yield(name: "{bucket}-{length_of_ast}")`
 fn make_from_function(bucket: String, num: usize) -> ast::Statement {
     let from = ast::CallExpr {
@@ -381,69 +422,51 @@ pub(crate) fn inject_tag_filter(
         }
     }
 
-    let filter_expr = ast::Expression::PipeExpr(Box::new(ast::PipeExpr {
-        argument: call,
-        base: ast::BaseNode::default(),
-        call: ast::CallExpr {
-            arguments: vec![ast::Expression::Object(Box::new(ast::ObjectExpr {
-                base: ast::BaseNode::default(),
-                properties: vec![
-                    ast::Property {
-                        base: ast::BaseNode::default(),
-                        key: ast::PropertyKey::Identifier(ast::Identifier {
+    let value = Some(ast::Expression::Function(Box::new(
+        ast::FunctionExpr {
+            arrow: vec![],
+            base: ast::BaseNode::default(),
+            body: ast::FunctionBody::Expr(ast::Expression::Unary(
+                Box::new(ast::UnaryExpr {
+                    base: ast::BaseNode::default(),
+                    argument: ast::Expression::Member(Box::new(
+                        ast::MemberExpr {
                             base: ast::BaseNode::default(),
-                            name: "fn".into(),
-                        }),
-                        value: Some(ast::Expression::Function(Box::new(ast::FunctionExpr{
-                            arrow: vec![],
-                            base: ast::BaseNode::default(),
-                            body: ast::FunctionBody::Expr(ast::Expression::Unary(Box::new(ast::UnaryExpr{
-                                base: ast::BaseNode::default(),
-                                argument: ast::Expression::Member(Box::new(ast::MemberExpr {
-                                    base: ast::BaseNode::default(),
-                                    lbrack: vec![],
-                                    rbrack: vec![],
-                                    object: ast::Expression::Identifier(ast::Identifier {
-                                        base: ast::BaseNode::default(),
-                                        name: "r".into(),
-                                    }),
-                                    property: ast::PropertyKey::Identifier(ast::Identifier {
-                                        base: ast::BaseNode::default(),
-                                        name,
-                                    }),
-                                })),
-                                operator: ast::Operator::ExistsOperator,
-                            }))),
-                            lparen: vec![],
-                            rparen: vec![],
-                            params: vec![ast::Property {
-                                base: ast::BaseNode::default(),
-                                key: ast::PropertyKey::Identifier(ast::Identifier {
+                            lbrack: vec![],
+                            rbrack: vec![],
+                            object: ast::Expression::Identifier(
+                                ast::Identifier {
                                     base: ast::BaseNode::default(),
                                     name: "r".into(),
-                                }),
-                                comma: vec![],
-                                separator: vec![],
-                                value: None,
-                            }],
-                        }))),
-                        comma: vec![],
-                        separator: vec![],
-                    }
-                ],
-                lbrace: vec![],
-                rbrace: vec![],
-                with: None,
-            }))],
-            base: ast::BaseNode::default(),
-            callee: ast::Expression::Identifier(ast::Identifier {
-                base: ast::BaseNode::default(),
-                name: "filter".into(),
-            }),
+                                },
+                            ),
+                            property: ast::PropertyKey::Identifier(
+                                ast::Identifier {
+                                    base: ast::BaseNode::default(),
+                                    name,
+                                },
+                            ),
+                        },
+                    )),
+                    operator: ast::Operator::ExistsOperator,
+                }),
+            )),
             lparen: vec![],
             rparen: vec![],
-        }
-    }));
+            params: vec![ast::Property {
+                base: ast::BaseNode::default(),
+                key: ast::PropertyKey::Identifier(ast::Identifier {
+                    base: ast::BaseNode::default(),
+                    name: "r".into(),
+                }),
+                comma: vec![],
+                separator: vec![],
+                value: None,
+            }],
+        },
+    )));
+
+    let filter_expr = make_filter_function(call, value);
 
     let yield_expr =
         make_yield_function(filter_expr, bucket, ast.body.len());
@@ -480,45 +503,10 @@ pub(crate) fn inject_field_filter(
         }
     }
 
-    let filter_expr =
-        ast::Expression::PipeExpr(Box::new(ast::PipeExpr {
-            argument: call,
-            base: ast::BaseNode::default(),
-            call: ast::CallExpr {
-                arguments: vec![ast::Expression::Object(Box::new(
-                    ast::ObjectExpr {
-                        base: ast::BaseNode::default(),
-                        properties: vec![ast::Property {
-                            base: ast::BaseNode::default(),
-                            key: ast::PropertyKey::Identifier(
-                                ast::Identifier {
-                                    base: ast::BaseNode::default(),
-                                    name: "fn".into(),
-                                },
-                            ),
-                            value: Some(make_flux_filter_function(
-                                "_field".into(),
-                                name,
-                            )),
-                            comma: vec![],
-                            separator: vec![],
-                        }],
-                        lbrace: vec![],
-                        rbrace: vec![],
-                        with: None,
-                    },
-                ))],
-                base: ast::BaseNode::default(),
-                callee: ast::Expression::Identifier(
-                    ast::Identifier {
-                        base: ast::BaseNode::default(),
-                        name: "filter".into(),
-                    },
-                ),
-                lparen: vec![],
-                rparen: vec![],
-            },
-        }));
+    let filter_expr = make_filter_function(
+        call,
+        Some(make_flux_filter_function("_field".into(), name)),
+    );
 
     let yield_expr =
         make_yield_function(filter_expr, bucket, ast.body.len());
@@ -555,44 +543,10 @@ pub(crate) fn inject_tag_value_filter(
         }
     }
 
-    let filter_expr =
-        ast::Expression::PipeExpr(Box::new(ast::PipeExpr {
-            argument: call,
-            base: ast::BaseNode::default(),
-            call: ast::CallExpr {
-                arguments: vec![ast::Expression::Object(Box::new(
-                    ast::ObjectExpr {
-                        base: ast::BaseNode::default(),
-                        properties: vec![ast::Property {
-                            base: ast::BaseNode::default(),
-                            key: ast::PropertyKey::Identifier(
-                                ast::Identifier {
-                                    base: ast::BaseNode::default(),
-                                    name: "fn".into(),
-                                },
-                            ),
-                            value: Some(make_flux_filter_function(
-                                name, value,
-                            )),
-                            comma: vec![],
-                            separator: vec![],
-                        }],
-                        lbrace: vec![],
-                        rbrace: vec![],
-                        with: None,
-                    },
-                ))],
-                base: ast::BaseNode::default(),
-                callee: ast::Expression::Identifier(
-                    ast::Identifier {
-                        base: ast::BaseNode::default(),
-                        name: "filter".into(),
-                    },
-                ),
-                lparen: vec![],
-                rparen: vec![],
-            },
-        }));
+    let filter_expr = make_filter_function(
+        call,
+        Some(make_flux_filter_function(name, value)),
+    );
 
     let yield_expr =
         make_yield_function(filter_expr, bucket, ast.body.len());
@@ -628,45 +582,10 @@ pub(crate) fn inject_measurement_filter(
         }
     }
 
-    let filter_expr =
-        ast::Expression::PipeExpr(Box::new(ast::PipeExpr {
-            argument: call,
-            base: ast::BaseNode::default(),
-            call: ast::CallExpr {
-                arguments: vec![ast::Expression::Object(Box::new(
-                    ast::ObjectExpr {
-                        base: ast::BaseNode::default(),
-                        properties: vec![ast::Property {
-                            base: ast::BaseNode::default(),
-                            key: ast::PropertyKey::Identifier(
-                                ast::Identifier {
-                                    base: ast::BaseNode::default(),
-                                    name: "fn".into(),
-                                },
-                            ),
-                            value: Some(make_flux_filter_function(
-                                "_measurement".into(),
-                                name,
-                            )),
-                            comma: vec![],
-                            separator: vec![],
-                        }],
-                        lbrace: vec![],
-                        rbrace: vec![],
-                        with: None,
-                    },
-                ))],
-                base: ast::BaseNode::default(),
-                callee: ast::Expression::Identifier(
-                    ast::Identifier {
-                        base: ast::BaseNode::default(),
-                        name: "filter".into(),
-                    },
-                ),
-                lparen: vec![],
-                rparen: vec![],
-            },
-        }));
+    let filter_expr = make_filter_function(
+        call,
+        Some(make_flux_filter_function("_measurement".into(), name)),
+    );
 
     let yield_expr =
         make_yield_function(filter_expr, bucket, ast.body.len());
