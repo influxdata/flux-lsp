@@ -5,6 +5,67 @@
 use flux::ast;
 use flux::ast::walk;
 
+/// This will return the ast equivalent of `yield(name: "{bucket}-{num}")`
+fn make_yield_function(
+    argument: ast::Expression,
+    bucket: String,
+    num: usize,
+) -> ast::ExprStmt {
+    ast::ExprStmt {
+        base: ast::BaseNode::default(),
+        expression: ast::Expression::PipeExpr(Box::new(
+            ast::PipeExpr {
+                argument,
+                base: ast::BaseNode::default(),
+                call: ast::CallExpr {
+                    arguments: vec![ast::Expression::Object(
+                        Box::new(ast::ObjectExpr {
+                            base: ast::BaseNode::default(),
+                            properties: vec![ast::Property {
+                                base: ast::BaseNode::default(),
+                                key: ast::PropertyKey::Identifier(
+                                    ast::Identifier {
+                                        base: ast::BaseNode::default(
+                                        ),
+                                        name: "name".into(),
+                                    },
+                                ),
+                                value: Some(
+                                    ast::Expression::StringLit(
+                                        ast::StringLit {
+                                            base:
+                                                ast::BaseNode::default(
+                                                ),
+                                            value: format!(
+                                                "{}-{}",
+                                                bucket, num,
+                                            ),
+                                        },
+                                    ),
+                                ),
+                                comma: vec![],
+                                separator: vec![],
+                            }],
+                            lbrace: vec![],
+                            rbrace: vec![],
+                            with: None,
+                        }),
+                    )],
+                    base: ast::BaseNode::default(),
+                    callee: ast::Expression::Identifier(
+                        ast::Identifier {
+                            base: ast::BaseNode::default(),
+                            name: "yield".into(),
+                        },
+                    ),
+                    lparen: vec![],
+                    rparen: vec![],
+                },
+            },
+        )),
+    }
+}
+
 fn make_from_function(bucket: String, num: usize) -> ast::Statement {
     let from = ast::CallExpr {
         base: ast::BaseNode::default(),
@@ -127,59 +188,7 @@ fn make_from_function(bucket: String, num: usize) -> ast::Statement {
         ))
     ;
 
-    let yield_expr = ast::ExprStmt {
-        base: ast::BaseNode::default(),
-        expression: ast::Expression::PipeExpr(Box::new(
-            ast::PipeExpr {
-                argument: range,
-                base: ast::BaseNode::default(),
-                call: ast::CallExpr {
-                    arguments: vec![ast::Expression::Object(
-                        Box::new(ast::ObjectExpr {
-                            base: ast::BaseNode::default(),
-                            properties: vec![ast::Property {
-                                base: ast::BaseNode::default(),
-                                key: ast::PropertyKey::Identifier(
-                                    ast::Identifier {
-                                        base: ast::BaseNode::default(
-                                        ),
-                                        name: "name".into(),
-                                    },
-                                ),
-                                value: Some(
-                                    ast::Expression::StringLit(
-                                        ast::StringLit {
-                                            base:
-                                                ast::BaseNode::default(
-                                                ),
-                                            value: format!(
-                                                "{}-{}",
-                                                bucket, num
-                                            ),
-                                        },
-                                    ),
-                                ),
-                                comma: vec![],
-                                separator: vec![],
-                            }],
-                            lbrace: vec![],
-                            rbrace: vec![],
-                            with: None,
-                        }),
-                    )],
-                    base: ast::BaseNode::default(),
-                    callee: ast::Expression::Identifier(
-                        ast::Identifier {
-                            base: ast::BaseNode::default(),
-                            name: "yield".into(),
-                        },
-                    ),
-                    lparen: vec![],
-                    rparen: vec![],
-                },
-            },
-        )),
-    };
+    let yield_expr = make_yield_function(range, bucket, num);
 
     ast::Statement::Expr(Box::new(yield_expr))
 }
@@ -434,60 +443,8 @@ pub(crate) fn inject_tag_filter(
         }
     }));
 
-    let yield_expr = ast::ExprStmt {
-        base: ast::BaseNode::default(),
-        expression: ast::Expression::PipeExpr(Box::new(
-            ast::PipeExpr {
-                argument: filter_expr,
-                base: ast::BaseNode::default(),
-                call: ast::CallExpr {
-                    arguments: vec![ast::Expression::Object(
-                        Box::new(ast::ObjectExpr {
-                            base: ast::BaseNode::default(),
-                            properties: vec![ast::Property {
-                                base: ast::BaseNode::default(),
-                                key: ast::PropertyKey::Identifier(
-                                    ast::Identifier {
-                                        base: ast::BaseNode::default(
-                                        ),
-                                        name: "name".into(),
-                                    },
-                                ),
-                                value: Some(
-                                    ast::Expression::StringLit(
-                                        ast::StringLit {
-                                            base:
-                                                ast::BaseNode::default(
-                                                ),
-                                            value: format!(
-                                                "{}-{}",
-                                                bucket,
-                                                ast.body.len(),
-                                            ),
-                                        },
-                                    ),
-                                ),
-                                comma: vec![],
-                                separator: vec![],
-                            }],
-                            lbrace: vec![],
-                            rbrace: vec![],
-                            with: None,
-                        }),
-                    )],
-                    base: ast::BaseNode::default(),
-                    callee: ast::Expression::Identifier(
-                        ast::Identifier {
-                            base: ast::BaseNode::default(),
-                            name: "yield".into(),
-                        },
-                    ),
-                    lparen: vec![],
-                    rparen: vec![],
-                },
-            },
-        )),
-    };
+    let yield_expr =
+        make_yield_function(filter_expr, bucket, ast.body.len());
 
     ast.body.push(ast::Statement::Expr(Box::new(yield_expr)));
 
@@ -561,60 +518,8 @@ pub(crate) fn inject_field_filter(
             },
         }));
 
-    let yield_expr = ast::ExprStmt {
-        base: ast::BaseNode::default(),
-        expression: ast::Expression::PipeExpr(Box::new(
-            ast::PipeExpr {
-                argument: filter_expr,
-                base: ast::BaseNode::default(),
-                call: ast::CallExpr {
-                    arguments: vec![ast::Expression::Object(
-                        Box::new(ast::ObjectExpr {
-                            base: ast::BaseNode::default(),
-                            properties: vec![ast::Property {
-                                base: ast::BaseNode::default(),
-                                key: ast::PropertyKey::Identifier(
-                                    ast::Identifier {
-                                        base: ast::BaseNode::default(
-                                        ),
-                                        name: "name".into(),
-                                    },
-                                ),
-                                value: Some(
-                                    ast::Expression::StringLit(
-                                        ast::StringLit {
-                                            base:
-                                                ast::BaseNode::default(
-                                                ),
-                                            value: format!(
-                                                "{}-{}",
-                                                bucket,
-                                                ast.body.len(),
-                                            ),
-                                        },
-                                    ),
-                                ),
-                                comma: vec![],
-                                separator: vec![],
-                            }],
-                            lbrace: vec![],
-                            rbrace: vec![],
-                            with: None,
-                        }),
-                    )],
-                    base: ast::BaseNode::default(),
-                    callee: ast::Expression::Identifier(
-                        ast::Identifier {
-                            base: ast::BaseNode::default(),
-                            name: "yield".into(),
-                        },
-                    ),
-                    lparen: vec![],
-                    rparen: vec![],
-                },
-            },
-        )),
-    };
+    let yield_expr =
+        make_yield_function(filter_expr, bucket, ast.body.len());
 
     ast.body.push(ast::Statement::Expr(Box::new(yield_expr)));
     Ok(ast)
@@ -687,60 +592,8 @@ pub(crate) fn inject_tag_value_filter(
             },
         }));
 
-    let yield_expr = ast::ExprStmt {
-        base: ast::BaseNode::default(),
-        expression: ast::Expression::PipeExpr(Box::new(
-            ast::PipeExpr {
-                argument: filter_expr,
-                base: ast::BaseNode::default(),
-                call: ast::CallExpr {
-                    arguments: vec![ast::Expression::Object(
-                        Box::new(ast::ObjectExpr {
-                            base: ast::BaseNode::default(),
-                            properties: vec![ast::Property {
-                                base: ast::BaseNode::default(),
-                                key: ast::PropertyKey::Identifier(
-                                    ast::Identifier {
-                                        base: ast::BaseNode::default(
-                                        ),
-                                        name: "name".into(),
-                                    },
-                                ),
-                                value: Some(
-                                    ast::Expression::StringLit(
-                                        ast::StringLit {
-                                            base:
-                                                ast::BaseNode::default(
-                                                ),
-                                            value: format!(
-                                                "{}-{}",
-                                                bucket,
-                                                ast.body.len(),
-                                            ),
-                                        },
-                                    ),
-                                ),
-                                comma: vec![],
-                                separator: vec![],
-                            }],
-                            lbrace: vec![],
-                            rbrace: vec![],
-                            with: None,
-                        }),
-                    )],
-                    base: ast::BaseNode::default(),
-                    callee: ast::Expression::Identifier(
-                        ast::Identifier {
-                            base: ast::BaseNode::default(),
-                            name: "yield".into(),
-                        },
-                    ),
-                    lparen: vec![],
-                    rparen: vec![],
-                },
-            },
-        )),
-    };
+    let yield_expr =
+        make_yield_function(filter_expr, bucket, ast.body.len());
 
     ast.body.push(ast::Statement::Expr(Box::new(yield_expr)));
     Ok(ast)
@@ -813,60 +666,8 @@ pub(crate) fn inject_measurement_filter(
             },
         }));
 
-    let yield_expr = ast::ExprStmt {
-        base: ast::BaseNode::default(),
-        expression: ast::Expression::PipeExpr(Box::new(
-            ast::PipeExpr {
-                argument: filter_expr,
-                base: ast::BaseNode::default(),
-                call: ast::CallExpr {
-                    arguments: vec![ast::Expression::Object(
-                        Box::new(ast::ObjectExpr {
-                            base: ast::BaseNode::default(),
-                            properties: vec![ast::Property {
-                                base: ast::BaseNode::default(),
-                                key: ast::PropertyKey::Identifier(
-                                    ast::Identifier {
-                                        base: ast::BaseNode::default(
-                                        ),
-                                        name: "name".into(),
-                                    },
-                                ),
-                                value: Some(
-                                    ast::Expression::StringLit(
-                                        ast::StringLit {
-                                            base:
-                                                ast::BaseNode::default(
-                                                ),
-                                            value: format!(
-                                                "{}-{}",
-                                                bucket,
-                                                ast.body.len(),
-                                            ),
-                                        },
-                                    ),
-                                ),
-                                comma: vec![],
-                                separator: vec![],
-                            }],
-                            lbrace: vec![],
-                            rbrace: vec![],
-                            with: None,
-                        }),
-                    )],
-                    base: ast::BaseNode::default(),
-                    callee: ast::Expression::Identifier(
-                        ast::Identifier {
-                            base: ast::BaseNode::default(),
-                            name: "yield".into(),
-                        },
-                    ),
-                    lparen: vec![],
-                    rparen: vec![],
-                },
-            },
-        )),
-    };
+    let yield_expr =
+        make_yield_function(filter_expr, bucket, ast.body.len());
 
     ast.body.push(ast::Statement::Expr(Box::new(yield_expr)));
 
