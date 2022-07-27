@@ -644,7 +644,6 @@ a = 0"#;
         assert_eq!(0, ast.body.len());
 
         ast.body.push(from);
-        // TODO (chunchun): do we expect yield(...) here?
         let expected = r#"from(bucket: "my-bucket") |> range(start: v.timeRangeStart, stop: v.timeRangeStop) |> yield(name: "my-bucket-0")
 "#;
         assert_eq!(
