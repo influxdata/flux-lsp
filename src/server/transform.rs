@@ -849,8 +849,10 @@ a = 0"#;
         );
     }
 
+    /// When the last `from` call isn't the right bucket,
+    /// return a new `from` call with the correct yield butcket name.
     #[test]
-    fn test_inject_measurement_append_yield() {
+    fn test_inject_measurement_filter_new_bucket() {
         let fluxscript = r#"from(bucket: "my-bucket")
     |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
     |> filter(fn: (r) => r._measurement == "test")
