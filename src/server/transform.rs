@@ -283,11 +283,7 @@ fn has_yield(statement: ast::Expression) -> bool {
             if let ast::Expression::Identifier(identifier) =
                 &call.callee
             {
-                if identifier.name == "yield" {
-                    true
-                } else {
-                    false
-                }
+                identifier.name == "yield"
             } else {
                 false
             }
@@ -414,11 +410,8 @@ pub(crate) fn inject_tag_filter(
     let last_statement: ast::Expression = call.clone();
     if has_yield(last_statement.clone()) {
         // discard the yield expression
-        match last_statement {
-            ast::Expression::PipeExpr(pipe_expr) => {
-                call = pipe_expr.argument;
-            }
-            _ => {}
+        if let ast::Expression::PipeExpr(pip_expr) = last_statement {
+            call = pip_expr.argument;
         }
     }
 
@@ -494,12 +487,9 @@ pub(crate) fn inject_field_filter(
 
     let last_statement: ast::Expression = call.clone();
     if has_yield(last_statement.clone()) {
-        match last_statement {
-            // discard the yield expression
-            ast::Expression::PipeExpr(pipe_expr) => {
-                call = pipe_expr.argument;
-            }
-            _ => {}
+        // discard the yield expression
+        if let ast::Expression::PipeExpr(pip_expr) = last_statement {
+            call = pip_expr.argument;
         }
     }
 
@@ -534,12 +524,9 @@ pub(crate) fn inject_tag_value_filter(
 
     let last_statement: ast::Expression = call.clone();
     if has_yield(last_statement.clone()) {
-        match last_statement {
-            // discard the yield expression
-            ast::Expression::PipeExpr(pipe_expr) => {
-                call = pipe_expr.argument;
-            }
-            _ => {}
+        // discard the yield expression
+        if let ast::Expression::PipeExpr(pip_expr) = last_statement {
+            call = pip_expr.argument;
         }
     }
 
@@ -574,11 +561,8 @@ pub(crate) fn inject_measurement_filter(
     let last_statement: ast::Expression = call.clone();
     if has_yield(last_statement.clone()) {
         // discard the yield expression
-        match last_statement {
-            ast::Expression::PipeExpr(pipe_expr) => {
-                call = pipe_expr.argument;
-            }
-            _ => {}
+        if let ast::Expression::PipeExpr(pip_expr) = last_statement {
+            call = pip_expr.argument;
         }
     }
 
