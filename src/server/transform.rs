@@ -5,47 +5,51 @@
 use flux::ast;
 use flux::ast::walk;
 
-fn make_from_function(bucket: String) -> ast::Statement {
-    let from = ast::CallExpr {
-        base: ast::BaseNode::default(),
-        callee: ast::Expression::Identifier(ast::Identifier {
+macro_rules! from {
+    ($bucket_name:expr) => {
+        ast::CallExpr {
             base: ast::BaseNode::default(),
-            name: "from".into(),
-        }),
-        arguments: vec![ast::Expression::Object(Box::new(
-            ast::ObjectExpr {
+            callee: ast::Expression::Identifier(ast::Identifier {
                 base: ast::BaseNode::default(),
-                lbrace: vec![],
-                with: None,
-                properties: vec![flux::ast::Property {
+                name: "from".into(),
+            }),
+            arguments: vec![ast::Expression::Object(Box::new(
+                ast::ObjectExpr {
                     base: ast::BaseNode::default(),
-                    key: ast::PropertyKey::Identifier(
-                        ast::Identifier {
-                            base: ast::BaseNode::default(),
-                            name: "bucket".into(),
-                        },
-                    ),
-                    separator: vec![],
-                    value: Some(ast::Expression::StringLit(
-                        ast::StringLit {
-                            base: ast::BaseNode::default(),
-                            value: bucket,
-                        },
-                    )),
-                    comma: vec![],
-                }],
-                rbrace: vec![],
-            },
-        ))],
-        lparen: vec![],
-        rparen: vec![],
+                    lbrace: vec![],
+                    with: None,
+                    properties: vec![flux::ast::Property {
+                        base: ast::BaseNode::default(),
+                        key: ast::PropertyKey::Identifier(
+                            ast::Identifier {
+                                base: ast::BaseNode::default(),
+                                name: "bucket".into(),
+                            },
+                        ),
+                        separator: vec![],
+                        value: Some(ast::Expression::StringLit(
+                            ast::StringLit {
+                                base: ast::BaseNode::default(),
+                                value: $bucket_name,  // BUCKET GOES HERE
+                            },
+                        )),
+                        comma: vec![],
+                    }],
+                    rbrace: vec![],
+                },
+            ))],
+            lparen: vec![],
+            rparen: vec![],
+        }
     };
+}
 
+fn make_from_function(bucket: String) -> ast::Statement {
     let range = ast::ExprStmt {
         base: ast::BaseNode::default(),
         expression: ast::Expression::PipeExpr(Box::new(
             ast::PipeExpr {
-                argument: ast::Expression::Call(Box::new(from)),
+                argument: ast::Expression::Call(Box::new(from!(bucket))),
                 base: ast::BaseNode::default(),
                 call: ast::CallExpr {
                     arguments: vec![ast::Expression::Object(
