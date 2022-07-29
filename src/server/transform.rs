@@ -6,57 +6,40 @@ use flux::ast;
 use flux::ast::walk;
 
 /// This will return the ast equivalent of `yield(name: "_influxDBEditor")`
-fn make_yield_function(argument: ast::Expression) -> ast::ExprStmt {
-    ast::ExprStmt {
-        base: ast::BaseNode::default(),
-        expression: ast::Expression::PipeExpr(Box::new(
-            ast::PipeExpr {
-                argument,
+fn make_yield_function() -> ast::CallExpr {
+    ast::CallExpr {
+        arguments: vec![ast::Expression::Object(Box::new(
+            ast::ObjectExpr {
                 base: ast::BaseNode::default(),
-                call: ast::CallExpr {
-                    arguments: vec![ast::Expression::Object(
-                        Box::new(ast::ObjectExpr {
-                            base: ast::BaseNode::default(),
-                            properties: vec![ast::Property {
-                                base: ast::BaseNode::default(),
-                                key: ast::PropertyKey::Identifier(
-                                    ast::Identifier {
-                                        base: ast::BaseNode::default(
-                                        ),
-                                        name: "name".into(),
-                                    },
-                                ),
-                                value: Some(
-                                    ast::Expression::StringLit(
-                                        ast::StringLit {
-                                            base:
-                                                ast::BaseNode::default(
-                                                ),
-                                            value: "_influxDBEditor"
-                                                .into(),
-                                        },
-                                    ),
-                                ),
-                                comma: vec![],
-                                separator: vec![],
-                            }],
-                            lbrace: vec![],
-                            rbrace: vec![],
-                            with: None,
-                        }),
-                    )],
+                properties: vec![ast::Property {
                     base: ast::BaseNode::default(),
-                    callee: ast::Expression::Identifier(
+                    key: ast::PropertyKey::Identifier(
                         ast::Identifier {
                             base: ast::BaseNode::default(),
-                            name: "yield".into(),
+                            name: "name".into(),
                         },
                     ),
-                    lparen: vec![],
-                    rparen: vec![],
-                },
+                    value: Some(ast::Expression::StringLit(
+                        ast::StringLit {
+                            base: ast::BaseNode::default(),
+                            value: "_influxDBEditor".into(),
+                        },
+                    )),
+                    comma: vec![],
+                    separator: vec![],
+                }],
+                lbrace: vec![],
+                rbrace: vec![],
+                with: None,
             },
-        )),
+        ))],
+        base: ast::BaseNode::default(),
+        callee: ast::Expression::Identifier(ast::Identifier {
+            base: ast::BaseNode::default(),
+            name: "yield".into(),
+        }),
+        lparen: vec![],
+        rparen: vec![],
     }
 }
 
@@ -456,12 +439,17 @@ pub(crate) fn inject_tag_filter(
         };
 
     let last_statement: ast::Expression = call.clone();
-    if has_yield(last_statement.clone()) {
-        // discard the yield expression
+    let yield_: ast::CallExpr = if has_yield(last_statement.clone()) {
         if let ast::Expression::PipeExpr(pip_expr) = last_statement {
             call = pip_expr.argument;
+            // re-use yield
+            pip_expr.call
+        } else {
+            make_yield_function()
         }
-    }
+    } else {
+        make_yield_function()
+    };
 
     let value = Some(ast::Expression::Function(Box::new(
         ast::FunctionExpr {
@@ -507,11 +495,18 @@ pub(crate) fn inject_tag_filter(
         },
     )));
 
-    let filter_expr = make_filter_function(call, value);
+    let filter_ = make_filter_function(call, value);
 
-    let yield_expr = make_yield_function(filter_expr);
-
-    ast.body.push(ast::Statement::Expr(Box::new(yield_expr)));
+    ast.body.push(ast::Statement::Expr(Box::new(ast::ExprStmt {
+        base: ast::BaseNode::default(),
+        expression: ast::Expression::PipeExpr(Box::new(
+            ast::PipeExpr {
+                base: ast::BaseNode::default(),
+                argument: filter_,
+                call: yield_,
+            },
+        )),
+    })));
 
     Ok(ast)
 }
@@ -533,21 +528,34 @@ pub(crate) fn inject_field_filter(
         };
 
     let last_statement: ast::Expression = call.clone();
-    if has_yield(last_statement.clone()) {
-        // discard the yield expression
+    let yield_: ast::CallExpr = if has_yield(last_statement.clone()) {
         if let ast::Expression::PipeExpr(pip_expr) = last_statement {
             call = pip_expr.argument;
+            // re-use yield
+            pip_expr.call
+        } else {
+            make_yield_function()
         }
-    }
+    } else {
+        make_yield_function()
+    };
 
-    let filter_expr = make_filter_function(
+    let filter_ = make_filter_function(
         call,
         Some(make_flux_filter_function("_field".into(), name)),
     );
 
-    let yield_expr = make_yield_function(filter_expr);
+    ast.body.push(ast::Statement::Expr(Box::new(ast::ExprStmt {
+        base: ast::BaseNode::default(),
+        expression: ast::Expression::PipeExpr(Box::new(
+            ast::PipeExpr {
+                base: ast::BaseNode::default(),
+                argument: filter_,
+                call: yield_,
+            },
+        )),
+    })));
 
-    ast.body.push(ast::Statement::Expr(Box::new(yield_expr)));
     Ok(ast)
 }
 
@@ -569,21 +577,34 @@ pub(crate) fn inject_tag_value_filter(
         };
 
     let last_statement: ast::Expression = call.clone();
-    if has_yield(last_statement.clone()) {
-        // discard the yield expression
+    let yield_: ast::CallExpr = if has_yield(last_statement.clone()) {
         if let ast::Expression::PipeExpr(pip_expr) = last_statement {
             call = pip_expr.argument;
+            // re-use yield
+            pip_expr.call
+        } else {
+            make_yield_function()
         }
-    }
+    } else {
+        make_yield_function()
+    };
 
-    let filter_expr = make_filter_function(
+    let filter_: ast::Expression = make_filter_function(
         call,
         Some(make_flux_filter_function(name, value)),
     );
 
-    let yield_expr = make_yield_function(filter_expr);
+    ast.body.push(ast::Statement::Expr(Box::new(ast::ExprStmt {
+        base: ast::BaseNode::default(),
+        expression: ast::Expression::PipeExpr(Box::new(
+            ast::PipeExpr {
+                base: ast::BaseNode::default(),
+                argument: filter_,
+                call: yield_,
+            },
+        )),
+    })));
 
-    ast.body.push(ast::Statement::Expr(Box::new(yield_expr)));
     Ok(ast)
 }
 
@@ -604,21 +625,33 @@ pub(crate) fn inject_measurement_filter(
         };
 
     let last_statement: ast::Expression = call.clone();
-    if has_yield(last_statement.clone()) {
-        // discard the yield expression
+    let yield_: ast::CallExpr = if has_yield(last_statement.clone()) {
         if let ast::Expression::PipeExpr(pip_expr) = last_statement {
             call = pip_expr.argument;
+            // re-use yield
+            pip_expr.call
+        } else {
+            make_yield_function()
         }
-    }
+    } else {
+        make_yield_function()
+    };
 
-    let filter_expr = make_filter_function(
+    let filter_: ast::Expression = make_filter_function(
         call,
         Some(make_flux_filter_function("_measurement".into(), name)),
     );
 
-    let yield_expr = make_yield_function(filter_expr);
-
-    ast.body.push(ast::Statement::Expr(Box::new(yield_expr)));
+    ast.body.push(ast::Statement::Expr(Box::new(ast::ExprStmt {
+        base: ast::BaseNode::default(),
+        expression: ast::Expression::PipeExpr(Box::new(
+            ast::PipeExpr {
+                base: ast::BaseNode::default(),
+                argument: filter_,
+                call: yield_,
+            },
+        )),
+    })));
 
     Ok(ast)
 }
