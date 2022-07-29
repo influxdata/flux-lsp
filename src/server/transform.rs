@@ -5,12 +5,8 @@
 use flux::ast;
 use flux::ast::walk;
 
-/// This will return the ast equivalent of `yield(name: "{bucket}-{num}")`
-fn make_yield_function(
-    argument: ast::Expression,
-    bucket: String,
-    num: usize,
-) -> ast::ExprStmt {
+/// This will return the ast equivalent of `yield(name: "_influxDBEditor")`
+fn make_yield_function(argument: ast::Expression) -> ast::ExprStmt {
     ast::ExprStmt {
         base: ast::BaseNode::default(),
         expression: ast::Expression::PipeExpr(Box::new(
@@ -36,10 +32,8 @@ fn make_yield_function(
                                             base:
                                                 ast::BaseNode::default(
                                                 ),
-                                            value: format!(
-                                                "{}-{}",
-                                                bucket, num,
-                                            ),
+                                            value: "_influxDBEditor"
+                                                .into(),
                                         },
                                     ),
                                 ),
@@ -515,8 +509,7 @@ pub(crate) fn inject_tag_filter(
 
     let filter_expr = make_filter_function(call, value);
 
-    let yield_expr =
-        make_yield_function(filter_expr, bucket, ast.body.len());
+    let yield_expr = make_yield_function(filter_expr);
 
     ast.body.push(ast::Statement::Expr(Box::new(yield_expr)));
 
@@ -552,8 +545,7 @@ pub(crate) fn inject_field_filter(
         Some(make_flux_filter_function("_field".into(), name)),
     );
 
-    let yield_expr =
-        make_yield_function(filter_expr, bucket, ast.body.len());
+    let yield_expr = make_yield_function(filter_expr);
 
     ast.body.push(ast::Statement::Expr(Box::new(yield_expr)));
     Ok(ast)
@@ -589,8 +581,7 @@ pub(crate) fn inject_tag_value_filter(
         Some(make_flux_filter_function(name, value)),
     );
 
-    let yield_expr =
-        make_yield_function(filter_expr, bucket, ast.body.len());
+    let yield_expr = make_yield_function(filter_expr);
 
     ast.body.push(ast::Statement::Expr(Box::new(yield_expr)));
     Ok(ast)
@@ -625,8 +616,7 @@ pub(crate) fn inject_measurement_filter(
         Some(make_flux_filter_function("_measurement".into(), name)),
     );
 
-    let yield_expr =
-        make_yield_function(filter_expr, bucket, ast.body.len());
+    let yield_expr = make_yield_function(filter_expr);
 
     ast.body.push(ast::Statement::Expr(Box::new(yield_expr)));
 
@@ -682,7 +672,7 @@ a = 0"#;
         assert_eq!(0, ast.body.len());
 
         ast.body.push(from);
-        let expected = r#"from(bucket: "my-bucket") |> range(start: v.timeRangeStart, stop: v.timeRangeStop) |> yield(name: "my-bucket-0")
+        let expected = r#"from(bucket: "my-bucket") |> range(start: v.timeRangeStart, stop: v.timeRangeStop) |> yield(name: "_influxDBEditor")
 "#;
         assert_eq!(
             expected,
@@ -774,7 +764,7 @@ a = 0"#;
             inject_tag_filter(&ast, "cpu".into(), "my-bucket".into())
                 .unwrap();
 
-        let expected = r#"from(bucket: "my-bucket") |> filter(fn: (r) => exists r.cpu) |> yield(name: "my-bucket-0")
+        let expected = r#"from(bucket: "my-bucket") |> filter(fn: (r) => exists r.cpu) |> yield(name: "_influxDBEditor")
 "#;
         assert_eq!(
             expected,
@@ -794,7 +784,7 @@ a = 0"#;
         let expected = r#"from(bucket: "my-bucket")
     |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
     |> filter(fn: (r) => exists r.cpu)
-    |> yield(name: "my-bucket-0")
+    |> yield(name: "_influxDBEditor")
 "#;
         assert_eq!(
             expected,
@@ -815,7 +805,7 @@ a = 0"#;
         )
         .unwrap();
 
-        let expected = r#"from(bucket: "my-bucket") |> filter(fn: (r) => r.myTag == "myTagValue") |> yield(name: "my-bucket-0")
+        let expected = r#"from(bucket: "my-bucket") |> filter(fn: (r) => r.myTag == "myTagValue") |> yield(name: "_influxDBEditor")
 "#;
         assert_eq!(
             expected,
@@ -839,7 +829,7 @@ a = 0"#;
         let expected = r#"from(bucket: "my-bucket")
     |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
     |> filter(fn: (r) => r.myTag == "myTagValue")
-    |> yield(name: "my-bucket-0")
+    |> yield(name: "_influxDBEditor")
 "#;
         assert_eq!(
             expected,
@@ -859,7 +849,7 @@ a = 0"#;
         )
         .unwrap();
 
-        let expected = r#"from(bucket: "my-bucket") |> filter(fn: (r) => r._field == "myField") |> yield(name: "my-bucket-0")
+        let expected = r#"from(bucket: "my-bucket") |> filter(fn: (r) => r._field == "myField") |> yield(name: "_influxDBEditor")
 "#;
         assert_eq!(
             expected,
@@ -879,7 +869,7 @@ a = 0"#;
         )
         .unwrap();
 
-        let expected = r#"from(bucket: "my-bucket") |> filter(fn: (r) => r._measurement == "myMeasurement") |> yield(name: "my-bucket-0")
+        let expected = r#"from(bucket: "my-bucket") |> filter(fn: (r) => r._measurement == "myMeasurement") |> yield(name: "_influxDBEditor")
 "#;
         assert_eq!(
             expected,
@@ -910,7 +900,7 @@ a = 0"#;
 from(bucket: "my-new-bucket")
     |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
     |> filter(fn: (r) => r._measurement == "myMeasurement")
-    |> yield(name: "my-new-bucket-1")
+    |> yield(name: "_influxDBEditor")
 "#;
         assert_eq!(
             expected,
