@@ -109,7 +109,7 @@ fn make_filter_function(
 
 /// This will return the ast equivalent of
 /// `from(bucket: "{bucket}") |> range(start: v.timeRangeStart, stop: v.timeRangeStop) |> yield(name: "{bucket}-{length_of_ast}")`
-fn make_from_function(bucket: String, num: usize) -> ast::Statement {
+fn make_from_function(bucket: String) -> ast::Statement {
     let from = ast::CallExpr {
         base: ast::BaseNode::default(),
         callee: ast::Expression::Identifier(ast::Identifier {
@@ -381,13 +381,13 @@ fn find_the_from(
                 }
 
                 file.body.push(last_statement);
-                make_from_function(bucket, file.body.len())
+                make_from_function(bucket)
             } else {
                 file.body.push(last_statement);
-                make_from_function(bucket, file.body.len())
+                make_from_function(bucket)
             }
         }
-        None => make_from_function(bucket, file.body.len()),
+        None => make_from_function(bucket),
     }
 }
 
