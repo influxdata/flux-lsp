@@ -207,40 +207,7 @@ fn make_from_function(bucket: String) -> ast::Statement {
         rparen: vec![],
     };
 
-    let yield_ = ast::CallExpr {
-        arguments: vec![ast::Expression::Object(Box::new(
-            ast::ObjectExpr {
-                base: ast::BaseNode::default(),
-                properties: vec![ast::Property {
-                    base: ast::BaseNode::default(),
-                    key: ast::PropertyKey::Identifier(
-                        ast::Identifier {
-                            base: ast::BaseNode::default(),
-                            name: "name".into(),
-                        },
-                    ),
-                    value: Some(ast::Expression::StringLit(
-                        ast::StringLit {
-                            base: ast::BaseNode::default(),
-                            value: "_influxDBEditor".into(),
-                        },
-                    )),
-                    comma: vec![],
-                    separator: vec![],
-                }],
-                lbrace: vec![],
-                rbrace: vec![],
-                with: None,
-            },
-        ))],
-        base: ast::BaseNode::default(),
-        callee: ast::Expression::Identifier(ast::Identifier {
-            base: ast::BaseNode::default(),
-            name: "yield".into(),
-        }),
-        lparen: vec![],
-        rparen: vec![],
-    };
+    let yield_: ast::CallExpr = make_yield_function();
 
     ast::Statement::Expr(Box::new(ast::ExprStmt {
         base: ast::BaseNode::default(),
