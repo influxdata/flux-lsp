@@ -41,95 +41,137 @@ fn make_from_function(bucket: String) -> ast::Statement {
         rparen: vec![],
     };
 
-    let range = ast::ExprStmt {
+    let range = ast::CallExpr {
+        arguments: vec![ast::Expression::Object(
+            Box::new(ast::ObjectExpr {
+                base: ast::BaseNode::default(),
+                properties: vec![ast::Property {
+                    base: ast::BaseNode::default(),
+                    key: ast::PropertyKey::Identifier(
+                        ast::Identifier {
+                            base: ast::BaseNode::default(
+                            ),
+                            name: "start".into(),
+                        },
+                    ),
+                    value: Some(
+                        ast::Expression::Member(Box::new(ast::MemberExpr {
+                            base: ast::BaseNode::default(),
+                            lbrack: vec![],
+                            rbrack: vec![],
+                            object: ast::Expression::Identifier(
+                                ast::Identifier {
+                                    base: ast::BaseNode::default(),
+                                    name: "v".into(),
+                                }
+                            ),
+                            property: ast::PropertyKey::Identifier(ast::Identifier {
+                                base: ast::BaseNode::default(),
+                                name: "timeRangeStart".into(),
+                            })
+                        }))
+                    ),
+                    comma: vec![],
+                    separator: vec![],
+                },
+                ast::Property {
+                    base: ast::BaseNode::default(),
+                    key: ast::PropertyKey::Identifier(
+                        ast::Identifier {
+                            base: ast::BaseNode::default(
+                            ),
+                            name: "stop".into(),
+                        },
+                    ),
+                    value: Some(
+                        ast::Expression::Member(Box::new(ast::MemberExpr {
+                            base: ast::BaseNode::default(),
+                            lbrack: vec![],
+                            rbrack: vec![],
+                            object: ast::Expression::Identifier(
+                                ast::Identifier {
+                                    base: ast::BaseNode::default(),
+                                    name: "v".into(),
+                                }
+                            ),
+                            property: ast::PropertyKey::Identifier(ast::Identifier {
+                                base: ast::BaseNode::default(),
+                                name: "timeRangeStop".into(),
+                            })
+                        }))
+                    ),
+                    comma: vec![],
+                    separator: vec![],
+                }
+                ],
+                lbrace: vec![],
+                rbrace: vec![],
+                with: None,
+            }),
+        )],
+        base: ast::BaseNode::default(),
+        callee: ast::Expression::Identifier(
+            ast::Identifier {
+                base: ast::BaseNode::default(),
+                name: "range".into(),
+            },
+        ),
+        lparen: vec![],
+        rparen: vec![],
+    };
+
+    let yield_ = ast::CallExpr {
+        arguments: vec![ast::Expression::Object(
+            Box::new(ast::ObjectExpr {
+                base: ast::BaseNode::default(),
+                properties: vec![ast::Property {
+                    base: ast::BaseNode::default(),
+                    key: ast::PropertyKey::Identifier(
+                        ast::Identifier {
+                            base: ast::BaseNode::default(
+                            ),
+                            name: "name".into(),
+                        },
+                    ),
+                    value: Some(
+                        ast::Expression::StringLit(ast::StringLit {
+                            base: ast::BaseNode::default(),
+                            value: "_influxDBEditor".into(),
+                        })
+                    ),
+                    comma: vec![],
+                    separator: vec![],
+                }],
+                lbrace: vec![],
+                rbrace: vec![],
+                with: None,
+            }),
+        )],
+        base: ast::BaseNode::default(),
+        callee: ast::Expression::Identifier(
+            ast::Identifier {
+                base: ast::BaseNode::default(),
+                name: "yield".into(),
+            },
+        ),
+        lparen: vec![],
+        rparen: vec![],
+    };
+
+    ast::Statement::Expr(Box::new(ast::ExprStmt {
         base: ast::BaseNode::default(),
         expression: ast::Expression::PipeExpr(Box::new(
             ast::PipeExpr {
-                argument: ast::Expression::Call(Box::new(from)),
                 base: ast::BaseNode::default(),
-                call: ast::CallExpr {
-                    arguments: vec![ast::Expression::Object(
-                        Box::new(ast::ObjectExpr {
-                            base: ast::BaseNode::default(),
-                            properties: vec![ast::Property {
-                                base: ast::BaseNode::default(),
-                                key: ast::PropertyKey::Identifier(
-                                    ast::Identifier {
-                                        base: ast::BaseNode::default(
-                                        ),
-                                        name: "start".into(),
-                                    },
-                                ),
-                                value: Some(
-                                    ast::Expression::Member(Box::new(ast::MemberExpr {
-                                        base: ast::BaseNode::default(),
-                                        lbrack: vec![],
-                                        rbrack: vec![],
-                                        object: ast::Expression::Identifier(
-                                            ast::Identifier {
-                                                base: ast::BaseNode::default(),
-                                                name: "v".into(),
-                                            }
-                                        ),
-                                        property: ast::PropertyKey::Identifier(ast::Identifier {
-                                            base: ast::BaseNode::default(),
-                                            name: "timeRangeStart".into(),
-                                        })
-                                    }))
-                                ),
-                                comma: vec![],
-                                separator: vec![],
-                            },
-                            ast::Property {
-                                base: ast::BaseNode::default(),
-                                key: ast::PropertyKey::Identifier(
-                                    ast::Identifier {
-                                        base: ast::BaseNode::default(
-                                        ),
-                                        name: "stop".into(),
-                                    },
-                                ),
-                                value: Some(
-                                    ast::Expression::Member(Box::new(ast::MemberExpr {
-                                        base: ast::BaseNode::default(),
-                                        lbrack: vec![],
-                                        rbrack: vec![],
-                                        object: ast::Expression::Identifier(
-                                            ast::Identifier {
-                                                base: ast::BaseNode::default(),
-                                                name: "v".into(),
-                                            }
-                                        ),
-                                        property: ast::PropertyKey::Identifier(ast::Identifier {
-                                            base: ast::BaseNode::default(),
-                                            name: "timeRangeStop".into(),
-                                        })
-                                    }))
-                                ),
-                                comma: vec![],
-                                separator: vec![],
-                            }
-                            ],
-                            lbrace: vec![],
-                            rbrace: vec![],
-                            with: None,
-                        }),
-                    )],
+                argument: ast::Expression::PipeExpr(Box::new(ast::PipeExpr {
+                    argument: ast::Expression::Call(Box::new(from)),
                     base: ast::BaseNode::default(),
-                    callee: ast::Expression::Identifier(
-                        ast::Identifier {
-                            base: ast::BaseNode::default(),
-                            name: "range".into(),
-                        },
-                    ),
-                    lparen: vec![],
-                    rparen: vec![],
-                },
+                    call: range,
+                })),
+                call: yield_,
             },
         )),
-    };
-
-    ast::Statement::Expr(Box::new(range))
+    }))
 }
 
 #[derive(Default)]
