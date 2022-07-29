@@ -46,42 +46,37 @@ fn make_yield_function() -> ast::CallExpr {
 /// This will return the ast equivalent of
 /// `filter(fn: (r) => {value})`
 fn make_filter_function(
-    argument: ast::Expression,
     value: Option<ast::Expression>,
-) -> ast::Expression {
-    ast::Expression::PipeExpr(Box::new(ast::PipeExpr {
-        argument,
-        base: ast::BaseNode::default(),
-        call: ast::CallExpr {
-            arguments: vec![ast::Expression::Object(Box::new(
-                ast::ObjectExpr {
-                    base: ast::BaseNode::default(),
-                    properties: vec![ast::Property {
-                        base: ast::BaseNode::default(),
-                        key: ast::PropertyKey::Identifier(
-                            ast::Identifier {
-                                base: ast::BaseNode::default(),
-                                name: "fn".into(),
-                            },
-                        ),
-                        value,
-                        comma: vec![],
-                        separator: vec![],
-                    }],
-                    lbrace: vec![],
-                    rbrace: vec![],
-                    with: None,
-                },
-            ))],
-            base: ast::BaseNode::default(),
-            callee: ast::Expression::Identifier(ast::Identifier {
+) -> ast::CallExpr {
+    ast::CallExpr {
+        arguments: vec![ast::Expression::Object(Box::new(
+            ast::ObjectExpr {
                 base: ast::BaseNode::default(),
-                name: "filter".into(),
-            }),
-            lparen: vec![],
-            rparen: vec![],
-        },
-    }))
+                properties: vec![ast::Property {
+                    base: ast::BaseNode::default(),
+                    key: ast::PropertyKey::Identifier(
+                        ast::Identifier {
+                            base: ast::BaseNode::default(),
+                            name: "fn".into(),
+                        },
+                    ),
+                    value,
+                    comma: vec![],
+                    separator: vec![],
+                }],
+                lbrace: vec![],
+                rbrace: vec![],
+                with: None,
+            },
+        ))],
+        base: ast::BaseNode::default(),
+        callee: ast::Expression::Identifier(ast::Identifier {
+            base: ast::BaseNode::default(),
+            name: "filter".into(),
+        }),
+        lparen: vec![],
+        rparen: vec![],
+    }
 }
 
 /// This will return the ast equivalent of
@@ -495,14 +490,20 @@ pub(crate) fn inject_tag_filter(
         },
     )));
 
-    let filter_ = make_filter_function(call, value);
+    let filter_: ast::CallExpr = make_filter_function(value);
 
     ast.body.push(ast::Statement::Expr(Box::new(ast::ExprStmt {
         base: ast::BaseNode::default(),
         expression: ast::Expression::PipeExpr(Box::new(
             ast::PipeExpr {
                 base: ast::BaseNode::default(),
-                argument: filter_,
+                argument: ast::Expression::PipeExpr(Box::new(
+                    ast::PipeExpr {
+                        argument: call,
+                        base: ast::BaseNode::default(),
+                        call: filter_,
+                    },
+                )),
                 call: yield_,
             },
         )),
@@ -540,17 +541,22 @@ pub(crate) fn inject_field_filter(
         make_yield_function()
     };
 
-    let filter_ = make_filter_function(
-        call,
-        Some(make_flux_filter_function("_field".into(), name)),
-    );
+    let filter_: ast::CallExpr = make_filter_function(Some(
+        make_flux_filter_function("_field".into(), name),
+    ));
 
     ast.body.push(ast::Statement::Expr(Box::new(ast::ExprStmt {
         base: ast::BaseNode::default(),
         expression: ast::Expression::PipeExpr(Box::new(
             ast::PipeExpr {
                 base: ast::BaseNode::default(),
-                argument: filter_,
+                argument: ast::Expression::PipeExpr(Box::new(
+                    ast::PipeExpr {
+                        argument: call,
+                        base: ast::BaseNode::default(),
+                        call: filter_,
+                    },
+                )),
                 call: yield_,
             },
         )),
@@ -589,17 +595,22 @@ pub(crate) fn inject_tag_value_filter(
         make_yield_function()
     };
 
-    let filter_: ast::Expression = make_filter_function(
-        call,
-        Some(make_flux_filter_function(name, value)),
-    );
+    let filter_: ast::CallExpr = make_filter_function(Some(
+        make_flux_filter_function(name, value),
+    ));
 
     ast.body.push(ast::Statement::Expr(Box::new(ast::ExprStmt {
         base: ast::BaseNode::default(),
         expression: ast::Expression::PipeExpr(Box::new(
             ast::PipeExpr {
                 base: ast::BaseNode::default(),
-                argument: filter_,
+                argument: ast::Expression::PipeExpr(Box::new(
+                    ast::PipeExpr {
+                        argument: call,
+                        base: ast::BaseNode::default(),
+                        call: filter_,
+                    },
+                )),
                 call: yield_,
             },
         )),
@@ -637,17 +648,22 @@ pub(crate) fn inject_measurement_filter(
         make_yield_function()
     };
 
-    let filter_: ast::Expression = make_filter_function(
-        call,
-        Some(make_flux_filter_function("_measurement".into(), name)),
-    );
+    let filter_: ast::CallExpr = make_filter_function(Some(
+        make_flux_filter_function("_measurement".into(), name),
+    ));
 
     ast.body.push(ast::Statement::Expr(Box::new(ast::ExprStmt {
         base: ast::BaseNode::default(),
         expression: ast::Expression::PipeExpr(Box::new(
             ast::PipeExpr {
                 base: ast::BaseNode::default(),
-                argument: filter_,
+                argument: ast::Expression::PipeExpr(Box::new(
+                    ast::PipeExpr {
+                        argument: call,
+                        base: ast::BaseNode::default(),
+                        call: filter_,
+                    },
+                )),
                 call: yield_,
             },
         )),
