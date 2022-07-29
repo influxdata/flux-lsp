@@ -127,7 +127,7 @@ fn make_from_function(bucket: String) -> ast::Statement {
                     value: Some(ast::Expression::StringLit(
                         ast::StringLit {
                             base: ast::BaseNode::default(),
-                            value: bucket.clone(),
+                            value: bucket,
                         },
                     )),
                     comma: vec![],
@@ -448,7 +448,7 @@ pub(crate) fn inject_tag_filter(
 
     let mut call: ast::Expression =
         if let ast::Statement::Expr(expr) =
-            find_the_from(&mut ast, bucket.clone())
+            find_the_from(&mut ast, bucket)
         {
             expr.expression
         } else {
@@ -525,7 +525,7 @@ pub(crate) fn inject_field_filter(
 
     let mut call: ast::Expression =
         if let ast::Statement::Expr(expr) =
-            find_the_from(&mut ast, bucket.clone())
+            find_the_from(&mut ast, bucket)
         {
             expr.expression
         } else {
@@ -561,7 +561,7 @@ pub(crate) fn inject_tag_value_filter(
 
     let mut call: ast::Expression =
         if let ast::Statement::Expr(expr) =
-            find_the_from(&mut ast, bucket.clone())
+            find_the_from(&mut ast, bucket)
         {
             expr.expression
         } else {
@@ -596,7 +596,7 @@ pub(crate) fn inject_measurement_filter(
 
     let mut call: ast::Expression =
         if let ast::Statement::Expr(expr) =
-            find_the_from(&mut ast, bucket.clone())
+            find_the_from(&mut ast, bucket)
         {
             expr.expression
         } else {
