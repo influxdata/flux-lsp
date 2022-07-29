@@ -440,10 +440,10 @@ pub(crate) fn inject_tag_filter(
 
     let last_statement: ast::Expression = call.clone();
     let yield_: ast::CallExpr = if has_yield(last_statement.clone()) {
-        if let ast::Expression::PipeExpr(pip_expr) = last_statement {
-            call = pip_expr.argument;
+        if let ast::Expression::PipeExpr(pipe_expr) = last_statement {
+            call = pipe_expr.argument;
             // re-use yield
-            pip_expr.call
+            pipe_expr.call
         } else {
             make_yield_function()
         }
@@ -529,10 +529,10 @@ pub(crate) fn inject_field_filter(
 
     let last_statement: ast::Expression = call.clone();
     let yield_: ast::CallExpr = if has_yield(last_statement.clone()) {
-        if let ast::Expression::PipeExpr(pip_expr) = last_statement {
-            call = pip_expr.argument;
+        if let ast::Expression::PipeExpr(pipe_expr) = last_statement {
+            call = pipe_expr.argument;
             // re-use yield
-            pip_expr.call
+            pipe_expr.call
         } else {
             make_yield_function()
         }
@@ -578,10 +578,10 @@ pub(crate) fn inject_tag_value_filter(
 
     let last_statement: ast::Expression = call.clone();
     let yield_: ast::CallExpr = if has_yield(last_statement.clone()) {
-        if let ast::Expression::PipeExpr(pip_expr) = last_statement {
-            call = pip_expr.argument;
+        if let ast::Expression::PipeExpr(pipe_expr) = last_statement {
+            call = pipe_expr.argument;
             // re-use yield
-            pip_expr.call
+            pipe_expr.call
         } else {
             make_yield_function()
         }
@@ -626,10 +626,10 @@ pub(crate) fn inject_measurement_filter(
 
     let last_statement: ast::Expression = call.clone();
     let yield_: ast::CallExpr = if has_yield(last_statement.clone()) {
-        if let ast::Expression::PipeExpr(pip_expr) = last_statement {
-            call = pip_expr.argument;
+        if let ast::Expression::PipeExpr(pipe_expr) = last_statement {
+            call = pipe_expr.argument;
             // re-use yield
-            pip_expr.call
+            pipe_expr.call
         } else {
             make_yield_function()
         }
