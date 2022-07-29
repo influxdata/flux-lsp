@@ -221,12 +221,10 @@ macro_rules! filter {
 }
 
 fn make_from_function(bucket: String) -> ast::Statement {
-    let range = ast::ExprStmt {
+    ast::Statement::Expr(Box::new(ast::ExprStmt {
         base: ast::BaseNode::default(),
         expression: ast::Expression::PipeExpr(Box::new(pipe!(ast::Expression::Call(Box::new(from!(bucket))), range!()))),
-    };
-
-    ast::Statement::Expr(Box::new(range))
+    }))
 }
 
 #[derive(Default)]
