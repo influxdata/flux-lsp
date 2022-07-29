@@ -108,7 +108,7 @@ fn make_filter_function(
 }
 
 /// This will return the ast equivalent of
-/// `from(bucket: "{bucket}") |> range(start: v.timeRangeStart, stop: v.timeRangeStop) |> yield(name: "{bucket}-{length_of_ast}")`
+/// `from(bucket: "{bucket}") |> range(start: v.timeRangeStart, stop: v.timeRangeStop) |> yield(name: "_influxDBEditor")`
 fn make_from_function(bucket: String) -> ast::Statement {
     let from = ast::CallExpr {
         base: ast::BaseNode::default(),
