@@ -1,9 +1,10 @@
 /// Diagnostics for flux code
 ///
 /// These diagnostics can range from informational lints to warnings and errors.
-use lspower::lsp;
-
 use flux::semantic::nodes::Package;
+use flux::semantic::walk::Node as WalkNode;
+use inflector::Inflector;
+use lspower::lsp;
 
 use super::visitors::semantic::{
     ContribDiagnosticVisitor, ExperimentalDiagnosticVisitor,
@@ -47,6 +48,42 @@ pub(crate) fn no_influxdb_identifiers(
 ) -> Vec<(Option<String>, lsp::Diagnostic)> {
     let visitor = crate::walk_semantic_package!(
         InfluxDBIdentifierDiagnosticVisitor::default(),
+        pkg
+    );
+    visitor.diagnostics
+}
+
+/// Walk the ast and identifiers that are defined in the script and check that they are
+/// using camelCase rather than snake_case.
+#[derive(Default)]
+struct CamelCaseIdentifierVisitor {
+    diagnostics: Vec<(Option<String>, lsp::Diagnostic)>,
+}
+
+impl<'a> flux::semantic::walk::Visitor<'a>
+    for CamelCaseIdentifierVisitor
+{
+    fn visit(&mut self, node: WalkNode<'a>) -> bool {
+        if let WalkNode::VariableAssgn(assign) = node {
+            if !assign.id.name.is_camel_case() {
+                self.diagnostics.push((assign.loc.file.clone(), lsp::Diagnostic {
+                    range: assign.id.loc.clone().into(),
+                    severity: Some(lsp::DiagnosticSeverity::INFORMATION),
+                    message: format!("Idiomatic flux uses camel case for identifier names. Consider renaming this identifier `{}`", assign.id.name.to_camel_case()),
+                    ..lsp::Diagnostic::default()
+                }))
+            }
+        }
+        true
+    }
+}
+
+/// Flux prefers camelCase over snake_case for identifiers.
+pub(crate) fn prefer_camel_case(
+    pkg: &Package,
+) -> Vec<(Option<String>, lsp::Diagnostic)> {
+    let visitor = crate::walk_semantic_package!(
+        CamelCaseIdentifierVisitor::default(),
         pkg
     );
     visitor.diagnostics
@@ -268,6 +305,28 @@ params = "abc123"
             },
             severity: Some(lsp::DiagnosticSeverity::WARNING),
             message: "Avoid using `params` as an identifier name. In some InfluxDB contexts, it may be provided at runtime.".into(),
+            ..lsp::Diagnostic::default()
+        })], diagnostics);
+    }
+
+    #[test]
+    fn prefer_camel_case_in_identifiers() {
+        let fluxscript = r#"my_snake_case = 10"#;
+        let package = get_package(&fluxscript);
+
+        let diagnostics = prefer_camel_case(&package);
+
+        assert_eq!(vec![(Some("script.flux".to_string()), lsp::Diagnostic {
+            range: lsp::Range {
+                start: lsp::Position {
+                    line: 0, character: 0,
+                },
+                end : lsp::Position {
+                    line: 0, character: 13,
+                },
+            },
+            severity: Some(lsp::DiagnosticSeverity::INFORMATION),
+            message: "Idiomatic flux uses camel case for identifier names. Consider renaming this identifier `mySnakeCase`".into(),
             ..lsp::Diagnostic::default()
         })], diagnostics);
     }

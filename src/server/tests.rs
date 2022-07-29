@@ -2065,42 +2065,42 @@ from()
             "label": "bucket",
             "kind": 5,
             "detail": "string",
-            "insertText": "bucket: $1",
+            "insertText": "bucket: \"$1\"",
             "insertTextFormat": 2
           },
           {
             "label": "bucketID",
             "kind": 5,
             "detail": "string",
-            "insertText": "bucketID: $2",
+            "insertText": "bucketID: \"$2\"",
             "insertTextFormat": 2
           },
           {
             "label": "host",
             "kind": 5,
             "detail": "string",
-            "insertText": "host: $3",
+            "insertText": "host: \"$3\"",
             "insertTextFormat": 2
           },
           {
             "label": "org",
             "kind": 5,
             "detail": "string",
-            "insertText": "org: $4",
+            "insertText": "org: \"$4\"",
             "insertTextFormat": 2
           },
           {
             "label": "orgID",
             "kind": 5,
             "detail": "string",
-            "insertText": "orgID: $5",
+            "insertText": "orgID: \"$5\"",
             "insertTextFormat": 2
           },
           {
             "label": "token",
             "kind": 5,
             "detail": "string",
-            "insertText": "token: $6",
+            "insertText": "token: \"$6\"",
             "insertTextFormat": 2
           }
         ]"#]]
@@ -2344,21 +2344,21 @@ csv.from(
               "label": "csv",
               "kind": 5,
               "detail": "string",
-              "insertText": "csv: $1",
+              "insertText": "csv: \"$1\"",
               "insertTextFormat": 2
             },
             {
               "label": "file",
               "kind": 5,
               "detail": "string",
-              "insertText": "file: $2",
+              "insertText": "file: \"$2\"",
               "insertTextFormat": 2
             },
             {
               "label": "mode",
               "kind": 5,
               "detail": "string",
-              "insertText": "mode: $3",
+              "insertText": "mode: \"$3\"",
               "insertTextFormat": 2
             }
           ]

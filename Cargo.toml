@@ -1,6 +1,6 @@
 [package]
 name = "flux-lsp"
-version = "0.8.27"
+version = "0.8.28"
 authors = ["Flux Developers <flux-developers@influxdata.com>"]
 edition = "2021"
 license = "MIT"
@@ -41,6 +41,7 @@ console_error_panic_hook = { version = "0.1.7", optional = true }
 console_log = { version = "0.2", optional = true }
 flux = { git = "https://github.com/influxdata/flux", rev = "e811f6c8", features = ["lsp"], default-features = false }
 futures = { version = "0.3.21", optional = true }
+Inflector = "0.11.4"
 js-sys = { version = "0.3.57", optional = true }
 lazy_static = "1.4.0"
 line-col = "0.2.1"
