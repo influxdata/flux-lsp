@@ -153,10 +153,51 @@ macro_rules! filter {
                             },
                         ),
                         value: Some(
-                            make_flux_filter_function(
-                                $key,
-                                $value,
-                            ),
+                            ast::Expression::Function(Box::new(ast::FunctionExpr {
+                                arrow: vec![],
+                                base: ast::BaseNode::default(),
+                                body: ast::FunctionBody::Expr(ast::Expression::Binary(
+                                    Box::new(ast::BinaryExpr {
+                                        base: ast::BaseNode::default(),
+                                        left: ast::Expression::Member(Box::new(
+                                            ast::MemberExpr {
+                                                base: ast::BaseNode::default(),
+                                                lbrack: vec![],
+                                                rbrack: vec![],
+                                                object: ast::Expression::Identifier(
+                                                    ast::Identifier {
+                                                        base: ast::BaseNode::default(),
+                                                        name: "r".into(),
+                                                    },
+                                                ),
+                                                property: ast::PropertyKey::Identifier(
+                                                    ast::Identifier {
+                                                        base: ast::BaseNode::default(),
+                                                        name: $key,
+                                                    },
+                                                ),
+                                            },
+                                        )),
+                                        right: ast::Expression::StringLit(ast::StringLit {
+                                            base: ast::BaseNode::default(),
+                                            value: $value,
+                                        }),
+                                        operator: ast::Operator::EqualOperator,
+                                    }),
+                                )),
+                                lparen: vec![],
+                                rparen: vec![],
+                                params: vec![ast::Property {
+                                    base: ast::BaseNode::default(),
+                                    key: ast::PropertyKey::Identifier(ast::Identifier {
+                                        base: ast::BaseNode::default(),
+                                        name: "r".into(),
+                                    }),
+                                    comma: vec![],
+                                    separator: vec![],
+                                    value: None,
+                                }],
+                            }))
                         ),
                         comma: vec![],
                         separator: vec![],
@@ -269,60 +310,6 @@ fn find_the_from(
         }
         None => make_from_function(bucket),
     }
-}
-
-/// Create a function used as then `fn` parameter of `filter`
-///
-/// This will return the ast equivalent of `(r) => r.{field} == "{value}"`.
-fn make_flux_filter_function(
-    field: String,
-    value: String,
-) -> ast::Expression {
-    ast::Expression::Function(Box::new(ast::FunctionExpr {
-        arrow: vec![],
-        base: ast::BaseNode::default(),
-        body: ast::FunctionBody::Expr(ast::Expression::Binary(
-            Box::new(ast::BinaryExpr {
-                base: ast::BaseNode::default(),
-                left: ast::Expression::Member(Box::new(
-                    ast::MemberExpr {
-                        base: ast::BaseNode::default(),
-                        lbrack: vec![],
-                        rbrack: vec![],
-                        object: ast::Expression::Identifier(
-                            ast::Identifier {
-                                base: ast::BaseNode::default(),
-                                name: "r".into(),
-                            },
-                        ),
-                        property: ast::PropertyKey::Identifier(
-                            ast::Identifier {
-                                base: ast::BaseNode::default(),
-                                name: field,
-                            },
-                        ),
-                    },
-                )),
-                right: ast::Expression::StringLit(ast::StringLit {
-                    base: ast::BaseNode::default(),
-                    value,
-                }),
-                operator: ast::Operator::EqualOperator,
-            }),
-        )),
-        lparen: vec![],
-        rparen: vec![],
-        params: vec![ast::Property {
-            base: ast::BaseNode::default(),
-            key: ast::PropertyKey::Identifier(ast::Identifier {
-                base: ast::BaseNode::default(),
-                name: "r".into(),
-            }),
-            comma: vec![],
-            separator: vec![],
-            value: None,
-        }],
-    }))
 }
 
 pub(crate) fn inject_tag_filter(
