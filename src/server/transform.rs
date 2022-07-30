@@ -134,7 +134,7 @@ macro_rules! pipe {
             base: ast::BaseNode::default(),
             call: $b,
         }
-    }
+    };
 }
 
 macro_rules! filter {
@@ -223,7 +223,10 @@ macro_rules! filter {
 fn make_from_function(bucket: String) -> ast::Statement {
     ast::Statement::Expr(Box::new(ast::ExprStmt {
         base: ast::BaseNode::default(),
-        expression: ast::Expression::PipeExpr(Box::new(pipe!(ast::Expression::Call(Box::new(from!(bucket))), range!()))),
+        expression: ast::Expression::PipeExpr(Box::new(pipe!(
+            ast::Expression::Call(Box::new(from!(bucket))),
+            range!()
+        ))),
     }))
 }
 
@@ -406,15 +409,18 @@ pub(crate) fn inject_field_filter(
 
     let call = if let ast::Statement::Expr(expr) =
         find_the_from(&mut ast, bucket)
-        {
-            expr.expression
-        } else {
-            return Err(());
-        };
+    {
+        expr.expression
+    } else {
+        return Err(());
+    };
 
     ast.body.push(ast::Statement::Expr(Box::new(ast::ExprStmt {
         base: ast::BaseNode::default(),
-        expression: ast::Expression::PipeExpr(Box::new(pipe!(call, filter!("_field".to_string(), name)))),
+        expression: ast::Expression::PipeExpr(Box::new(pipe!(
+            call,
+            filter!("_field".to_string(), name)
+        ))),
     })));
     Ok(ast)
 }
@@ -437,7 +443,10 @@ pub(crate) fn inject_tag_value_filter(
 
     ast.body.push(ast::Statement::Expr(Box::new(ast::ExprStmt {
         base: ast::BaseNode::default(),
-        expression: ast::Expression::PipeExpr(Box::new(pipe!(call, filter!(name, value)))),
+        expression: ast::Expression::PipeExpr(Box::new(pipe!(
+            call,
+            filter!(name, value)
+        ))),
     })));
     Ok(ast)
 }
@@ -459,7 +468,10 @@ pub(crate) fn inject_measurement_filter(
 
     ast.body.push(ast::Statement::Expr(Box::new(ast::ExprStmt {
         base: ast::BaseNode::default(),
-        expression: ast::Expression::PipeExpr(Box::new(pipe!(call, filter!("_measurement".into(), name)))),
+        expression: ast::Expression::PipeExpr(Box::new(pipe!(
+            call,
+            filter!("_measurement".into(), name)
+        ))),
     })));
     Ok(ast)
 }
