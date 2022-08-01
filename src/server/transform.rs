@@ -5,6 +5,8 @@
 use flux::ast;
 use flux::ast::walk;
 
+const YIELD_NAME: &str = "_influxDBEditor";
+
 /// This will return the ast equivalent of
 /// `from(bucket: "{$bucket_name}")
 macro_rules! from {
@@ -252,7 +254,7 @@ macro_rules! yield_ {
                         value: Some(ast::Expression::StringLit(
                             ast::StringLit {
                                 base: ast::BaseNode::default(),
-                                value: "_influxDBEditor".into(),
+                                value: YIELD_NAME.into(),
                             },
                         )),
                         comma: vec![],
