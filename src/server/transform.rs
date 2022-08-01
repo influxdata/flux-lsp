@@ -307,11 +307,12 @@ fn make_from_function(bucket: String) -> ast::Statement {
 }
 
 #[derive(Default)]
-struct FromBucketVisitor {
+struct InjectionStatementFinderVisitor {
     bucket: Option<String>,
+    yield_name: Option<String>,
 }
 
-impl<'a> walk::Visitor<'a> for FromBucketVisitor {
+impl<'a> walk::Visitor<'a> for InjectionStatementFinderVisitor {
     fn visit(&mut self, node: walk::Node<'a>) -> bool {
         match node {
             walk::Node::CallExpr(call) => {
@@ -326,6 +327,21 @@ impl<'a> walk::Visitor<'a> for FromBucketVisitor {
                                         if key.name == "bucket" {
                                             if let Some(ast::Expression::StringLit(value)) = &property.value {
                                                 self.bucket = Some(value.value.clone());
+                                            }
+                                        }
+                                    }
+                                })
+                            }
+                        });
+                        false
+                    } else if identifier.name == "yield" {
+                        call.arguments.iter().for_each(|argument| {
+                            if let ast::Expression::Object(obj) = argument {
+                                obj.properties.iter().for_each(|property| {
+                                    if let ast::PropertyKey::Identifier(key) = &property.key {
+                                        if key.name == "name" {
+                                            if let Some(ast::Expression::StringLit(value)) = &property.value {
+                                                self.yield_name = Some(value.value.clone());
                                             }
                                         }
                                     }
@@ -369,7 +385,8 @@ fn find_the_from(
                 last_statement.clone()
             {
                 let walker = walk::Node::ExprStmt(statement.as_ref());
-                let mut visitor = FromBucketVisitor::default();
+                let mut visitor =
+                    InjectionStatementFinderVisitor::default();
 
                 ast::walk::walk(&mut visitor, walker);
 
