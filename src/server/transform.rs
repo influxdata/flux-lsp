@@ -274,6 +274,23 @@ macro_rules! yield_ {
     };
 }
 
+// check if the last expression is "yield"
+fn has_yield(statement: ast::Expression) -> bool {
+    match statement {
+        ast::Expression::PipeExpr(pipe_expr) => {
+            let call = pipe_expr.call.clone();
+            if let ast::Expression::Identifier(identifier) =
+                &call.callee
+            {
+                identifier.name == "yield"
+            } else {
+                false
+            }
+        }
+        _ => false,
+    }
+}
+
 fn make_from_function(bucket: String) -> ast::Statement {
     ast::Statement::Expr(Box::new(ast::ExprStmt {
         base: ast::BaseNode::default(),
@@ -323,23 +340,6 @@ impl<'a> walk::Visitor<'a> for FromBucketVisitor {
             }
             _ => true,
         }
-    }
-}
-
-// check if the last expression is "yield"
-fn has_yield(statement: ast::Expression) -> bool {
-    match statement {
-        ast::Expression::PipeExpr(pipe_expr) => {
-            let call = pipe_expr.call.clone();
-            if let ast::Expression::Identifier(identifier) =
-                &call.callee
-            {
-                identifier.name == "yield"
-            } else {
-                false
-            }
-        }
-        _ => false,
     }
 }
 
