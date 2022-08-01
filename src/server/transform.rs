@@ -181,84 +181,55 @@ macro_rules! filter_ {
 /// `filter(fn: (r) => r.{$key} = {$value})`
 macro_rules! filter {
     ($key:expr, $value:expr) => {
-        ast::CallExpr {
-            arguments: vec![ast::Expression::Object(
-                Box::new(ast::ObjectExpr {
+        filter_!(
+            Some(
+                ast::Expression::Function(Box::new(ast::FunctionExpr {
+                    arrow: vec![],
                     base: ast::BaseNode::default(),
-                    properties: vec![ast::Property {
-                        base: ast::BaseNode::default(),
-                        key: ast::PropertyKey::Identifier(
-                            ast::Identifier {
-                                base: ast::BaseNode::default(
-                                ),
-                                name: "fn".into(),
-                            },
-                        ),
-                        value: Some(
-                            ast::Expression::Function(Box::new(ast::FunctionExpr {
-                                arrow: vec![],
-                                base: ast::BaseNode::default(),
-                                body: ast::FunctionBody::Expr(ast::Expression::Binary(
-                                    Box::new(ast::BinaryExpr {
-                                        base: ast::BaseNode::default(),
-                                        left: ast::Expression::Member(Box::new(
-                                            ast::MemberExpr {
-                                                base: ast::BaseNode::default(),
-                                                lbrack: vec![],
-                                                rbrack: vec![],
-                                                object: ast::Expression::Identifier(
-                                                    ast::Identifier {
-                                                        base: ast::BaseNode::default(),
-                                                        name: "r".into(),
-                                                    },
-                                                ),
-                                                property: ast::PropertyKey::Identifier(
-                                                    ast::Identifier {
-                                                        base: ast::BaseNode::default(),
-                                                        name: $key,
-                                                    },
-                                                ),
-                                            },
-                                        )),
-                                        right: ast::Expression::StringLit(ast::StringLit {
-                                            base: ast::BaseNode::default(),
-                                            value: $value,
-                                        }),
-                                        operator: ast::Operator::EqualOperator,
-                                    }),
-                                )),
-                                lparen: vec![],
-                                rparen: vec![],
-                                params: vec![ast::Property {
+                    body: ast::FunctionBody::Expr(ast::Expression::Binary(
+                        Box::new(ast::BinaryExpr {
+                            base: ast::BaseNode::default(),
+                            left: ast::Expression::Member(Box::new(
+                                ast::MemberExpr {
                                     base: ast::BaseNode::default(),
-                                    key: ast::PropertyKey::Identifier(ast::Identifier {
-                                        base: ast::BaseNode::default(),
-                                        name: "r".into(),
-                                    }),
-                                    comma: vec![],
-                                    separator: vec![],
-                                    value: None,
-                                }],
-                            }))
-                        ),
+                                    lbrack: vec![],
+                                    rbrack: vec![],
+                                    object: ast::Expression::Identifier(
+                                        ast::Identifier {
+                                            base: ast::BaseNode::default(),
+                                            name: "r".into(),
+                                        },
+                                    ),
+                                    property: ast::PropertyKey::Identifier(
+                                        ast::Identifier {
+                                            base: ast::BaseNode::default(),
+                                            name: $key,
+                                        },
+                                    ),
+                                },
+                            )),
+                            right: ast::Expression::StringLit(ast::StringLit {
+                                base: ast::BaseNode::default(),
+                                value: $value,
+                            }),
+                            operator: ast::Operator::EqualOperator,
+                        }),
+                    )),
+                    lparen: vec![],
+                    rparen: vec![],
+                    params: vec![ast::Property {
+                        base: ast::BaseNode::default(),
+                        key: ast::PropertyKey::Identifier(ast::Identifier {
+                            base: ast::BaseNode::default(),
+                            name: "r".into(),
+                        }),
                         comma: vec![],
                         separator: vec![],
+                        value: None,
                     }],
-                    lbrace: vec![],
-                    rbrace: vec![],
-                    with: None,
-                }),
-            )],
-            base: ast::BaseNode::default(),
-            callee: ast::Expression::Identifier(
-                ast::Identifier {
-                    base: ast::BaseNode::default(),
-                    name: "filter".into(),
-                },
-            ),
-            lparen: vec![],
-            rparen: vec![],
-        }
+                }))
+            )
+        )
     }
 }
 
