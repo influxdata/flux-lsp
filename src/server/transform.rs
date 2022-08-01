@@ -5,155 +5,81 @@
 use flux::ast;
 use flux::ast::walk;
 
-/// This will return the ast equivalent of `yield(name: "_influxDBEditor")`
-fn make_yield_function() -> ast::CallExpr {
-    ast::CallExpr {
-        arguments: vec![ast::Expression::Object(Box::new(
-            ast::ObjectExpr {
-                base: ast::BaseNode::default(),
-                properties: vec![ast::Property {
-                    base: ast::BaseNode::default(),
-                    key: ast::PropertyKey::Identifier(
-                        ast::Identifier {
-                            base: ast::BaseNode::default(),
-                            name: "name".into(),
-                        },
-                    ),
-                    value: Some(ast::Expression::StringLit(
-                        ast::StringLit {
-                            base: ast::BaseNode::default(),
-                            value: "_influxDBEditor".into(),
-                        },
-                    )),
-                    comma: vec![],
-                    separator: vec![],
-                }],
-                lbrace: vec![],
-                rbrace: vec![],
-                with: None,
-            },
-        ))],
-        base: ast::BaseNode::default(),
-        callee: ast::Expression::Identifier(ast::Identifier {
-            base: ast::BaseNode::default(),
-            name: "yield".into(),
-        }),
-        lparen: vec![],
-        rparen: vec![],
-    }
-}
-
 /// This will return the ast equivalent of
-/// `filter(fn: (r) => {value})`
-fn make_filter_function(
-    value: Option<ast::Expression>,
-) -> ast::CallExpr {
-    ast::CallExpr {
-        arguments: vec![ast::Expression::Object(Box::new(
-            ast::ObjectExpr {
-                base: ast::BaseNode::default(),
-                properties: vec![ast::Property {
-                    base: ast::BaseNode::default(),
-                    key: ast::PropertyKey::Identifier(
-                        ast::Identifier {
-                            base: ast::BaseNode::default(),
-                            name: "fn".into(),
-                        },
-                    ),
-                    value,
-                    comma: vec![],
-                    separator: vec![],
-                }],
-                lbrace: vec![],
-                rbrace: vec![],
-                with: None,
-            },
-        ))],
-        base: ast::BaseNode::default(),
-        callee: ast::Expression::Identifier(ast::Identifier {
+/// `from(bucket: "{$bucket_name}")
+macro_rules! from {
+    ($bucket_name:expr) => {
+        ast::CallExpr {
             base: ast::BaseNode::default(),
-            name: "filter".into(),
-        }),
-        lparen: vec![],
-        rparen: vec![],
-    }
-}
-
-/// This will return the ast equivalent of
-/// `from(bucket: "{bucket}") |> range(start: v.timeRangeStart, stop: v.timeRangeStop) |> yield(name: "_influxDBEditor")`
-fn make_from_function(bucket: String) -> ast::Statement {
-    let from = ast::CallExpr {
-        base: ast::BaseNode::default(),
-        callee: ast::Expression::Identifier(ast::Identifier {
-            base: ast::BaseNode::default(),
-            name: "from".into(),
-        }),
-        arguments: vec![ast::Expression::Object(Box::new(
-            ast::ObjectExpr {
+            callee: ast::Expression::Identifier(ast::Identifier {
                 base: ast::BaseNode::default(),
-                lbrace: vec![],
-                with: None,
-                properties: vec![flux::ast::Property {
+                name: "from".into(),
+            }),
+            arguments: vec![ast::Expression::Object(Box::new(
+                ast::ObjectExpr {
                     base: ast::BaseNode::default(),
-                    key: ast::PropertyKey::Identifier(
-                        ast::Identifier {
-                            base: ast::BaseNode::default(),
-                            name: "bucket".into(),
-                        },
-                    ),
-                    separator: vec![],
-                    value: Some(ast::Expression::StringLit(
-                        ast::StringLit {
-                            base: ast::BaseNode::default(),
-                            value: bucket,
-                        },
-                    )),
-                    comma: vec![],
-                }],
-                rbrace: vec![],
-            },
-        ))],
-        lparen: vec![],
-        rparen: vec![],
-    };
-
-    let range = ast::CallExpr {
-        arguments: vec![ast::Expression::Object(Box::new(
-            ast::ObjectExpr {
-                base: ast::BaseNode::default(),
-                properties: vec![
-                    ast::Property {
+                    lbrace: vec![],
+                    with: None,
+                    properties: vec![flux::ast::Property {
                         base: ast::BaseNode::default(),
                         key: ast::PropertyKey::Identifier(
                             ast::Identifier {
                                 base: ast::BaseNode::default(),
+                                name: "bucket".into(),
+                            },
+                        ),
+                        separator: vec![],
+                        value: Some(ast::Expression::StringLit(
+                            ast::StringLit {
+                                base: ast::BaseNode::default(),
+                                value: $bucket_name,  // BUCKET GOES HERE
+                            },
+                        )),
+                        comma: vec![],
+                    }],
+                    rbrace: vec![],
+                },
+            ))],
+            lparen: vec![],
+            rparen: vec![],
+        }
+    };
+}
+
+/// This will return the ast equivalent of
+/// |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+macro_rules! range {
+    () => {
+        ast::CallExpr {
+            arguments: vec![ast::Expression::Object(
+                Box::new(ast::ObjectExpr {
+                    base: ast::BaseNode::default(),
+                    properties: vec![ast::Property {
+                        base: ast::BaseNode::default(),
+                        key: ast::PropertyKey::Identifier(
+                            ast::Identifier {
+                                base: ast::BaseNode::default(
+                                ),
                                 name: "start".into(),
                             },
                         ),
-                        value: Some(ast::Expression::Member(
-                            Box::new(ast::MemberExpr {
+                        value: Some(
+                            ast::Expression::Member(Box::new(ast::MemberExpr {
                                 base: ast::BaseNode::default(),
                                 lbrack: vec![],
                                 rbrack: vec![],
                                 object: ast::Expression::Identifier(
                                     ast::Identifier {
-                                        base: ast::BaseNode::default(
-                                        ),
+                                        base: ast::BaseNode::default(),
                                         name: "v".into(),
-                                    },
+                                    }
                                 ),
-                                property:
-                                    ast::PropertyKey::Identifier(
-                                        ast::Identifier {
-                                            base:
-                                                ast::BaseNode::default(
-                                                ),
-                                            name: "timeRangeStart"
-                                                .into(),
-                                        },
-                                    ),
-                            }),
-                        )),
+                                property: ast::PropertyKey::Identifier(ast::Identifier {
+                                    base: ast::BaseNode::default(),
+                                    name: "timeRangeStart".into(),
+                                })
+                            }))
+                        ),
                         comma: vec![],
                         separator: vec![],
                     },
@@ -161,71 +87,232 @@ fn make_from_function(bucket: String) -> ast::Statement {
                         base: ast::BaseNode::default(),
                         key: ast::PropertyKey::Identifier(
                             ast::Identifier {
-                                base: ast::BaseNode::default(),
+                                base: ast::BaseNode::default(
+                                ),
                                 name: "stop".into(),
                             },
                         ),
-                        value: Some(ast::Expression::Member(
-                            Box::new(ast::MemberExpr {
+                        value: Some(
+                            ast::Expression::Member(Box::new(ast::MemberExpr {
                                 base: ast::BaseNode::default(),
                                 lbrack: vec![],
                                 rbrack: vec![],
                                 object: ast::Expression::Identifier(
                                     ast::Identifier {
-                                        base: ast::BaseNode::default(
-                                        ),
+                                        base: ast::BaseNode::default(),
                                         name: "v".into(),
-                                    },
+                                    }
                                 ),
-                                property:
-                                    ast::PropertyKey::Identifier(
-                                        ast::Identifier {
-                                            base:
-                                                ast::BaseNode::default(
+                                property: ast::PropertyKey::Identifier(ast::Identifier {
+                                    base: ast::BaseNode::default(),
+                                    name: "timeRangeStop".into(),
+                                })
+                            }))
+                        ),
+                        comma: vec![],
+                        separator: vec![],
+                    }
+                    ],
+                    lbrace: vec![],
+                    rbrace: vec![],
+                    with: None,
+                }),
+            )],
+            base: ast::BaseNode::default(),
+            callee: ast::Expression::Identifier(
+                ast::Identifier {
+                    base: ast::BaseNode::default(),
+                    name: "range".into(),
+                },
+            ),
+            lparen: vec![],
+            rparen: vec![],
+        }
+    }
+}
+
+macro_rules! pipe {
+    ($a:expr, $b:expr) => {
+        ast::PipeExpr {
+            argument: $a,
+            base: ast::BaseNode::default(),
+            call: $b,
+        }
+    };
+}
+
+/// This will return the ast equivalent of
+/// `filter(fn: (r) => {$value})`
+macro_rules! filter_ {
+    ($value:expr) => {
+        ast::CallExpr {
+            arguments: vec![ast::Expression::Object(Box::new(
+                ast::ObjectExpr {
+                    base: ast::BaseNode::default(),
+                    properties: vec![ast::Property {
+                        base: ast::BaseNode::default(),
+                        key: ast::PropertyKey::Identifier(
+                            ast::Identifier {
+                                base: ast::BaseNode::default(),
+                                name: "fn".into(),
+                            },
+                        ),
+                        value: $value,
+                        comma: vec![],
+                        separator: vec![],
+                    }],
+                    lbrace: vec![],
+                    rbrace: vec![],
+                    with: None,
+                },
+            ))],
+            base: ast::BaseNode::default(),
+            callee: ast::Expression::Identifier(ast::Identifier {
+                base: ast::BaseNode::default(),
+                name: "filter".into(),
+            }),
+            lparen: vec![],
+            rparen: vec![],
+        }
+    };
+}
+
+/// This will return the ast equivalent of
+/// `filter(fn: (r) => r.{$key} = {$value})`
+macro_rules! filter {
+    ($key:expr, $value:expr) => {
+        ast::CallExpr {
+            arguments: vec![ast::Expression::Object(
+                Box::new(ast::ObjectExpr {
+                    base: ast::BaseNode::default(),
+                    properties: vec![ast::Property {
+                        base: ast::BaseNode::default(),
+                        key: ast::PropertyKey::Identifier(
+                            ast::Identifier {
+                                base: ast::BaseNode::default(
+                                ),
+                                name: "fn".into(),
+                            },
+                        ),
+                        value: Some(
+                            ast::Expression::Function(Box::new(ast::FunctionExpr {
+                                arrow: vec![],
+                                base: ast::BaseNode::default(),
+                                body: ast::FunctionBody::Expr(ast::Expression::Binary(
+                                    Box::new(ast::BinaryExpr {
+                                        base: ast::BaseNode::default(),
+                                        left: ast::Expression::Member(Box::new(
+                                            ast::MemberExpr {
+                                                base: ast::BaseNode::default(),
+                                                lbrack: vec![],
+                                                rbrack: vec![],
+                                                object: ast::Expression::Identifier(
+                                                    ast::Identifier {
+                                                        base: ast::BaseNode::default(),
+                                                        name: "r".into(),
+                                                    },
                                                 ),
-                                            name: "timeRangeStop"
-                                                .into(),
-                                        },
-                                    ),
-                            }),
+                                                property: ast::PropertyKey::Identifier(
+                                                    ast::Identifier {
+                                                        base: ast::BaseNode::default(),
+                                                        name: $key,
+                                                    },
+                                                ),
+                                            },
+                                        )),
+                                        right: ast::Expression::StringLit(ast::StringLit {
+                                            base: ast::BaseNode::default(),
+                                            value: $value,
+                                        }),
+                                        operator: ast::Operator::EqualOperator,
+                                    }),
+                                )),
+                                lparen: vec![],
+                                rparen: vec![],
+                                params: vec![ast::Property {
+                                    base: ast::BaseNode::default(),
+                                    key: ast::PropertyKey::Identifier(ast::Identifier {
+                                        base: ast::BaseNode::default(),
+                                        name: "r".into(),
+                                    }),
+                                    comma: vec![],
+                                    separator: vec![],
+                                    value: None,
+                                }],
+                            }))
+                        ),
+                        comma: vec![],
+                        separator: vec![],
+                    }],
+                    lbrace: vec![],
+                    rbrace: vec![],
+                    with: None,
+                }),
+            )],
+            base: ast::BaseNode::default(),
+            callee: ast::Expression::Identifier(
+                ast::Identifier {
+                    base: ast::BaseNode::default(),
+                    name: "filter".into(),
+                },
+            ),
+            lparen: vec![],
+            rparen: vec![],
+        }
+    }
+}
+
+/// This will return the ast equivalent of
+/// `yield(name: "_influxDBEditor")`
+macro_rules! yield_ {
+    () => {
+        ast::CallExpr {
+            arguments: vec![ast::Expression::Object(Box::new(
+                ast::ObjectExpr {
+                    base: ast::BaseNode::default(),
+                    properties: vec![ast::Property {
+                        base: ast::BaseNode::default(),
+                        key: ast::PropertyKey::Identifier(
+                            ast::Identifier {
+                                base: ast::BaseNode::default(),
+                                name: "name".into(),
+                            },
+                        ),
+                        value: Some(ast::Expression::StringLit(
+                            ast::StringLit {
+                                base: ast::BaseNode::default(),
+                                value: "_influxDBEditor".into(),
+                            },
                         )),
                         comma: vec![],
                         separator: vec![],
-                    },
-                ],
-                lbrace: vec![],
-                rbrace: vec![],
-                with: None,
-            },
-        ))],
-        base: ast::BaseNode::default(),
-        callee: ast::Expression::Identifier(ast::Identifier {
+                    }],
+                    lbrace: vec![],
+                    rbrace: vec![],
+                    with: None,
+                },
+            ))],
             base: ast::BaseNode::default(),
-            name: "range".into(),
-        }),
-        lparen: vec![],
-        rparen: vec![],
+            callee: ast::Expression::Identifier(ast::Identifier {
+                base: ast::BaseNode::default(),
+                name: "yield".into(),
+            }),
+            lparen: vec![],
+            rparen: vec![],
+        }
     };
+}
 
-    let yield_: ast::CallExpr = make_yield_function();
-
+fn make_from_function(bucket: String) -> ast::Statement {
     ast::Statement::Expr(Box::new(ast::ExprStmt {
         base: ast::BaseNode::default(),
-        expression: ast::Expression::PipeExpr(Box::new(
-            ast::PipeExpr {
-                base: ast::BaseNode::default(),
-                argument: ast::Expression::PipeExpr(Box::new(
-                    ast::PipeExpr {
-                        argument: ast::Expression::Call(Box::new(
-                            from,
-                        )),
-                        base: ast::BaseNode::default(),
-                        call: range,
-                    },
-                )),
-                call: yield_,
-            },
-        )),
+        expression: ast::Expression::PipeExpr(Box::new(pipe!(
+            ast::Expression::PipeExpr(Box::new(pipe!(
+                ast::Expression::Call(Box::new(from!(bucket))),
+                range!()
+            ))),
+            yield_!()
+        ))),
     }))
 }
 
@@ -330,60 +417,6 @@ fn find_the_from(
     }
 }
 
-/// Create a function used as then `fn` parameter of `filter`
-///
-/// This will return the ast equivalent of `(r) => r.{field} == "{value}"`.
-fn make_flux_filter_function(
-    field: String,
-    value: String,
-) -> ast::Expression {
-    ast::Expression::Function(Box::new(ast::FunctionExpr {
-        arrow: vec![],
-        base: ast::BaseNode::default(),
-        body: ast::FunctionBody::Expr(ast::Expression::Binary(
-            Box::new(ast::BinaryExpr {
-                base: ast::BaseNode::default(),
-                left: ast::Expression::Member(Box::new(
-                    ast::MemberExpr {
-                        base: ast::BaseNode::default(),
-                        lbrack: vec![],
-                        rbrack: vec![],
-                        object: ast::Expression::Identifier(
-                            ast::Identifier {
-                                base: ast::BaseNode::default(),
-                                name: "r".into(),
-                            },
-                        ),
-                        property: ast::PropertyKey::Identifier(
-                            ast::Identifier {
-                                base: ast::BaseNode::default(),
-                                name: field,
-                            },
-                        ),
-                    },
-                )),
-                right: ast::Expression::StringLit(ast::StringLit {
-                    base: ast::BaseNode::default(),
-                    value,
-                }),
-                operator: ast::Operator::EqualOperator,
-            }),
-        )),
-        lparen: vec![],
-        rparen: vec![],
-        params: vec![ast::Property {
-            base: ast::BaseNode::default(),
-            key: ast::PropertyKey::Identifier(ast::Identifier {
-                base: ast::BaseNode::default(),
-                name: "r".into(),
-            }),
-            comma: vec![],
-            separator: vec![],
-            value: None,
-        }],
-    }))
-}
-
 pub(crate) fn inject_tag_filter(
     file: &ast::File,
     name: String,
@@ -407,10 +440,10 @@ pub(crate) fn inject_tag_filter(
             // re-use yield
             pipe_expr.call
         } else {
-            make_yield_function()
+            yield_!()
         }
     } else {
-        make_yield_function()
+        yield_!()
     };
 
     let value = Some(ast::Expression::Function(Box::new(
@@ -457,23 +490,15 @@ pub(crate) fn inject_tag_filter(
         },
     )));
 
-    let filter_: ast::CallExpr = make_filter_function(value);
-
     ast.body.push(ast::Statement::Expr(Box::new(ast::ExprStmt {
         base: ast::BaseNode::default(),
-        expression: ast::Expression::PipeExpr(Box::new(
-            ast::PipeExpr {
-                base: ast::BaseNode::default(),
-                argument: ast::Expression::PipeExpr(Box::new(
-                    ast::PipeExpr {
-                        argument: call,
-                        base: ast::BaseNode::default(),
-                        call: filter_,
-                    },
-                )),
-                call: yield_,
-            },
-        )),
+        expression: ast::Expression::PipeExpr(Box::new(pipe!(
+            ast::Expression::PipeExpr(Box::new(pipe!(
+                call,
+                filter_!(value)
+            ))),
+            yield_
+        ))),
     })));
 
     Ok(ast)
@@ -502,31 +527,21 @@ pub(crate) fn inject_field_filter(
             // re-use yield
             pipe_expr.call
         } else {
-            make_yield_function()
+            yield_!()
         }
     } else {
-        make_yield_function()
+        yield_!()
     };
-
-    let filter_: ast::CallExpr = make_filter_function(Some(
-        make_flux_filter_function("_field".into(), name),
-    ));
 
     ast.body.push(ast::Statement::Expr(Box::new(ast::ExprStmt {
         base: ast::BaseNode::default(),
-        expression: ast::Expression::PipeExpr(Box::new(
-            ast::PipeExpr {
-                base: ast::BaseNode::default(),
-                argument: ast::Expression::PipeExpr(Box::new(
-                    ast::PipeExpr {
-                        argument: call,
-                        base: ast::BaseNode::default(),
-                        call: filter_,
-                    },
-                )),
-                call: yield_,
-            },
-        )),
+        expression: ast::Expression::PipeExpr(Box::new(pipe!(
+            ast::Expression::PipeExpr(Box::new(pipe!(
+                call,
+                filter!("_field".to_string(), name)
+            ))),
+            yield_
+        ))),
     })));
 
     Ok(ast)
@@ -556,31 +571,21 @@ pub(crate) fn inject_tag_value_filter(
             // re-use yield
             pipe_expr.call
         } else {
-            make_yield_function()
+            yield_!()
         }
     } else {
-        make_yield_function()
+        yield_!()
     };
-
-    let filter_: ast::CallExpr = make_filter_function(Some(
-        make_flux_filter_function(name, value),
-    ));
 
     ast.body.push(ast::Statement::Expr(Box::new(ast::ExprStmt {
         base: ast::BaseNode::default(),
-        expression: ast::Expression::PipeExpr(Box::new(
-            ast::PipeExpr {
-                base: ast::BaseNode::default(),
-                argument: ast::Expression::PipeExpr(Box::new(
-                    ast::PipeExpr {
-                        argument: call,
-                        base: ast::BaseNode::default(),
-                        call: filter_,
-                    },
-                )),
-                call: yield_,
-            },
-        )),
+        expression: ast::Expression::PipeExpr(Box::new(pipe!(
+            ast::Expression::PipeExpr(Box::new(pipe!(
+                call,
+                filter!(name, value)
+            ))),
+            yield_
+        ))),
     })));
 
     Ok(ast)
@@ -609,31 +614,21 @@ pub(crate) fn inject_measurement_filter(
             // re-use yield
             pipe_expr.call
         } else {
-            make_yield_function()
+            yield_!()
         }
     } else {
-        make_yield_function()
+        yield_!()
     };
-
-    let filter_: ast::CallExpr = make_filter_function(Some(
-        make_flux_filter_function("_measurement".into(), name),
-    ));
 
     ast.body.push(ast::Statement::Expr(Box::new(ast::ExprStmt {
         base: ast::BaseNode::default(),
-        expression: ast::Expression::PipeExpr(Box::new(
-            ast::PipeExpr {
-                base: ast::BaseNode::default(),
-                argument: ast::Expression::PipeExpr(Box::new(
-                    ast::PipeExpr {
-                        argument: call,
-                        base: ast::BaseNode::default(),
-                        call: filter_,
-                    },
-                )),
-                call: yield_,
-            },
-        )),
+        expression: ast::Expression::PipeExpr(Box::new(pipe!(
+            ast::Expression::PipeExpr(Box::new(pipe!(
+                call,
+                filter!("_measurement".into(), name)
+            ))),
+            yield_
+        ))),
     })));
 
     Ok(ast)
