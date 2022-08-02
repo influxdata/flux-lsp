@@ -1,7 +1,7 @@
 Flux Composition
 ==
 
-The composition capabilities of the flux LSP server enable clients to create a query builder experience without deep knowledge of the flux internals. Composition will create a "Composition-owned" statement in a given flux file, and will be able to append/remove filter calls to that statement. The composition rules apply as follows:
+The composition capabilities of the flux LSP server enable clients to create a query builder experience without deep knowledge of the flux internals. Composition will create a "Composition-owned" statement in a given flux file, and will be able to add/remove filter calls to that statement. The composition rules apply as follows:
 
   - Composition must never generate a query that cannot be executed.
   - Composition should never generate a query that a user with sufficient flux knowledge would never write, e.g. `filter(fn: (r) => r.foo == "bar") |> filter(fn: (r) => r.foo == "bar")`
@@ -42,13 +42,13 @@ interface CompositionInitializeParams {
   - result: `null`
   - error: code and message set in case an exception happens during the initialize request.
 
-Append Measurement Filter
+Add Measurement Filter
 --
 
-The append measurement filter request is sent from the client to the server to append a measurement filter. If a measurement is not already specified, e.g. it was not specified in the initialization and not called previously, it will result in a `workspace/applyEdit` request from the server to the client with the associated filter addition. If a measurement filter already exists, an error will be reported in the form of a `window/showMessage` request from the server to the client with the associated information.
+The add measurement filter request is sent from the client to the server to add a measurement filter. If a measurement is not already specified, e.g. it was not specified in the initialization and not called previously, it will result in a `workspace/applyEdit` request from the server to the client with the associated filter addition. If a measurement filter already exists, an error will be reported in the form of a `window/showMessage` request from the server to the client with the associated information.
 
 *Request*
-  - method: `fluxComposition/appendMeasurementFilter`
+  - method: `fluxComposition/addMeasurementFilter`
   - params: `ValueFilterParams`
 
 ```
@@ -70,13 +70,13 @@ interface ValueFilterParams {
   - error: code and message set in case an exception happens during the request.
 
 
-Append Field Filter
+Add Field Filter
 --
 
-The append field filter request is sent from the client to the server to append a field filter. If the specific field filter does not already exist, the request will result in a `workspace/applyEdit` request from the server to the client with the associated changes. If the field filter already exists, an error will be reported in the form of a `window/showMessage` request from the server to the client.
+The add field filter request is sent from the client to the server to add a field filter. If the specific field filter does not already exist, the request will result in a `workspace/applyEdit` request from the server to the client with the associated changes. If the field filter already exists, an error will be reported in the form of a `window/showMessage` request from the server to the client.
 
 *Request*
-  - method: `fluxComposition/appendFieldFilter`
+  - method: `fluxComposition/addFieldFilter`
   - params: `ValueFilterParams`
 
 *Response*
@@ -84,13 +84,13 @@ The append field filter request is sent from the client to the server to append 
   - error: code and message set in case an exception happens during the request.
 
 
-Append Tag Filter
+Add Tag Filter
 --
 
-The append tag filter request is sent from the client to the server to append a tag filter. If the specific tag filter does not already exist, the request will result in a `workspace/applyEdit` request from the server to the client with the associated changes. If the tag filter already exists, an error will be reported in the form of a `window/showMessage` request from the server to the client.
+The add tag filter request is sent from the client to the server to add a tag filter. If the specific tag filter does not already exist, the request will result in a `workspace/applyEdit` request from the server to the client with the associated changes. If the tag filter already exists, an error will be reported in the form of a `window/showMessage` request from the server to the client.
 
 *Request*
-  - method: `fluxComposition/appendTagFilter`
+  - method: `fluxComposition/addTagFilter`
   - params: `ValueFilterParams`
 
 *Response*
@@ -98,13 +98,13 @@ The append tag filter request is sent from the client to the server to append a 
   - error: code and message set in case an exception happens during the request.
 
 
-Append Tag Value Filter
+Add Tag Value Filter
 --
 
-The append tag value filter request is sent from the client to the server to append a tag value filter. If the specific tag value filter does not already exist, the request will result in a `workspace/applyEdit` request from the server to the client with the associated changes. If the tag value filter already exists, an error will be reported in the form of a `window/showMessage` request from the server to the client.
+The add tag value filter request is sent from the client to the server to add a tag value filter. If the specific tag value filter does not already exist, the request will result in a `workspace/applyEdit` request from the server to the client with the associated changes. If the tag value filter already exists, an error will be reported in the form of a `window/showMessage` request from the server to the client.
 
 *Request*
-  - method: `fluxComposition/appendTagValueFilter`
+  - method: `fluxComposition/addTagValueFilter`
   - params: `TagValueFilterParams`
 
 ```
