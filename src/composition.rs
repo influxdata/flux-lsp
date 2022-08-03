@@ -319,6 +319,8 @@ impl<'a> ast::walk::Visitor<'a>
     }
 }
 
+type CompositionResult = Result<(), ()>;
+
 /// Composition acts as the public entry point into the composition functionality.
 struct Composition {
     file: ast::File,
@@ -346,7 +348,7 @@ impl Composition {
         &mut self,
         bucket: &str,
         measurement: Option<&str>,
-    ) -> Result<(), ()> {
+    ) -> CompositionResult {
         let mut visitor =
             CompositionStatementFinderVisitor::default();
         flux::ast::walk::walk(
@@ -409,6 +411,58 @@ impl Composition {
             })),
         );
 
+        Ok(())
+    }
+
+    fn add_measurement(&mut self, measurement: &str) -> CompositionResult {
+        let mut visitor =
+            CompositionStatementFinderVisitor::default();
+        flux::ast::walk::walk(
+            &mut visitor,
+            flux::ast::walk::Node::File(&self.file),
+        );
+        if visitor.statement.is_none() {
+            return Err(());
+        }
+
+        let expr_statement = visitor.statement.expect("Previous check failed.");
+        self.file.body = self
+            .file
+            .body
+            .iter()
+            .filter(|statement| match statement {
+                ast::Statement::Expr(expression) => {
+                    expr_statement != *expression.as_ref()
+                }
+                _ => true,
+            })
+            .cloned()
+            .collect();
+
+        let yieldless = if let ast::Expression::PipeExpr(pipe_expr) = expr_statement.expression {
+            pipe_expr.argument
+        } else {
+            return Err(());
+        };
+
+        self.file.body.insert(
+            0,
+            ast::Statement::Expr(Box::new(ast::ExprStmt {
+                base: ast::BaseNode::default(),
+                expression: ast::Expression::PipeExpr(Box::new(pipe!(
+                    ast::Expression::PipeExpr(Box::new(
+                        pipe!(
+                            yieldless,
+                            filter!(
+                                "_measurement".into(),
+                                measurement.into()
+                            )
+                        )
+                    )),
+                    yield_!()
+                )))
+            })),
+        );
         Ok(())
     }
 }
@@ -485,5 +539,28 @@ from(bucket: "my-bucket") |> yield(name: "my-result")
             .to_string(),
             composition.to_string()
         );
+    }
+
+    #[test]
+    fn composition_add_measurement() {
+        let fluxscript = r#""#;
+        let ast = flux::parser::parse_string("".into(), &fluxscript);
+
+        let mut composition = Composition::new(ast);
+
+        composition
+            .initialize(&"an-composition", None)
+            .unwrap();
+        composition.add_measurement(&"myMeasurement").unwrap();
+
+        assert_eq!(
+            r#"from(bucket: "an-composition")
+    |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+    |> filter(fn: (r) => r._measurement == "myMeasurement")
+    |> yield(name: "_editor_composition")
+"#
+            .to_string(),
+            composition.to_string()
+        )
     }
 }
