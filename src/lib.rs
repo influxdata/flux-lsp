@@ -7,6 +7,7 @@
     clippy::wildcard_imports
 )]
 mod completion;
+mod composition;
 mod diagnostics;
 mod lang;
 mod lsp;
@@ -27,7 +28,7 @@ pub use server::LspServer;
 
 #[macro_export]
 macro_rules! walk_ast_package {
-    ($visitor:expr, $package:ident) => {{
+    ($visitor:expr, $package:expr) => {{
         let mut visitor = $visitor;
         flux::ast::walk::walk(
             &mut visitor,
