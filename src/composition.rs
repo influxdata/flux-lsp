@@ -287,70 +287,50 @@ impl CompositionQueryAnalyzer {
 
 impl<'a> ast::walk::Visitor<'a> for CompositionQueryAnalyzer {
     fn visit(&mut self, node: ast::walk::Node<'a>) -> bool {
-        if let ast::walk::Node::CallExpr(expr) = node {
-            if let ast::Expression::Identifier(identifier) =
-                &expr.callee
-            {
-                if identifier.name == "filter" {
-                    expr.arguments.iter().for_each(|argument| {
-                            if let ast::Expression::Object(argument_expr) = argument {
-                                argument_expr.properties.iter().for_each(|property| {
-                                    if let ast::PropertyKey::Identifier(identifier) = &property.key {
-                                        if identifier.name == "fn" {
-                                            match &property.value {
-                                                Some(ast::Expression::Function(function_expr)) => {
-                                                    match &function_expr.body {
-                                                        ast::FunctionBody::Expr(ast::Expression::Binary(binary_expr)) => {
-                                                            match binary_expr.operator {
-                                                                ast::Operator::EqualOperator => {
-                                                                    if let ast::Expression::Member(left) = &binary_expr.left {
-                                                                        if let ast::PropertyKey::Identifier(ident) = &left.property {
-                                                                            match ident.name.as_ref() {
-                                                                                "_measurement" => {
-                                                                                    if let ast::Expression::StringLit(string_literal) = &binary_expr.right {
-                                                                                        self.measurement = Some(string_literal.value.clone());
-                                                                                    }
-                                                                                },
-                                                                                "_field" => {
-                                                                                    // This only matches when there is a single _field match.
-                                                                                    if let ast::Expression::StringLit(string_literal) = &binary_expr.right {
-                                                                                        self.fields.push(string_literal.value.clone());
-                                                                                    }
-                                                                                }
-                                                                                _ => {
-                                                                                    // Treat these all as tag filters.
-                                                                                    if let ast::Expression::StringLit(string_literal) = &binary_expr.right {
-                                                                                        self.tag_values.push((ident.name.clone(), string_literal.value.clone()));
-                                                                                    }
-                                                                                },
-                                                                            }
-                                                                        }
-                                                                    }
-                                                                },
-                                                                _ => (),
-                                                            }
-                                                        },
-                                                        ast::FunctionBody::Expr(ast::Expression::Unary(unary_expr)) => {
-                                                            if unary_expr.operator == ast::Operator::ExistsOperator {
-                                                                if let ast::Expression::Member(member_expr) = &unary_expr.argument {
-                                                                    if let ast::PropertyKey::Identifier(identifier) = &member_expr.property {
-                                                                        self.tags.push(identifier.name.clone());
-                                                                    }
-                                                                }
-                                                            }
-                                                        }
-                                                        _ => (),
-                                                    }
-                                                },
-                                                _ => (),
-                                            }
+        // Because we own the entire implementation of the Composition query statement, we can be super naive
+        // about what the shape of these functions looks like. If the implementation ever gets more complex, than
+        // we can short circuit execution in the matcher to prevent recursing into obvious dead-ends.
+        match node {
+            ast::walk::Node::BinaryExpr(binary_expr) => {
+                match binary_expr.operator {
+                    ast::Operator::EqualOperator => {
+                        if let ast::Expression::Member(left) = &binary_expr.left {
+                            if let ast::PropertyKey::Identifier(ident) = &left.property {
+                                match ident.name.as_ref() {
+                                    "_measurement" => {
+                                        if let ast::Expression::StringLit(string_literal) = &binary_expr.right {
+                                            self.measurement = Some(string_literal.value.clone());
+                                        }
+                                    },
+                                    "_field" => {
+                                        // This only matches when there is a single _field match.
+                                        if let ast::Expression::StringLit(string_literal) = &binary_expr.right {
+                                            self.fields.push(string_literal.value.clone());
                                         }
                                     }
-                                })
+                                    _ => {
+                                        // Treat these all as tag filters.
+                                        if let ast::Expression::StringLit(string_literal) = &binary_expr.right {
+                                            self.tag_values.push((ident.name.clone(), string_literal.value.clone()));
+                                        }
+                                    },
+                                }
                             }
-                        });
+                        }
+                    },
+                    _ => (),
                 }
-            }
+            },
+            ast::walk::Node::UnaryExpr(unary_expr) => {
+                if unary_expr.operator == ast::Operator::ExistsOperator {
+                    if let ast::Expression::Member(member_expr) = &unary_expr.argument {
+                        if let ast::PropertyKey::Identifier(identifier) = &member_expr.property {
+                            self.tags.push(identifier.name.clone());
+                        }
+                    }
+                }
+            },
+            _ => (),
         }
         true
     }
@@ -583,7 +563,7 @@ mod tests {
         let fluxscript = r#"from(bucket: "an-composition")
 |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
 |> filter(fn: (r) => r._measurement == "myMeasurement")
-|> filter(fn: (r) => r._field == "myField")
+|> filter(fn: (r) => r._field == "myField" || r._field == "myOtherField")
 |> filter(fn: (r) => exists r.anTag)
 |> filter(fn: (r) => r.myTag == "anValue")
 |> filter(fn: (r) => r.myOtherTag == "anotherValue")
@@ -603,10 +583,25 @@ mod tests {
         let mut analyzer = CompositionQueryAnalyzer::default();
         analyzer.analyze(expr_statement.clone());
 
-        assert_eq!(Some("myMeasurement".to_string()), analyzer.measurement);
-        assert_eq!(vec!["myField"], analyzer.fields);
-        assert_eq!(vec!["anTag".to_string(), "anotherTag".to_string()], analyzer.tags);
-        assert_eq!(vec![("myTag".to_string(), "anValue".to_string()), ("myOtherTag".to_string(), "anotherValue".to_string())], analyzer.tag_values);
+        assert_eq!(
+            Some("myMeasurement".to_string()),
+            analyzer.measurement
+        );
+        assert_eq!(vec!["myField", "myOtherField"], analyzer.fields);
+        assert_eq!(
+            vec!["anTag".to_string(), "anotherTag".to_string()],
+            analyzer.tags
+        );
+        assert_eq!(
+            vec![
+                ("myTag".to_string(), "anValue".to_string()),
+                (
+                    "myOtherTag".to_string(),
+                    "anotherValue".to_string()
+                )
+            ],
+            analyzer.tag_values
+        );
     }
 
     /// Initializing composition for a file will add a composition-owned statement
