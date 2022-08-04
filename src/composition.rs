@@ -292,44 +292,54 @@ impl<'a> ast::walk::Visitor<'a> for CompositionQueryAnalyzer {
         // we can short circuit execution in the matcher to prevent recursing into obvious dead-ends.
         match node {
             ast::walk::Node::BinaryExpr(binary_expr) => {
-                match binary_expr.operator {
-                    ast::Operator::EqualOperator => {
-                        if let ast::Expression::Member(left) = &binary_expr.left {
-                            if let ast::PropertyKey::Identifier(ident) = &left.property {
-                                match ident.name.as_ref() {
-                                    "_measurement" => {
-                                        if let ast::Expression::StringLit(string_literal) = &binary_expr.right {
-                                            self.measurement = Some(string_literal.value.clone());
-                                        }
-                                    },
-                                    "_field" => {
-                                        // This only matches when there is a single _field match.
-                                        if let ast::Expression::StringLit(string_literal) = &binary_expr.right {
-                                            self.fields.push(string_literal.value.clone());
-                                        }
-                                    }
-                                    _ => {
-                                        // Treat these all as tag filters.
-                                        if let ast::Expression::StringLit(string_literal) = &binary_expr.right {
-                                            self.tag_values.push((ident.name.clone(), string_literal.value.clone()));
-                                        }
-                                    },
+                if binary_expr.operator
+                    == ast::Operator::EqualOperator
+                {
+                    if let ast::Expression::Member(left) =
+                        &binary_expr.left
+                    {
+                        if let ast::PropertyKey::Identifier(ident) =
+                            &left.property
+                        {
+                            match ident.name.as_ref() {
+                            "_measurement" => {
+                                if let ast::Expression::StringLit(string_literal) = &binary_expr.right {
+                                    self.measurement = Some(string_literal.value.clone());
+                                }
+                            },
+                            "_field" => {
+                                // This only matches when there is a single _field match.
+                                if let ast::Expression::StringLit(string_literal) = &binary_expr.right {
+                                    self.fields.push(string_literal.value.clone());
                                 }
                             }
+                            _ => {
+                                // Treat these all as tag filters.
+                                if let ast::Expression::StringLit(string_literal) = &binary_expr.right {
+                                    self.tag_values.push((ident.name.clone(), string_literal.value.clone()));
+                                }
+                            },
                         }
-                    },
-                    _ => (),
+                        }
+                    }
                 }
-            },
+            }
             ast::walk::Node::UnaryExpr(unary_expr) => {
-                if unary_expr.operator == ast::Operator::ExistsOperator {
-                    if let ast::Expression::Member(member_expr) = &unary_expr.argument {
-                        if let ast::PropertyKey::Identifier(identifier) = &member_expr.property {
+                if unary_expr.operator
+                    == ast::Operator::ExistsOperator
+                {
+                    if let ast::Expression::Member(member_expr) =
+                        &unary_expr.argument
+                    {
+                        if let ast::PropertyKey::Identifier(
+                            identifier,
+                        ) = &member_expr.property
+                        {
                             self.tags.push(identifier.name.clone());
                         }
                     }
                 }
-            },
+            }
             _ => (),
         }
         true
