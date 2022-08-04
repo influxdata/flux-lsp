@@ -262,6 +262,55 @@ macro_rules! pipe {
     };
 }
 
+#[derive(Default)]
+struct MeasurementFilterFinder {
+    measurement_filter: Option<String>,
+}
+
+impl<'a> ast::walk::Visitor<'a> for MeasurementFilterFinder {
+    fn visit(&mut self, node: ast::walk::Node<'a>) -> bool {
+        if let ast::walk::Node::CallExpr(expr) = node {
+            if let ast::Expression::Identifier(identifier) =
+                &expr.callee
+            {
+                if identifier.name == "filter" {
+                    expr.arguments.iter().for_each(|argument| {
+                            if let ast::Expression::Object(argument_expr) = argument {
+                                argument_expr.properties.iter().for_each(|property| {
+                                    if let ast::PropertyKey::Identifier(identifier) = &property.key {
+                                        if identifier.name == "fn" {
+                                            if let Some(ast::Expression::Function(function_expr)) = &property.value {
+                                                if let ast::FunctionBody::Expr(ast::Expression::Binary(binary_expr)) = &function_expr.body {
+                                                    // We will be supporting EqualOperator and Exists operator, but not for this specific patch.
+                                                    #[allow(clippy::single_match)]
+                                                    match binary_expr.operator {
+                                                        ast::Operator::EqualOperator => {
+                                                            if let ast::Expression::Member(left) = &binary_expr.left {
+                                                                if let ast::PropertyKey::Identifier(ident) = &left.property {
+                                                                    if ident.name == "_measurement" {
+                                                                        if let ast::Expression::StringLit(string_literal) = &binary_expr.right {
+                                                                            self.measurement_filter = Some(string_literal.value.clone());
+                                                                        }
+                                                                    }
+                                                                }
+                                                            }
+                                                        },
+                                                        _ => (),
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                })
+                            }
+                        });
+                }
+            }
+        }
+        true
+    }
+}
+
 /// Find the composition statement.
 ///
 /// The composition statement is identified as follows: a `from` function that contains
@@ -414,7 +463,11 @@ impl Composition {
         Ok(())
     }
 
-    fn add_measurement(&mut self, measurement: &str) -> CompositionResult {
+    #[allow(dead_code)]
+    fn add_measurement(
+        &mut self,
+        measurement: &str,
+    ) -> CompositionResult {
         let mut visitor =
             CompositionStatementFinderVisitor::default();
         flux::ast::walk::walk(
@@ -424,8 +477,21 @@ impl Composition {
         if visitor.statement.is_none() {
             return Err(());
         }
+        let expr_statement =
+            visitor.statement.expect("Previous check failed.");
 
-        let expr_statement = visitor.statement.expect("Previous check failed.");
+        let mut measurement_visitor =
+            MeasurementFilterFinder::default();
+        flux::ast::walk::walk(
+            &mut measurement_visitor,
+            flux::ast::walk::Node::from_stmt(&ast::Statement::Expr(
+                Box::new(expr_statement.clone()),
+            )),
+        );
+        if measurement_visitor.measurement_filter.is_some() {
+            return Err(());
+        }
+
         self.file.body = self
             .file
             .body
@@ -439,7 +505,9 @@ impl Composition {
             .cloned()
             .collect();
 
-        let yieldless = if let ast::Expression::PipeExpr(pipe_expr) = expr_statement.expression {
+        let yieldless = if let ast::Expression::PipeExpr(pipe_expr) =
+            expr_statement.expression
+        {
             pipe_expr.argument
         } else {
             return Err(());
@@ -449,18 +517,18 @@ impl Composition {
             0,
             ast::Statement::Expr(Box::new(ast::ExprStmt {
                 base: ast::BaseNode::default(),
-                expression: ast::Expression::PipeExpr(Box::new(pipe!(
-                    ast::Expression::PipeExpr(Box::new(
-                        pipe!(
+                expression: ast::Expression::PipeExpr(Box::new(
+                    pipe!(
+                        ast::Expression::PipeExpr(Box::new(pipe!(
                             yieldless,
                             filter!(
                                 "_measurement".into(),
                                 measurement.into()
                             )
-                        )
-                    )),
-                    yield_!()
-                )))
+                        ))),
+                        yield_!()
+                    ),
+                )),
             })),
         );
         Ok(())
@@ -548,9 +616,7 @@ from(bucket: "my-bucket") |> yield(name: "my-result")
 
         let mut composition = Composition::new(ast);
 
-        composition
-            .initialize(&"an-composition", None)
-            .unwrap();
+        composition.initialize(&"an-composition", None).unwrap();
         composition.add_measurement(&"myMeasurement").unwrap();
 
         assert_eq!(
@@ -562,5 +628,22 @@ from(bucket: "my-bucket") |> yield(name: "my-result")
             .to_string(),
             composition.to_string()
         )
+    }
+
+    #[test]
+    fn composition_add_measurement_measurement_already_exists() {
+        let fluxscript = r#"from(bucket: "an-composition")
+        |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+        |> filter(fn: (r) => r._measurement == "anMeasurement")
+        |> yield(name: "_editor_composition")
+    "#;
+        let ast = flux::parser::parse_string("".into(), &fluxscript);
+
+        let mut composition = Composition::new(ast);
+        // DON'T INITIALIZE THIS! WE'RE SIMULATING AN ALREADY INITIALIZED QUERY.
+
+        assert!(composition
+            .add_measurement(&"myMeasurement")
+            .is_err());
     }
 }
