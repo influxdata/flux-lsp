@@ -346,6 +346,7 @@ impl<'a> ast::walk::Visitor<'a> for CompositionQueryAnalyzer {
     }
 }
 
+// TODO: DRY
 #[derive(Default)]
 struct FieldFilterFinder {
     field_filter: Option<String>,
@@ -570,6 +571,7 @@ impl Composition {
             return Err(());
         }
 
+        // TODO: DRY
         self.file.body = self
             .file
             .body
@@ -613,7 +615,7 @@ impl Composition {
     }
 
     #[allow(dead_code)]
-    fn add_field(&mut self, filter: &str) -> CompositionResult {
+    fn add_field(&mut self, field: &str) -> CompositionResult {
         let mut visitor =
             CompositionStatementFinderVisitor::default();
         flux::ast::walk::walk(
@@ -633,10 +635,25 @@ impl Composition {
                 Box::new(expr_statement.clone()),
             )),
         );
+
         // TODO: if the field value already exits, error
-        if field_visitor.field_filter.is_some() {
-            return Err(());
-        }
+        // if field_visitor.field_filter.is_some() {
+        //     return Err(());
+        // }
+
+        // TODO: DRY
+        self.file.body = self
+            .file
+            .body
+            .iter()
+            .filter(|statement| match statement {
+                ast::Statement::Expr(expression) => {
+                    expr_statement != *expression.as_ref()
+                }
+                _ => true,
+            })
+            .cloned()
+            .collect();
 
         let yieldless = if let ast::Expression::PipeExpr(pipe_expr) =
             expr_statement.expression
@@ -654,7 +671,7 @@ impl Composition {
                     pipe!(
                         ast::Expression::PipeExpr(Box::new(pipe!(
                             yieldless,
-                            filter!("_filter".into(), filter.into())
+                            filter!("_field".into(), field.into())
                         ))),
                         yield_!()
                     ),
@@ -838,7 +855,7 @@ from(bucket: "my-bucket") |> yield(name: "my-result")
         assert_eq!(
             r#"from(bucket: "an-composition")
     |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
-    |> filter(fn: (r) => r.field == "myField")
+    |> filter(fn: (r) => r._field == "myField")
     |> yield(name: "_editor_composition")
 "#
             .to_string(),
