@@ -263,6 +263,7 @@ mod tests {
               "experimental/bigtable",
               "experimental/bitwise",
               "experimental/csv",
+              "experimental/date/boundaries",
               "experimental/geo",
               "experimental/http",
               "experimental/http/requests",
