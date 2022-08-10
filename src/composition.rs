@@ -635,11 +635,12 @@ impl Composition {
                 Box::new(expr_statement.clone()),
             )),
         );
+        let mut analyzer = CompositionQueryAnalyzer::default();
+        analyzer.analyze(expr_statement.clone());
 
-        // TODO: if the field value already exits, error
-        // if field_visitor.field_filter.is_some() {
-        //     return Err(());
-        // }
+        if analyzer.fields.contains(&field.to_string()) {
+            return Err(());
+        }
 
         // TODO: DRY
         self.file.body = self
