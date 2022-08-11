@@ -162,6 +162,30 @@ macro_rules! binary_eq_expr {
     };
 }
 
+#[derive(Clone, Copy)]
+struct FilterKey<T>(T);
+
+trait Get {
+    fn get(&mut self) -> Option<String>;
+}
+
+impl Get for FilterKey<&String> {
+    fn get(&mut self) -> Option<String> {
+        Some(self.0.to_owned())
+    }
+}
+
+impl Get for FilterKey<&[String]> {
+    fn get(&mut self) -> Option<String> {
+        if let Some(key) = self.0.first() {
+            self.0 = &self.0[1..];
+            Some(key.to_owned())
+        } else {
+            None
+        }
+    }
+}
+
 /// Returns the logical expr, which are predicates joined by the operator.
 ///
 /// # Arguments
@@ -173,28 +197,44 @@ macro_rules! binary_eq_expr {
 /// As such, the filter! macro can be compile time (since it only pass the pointer to values).
 /// Then this logical_expr() cannot be a macro, because has an unknown runtime recursive depth.
 /// Yet the lower binary_eq_expr! can still be a macro.
-fn logical_expr(
+fn logical_expr<T>(
     operator: ast::LogicalOperator,
-    key: String,
+    mut filter_key: T,
     values: &[String],
-) -> Result<ast::Expression, ()> {
+) -> Result<ast::Expression, ()>
+where
+    T: Get + Clone,
+{
     match values {
         [] => Err(()),
-        [head] => Ok(binary_eq_expr!(key, head.to_string())),
+        [head] => {
+            if let Some(key) = filter_key.get() {
+                Ok(binary_eq_expr!(key, head.to_string()))
+            } else {
+                Err(())
+            }
+        }
         [head, ..] => {
-            if let Ok(right) = logical_expr(
-                operator.clone(),
-                key.clone(),
-                &values[1..].to_vec(),
-            ) {
-                Ok(ast::Expression::Logical(Box::new(
-                    ast::LogicalExpr {
-                        base: ast::BaseNode::default(),
-                        left: binary_eq_expr!(key, head.to_string()),
-                        right,
-                        operator,
-                    },
-                )))
+            if let Some(key) = filter_key.get() {
+                if let Ok(right) = logical_expr(
+                    operator.clone(),
+                    filter_key.to_owned(),
+                    &values[1..].to_vec(),
+                ) {
+                    Ok(ast::Expression::Logical(Box::new(
+                        ast::LogicalExpr {
+                            base: ast::BaseNode::default(),
+                            left: binary_eq_expr!(
+                                key,
+                                head.to_string()
+                            ),
+                            right,
+                            operator,
+                        },
+                    )))
+                } else {
+                    Err(())
+                }
             } else {
                 Err(())
             }
@@ -340,12 +380,11 @@ impl CompositionQueryAnalyzer {
         )));
 
         if let Some(measurement) = &self.measurement {
-            let measurements = vec![measurement.to_owned()];
             inner = ast::Expression::PipeExpr(Box::new(pipe!(
                 inner,
                 filter!(
-                    "_measurement".into(),
-                    &measurements,
+                    FilterKey(&"_measurement".to_string()),
+                    &[measurement.to_owned()],
                     ast::LogicalOperator::OrOperator
                 )
             )));
@@ -355,9 +394,25 @@ impl CompositionQueryAnalyzer {
             inner = ast::Expression::PipeExpr(Box::new(pipe!(
                 inner,
                 filter!(
-                    "_field".into(),
+                    FilterKey(&"_field".to_string()),
                     &self.fields,
                     ast::LogicalOperator::OrOperator
+                )
+            )));
+        }
+
+        if !self.tag_values.is_empty() {
+            let (filter_keys, filter_values) = self
+                .tag_values
+                .iter()
+                .cloned()
+                .unzip::<String, String, Vec<String>, Vec<String>>();
+            inner = ast::Expression::PipeExpr(Box::new(pipe!(
+                inner,
+                filter!(
+                    FilterKey(filter_keys.as_slice()),
+                    filter_values.as_ref(),
+                    ast::LogicalOperator::AndOperator
                 )
             )));
         }
@@ -681,6 +736,61 @@ impl Composition {
 
         Ok(())
     }
+
+    #[allow(dead_code)]
+    fn add_tag_value(
+        &mut self,
+        tag_key: &str,
+        tag_value: &str,
+    ) -> CompositionResult {
+        let mut visitor =
+            CompositionStatementFinderVisitor::default();
+        flux::ast::walk::walk(
+            &mut visitor,
+            flux::ast::walk::Node::File(&self.file),
+        );
+        if visitor.statement.is_none() {
+            return Err(());
+        }
+        let expr_statement =
+            visitor.statement.expect("Previous check failed.");
+
+        let mut analyzer = CompositionQueryAnalyzer::default();
+        analyzer.analyze(expr_statement.clone());
+
+        let tag_pair = (tag_key.to_string(), tag_value.to_string());
+        if analyzer.tag_values.contains(&tag_pair) {
+            return Err(());
+        } else {
+            analyzer.tag_values.push(tag_pair);
+        }
+        let statement = analyzer.build();
+
+        self.file.body = self
+            .file
+            .body
+            .iter()
+            .filter(|statement| match statement {
+                ast::Statement::Expr(expression) => {
+                    expr_statement != *expression.as_ref()
+                }
+                _ => true,
+            })
+            .cloned()
+            .collect();
+
+        self.file.body.insert(
+            0,
+            ast::Statement::Expr(Box::new(ast::ExprStmt {
+                base: ast::BaseNode::default(),
+                expression: ast::Expression::PipeExpr(Box::new(
+                    statement,
+                )),
+            })),
+        );
+
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -926,6 +1036,73 @@ from(bucket: "my-bucket") |> yield(name: "my-result")
     |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
     |> filter(fn: (r) => r._measurement == "anMeasurement")
     |> filter(fn: (r) => r._field == "firstField" or r._field == "secondField")
+    |> yield(name: "_editor_composition")
+"#
+            .to_string(),
+            composition.to_string()
+        )
+    }
+
+    #[test]
+    fn composition_add_tag_value() {
+        let fluxscript = r#"from(bucket: "an-composition")
+        |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+        |> yield(name: "_editor_composition")
+    "#;
+        let ast = flux::parser::parse_string("".into(), &fluxscript);
+
+        let mut composition = Composition::new(ast);
+        // DON'T INITIALIZE THIS! WE'RE SIMULATING AN ALREADY INITIALIZED QUERY.
+        composition.add_tag_value(&"tagKey", &"tagValue").unwrap();
+
+        assert_eq!(
+            r#"from(bucket: "an-composition")
+    |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+    |> filter(fn: (r) => r.tagKey == "tagValue")
+    |> yield(name: "_editor_composition")
+"#
+            .to_string(),
+            composition.to_string()
+        )
+    }
+
+    #[test]
+    fn composition_add_tag_value_tag_value_already_exists() {
+        let fluxscript = r#"from(bucket: "an-composition")
+        |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+        |> filter(fn: (r) => r._measurement == "anMeasurement")
+        |> filter(fn: (r) => r.tagKey == "tagValue")
+        |> yield(name: "_editor_composition")
+    "#;
+        let ast = flux::parser::parse_string("".into(), &fluxscript);
+
+        let mut composition = Composition::new(ast);
+        // DON'T INITIALIZE THIS! WE'RE SIMULATING AN ALREADY INITIALIZED QUERY.
+
+        assert!(composition
+            .add_tag_value(&"tagKey", &"tagValue")
+            .is_err());
+    }
+
+    #[test]
+    fn composition_add_tag_value_second_tag_value() {
+        let fluxscript = r#"from(bucket: "an-composition")
+        |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+        |> filter(fn: (r) => r._measurement == "anMeasurement")
+        |> filter(fn: (r) => r.tagKey1 == "tagValue1")
+        |> yield(name: "_editor_composition")
+    "#;
+        let ast = flux::parser::parse_string("".into(), &fluxscript);
+
+        let mut composition = Composition::new(ast);
+        // DON'T INITIALIZE THIS! WE'RE SIMULATING AN ALREADY INITIALIZED QUERY.
+        composition.add_tag_value(&"tagKey2", &"tagValue2").unwrap();
+
+        assert_eq!(
+            r#"from(bucket: "an-composition")
+    |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+    |> filter(fn: (r) => r._measurement == "anMeasurement")
+    |> filter(fn: (r) => r.tagKey1 == "tagValue1" and r.tagKey2 == "tagValue2")
     |> yield(name: "_editor_composition")
 "#
             .to_string(),
