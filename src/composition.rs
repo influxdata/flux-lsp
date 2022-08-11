@@ -332,8 +332,9 @@ impl CompositionQueryAnalyzer {
     }
 
     fn build(&mut self) -> ast::PipeExpr {
-        match &self.measurement {
-            None => {
+        match (&self.measurement, self.fields.len(), self.tags.len())
+        {
+            (None, 0, 0) => {
                 pipe!(
                     ast::Expression::PipeExpr(Box::new(pipe!(
                         ast::Expression::Call(Box::new(from!(self
@@ -362,6 +363,53 @@ impl CompositionQueryAnalyzer {
                     yield_!()
                 )
             }
+            (None, 1.., 0) => {
+                pipe!(
+                    ast::Expression::PipeExpr(Box::new(pipe!(
+                        ast::Expression::PipeExpr(Box::new(pipe!(
+                            ast::Expression::Call(Box::new(from!(
+                                self.bucket.to_owned()
+                            ))),
+                            range!()
+                        ),)),
+                        filter!(
+                            "_field".into(),
+                            &self.fields,
+                            ast::LogicalOperator::OrOperator
+                        )
+                    ))),
+                    yield_!()
+                )
+            }
+            (Some(measurement), 1.., 0) => {
+                let measurements = vec![measurement.to_owned()];
+                pipe!(
+                    ast::Expression::PipeExpr(Box::new(pipe!(
+                        ast::Expression::PipeExpr(Box::new(pipe!(
+                            ast::Expression::PipeExpr(Box::new(
+                                pipe!(
+                                    ast::Expression::Call(Box::new(
+                                        from!(self.bucket.to_owned())
+                                    )),
+                                    range!()
+                                ),
+                            )),
+                            filter!(
+                                "_measurement".into(),
+                                &measurements,
+                                ast::LogicalOperator::OrOperator
+                            )
+                        ))),
+                        filter!(
+                            "_field".into(),
+                            &self.fields,
+                            ast::LogicalOperator::OrOperator
+                        )
+                    ))),
+                    yield_!()
+                )
+            }
+            _ => todo!(),
         }
     }
 }
@@ -632,6 +680,56 @@ impl Composition {
         );
         Ok(())
     }
+
+    #[allow(dead_code)]
+    fn add_field(&mut self, field: &str) -> CompositionResult {
+        let mut visitor =
+            CompositionStatementFinderVisitor::default();
+        flux::ast::walk::walk(
+            &mut visitor,
+            flux::ast::walk::Node::File(&self.file),
+        );
+        if visitor.statement.is_none() {
+            return Err(());
+        }
+        let expr_statement =
+            visitor.statement.expect("Previous check failed.");
+
+        let mut analyzer = CompositionQueryAnalyzer::default();
+        analyzer.analyze(expr_statement.clone());
+
+        if analyzer.fields.contains(&field.to_string()) {
+            return Err(());
+        } else {
+            analyzer.fields.push(field.to_string());
+        }
+        let statement = analyzer.build();
+
+        self.file.body = self
+            .file
+            .body
+            .iter()
+            .filter(|statement| match statement {
+                ast::Statement::Expr(expression) => {
+                    expr_statement != *expression.as_ref()
+                }
+                _ => true,
+            })
+            .cloned()
+            .collect();
+
+        self.file.body.insert(
+            0,
+            ast::Statement::Expr(Box::new(ast::ExprStmt {
+                base: ast::BaseNode::default(),
+                expression: ast::Expression::PipeExpr(Box::new(
+                    statement,
+                )),
+            })),
+        );
+
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -792,5 +890,95 @@ from(bucket: "my-bucket") |> yield(name: "my-result")
         assert!(composition
             .add_measurement(&"myMeasurement")
             .is_err());
+    }
+
+    #[test]
+    fn composition_add_field() {
+        let fluxscript = r#"from(bucket: "an-composition")
+        |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+        |> yield(name: "_editor_composition")
+    "#;
+        let ast = flux::parser::parse_string("".into(), &fluxscript);
+
+        let mut composition = Composition::new(ast);
+        // DON'T INITIALIZE THIS! WE'RE SIMULATING AN ALREADY INITIALIZED QUERY.
+        composition.add_field(&"myField").unwrap();
+
+        assert_eq!(
+            r#"from(bucket: "an-composition")
+    |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+    |> filter(fn: (r) => r._field == "myField")
+    |> yield(name: "_editor_composition")
+"#
+            .to_string(),
+            composition.to_string()
+        )
+    }
+
+    #[test]
+    fn composition_add_field_with_measurement() {
+        let fluxscript = r#"from(bucket: "an-composition")
+        |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+        |> filter(fn: (r) => r._measurement == "anMeasurement")
+        |> yield(name: "_editor_composition")
+    "#;
+        let ast = flux::parser::parse_string("".into(), &fluxscript);
+
+        let mut composition = Composition::new(ast);
+        // DON'T INITIALIZE THIS! WE'RE SIMULATING AN ALREADY INITIALIZED QUERY.
+        composition.add_field(&"myField").unwrap();
+
+        assert_eq!(
+            r#"from(bucket: "an-composition")
+    |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+    |> filter(fn: (r) => r._measurement == "anMeasurement")
+    |> filter(fn: (r) => r._field == "myField")
+    |> yield(name: "_editor_composition")
+"#
+            .to_string(),
+            composition.to_string()
+        )
+    }
+
+    #[test]
+    fn composition_add_field_field_already_exists() {
+        let fluxscript = r#"from(bucket: "an-composition")
+        |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+        |> filter(fn: (r) => r._measurement == "anMeasurement")
+        |> filter(fn: (r) => r._field == "anField")
+        |> yield(name: "_editor_composition")
+    "#;
+        let ast = flux::parser::parse_string("".into(), &fluxscript);
+
+        let mut composition = Composition::new(ast);
+        // DON'T INITIALIZE THIS! WE'RE SIMULATING AN ALREADY INITIALIZED QUERY.
+
+        assert!(composition.add_field(&"anField").is_err());
+    }
+
+    #[test]
+    fn composition_add_field_second_field() {
+        let fluxscript = r#"from(bucket: "an-composition")
+        |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+        |> filter(fn: (r) => r._measurement == "anMeasurement")
+        |> filter(fn: (r) => r._field == "firstField")
+        |> yield(name: "_editor_composition")
+    "#;
+        let ast = flux::parser::parse_string("".into(), &fluxscript);
+
+        let mut composition = Composition::new(ast);
+        // DON'T INITIALIZE THIS! WE'RE SIMULATING AN ALREADY INITIALIZED QUERY.
+        composition.add_field(&"secondField").unwrap();
+
+        assert_eq!(
+            r#"from(bucket: "an-composition")
+    |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+    |> filter(fn: (r) => r._measurement == "anMeasurement")
+    |> filter(fn: (r) => r._field == "firstField" or r._field == "secondField")
+    |> yield(name: "_editor_composition")
+"#
+            .to_string(),
+            composition.to_string()
+        )
     }
 }
