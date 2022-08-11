@@ -297,6 +297,7 @@ macro_rules! pipe {
 /// Composition statement, it does not make changes.
 #[derive(Default)]
 struct CompositionQueryAnalyzer {
+    bucket: String,
     measurement: Option<String>,
     fields: Vec<String>,
     tags: Vec<String>,
@@ -312,6 +313,77 @@ impl CompositionQueryAnalyzer {
             )),
         );
     }
+
+    fn build(&mut self) -> ast::PipeExpr {
+        let statement = match (&self.measurement, self.fields.len(), self.tags.len()) {
+            (None, 0, 0) => {
+                pipe!(
+                    ast::Expression::PipeExpr(Box::new(pipe!(
+                        ast::Expression::Call(Box::new(from!(
+                            self.bucket.to_owned()
+                        ))),
+                        range!()
+                    ))),
+                    yield_!()
+                )
+            }
+            (Some(measurement), 0, 0) => {
+                let measurements = vec![measurement.to_owned()];
+                pipe!(
+                    ast::Expression::PipeExpr(Box::new(pipe!(
+                        ast::Expression::PipeExpr(Box::new(pipe!(
+                            ast::Expression::Call(Box::new(from!(
+                                self.bucket.to_owned()
+                            ))),
+                            range!()
+                        ),)),
+                        filter!(
+                            "_measurement".into(),
+                            &measurements
+                        )
+                    ))),
+                    yield_!()
+                )
+            }
+            (None, 1.., 0) => {
+                pipe!(
+                    ast::Expression::PipeExpr(Box::new(pipe!(
+                        ast::Expression::PipeExpr(Box::new(pipe!(
+                            ast::Expression::Call(Box::new(from!(
+                                self.bucket.to_owned()
+                            ))),
+                            range!()
+                        ),)),
+                        filter!("_field".into(), &self.fields)
+                    ))),
+                    yield_!()
+                )
+            }
+            (Some(measurement), 1.., 0) => {
+                let measurements = vec![measurement.to_owned()];
+                pipe!(
+                    ast::Expression::PipeExpr(Box::new(pipe!(
+                        ast::Expression::PipeExpr(Box::new(pipe!(
+                            ast::Expression::PipeExpr(Box::new(pipe!(
+                                ast::Expression::Call(Box::new(from!(
+                                    self.bucket.to_owned()
+                                ))),
+                                range!()
+                            ),)),
+                            filter!(
+                                "_measurement".into(),
+                                &measurements
+                            )
+                        ))),
+                        filter!("_field".into(), &self.fields)
+                    ))),
+                    yield_!()
+                )
+            }
+            _ => todo!()
+        };
+        statement
+    }
 }
 
 impl<'a> ast::walk::Visitor<'a> for CompositionQueryAnalyzer {
@@ -320,6 +392,18 @@ impl<'a> ast::walk::Visitor<'a> for CompositionQueryAnalyzer {
         // about what the shape of these functions looks like. If the implementation ever gets more complex, than
         // we can short circuit execution in the matcher to prevent recursing into obvious dead-ends.
         match node {
+            ast::walk::Node::CallExpr(call_expr) => {
+                if let ast::Expression::Identifier(identifier) = &call_expr.callee {
+                    if identifier.name.as_str() == "from" {
+                        if let ast::Expression::Object(object_expr) = &call_expr.arguments[0] {
+                            let ast::Property {base: _, key: _, separator: _, value, comma: _} = &object_expr.properties[0];
+                            if let Some(ast::Expression::StringLit(ast::StringLit {base: _, value})) = value {
+                                self.bucket = value.clone()
+                            }
+                        }
+                    }
+                }
+            }
             ast::walk::Node::BinaryExpr(binary_expr) => {
                 if binary_expr.operator
                     == ast::Operator::EqualOperator
@@ -370,56 +454,6 @@ impl<'a> ast::walk::Visitor<'a> for CompositionQueryAnalyzer {
                 }
             }
             _ => (),
-        }
-        true
-    }
-}
-
-// TODO: DRY
-#[derive(Default)]
-struct FieldFilterFinder {
-    field_filter: Option<String>,
-}
-
-impl<'a> ast::walk::Visitor<'a> for FieldFilterFinder {
-    fn visit(&mut self, node: ast::walk::Node<'a>) -> bool {
-        if let ast::walk::Node::CallExpr(expr) = node {
-            if let ast::Expression::Identifier(identifier) =
-                &expr.callee
-            {
-                if identifier.name == "filter" {
-                    expr.arguments.iter().for_each(|argument| {
-                            if let ast::Expression::Object(argument_expr) = argument {
-                                argument_expr.properties.iter().for_each(|property| {
-                                    if let ast::PropertyKey::Identifier(identifier) = &property.key {
-                                        if identifier.name == "fn" {
-                                            if let Some(ast::Expression::Function(function_expr)) = &property.value {
-                                                if let ast::FunctionBody::Expr(ast::Expression::Binary(binary_expr)) = &function_expr.body {
-                                                    // We will be supporting EqualOperator and Exists operator, but not for this specific patch.
-                                                    #[allow(clippy::single_match)]
-                                                    match binary_expr.operator {
-                                                        ast::Operator::EqualOperator => {
-                                                            if let ast::Expression::Member(left) = &binary_expr.left {
-                                                                if let ast::PropertyKey::Identifier(ident) = &left.property {
-                                                                    if ident.name == "_field" {
-                                                                        if let ast::Expression::StringLit(string_literal) = &binary_expr.right {
-                                                                            self.field_filter = Some(string_literal.value.clone());
-                                                                        }
-                                                                    }
-                                                                }
-                                                            }
-                                                        },
-                                                        _ => (),
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                })
-                            }
-                        });
-                }
-            }
         }
         true
     }
@@ -533,37 +567,15 @@ impl Composition {
                 .collect();
         }
 
-        let statement = match measurement {
-            None => {
-                pipe!(
-                    ast::Expression::PipeExpr(Box::new(pipe!(
-                        ast::Expression::Call(Box::new(from!(
-                            bucket.to_string()
-                        ))),
-                        range!()
-                    ))),
-                    yield_!()
-                )
-            }
-            Some(measurement) => {
-                let measurements = vec![measurement.into()];
-                pipe!(
-                    ast::Expression::PipeExpr(Box::new(pipe!(
-                        ast::Expression::PipeExpr(Box::new(pipe!(
-                            ast::Expression::Call(Box::new(from!(
-                                bucket.to_string()
-                            ))),
-                            range!()
-                        ),)),
-                        filter!(
-                            "_measurement".into(),
-                            &measurements
-                        )
-                    ))),
-                    yield_!()
-                )
-            }
+        let mut analyzer = CompositionQueryAnalyzer {
+            bucket: bucket.to_string(),
+            measurement: measurement.map(|m| m.to_owned()),
+            fields: vec![],
+            tags: vec![],
+            tag_values: vec![],
         };
+
+        let statement = analyzer.build();
 
         self.file.body.insert(
             0,
@@ -599,10 +611,11 @@ impl Composition {
         analyzer.analyze(expr_statement.clone());
         if analyzer.measurement.is_some() {
             return Err(());
+        } else {
+            analyzer.measurement = Some(measurement.into())
         }
-        let measurements = vec![measurement.into()];
+        let statement = analyzer.build();
 
-        // TODO: DRY
         self.file.body = self
             .file
             .body
@@ -616,32 +629,16 @@ impl Composition {
             .cloned()
             .collect();
 
-        let yieldless = if let ast::Expression::PipeExpr(pipe_expr) =
-            expr_statement.expression
-        {
-            pipe_expr.argument
-        } else {
-            return Err(());
-        };
-
         self.file.body.insert(
             0,
             ast::Statement::Expr(Box::new(ast::ExprStmt {
                 base: ast::BaseNode::default(),
                 expression: ast::Expression::PipeExpr(Box::new(
-                    pipe!(
-                        ast::Expression::PipeExpr(Box::new(pipe!(
-                            yieldless,
-                            filter!(
-                                "_measurement".into(),
-                                &measurements
-                            )
-                        ))),
-                        yield_!()
-                    ),
+                    statement,
                 )),
             })),
         );
+
         Ok(())
     }
 
@@ -659,23 +656,17 @@ impl Composition {
         let expr_statement =
             visitor.statement.expect("Previous check failed.");
 
-        let mut field_visitor = FieldFilterFinder::default();
-        flux::ast::walk::walk(
-            &mut field_visitor,
-            flux::ast::walk::Node::from_stmt(&ast::Statement::Expr(
-                Box::new(expr_statement.clone()),
-            )),
-        );
         let mut analyzer = CompositionQueryAnalyzer::default();
         analyzer.analyze(expr_statement.clone());
 
         if analyzer.fields.contains(&field.to_string()) {
             return Err(());
+        } else {
+            analyzer.fields.push(field.to_string());
         }
-        let mut fields = analyzer.fields;
-        fields.push(field.to_string());
+        println!("analyzer.fields: {:?}", analyzer.fields);
+        let statement = analyzer.build();
 
-        // TODO: DRY
         self.file.body = self
             .file
             .body
@@ -689,29 +680,16 @@ impl Composition {
             .cloned()
             .collect();
 
-        let yieldless = if let ast::Expression::PipeExpr(pipe_expr) =
-            expr_statement.expression
-        {
-            pipe_expr.argument
-        } else {
-            return Err(());
-        };
-
         self.file.body.insert(
             0,
             ast::Statement::Expr(Box::new(ast::ExprStmt {
                 base: ast::BaseNode::default(),
                 expression: ast::Expression::PipeExpr(Box::new(
-                    pipe!(
-                        ast::Expression::PipeExpr(Box::new(pipe!(
-                            yieldless,
-                            filter!("_field".into(), &fields)
-                        ))),
-                        yield_!()
-                    ),
+                    statement,
                 )),
             })),
         );
+
         Ok(())
     }
 }
