@@ -132,56 +132,62 @@ macro_rules! range {
 
 macro_rules! binary_eq_expr {
     ($key:expr, $value:expr) => {
-        ast::Expression::Binary(
-            Box::new(ast::BinaryExpr {
-                base: ast::BaseNode::default(),
-                left: ast::Expression::Member(Box::new(
-                    ast::MemberExpr {
-                        base: ast::BaseNode::default(),
-                        lbrack: vec![],
-                        rbrack: vec![],
-                        object: ast::Expression::Identifier(
-                            ast::Identifier {
-                                base: ast::BaseNode::default(),
-                                name: "r".into(),
-                            },
-                        ),
-                        property: ast::PropertyKey::Identifier(
-                            ast::Identifier {
-                                base: ast::BaseNode::default(),
-                                name: $key,
-                            },
-                        ),
-                    },
-                )),
-                right: ast::Expression::StringLit(ast::StringLit {
+        ast::Expression::Binary(Box::new(ast::BinaryExpr {
+            base: ast::BaseNode::default(),
+            left: ast::Expression::Member(Box::new(
+                ast::MemberExpr {
                     base: ast::BaseNode::default(),
-                    value: $value,
-                }),
-                operator: ast::Operator::EqualOperator,
+                    lbrack: vec![],
+                    rbrack: vec![],
+                    object: ast::Expression::Identifier(
+                        ast::Identifier {
+                            base: ast::BaseNode::default(),
+                            name: "r".into(),
+                        },
+                    ),
+                    property: ast::PropertyKey::Identifier(
+                        ast::Identifier {
+                            base: ast::BaseNode::default(),
+                            name: $key,
+                        },
+                    ),
+                },
+            )),
+            right: ast::Expression::StringLit(ast::StringLit {
+                base: ast::BaseNode::default(),
+                value: $value,
             }),
-        )
-    }
+            operator: ast::Operator::EqualOperator,
+        }))
+    };
 }
 
-fn logical_expr (operator: ast::LogicalOperator, key: String, values: &Vec<String>) -> Result<ast::Expression,()> {
-    match &values[..] {
-        [] => { Err(()) },
+fn logical_expr(
+    operator: ast::LogicalOperator,
+    key: String,
+    values: &[String],
+) -> Result<ast::Expression, ()> {
+    match values {
+        [] => Err(()),
         [head] => Ok(binary_eq_expr!(key, head.to_string())),
         [head, ..] => {
-            if let Ok(right) = logical_expr(operator.clone(), key.clone(), &values[1..].to_vec()) {
-               Ok(ast::Expression::Logical(
-                    Box::new(ast::LogicalExpr {
+            if let Ok(right) = logical_expr(
+                operator.clone(),
+                key.clone(),
+                &values[1..].to_vec(),
+            ) {
+                Ok(ast::Expression::Logical(Box::new(
+                    ast::LogicalExpr {
                         base: ast::BaseNode::default(),
                         left: binary_eq_expr!(key, head.to_string()),
                         right,
-                        operator: operator,
-                    }),
-                ))
+                        operator,
+                    },
+                )))
             } else {
                 Err(())
             }
-        },
+        }
     }
 }
 
@@ -315,13 +321,17 @@ impl CompositionQueryAnalyzer {
     }
 
     fn build(&mut self) -> ast::PipeExpr {
-        let statement = match (&self.measurement, self.fields.len(), self.tags.len()) {
+        match (
+            &self.measurement,
+            self.fields.len(),
+            self.tags.len(),
+        ) {
             (None, 0, 0) => {
                 pipe!(
                     ast::Expression::PipeExpr(Box::new(pipe!(
-                        ast::Expression::Call(Box::new(from!(
-                            self.bucket.to_owned()
-                        ))),
+                        ast::Expression::Call(Box::new(from!(self
+                            .bucket
+                            .to_owned()))),
                         range!()
                     ))),
                     yield_!()
@@ -337,10 +347,7 @@ impl CompositionQueryAnalyzer {
                             ))),
                             range!()
                         ),)),
-                        filter!(
-                            "_measurement".into(),
-                            &measurements
-                        )
+                        filter!("_measurement".into(), &measurements)
                     ))),
                     yield_!()
                 )
@@ -364,12 +371,14 @@ impl CompositionQueryAnalyzer {
                 pipe!(
                     ast::Expression::PipeExpr(Box::new(pipe!(
                         ast::Expression::PipeExpr(Box::new(pipe!(
-                            ast::Expression::PipeExpr(Box::new(pipe!(
-                                ast::Expression::Call(Box::new(from!(
-                                    self.bucket.to_owned()
-                                ))),
-                                range!()
-                            ),)),
+                            ast::Expression::PipeExpr(Box::new(
+                                pipe!(
+                                    ast::Expression::Call(Box::new(
+                                        from!(self.bucket.to_owned())
+                                    )),
+                                    range!()
+                                ),
+                            )),
                             filter!(
                                 "_measurement".into(),
                                 &measurements
@@ -380,9 +389,8 @@ impl CompositionQueryAnalyzer {
                     yield_!()
                 )
             }
-            _ => todo!()
-        };
-        statement
+            _ => todo!(),
+        }
     }
 }
 
@@ -393,11 +401,24 @@ impl<'a> ast::walk::Visitor<'a> for CompositionQueryAnalyzer {
         // we can short circuit execution in the matcher to prevent recursing into obvious dead-ends.
         match node {
             ast::walk::Node::CallExpr(call_expr) => {
-                if let ast::Expression::Identifier(identifier) = &call_expr.callee {
+                if let ast::Expression::Identifier(identifier) =
+                    &call_expr.callee
+                {
                     if identifier.name.as_str() == "from" {
-                        if let ast::Expression::Object(object_expr) = &call_expr.arguments[0] {
-                            let ast::Property {base: _, key: _, separator: _, value, comma: _} = &object_expr.properties[0];
-                            if let Some(ast::Expression::StringLit(ast::StringLit {base: _, value})) = value {
+                        if let ast::Expression::Object(object_expr) =
+                            &call_expr.arguments[0]
+                        {
+                            let ast::Property {
+                                base: _,
+                                key: _,
+                                separator: _,
+                                value,
+                                comma: _,
+                            } = &object_expr.properties[0];
+                            if let Some(ast::Expression::StringLit(
+                                ast::StringLit { base: _, value },
+                            )) = value
+                            {
                                 self.bucket = value.clone()
                             }
                         }
@@ -664,7 +685,6 @@ impl Composition {
         } else {
             analyzer.fields.push(field.to_string());
         }
-        println!("analyzer.fields: {:?}", analyzer.fields);
         let statement = analyzer.build();
 
         self.file.body = self
