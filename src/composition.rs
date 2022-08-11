@@ -162,6 +162,30 @@ macro_rules! binary_eq_expr {
     };
 }
 
+#[derive(Clone, Copy)]
+struct FilterKey<T>(T);
+
+trait Get {
+    fn get(&mut self) -> Option<String>;
+}
+
+impl Get for FilterKey<&String> {
+    fn get(&mut self) -> Option<String> {
+        Some(self.0.to_owned())
+    }
+}
+
+impl Get for FilterKey<&[String]> {
+    fn get(&mut self) -> Option<String> {
+        if let Some(key) = self.0.first() {
+            self.0 = &self.0[1..];
+            Some(key.to_owned())
+        } else {
+            None
+        }
+    }
+}
+
 /// Returns the logical expr, which are predicates joined by the operator.
 ///
 /// # Arguments
@@ -173,7 +197,7 @@ macro_rules! binary_eq_expr {
 /// As such, the filter! macro can be compile time (since it only pass the pointer to values).
 /// Then this logical_expr() cannot be a macro, because has an unknown runtime recursive depth.
 /// Yet the lower binary_eq_expr! can still be a macro.
-fn logical_expr(
+fn logical_expr<T>(
     operator: ast::LogicalOperator,
     keys: &[String],
     values: &[String],
