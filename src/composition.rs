@@ -130,8 +130,69 @@ macro_rules! range {
     }
 }
 
-macro_rules! filter {
+macro_rules! binary_eq_expr {
     ($key:expr, $value:expr) => {
+        ast::Expression::Binary(Box::new(ast::BinaryExpr {
+            base: ast::BaseNode::default(),
+            left: ast::Expression::Member(Box::new(
+                ast::MemberExpr {
+                    base: ast::BaseNode::default(),
+                    lbrack: vec![],
+                    rbrack: vec![],
+                    object: ast::Expression::Identifier(
+                        ast::Identifier {
+                            base: ast::BaseNode::default(),
+                            name: "r".into(),
+                        },
+                    ),
+                    property: ast::PropertyKey::Identifier(
+                        ast::Identifier {
+                            base: ast::BaseNode::default(),
+                            name: $key,
+                        },
+                    ),
+                },
+            )),
+            right: ast::Expression::StringLit(ast::StringLit {
+                base: ast::BaseNode::default(),
+                value: $value,
+            }),
+            operator: ast::Operator::EqualOperator,
+        }))
+    };
+}
+
+fn logical_expr(
+    operator: ast::LogicalOperator,
+    key: String,
+    values: &[String],
+) -> Result<ast::Expression, ()> {
+    match values {
+        [] => Err(()),
+        [head] => Ok(binary_eq_expr!(key, head.to_string())),
+        [head, ..] => {
+            if let Ok(right) = logical_expr(
+                operator.clone(),
+                key.clone(),
+                &values[1..].to_vec(),
+            ) {
+                Ok(ast::Expression::Logical(Box::new(
+                    ast::LogicalExpr {
+                        base: ast::BaseNode::default(),
+                        left: binary_eq_expr!(key, head.to_string()),
+                        right,
+                        operator,
+                    },
+                )))
+            } else {
+                Err(())
+            }
+        }
+    }
+}
+
+macro_rules! filter {
+    ($key:expr, $values:expr, $operator:expr) => {
         ast::CallExpr {
             arguments: vec![ast::Expression::Object(
                 Box::new(ast::ObjectExpr {
@@ -149,35 +210,9 @@ macro_rules! filter {
                             ast::Expression::Function(Box::new(ast::FunctionExpr {
                                 arrow: vec![],
                                 base: ast::BaseNode::default(),
-                                body: ast::FunctionBody::Expr(ast::Expression::Binary(
-                                    Box::new(ast::BinaryExpr {
-                                        base: ast::BaseNode::default(),
-                                        left: ast::Expression::Member(Box::new(
-                                            ast::MemberExpr {
-                                                base: ast::BaseNode::default(),
-                                                lbrack: vec![],
-                                                rbrack: vec![],
-                                                object: ast::Expression::Identifier(
-                                                    ast::Identifier {
-                                                        base: ast::BaseNode::default(),
-                                                        name: "r".into(),
-                                                    },
-                                                ),
-                                                property: ast::PropertyKey::Identifier(
-                                                    ast::Identifier {
-                                                        base: ast::BaseNode::default(),
-                                                        name: $key,
-                                                    },
-                                                ),
-                                            },
-                                        )),
-                                        right: ast::Expression::StringLit(ast::StringLit {
-                                            base: ast::BaseNode::default(),
-                                            value: $value,
-                                        }),
-                                        operator: ast::Operator::EqualOperator,
-                                    }),
-                                )),
+                                body: ast::FunctionBody::Expr(
+                                    logical_expr($operator, $key, $values).unwrap()
+                                ),
                                 lparen: vec![],
                                 rparen: vec![],
                                 params: vec![ast::Property {
@@ -299,6 +334,7 @@ impl CompositionQueryAnalyzer {
                 )
             }
             Some(measurement) => {
+                let measurements = vec![measurement.to_owned()];
                 pipe!(
                     ast::Expression::PipeExpr(Box::new(pipe!(
                         ast::Expression::PipeExpr(Box::new(pipe!(
@@ -309,7 +345,8 @@ impl CompositionQueryAnalyzer {
                         ),)),
                         filter!(
                             "_measurement".into(),
-                            measurement.to_owned()
+                            &measurements,
+                            ast::LogicalOperator::OrOperator
                         )
                     ))),
                     yield_!()
