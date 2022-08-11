@@ -192,7 +192,7 @@ fn logical_expr(
 }
 
 macro_rules! filter {
-    ($key:expr, $values:expr) => {
+    ($key:expr, $values:expr, $operator:expr) => {
         ast::CallExpr {
             arguments: vec![ast::Expression::Object(
                 Box::new(ast::ObjectExpr {
@@ -211,7 +211,7 @@ macro_rules! filter {
                                 arrow: vec![],
                                 base: ast::BaseNode::default(),
                                 body: ast::FunctionBody::Expr(
-                                    logical_expr(ast::LogicalOperator::OrOperator, $key, $values).unwrap()
+                                    logical_expr($operator, $key, $values).unwrap()
                                 ),
                                 lparen: vec![],
                                 rparen: vec![],
@@ -347,7 +347,7 @@ impl CompositionQueryAnalyzer {
                             ))),
                             range!()
                         ),)),
-                        filter!("_measurement".into(), &measurements)
+                        filter!("_measurement".into(), &measurements, ast::LogicalOperator::OrOperator)
                     ))),
                     yield_!()
                 )
@@ -361,7 +361,7 @@ impl CompositionQueryAnalyzer {
                             ))),
                             range!()
                         ),)),
-                        filter!("_field".into(), &self.fields)
+                        filter!("_field".into(), &self.fields, ast::LogicalOperator::OrOperator)
                     ))),
                     yield_!()
                 )
@@ -381,10 +381,11 @@ impl CompositionQueryAnalyzer {
                             )),
                             filter!(
                                 "_measurement".into(),
-                                &measurements
+                                &measurements,
+                                ast::LogicalOperator::OrOperator
                             )
                         ))),
-                        filter!("_field".into(), &self.fields)
+                        filter!("_field".into(), &self.fields, ast::LogicalOperator::OrOperator)
                     ))),
                     yield_!()
                 )
