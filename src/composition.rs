@@ -331,22 +331,20 @@ impl CompositionQueryAnalyzer {
         );
     }
 
-    fn build(&mut self) -> ast::PipeExpr {
-        match (&self.measurement, self.fields.len(), self.tags.len())
-        {
-            (None, 0, 0) => {
-                pipe!(
-                    ast::Expression::PipeExpr(Box::new(pipe!(
-                        ast::Expression::Call(Box::new(from!(self
-                            .bucket
-                            .to_owned()))),
-                        range!()
-                    ))),
-                    yield_!()
-                )
-            }
-            Some(measurement) => {
-                pipe!(
+    fn build(&mut self) -> Result<ast::PipeExpr, ()> {
+        match (&self.measurement, self.fields.len()) {
+            (None, 0) => Ok(pipe!(
+                ast::Expression::PipeExpr(Box::new(pipe!(
+                    ast::Expression::Call(Box::new(from!(self
+                        .bucket
+                        .to_owned()))),
+                    range!()
+                ))),
+                yield_!()
+            )),
+            (Some(measurement), 0) => {
+                let measurements = vec![measurement.to_owned()];
+                Ok(pipe!(
                     ast::Expression::PipeExpr(Box::new(pipe!(
                         ast::Expression::PipeExpr(Box::new(pipe!(
                             ast::Expression::Call(Box::new(from!(
@@ -361,29 +359,27 @@ impl CompositionQueryAnalyzer {
                         )
                     ))),
                     yield_!()
-                )
+                ))
             }
-            (None, 1.., 0) => {
-                pipe!(
+            (None, 1..) => Ok(pipe!(
+                ast::Expression::PipeExpr(Box::new(pipe!(
                     ast::Expression::PipeExpr(Box::new(pipe!(
-                        ast::Expression::PipeExpr(Box::new(pipe!(
-                            ast::Expression::Call(Box::new(from!(
-                                self.bucket.to_owned()
-                            ))),
-                            range!()
-                        ),)),
-                        filter!(
-                            "_field".into(),
-                            &self.fields,
-                            ast::LogicalOperator::OrOperator
-                        )
-                    ))),
-                    yield_!()
-                )
-            }
-            (Some(measurement), 1.., 0) => {
+                        ast::Expression::Call(Box::new(from!(self
+                            .bucket
+                            .to_owned()))),
+                        range!()
+                    ),)),
+                    filter!(
+                        "_field".into(),
+                        &self.fields,
+                        ast::LogicalOperator::OrOperator
+                    )
+                ))),
+                yield_!()
+            )),
+            (Some(measurement), 1..) => {
                 let measurements = vec![measurement.to_owned()];
-                pipe!(
+                Ok(pipe!(
                     ast::Expression::PipeExpr(Box::new(pipe!(
                         ast::Expression::PipeExpr(Box::new(pipe!(
                             ast::Expression::PipeExpr(Box::new(
@@ -407,9 +403,9 @@ impl CompositionQueryAnalyzer {
                         )
                     ))),
                     yield_!()
-                )
+                ))
             }
-            _ => todo!(),
+            (None, _) | (Some(_), _) => Err(()),
         }
     }
 }
@@ -601,7 +597,7 @@ impl Composition {
             tags: vec![],
             tag_values: vec![],
         };
-        let statement = analyzer.build();
+        let statement = analyzer.build().expect("Should not error, via unreachable match in analyzer.build()");
 
         if let Some(expr_statement) = visitor.statement {
             self.file.body = self
@@ -654,7 +650,7 @@ impl Composition {
         } else {
             analyzer.measurement = Some(measurement.into())
         }
-        let statement = analyzer.build();
+        let statement = analyzer.build().expect("Should not error, via unreachable match in analyzer.build()");
 
         self.file.body = self
             .file
@@ -703,7 +699,7 @@ impl Composition {
         } else {
             analyzer.fields.push(field.to_string());
         }
-        let statement = analyzer.build();
+        let statement = analyzer.build().expect("Should not error, via unreachable match in analyzer.build()");
 
         self.file.body = self
             .file
