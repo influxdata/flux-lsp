@@ -331,82 +331,37 @@ impl CompositionQueryAnalyzer {
         );
     }
 
-    fn build(&mut self) -> Result<ast::PipeExpr, ()> {
-        match (&self.measurement, self.fields.len()) {
-            (None, 0) => Ok(pipe!(
-                ast::Expression::PipeExpr(Box::new(pipe!(
-                    ast::Expression::Call(Box::new(from!(self
-                        .bucket
-                        .to_owned()))),
-                    range!()
-                ))),
-                yield_!()
-            )),
-            (Some(measurement), 0) => {
-                let measurements = vec![measurement.to_owned()];
-                Ok(pipe!(
-                    ast::Expression::PipeExpr(Box::new(pipe!(
-                        ast::Expression::PipeExpr(Box::new(pipe!(
-                            ast::Expression::Call(Box::new(from!(
-                                self.bucket.to_owned()
-                            ))),
-                            range!()
-                        ),)),
-                        filter!(
-                            "_measurement".into(),
-                            &[measurement.to_owned()],
-                            ast::LogicalOperator::OrOperator
-                        )
-                    ))),
-                    yield_!()
-                ))
-            }
-            (None, 1..) => Ok(pipe!(
-                ast::Expression::PipeExpr(Box::new(pipe!(
-                    ast::Expression::PipeExpr(Box::new(pipe!(
-                        ast::Expression::Call(Box::new(from!(self
-                            .bucket
-                            .to_owned()))),
-                        range!()
-                    ),)),
-                    filter!(
-                        "_field".into(),
-                        &self.fields,
-                        ast::LogicalOperator::OrOperator
-                    )
-                ))),
-                yield_!()
-            )),
-            (Some(measurement), 1..) => {
-                let measurements = vec![measurement.to_owned()];
-                Ok(pipe!(
-                    ast::Expression::PipeExpr(Box::new(pipe!(
-                        ast::Expression::PipeExpr(Box::new(pipe!(
-                            ast::Expression::PipeExpr(Box::new(
-                                pipe!(
-                                    ast::Expression::Call(Box::new(
-                                        from!(self.bucket.to_owned())
-                                    )),
-                                    range!()
-                                ),
-                            )),
-                            filter!(
-                                "_measurement".into(),
-                                &measurements,
-                                ast::LogicalOperator::OrOperator
-                            )
-                        ))),
-                        filter!(
-                            "_field".into(),
-                            &self.fields,
-                            ast::LogicalOperator::OrOperator
-                        )
-                    ))),
-                    yield_!()
-                ))
-            }
-            (None, _) | (Some(_), _) => Err(()),
+    fn build(&mut self) -> ast::PipeExpr {
+        let mut inner = ast::Expression::PipeExpr(Box::new(pipe!(
+            ast::Expression::Call(Box::new(from!(self
+                .bucket
+                .to_owned()))),
+            range!()
+        )));
+
+        if let Some(measurement) = &self.measurement {
+            let measurements = vec![measurement.to_owned()];
+            inner = ast::Expression::PipeExpr(Box::new(pipe!(
+                inner,
+                filter!(
+                    "_measurement".into(),
+                    &measurements,
+                    ast::LogicalOperator::OrOperator
+                )
+            )));
         }
+
+        if !self.fields.is_empty() {
+            inner = ast::Expression::PipeExpr(Box::new(pipe!(
+                inner,
+                filter!(
+                    "_field".into(),
+                    &self.fields,
+                    ast::LogicalOperator::OrOperator
+                )
+            )));
+        }
+        pipe!(inner, yield_!())
     }
 }
 
@@ -597,7 +552,7 @@ impl Composition {
             tags: vec![],
             tag_values: vec![],
         };
-        let statement = analyzer.build().expect("Should not error, via unreachable match in analyzer.build()");
+        let statement = analyzer.build();
 
         if let Some(expr_statement) = visitor.statement {
             self.file.body = self
@@ -650,7 +605,7 @@ impl Composition {
         } else {
             analyzer.measurement = Some(measurement.into())
         }
-        let statement = analyzer.build().expect("Should not error, via unreachable match in analyzer.build()");
+        let statement = analyzer.build();
 
         self.file.body = self
             .file
@@ -699,7 +654,7 @@ impl Composition {
         } else {
             analyzer.fields.push(field.to_string());
         }
-        let statement = analyzer.build().expect("Should not error, via unreachable match in analyzer.build()");
+        let statement = analyzer.build();
 
         self.file.body = self
             .file
