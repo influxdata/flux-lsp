@@ -644,29 +644,9 @@ impl Composition {
         let statement = analyzer.build();
 
         if let Some(expr_statement) = visitor.statement {
-            self.file.body = self
-                .file
-                .body
-                .iter()
-                .filter(|statement| match statement {
-                    ast::Statement::Expr(expression) => {
-                        expr_statement != *expression.as_ref()
-                    }
-                    _ => true,
-                })
-                .cloned()
-                .collect();
+            self.remove_previous(expr_statement);
         }
-
-        self.file.body.insert(
-            0,
-            ast::Statement::Expr(Box::new(ast::ExprStmt {
-                base: ast::BaseNode::default(),
-                expression: ast::Expression::PipeExpr(Box::new(
-                    statement,
-                )),
-            })),
-        );
+        self.add_updated(statement);
         Ok(())
     }
 
@@ -696,28 +676,8 @@ impl Composition {
         }
         let statement = analyzer.build();
 
-        self.file.body = self
-            .file
-            .body
-            .iter()
-            .filter(|statement| match statement {
-                ast::Statement::Expr(expression) => {
-                    expr_statement != *expression.as_ref()
-                }
-                _ => true,
-            })
-            .cloned()
-            .collect();
-
-        self.file.body.insert(
-            0,
-            ast::Statement::Expr(Box::new(ast::ExprStmt {
-                base: ast::BaseNode::default(),
-                expression: ast::Expression::PipeExpr(Box::new(
-                    statement,
-                )),
-            })),
-        );
+        self.remove_previous(expr_statement);
+        self.add_updated(statement);
         Ok(())
     }
 
@@ -745,29 +705,8 @@ impl Composition {
         }
         let statement = analyzer.build();
 
-        self.file.body = self
-            .file
-            .body
-            .iter()
-            .filter(|statement| match statement {
-                ast::Statement::Expr(expression) => {
-                    expr_statement != *expression.as_ref()
-                }
-                _ => true,
-            })
-            .cloned()
-            .collect();
-
-        self.file.body.insert(
-            0,
-            ast::Statement::Expr(Box::new(ast::ExprStmt {
-                base: ast::BaseNode::default(),
-                expression: ast::Expression::PipeExpr(Box::new(
-                    statement,
-                )),
-            })),
-        );
-
+        self.remove_previous(expr_statement);
+        self.add_updated(statement);
         Ok(())
     }
 
@@ -795,29 +734,8 @@ impl Composition {
         }
         let statement = analyzer.build();
 
-        self.file.body = self
-            .file
-            .body
-            .iter()
-            .filter(|statement| match statement {
-                ast::Statement::Expr(expression) => {
-                    expr_statement != *expression.as_ref()
-                }
-                _ => true,
-            })
-            .cloned()
-            .collect();
-
-        self.file.body.insert(
-            0,
-            ast::Statement::Expr(Box::new(ast::ExprStmt {
-                base: ast::BaseNode::default(),
-                expression: ast::Expression::PipeExpr(Box::new(
-                    statement,
-                )),
-            })),
-        );
-
+        self.remove_previous(expr_statement);
+        self.add_updated(statement);
         Ok(())
     }
 
@@ -850,19 +768,27 @@ impl Composition {
         }
         let statement = analyzer.build();
 
+        self.remove_previous(expr_statement);
+        self.add_updated(statement);
+        Ok(())
+    }
+
+    fn remove_previous(&mut self, found_composition: ast::ExprStmt) {
         self.file.body = self
             .file
             .body
             .iter()
             .filter(|statement| match statement {
                 ast::Statement::Expr(expression) => {
-                    expr_statement != *expression.as_ref()
+                    found_composition != *expression.as_ref()
                 }
                 _ => true,
             })
             .cloned()
             .collect();
+    }
 
+    fn add_updated(&mut self, statement: ast::PipeExpr) {
         self.file.body.insert(
             0,
             ast::Statement::Expr(Box::new(ast::ExprStmt {
@@ -871,9 +797,7 @@ impl Composition {
                     statement,
                 )),
             })),
-        );
-
-        Ok(())
+        )
     }
 }
 
