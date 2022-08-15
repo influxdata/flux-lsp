@@ -162,6 +162,17 @@ macro_rules! binary_eq_expr {
     };
 }
 
+/// Returns the logical expr, which are predicates joined by the operator.
+///
+/// # Arguments
+/// * `operator` - ast::LogicalOperator used to join predicates.
+/// * `key` - the string used in all of the predicates. key = value
+/// * `values` - pointer to vector slice of strings, to be used as each value in the predicates.
+///
+/// logical_expr() is a recursive function, with an unknown length (at compile time) of the values vector.
+/// As such, the filter! macro can be compile time (since it only pass the pointer to values).
+/// Then this logical_expr() cannot be a macro, because has an unknown runtime recursive depth.
+/// Yet the lower binary_eq_expr! can still be a macro.
 fn logical_expr(
     operator: ast::LogicalOperator,
     key: String,
@@ -334,7 +345,6 @@ impl CompositionQueryAnalyzer {
                 )
             }
             Some(measurement) => {
-                let measurements = vec![measurement.to_owned()];
                 pipe!(
                     ast::Expression::PipeExpr(Box::new(pipe!(
                         ast::Expression::PipeExpr(Box::new(pipe!(
@@ -345,7 +355,7 @@ impl CompositionQueryAnalyzer {
                         ),)),
                         filter!(
                             "_measurement".into(),
-                            &measurements,
+                            &[measurement.to_owned()],
                             ast::LogicalOperator::OrOperator
                         )
                     ))),
