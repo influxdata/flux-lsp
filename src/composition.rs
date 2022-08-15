@@ -268,6 +268,7 @@ macro_rules! pipe {
 /// Composition statement, it does not make changes.
 #[derive(Default)]
 struct CompositionQueryAnalyzer {
+    bucket: String,
     measurement: Option<String>,
     fields: Vec<String>,
     tags: Vec<String>,
@@ -283,6 +284,39 @@ impl CompositionQueryAnalyzer {
             )),
         );
     }
+
+    fn build(&mut self) -> ast::PipeExpr {
+        match &self.measurement {
+            None => {
+                pipe!(
+                    ast::Expression::PipeExpr(Box::new(pipe!(
+                        ast::Expression::Call(Box::new(from!(self
+                            .bucket
+                            .to_owned()))),
+                        range!()
+                    ))),
+                    yield_!()
+                )
+            }
+            Some(measurement) => {
+                pipe!(
+                    ast::Expression::PipeExpr(Box::new(pipe!(
+                        ast::Expression::PipeExpr(Box::new(pipe!(
+                            ast::Expression::Call(Box::new(from!(
+                                self.bucket.to_owned()
+                            ))),
+                            range!()
+                        ),)),
+                        filter!(
+                            "_measurement".into(),
+                            measurement.to_owned()
+                        )
+                    ))),
+                    yield_!()
+                )
+            }
+        }
+    }
 }
 
 impl<'a> ast::walk::Visitor<'a> for CompositionQueryAnalyzer {
@@ -291,6 +325,31 @@ impl<'a> ast::walk::Visitor<'a> for CompositionQueryAnalyzer {
         // about what the shape of these functions looks like. If the implementation ever gets more complex, than
         // we can short circuit execution in the matcher to prevent recursing into obvious dead-ends.
         match node {
+            ast::walk::Node::CallExpr(call_expr) => {
+                if let ast::Expression::Identifier(identifier) =
+                    &call_expr.callee
+                {
+                    if identifier.name.as_str() == "from" {
+                        if let ast::Expression::Object(object_expr) =
+                            &call_expr.arguments[0]
+                        {
+                            let ast::Property {
+                                base: _,
+                                key: _,
+                                separator: _,
+                                value,
+                                comma: _,
+                            } = &object_expr.properties[0];
+                            if let Some(ast::Expression::StringLit(
+                                ast::StringLit { base: _, value },
+                            )) = value
+                            {
+                                self.bucket = value.clone()
+                            }
+                        }
+                    }
+                }
+            }
             ast::walk::Node::BinaryExpr(binary_expr) => {
                 if binary_expr.operator
                     == ast::Operator::EqualOperator
@@ -439,6 +498,16 @@ impl Composition {
             &mut visitor,
             flux::ast::walk::Node::File(&self.file),
         );
+
+        let mut analyzer = CompositionQueryAnalyzer {
+            bucket: bucket.to_string(),
+            measurement: measurement.map(|m| m.to_owned()),
+            fields: vec![],
+            tags: vec![],
+            tag_values: vec![],
+        };
+        let statement = analyzer.build();
+
         if let Some(expr_statement) = visitor.statement {
             self.file.body = self
                 .file
@@ -454,37 +523,6 @@ impl Composition {
                 .collect();
         }
 
-        let statement = match measurement {
-            None => {
-                pipe!(
-                    ast::Expression::PipeExpr(Box::new(pipe!(
-                        ast::Expression::Call(Box::new(from!(
-                            bucket.to_string()
-                        ))),
-                        range!()
-                    ))),
-                    yield_!()
-                )
-            }
-            Some(measurement) => {
-                pipe!(
-                    ast::Expression::PipeExpr(Box::new(pipe!(
-                        ast::Expression::PipeExpr(Box::new(pipe!(
-                            ast::Expression::Call(Box::new(from!(
-                                bucket.to_string()
-                            ))),
-                            range!()
-                        ),)),
-                        filter!(
-                            "_measurement".into(),
-                            measurement.into()
-                        )
-                    ))),
-                    yield_!()
-                )
-            }
-        };
-
         self.file.body.insert(
             0,
             ast::Statement::Expr(Box::new(ast::ExprStmt {
@@ -494,7 +532,6 @@ impl Composition {
                 )),
             })),
         );
-
         Ok(())
     }
 
@@ -519,7 +556,10 @@ impl Composition {
         analyzer.analyze(expr_statement.clone());
         if analyzer.measurement.is_some() {
             return Err(());
+        } else {
+            analyzer.measurement = Some(measurement.into())
         }
+        let statement = analyzer.build();
 
         self.file.body = self
             .file
@@ -534,29 +574,12 @@ impl Composition {
             .cloned()
             .collect();
 
-        let yieldless = if let ast::Expression::PipeExpr(pipe_expr) =
-            expr_statement.expression
-        {
-            pipe_expr.argument
-        } else {
-            return Err(());
-        };
-
         self.file.body.insert(
             0,
             ast::Statement::Expr(Box::new(ast::ExprStmt {
                 base: ast::BaseNode::default(),
                 expression: ast::Expression::PipeExpr(Box::new(
-                    pipe!(
-                        ast::Expression::PipeExpr(Box::new(pipe!(
-                            yieldless,
-                            filter!(
-                                "_measurement".into(),
-                                measurement.into()
-                            )
-                        ))),
-                        yield_!()
-                    ),
+                    statement,
                 )),
             })),
         );
@@ -592,6 +615,8 @@ mod tests {
 
         let mut analyzer = CompositionQueryAnalyzer::default();
         analyzer.analyze(expr_statement.clone());
+
+        assert_eq!("an-composition".to_string(), analyzer.bucket);
 
         assert_eq!(
             Some("myMeasurement".to_string()),
