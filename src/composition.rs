@@ -162,30 +162,6 @@ macro_rules! binary_eq_expr {
     };
 }
 
-#[derive(Clone, Copy)]
-struct FilterKey<T>(T);
-
-trait Get {
-    fn get(&mut self) -> Option<String>;
-}
-
-impl Get for FilterKey<&String> {
-    fn get(&mut self) -> Option<String> {
-        Some(self.0.to_owned())
-    }
-}
-
-impl Get for FilterKey<&[String]> {
-    fn get(&mut self) -> Option<String> {
-        if let Some(key) = self.0.first() {
-            self.0 = &self.0[1..];
-            Some(key.to_owned())
-        } else {
-            None
-        }
-    }
-}
-
 /// Returns the logical expr, which are predicates joined by the operator.
 ///
 /// # Arguments
@@ -197,48 +173,37 @@ impl Get for FilterKey<&[String]> {
 /// As such, the filter! macro can be compile time (since it only pass the pointer to values).
 /// Then this logical_expr() cannot be a macro, because has an unknown runtime recursive depth.
 /// Yet the lower binary_eq_expr! can still be a macro.
-fn logical_expr<T>(
+fn logical_expr(
     operator: ast::LogicalOperator,
-    mut filter_key: T,
+    keys: &[String],
     values: &[String],
-) -> Result<ast::Expression, ()>
-where
-    T: Get + Clone,
-{
-    match values {
-        [] => Err(()),
-        [head] => {
-            if let Some(key) = filter_key.get() {
-                Ok(binary_eq_expr!(key, head.to_string()))
+) -> Result<ast::Expression, ()> {
+    match (keys, values) {
+        ([key], [value]) => {
+            Ok(binary_eq_expr!(key.to_owned(), value.to_owned()))
+        }
+        ([key, ..], [value, ..]) => {
+            if let Ok(right) = logical_expr(
+                operator.clone(),
+                &keys[1..],
+                &values[1..],
+            ) {
+                Ok(ast::Expression::Logical(Box::new(
+                    ast::LogicalExpr {
+                        base: ast::BaseNode::default(),
+                        left: binary_eq_expr!(
+                            key.to_owned(),
+                            value.to_owned()
+                        ),
+                        right,
+                        operator,
+                    },
+                )))
             } else {
                 Err(())
             }
         }
-        [head, ..] => {
-            if let Some(key) = filter_key.get() {
-                if let Ok(right) = logical_expr(
-                    operator.clone(),
-                    filter_key.to_owned(),
-                    &values[1..].to_vec(),
-                ) {
-                    Ok(ast::Expression::Logical(Box::new(
-                        ast::LogicalExpr {
-                            base: ast::BaseNode::default(),
-                            left: binary_eq_expr!(
-                                key,
-                                head.to_string()
-                            ),
-                            right,
-                            operator,
-                        },
-                    )))
-                } else {
-                    Err(())
-                }
-            } else {
-                Err(())
-            }
-        }
+        _ => Err(()),
     }
 }
 
@@ -383,7 +348,7 @@ impl CompositionQueryAnalyzer {
             inner = ast::Expression::PipeExpr(Box::new(pipe!(
                 inner,
                 filter!(
-                    FilterKey(&"_measurement".to_string()),
+                    &["_measurement".to_string()],
                     &[measurement.to_owned()],
                     ast::LogicalOperator::OrOperator
                 )
@@ -394,7 +359,7 @@ impl CompositionQueryAnalyzer {
             inner = ast::Expression::PipeExpr(Box::new(pipe!(
                 inner,
                 filter!(
-                    FilterKey(&"_field".to_string()),
+                    &vec!["_field".to_string(); self.fields.len()],
                     &self.fields,
                     ast::LogicalOperator::OrOperator
                 )
@@ -410,7 +375,7 @@ impl CompositionQueryAnalyzer {
             inner = ast::Expression::PipeExpr(Box::new(pipe!(
                 inner,
                 filter!(
-                    FilterKey(filter_keys.as_slice()),
+                    filter_keys.as_slice(),
                     filter_values.as_ref(),
                     ast::LogicalOperator::AndOperator
                 )
