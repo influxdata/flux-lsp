@@ -345,7 +345,6 @@ impl CompositionQueryAnalyzer {
                 )
             }
             Some(measurement) => {
-                let measurements = vec![measurement.to_owned()];
                 pipe!(
                     ast::Expression::PipeExpr(Box::new(pipe!(
                         ast::Expression::PipeExpr(Box::new(pipe!(
@@ -356,11 +355,7 @@ impl CompositionQueryAnalyzer {
                         ),)),
                         filter!(
                             "_measurement".into(),
-<<<<<<< HEAD
                             &[measurement.to_owned()],
-=======
-                            &measurements,
->>>>>>> b172270 (feat: have macro filter! handle multiple predicate statements, all with the same logical operator. Use macros for the compile time AST construction, sandwiched around a runtime fn logical_expr() which handles the runtime determined length of the values array.)
                             ast::LogicalOperator::OrOperator
                         )
                     ))),
