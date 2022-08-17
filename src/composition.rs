@@ -1233,6 +1233,31 @@ from(bucket: "my-bucket") |> yield(name: "my-result")
     }
 
     #[test]
+    fn composition_add_tag_tag_value_already_exists() {
+        let fluxscript = r#"from(bucket: "an-composition")
+        |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+        |> filter(fn: (r) => r.tagKey == "tagValue")
+        |> yield(name: "_editor_composition")
+    "#;
+        let ast = flux::parser::parse_string("".into(), &fluxscript);
+
+        let mut composition = Composition::new(ast);
+        // DON'T INITIALIZE THIS! WE'RE SIMULATING AN ALREADY INITIALIZED QUERY.
+        composition.add_tag(&"tagKey").unwrap();
+
+        assert_eq!(
+            r#"from(bucket: "an-composition")
+    |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+    |> filter(fn: (r) => exists r.tagKey)
+    |> filter(fn: (r) => r.tagKey == "tagValue")
+    |> yield(name: "_editor_composition")
+"#
+            .to_string(),
+            composition.to_string()
+        )
+    }
+
+    #[test]
     fn composition_add_tag_second_tag() {
         let fluxscript = r#"from(bucket: "an-composition")
         |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
