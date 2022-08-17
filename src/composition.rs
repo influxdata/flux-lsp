@@ -1306,8 +1306,8 @@ from(bucket: "my-bucket") |> yield(name: "my-result")
         assert_eq!(
             r#"from(bucket: "an-composition")
     |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
-    |> filter(fn: (r) => exists r.tagKey)
     |> filter(fn: (r) => r.tagKey == "tagValue")
+    |> filter(fn: (r) => exists r.tagKey)
     |> yield(name: "_editor_composition")
 "#
             .to_string(),
