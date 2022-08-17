@@ -130,6 +130,34 @@ macro_rules! range {
     }
 }
 
+macro_rules! exists {
+    ($key:expr) => {
+        ast::Expression::Unary(Box::new(ast::UnaryExpr {
+            base: ast::BaseNode::default(),
+            operator: ast::Operator::ExistsOperator,
+            argument: ast::Expression::Member(Box::new(
+                ast::MemberExpr {
+                    base: ast::BaseNode::default(),
+                    lbrack: vec![],
+                    rbrack: vec![],
+                    object: ast::Expression::Identifier(
+                        ast::Identifier {
+                            base: ast::BaseNode::default(),
+                            name: "r".into(),
+                        },
+                    ),
+                    property: ast::PropertyKey::Identifier(
+                        ast::Identifier {
+                            base: ast::BaseNode::default(),
+                            name: $key,
+                        },
+                    ),
+                },
+            )),
+        }))
+    };
+}
+
 macro_rules! binary_eq_expr {
     ($key:expr, $value:expr) => {
         ast::Expression::Binary(Box::new(ast::BinaryExpr {
@@ -162,6 +190,33 @@ macro_rules! binary_eq_expr {
     };
 }
 
+fn chained_exists_expr(
+    operator: ast::LogicalOperator,
+    values: &[String],
+) -> Result<ast::Expression, ()> {
+    match values {
+        [] => Err(()),
+        [head] => Ok(exists!(head.to_string())),
+        [head, ..] => {
+            if let Ok(right) = chained_exists_expr(
+                operator.clone(),
+                &values[1..].to_vec(),
+            ) {
+                Ok(ast::Expression::Logical(Box::new(
+                    ast::LogicalExpr {
+                        base: ast::BaseNode::default(),
+                        left: exists!(head.to_string()),
+                        right,
+                        operator,
+                    },
+                )))
+            } else {
+                Err(())
+            }
+        }
+    }
+}
+
 /// Returns the logical expr, which are predicates joined by the operator.
 ///
 /// # Arguments
@@ -173,7 +228,7 @@ macro_rules! binary_eq_expr {
 /// As such, the filter! macro can be compile time (since it only pass the pointer to values).
 /// Then this logical_expr() cannot be a macro, because has an unknown runtime recursive depth.
 /// Yet the lower binary_eq_expr! can still be a macro.
-fn logical_expr(
+fn chained_binary_eq_expr(
     operator: ast::LogicalOperator,
     keys: &[String],
     values: &[String],
@@ -183,7 +238,7 @@ fn logical_expr(
             Ok(binary_eq_expr!(key.to_owned(), value.to_owned()))
         }
         ([key, ..], [value, ..]) => {
-            if let Ok(right) = logical_expr(
+            if let Ok(right) = chained_binary_eq_expr(
                 operator.clone(),
                 &keys[1..],
                 &values[1..],
@@ -208,7 +263,13 @@ fn logical_expr(
 }
 
 macro_rules! filter {
+    ($values:expr, $operator:expr) => {
+        filter!(None, $values, $operator, chained_exists_expr($operator, $values).unwrap())
+    };
     ($key:expr, $values:expr, $operator:expr) => {
+        filter!($key, $values, $operator, chained_binary_eq_expr($operator, $key, $values).unwrap())
+    };
+    ($key:expr, $values:expr, $operator:expr, $funBody:expr) => {
         ast::CallExpr {
             arguments: vec![ast::Expression::Object(
                 Box::new(ast::ObjectExpr {
@@ -226,9 +287,7 @@ macro_rules! filter {
                             ast::Expression::Function(Box::new(ast::FunctionExpr {
                                 arrow: vec![],
                                 base: ast::BaseNode::default(),
-                                body: ast::FunctionBody::Expr(
-                                    logical_expr($operator, $key, $values).unwrap()
-                                ),
+                                body: ast::FunctionBody::Expr($funBody),
                                 lparen: vec![],
                                 rparen: vec![],
                                 params: vec![ast::Property {
@@ -261,7 +320,7 @@ macro_rules! filter {
             lparen: vec![],
             rparen: vec![],
         }
-    }
+    };
 }
 
 macro_rules! yield_ {
@@ -362,6 +421,16 @@ impl CompositionQueryAnalyzer {
                     &vec!["_field".to_string(); self.fields.len()],
                     &self.fields,
                     ast::LogicalOperator::OrOperator
+                )
+            )));
+        }
+
+        if !self.tags.is_empty() {
+            inner = ast::Expression::PipeExpr(Box::new(pipe!(
+                inner,
+                filter!(
+                    &self.tags,
+                    ast::LogicalOperator::AndOperator
                 )
             )));
         }
@@ -673,6 +742,56 @@ impl Composition {
             return Err(());
         } else {
             analyzer.fields.push(field.to_string());
+        }
+        let statement = analyzer.build();
+
+        self.file.body = self
+            .file
+            .body
+            .iter()
+            .filter(|statement| match statement {
+                ast::Statement::Expr(expression) => {
+                    expr_statement != *expression.as_ref()
+                }
+                _ => true,
+            })
+            .cloned()
+            .collect();
+
+        self.file.body.insert(
+            0,
+            ast::Statement::Expr(Box::new(ast::ExprStmt {
+                base: ast::BaseNode::default(),
+                expression: ast::Expression::PipeExpr(Box::new(
+                    statement,
+                )),
+            })),
+        );
+
+        Ok(())
+    }
+
+    #[allow(dead_code)]
+    fn add_tag(&mut self, tag: &str) -> CompositionResult {
+        let mut visitor =
+            CompositionStatementFinderVisitor::default();
+        flux::ast::walk::walk(
+            &mut visitor,
+            flux::ast::walk::Node::File(&self.file),
+        );
+        if visitor.statement.is_none() {
+            return Err(());
+        }
+        let expr_statement =
+            visitor.statement.expect("Previous check failed.");
+
+        let mut analyzer = CompositionQueryAnalyzer::default();
+        analyzer.analyze(expr_statement.clone());
+
+        if analyzer.tags.contains(&tag.to_string()) {
+            return Err(());
+        } else {
+            analyzer.tags.push(tag.to_string());
         }
         let statement = analyzer.build();
 
@@ -1068,6 +1187,97 @@ from(bucket: "my-bucket") |> yield(name: "my-result")
     |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
     |> filter(fn: (r) => r._measurement == "anMeasurement")
     |> filter(fn: (r) => r.tagKey1 == "tagValue1" and r.tagKey2 == "tagValue2")
+    |> yield(name: "_editor_composition")
+"#
+            .to_string(),
+            composition.to_string()
+        )
+    }
+
+    #[test]
+    fn composition_add_tag() {
+        let fluxscript = r#"from(bucket: "an-composition")
+        |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+        |> yield(name: "_editor_composition")
+    "#;
+        let ast = flux::parser::parse_string("".into(), &fluxscript);
+
+        let mut composition = Composition::new(ast);
+        // DON'T INITIALIZE THIS! WE'RE SIMULATING AN ALREADY INITIALIZED QUERY.
+        composition.add_tag(&"tagKey").unwrap();
+
+        assert_eq!(
+            r#"from(bucket: "an-composition")
+    |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+    |> filter(fn: (r) => exists r.tagKey)
+    |> yield(name: "_editor_composition")
+"#
+            .to_string(),
+            composition.to_string()
+        )
+    }
+
+    #[test]
+    fn composition_add_tag_tag_already_exists() {
+        let fluxscript = r#"from(bucket: "an-composition")
+        |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+        |> filter(fn: (r) => exists r.tagKey)
+        |> yield(name: "_editor_composition")
+    "#;
+        let ast = flux::parser::parse_string("".into(), &fluxscript);
+
+        let mut composition = Composition::new(ast);
+        // DON'T INITIALIZE THIS! WE'RE SIMULATING AN ALREADY INITIALIZED QUERY.
+
+        assert!(composition.add_tag(&"tagKey").is_err());
+    }
+
+    #[test]
+    fn composition_add_tag_tag_value_already_exists() {
+        let fluxscript = r#"from(bucket: "an-composition")
+        |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+        |> filter(fn: (r) => r.tagKey == "tagValue")
+        |> yield(name: "_editor_composition")
+    "#;
+        let ast = flux::parser::parse_string("".into(), &fluxscript);
+
+        let mut composition = Composition::new(ast);
+        // DON'T INITIALIZE THIS! WE'RE SIMULATING AN ALREADY INITIALIZED QUERY.
+        composition.add_tag(&"tagKey").unwrap();
+
+        assert_eq!(
+            r#"from(bucket: "an-composition")
+    |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+    |> filter(fn: (r) => exists r.tagKey)
+    |> filter(fn: (r) => r.tagKey == "tagValue")
+    |> yield(name: "_editor_composition")
+"#
+            .to_string(),
+            composition.to_string()
+        )
+    }
+
+    #[test]
+    fn composition_add_tag_second_tag() {
+        let fluxscript = r#"from(bucket: "an-composition")
+        |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+        |> filter(fn: (r) => r._measurement == "anMeasurement")
+        |> filter(fn: (r) => r._field == "anField")
+        |> filter(fn: (r) => exists r.tagKey1)
+        |> yield(name: "_editor_composition")
+    "#;
+        let ast = flux::parser::parse_string("".into(), &fluxscript);
+
+        let mut composition = Composition::new(ast);
+        // DON'T INITIALIZE THIS! WE'RE SIMULATING AN ALREADY INITIALIZED QUERY.
+        composition.add_tag(&"tagKey2").unwrap();
+
+        assert_eq!(
+            r#"from(bucket: "an-composition")
+    |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+    |> filter(fn: (r) => r._measurement == "anMeasurement")
+    |> filter(fn: (r) => r._field == "anField")
+    |> filter(fn: (r) => exists r.tagKey1 and exists r.tagKey2)
     |> yield(name: "_editor_composition")
 "#
             .to_string(),
