@@ -1664,6 +1664,15 @@ impl LanguageServer for LspServer {
                 }
                 Ok(None)
             }
+            Ok(LspServerCommand::CompositionInitialize) => todo!(),
+            Ok(LspServerCommand::AddMeasurementFilter) => todo!(),
+            Ok(LspServerCommand::RemoveMeasurementFilter) => todo!(),
+            Ok(LspServerCommand::AddFieldFilter) => todo!(),
+            Ok(LspServerCommand::RemoveFieldFilter) => todo!(),
+            Ok(LspServerCommand::AddTagFilter) => todo!(),
+            Ok(LspServerCommand::RemoveTagFilter) => todo!(),
+            Ok(LspServerCommand::AddTagValueFilter) => todo!(),
+            Ok(LspServerCommand::RemoveTagValueFilter) => todo!(),
             Ok(LspServerCommand::GetFunctionList) => Ok(Some(
                 lang::UNIVERSE
                     .functions()

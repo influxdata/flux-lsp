@@ -6,6 +6,15 @@ pub enum LspServerCommand {
     InjectTagValueFilter,
     InjectFieldFilter,
     InjectMeasurementFilter,
+    CompositionInitialize,
+    AddMeasurementFilter,
+    RemoveMeasurementFilter,
+    AddFieldFilter,
+    RemoveFieldFilter,
+    AddTagFilter,
+    RemoveTagFilter,
+    AddTagValueFilter,
+    RemoveTagValueFilter,
     GetFunctionList,
 }
 
@@ -25,6 +34,33 @@ impl TryFrom<String> for LspServerCommand {
             }
             "injectMeasurementFilter" => {
                 Ok(LspServerCommand::InjectMeasurementFilter)
+            }
+            "fluxComposition/initialize" => {
+                Ok(LspServerCommand::CompositionInitialize)
+            }
+            "fluxComposition/addMeasurementFilter" => {
+                Ok(LspServerCommand::AddMeasurementFilter)
+            }
+            "fluxComposition/addFieldFilter" => {
+                Ok(LspServerCommand::AddFieldFilter)
+            }
+            "fluxComposition/addTagFilter" => {
+                Ok(LspServerCommand::AddTagFilter)
+            }
+            "fluxComposition/addTagValueFilter" => {
+                Ok(LspServerCommand::AddTagValueFilter)
+            }
+            "fluxComposition/removeMeasurementFilter" => {
+                Ok(LspServerCommand::RemoveMeasurementFilter)
+            }
+            "fluxComposition/removeFieldFilter" => {
+                Ok(LspServerCommand::RemoveFieldFilter)
+            }
+            "fluxComposition/removeTagFilter" => {
+                Ok(LspServerCommand::RemoveTagFilter)
+            }
+            "fluxComposition/removeTagValueFilter" => {
+                Ok(LspServerCommand::RemoveTagValueFilter)
             }
             "getFunctionList" => {
                 Ok(LspServerCommand::GetFunctionList)
@@ -51,6 +87,33 @@ impl From<LspServerCommand> for String {
             }
             LspServerCommand::InjectMeasurementFilter => {
                 "injectMeasurementFilter".into()
+            }
+            LspServerCommand::CompositionInitialize => {
+                "fluxComposition/initialize".into()
+            }
+            LspServerCommand::AddMeasurementFilter => {
+                "fluxComposition/addMeasurementFilter".into()
+            }
+            LspServerCommand::AddFieldFilter => {
+                "fluxComposition/addFieldFilter".into()
+            }
+            LspServerCommand::AddTagFilter => {
+                "fluxComposition/addTagFilter".into()
+            }
+            LspServerCommand::AddTagValueFilter => {
+                "fluxComposition/addTagValueFilter".into()
+            }
+            LspServerCommand::RemoveMeasurementFilter => {
+                "fluxComposition/removeMeasurementFilter".into()
+            }
+            LspServerCommand::RemoveFieldFilter => {
+                "fluxComposition/removeFieldFilter".into()
+            }
+            LspServerCommand::RemoveTagFilter => {
+                "fluxComposition/removeTagFilter".into()
+            }
+            LspServerCommand::RemoveTagValueFilter => {
+                "fluxComposition/removeTagValueFilter".into()
             }
             LspServerCommand::GetFunctionList => {
                 "getFunctionList".into()
