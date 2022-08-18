@@ -722,6 +722,61 @@ impl Composition {
     }
 
     #[allow(dead_code)]
+    fn remove_measurement(
+        &mut self,
+        measurement: &str,
+    ) -> CompositionResult {
+        let mut visitor =
+            CompositionStatementFinderVisitor::default();
+        flux::ast::walk::walk(
+            &mut visitor,
+            flux::ast::walk::Node::File(&self.file),
+        );
+        if visitor.statement.is_none() {
+            return Err(());
+        }
+        let expr_statement =
+            visitor.statement.expect("Previous check failed.");
+
+        let mut analyzer = CompositionQueryAnalyzer::default();
+        analyzer.analyze(expr_statement.clone());
+
+        if let Some(m) = analyzer.measurement {
+            if m == *measurement {
+                analyzer.measurement = None;
+
+                let statement = analyzer.build();
+
+                self.file.body = self
+                    .file
+                    .body
+                    .iter()
+                    .filter(|statement| match statement {
+                        ast::Statement::Expr(expression) => {
+                            expr_statement != *expression.as_ref()
+                        }
+                        _ => true,
+                    })
+                    .cloned()
+                    .collect();
+
+                self.file.body.insert(
+                    0,
+                    ast::Statement::Expr(Box::new(ast::ExprStmt {
+                        base: ast::BaseNode::default(),
+                        expression: ast::Expression::PipeExpr(
+                            Box::new(statement),
+                        ),
+                    })),
+                );
+
+                return Ok(());
+            }
+        }
+        Err(())
+    }
+
+    #[allow(dead_code)]
     fn add_field(&mut self, field: &str) -> CompositionResult {
         let mut visitor =
             CompositionStatementFinderVisitor::default();
@@ -1034,6 +1089,63 @@ from(bucket: "my-bucket") |> yield(name: "my-result")
 
         assert!(composition
             .add_measurement(&"myMeasurement")
+            .is_err());
+    }
+
+    #[test]
+    fn composition_remove_measurement() {
+        let fluxscript = r#"from(bucket: "an-composition")
+        |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+        |> filter(fn: (r) => r._measurement == "anMeasurement")
+        |> filter(fn: (r) => r._field == "anField")
+        |> yield(name: "_editor_composition")
+    "#;
+        let ast = flux::parser::parse_string("".into(), &fluxscript);
+
+        let mut composition = Composition::new(ast);
+        // DON'T INITIALIZE THIS! WE'RE SIMULATING AN ALREADY INITIALIZED QUERY.
+        composition.remove_measurement(&"anMeasurement").unwrap();
+
+        assert_eq!(
+            r#"from(bucket: "an-composition")
+    |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+    |> filter(fn: (r) => r._field == "anField")
+    |> yield(name: "_editor_composition")
+"#
+            .to_string(),
+            composition.to_string()
+        )
+    }
+
+    #[test]
+    fn composition_remove_measurement_different_measurement() {
+        let fluxscript = r#"from(bucket: "an-composition")
+        |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+        |> filter(fn: (r) => r._measurement == "anMeasurement")
+        |> yield(name: "_editor_composition")
+    "#;
+        let ast = flux::parser::parse_string("".into(), &fluxscript);
+
+        let mut composition = Composition::new(ast);
+        // DON'T INITIALIZE THIS! WE'RE SIMULATING AN ALREADY INITIALIZED QUERY.
+        assert!(composition
+            .remove_measurement(&"anotherMeasurement")
+            .is_err());
+    }
+
+    #[test]
+    fn composition_remove_measurement_no_measurement_exists() {
+        let fluxscript = r#"from(bucket: "an-composition")
+        |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+        |> filter(fn: (r) => r._field == "anField")
+        |> yield(name: "_editor_composition")
+    "#;
+        let ast = flux::parser::parse_string("".into(), &fluxscript);
+
+        let mut composition = Composition::new(ast);
+        // DON'T INITIALIZE THIS! WE'RE SIMULATING AN ALREADY INITIALIZED QUERY.
+        assert!(composition
+            .remove_measurement(&"anotherMeasurement")
             .is_err());
     }
 
