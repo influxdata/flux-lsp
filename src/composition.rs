@@ -772,6 +772,57 @@ impl Composition {
     }
 
     #[allow(dead_code)]
+    fn remove_field(&mut self, field: &str) -> CompositionResult {
+        let mut visitor =
+            CompositionStatementFinderVisitor::default();
+        flux::ast::walk::walk(
+            &mut visitor,
+            flux::ast::walk::Node::File(&self.file),
+        );
+        if visitor.statement.is_none() {
+            return Err(());
+        }
+        let expr_statement =
+            visitor.statement.expect("Previous check failed.");
+
+        let mut analyzer = CompositionQueryAnalyzer::default();
+        analyzer.analyze(expr_statement.clone());
+
+        let previous_len = analyzer.fields.len();
+        analyzer.fields.retain(|f| f != &field.to_string());
+
+        if previous_len == analyzer.fields.len() {
+            return Err(());
+        }
+        let statement = analyzer.build();
+
+        self.file.body = self
+            .file
+            .body
+            .iter()
+            .filter(|statement| match statement {
+                ast::Statement::Expr(expression) => {
+                    expr_statement != *expression.as_ref()
+                }
+                _ => true,
+            })
+            .cloned()
+            .collect();
+
+        self.file.body.insert(
+            0,
+            ast::Statement::Expr(Box::new(ast::ExprStmt {
+                base: ast::BaseNode::default(),
+                expression: ast::Expression::PipeExpr(Box::new(
+                    statement,
+                )),
+            })),
+        );
+
+        Ok(())
+    }
+
+    #[allow(dead_code)]
     fn add_tag(&mut self, tag: &str) -> CompositionResult {
         let mut visitor =
             CompositionStatementFinderVisitor::default();
@@ -1125,6 +1176,72 @@ from(bucket: "my-bucket") |> yield(name: "my-result")
             .to_string(),
             composition.to_string()
         )
+    }
+
+    #[test]
+    fn composition_remove_field() {
+        let fluxscript = r#"from(bucket: "an-composition")
+        |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+        |> filter(fn: (r) => r._measurement == "anMeasurement")
+        |> filter(fn: (r) => r._field == "anField")
+        |> yield(name: "_editor_composition")
+    "#;
+        let ast = flux::parser::parse_string("".into(), &fluxscript);
+
+        let mut composition = Composition::new(ast);
+        // DON'T INITIALIZE THIS! WE'RE SIMULATING AN ALREADY INITIALIZED QUERY.
+        composition.remove_field(&"anField").unwrap();
+
+        assert_eq!(
+            r#"from(bucket: "an-composition")
+    |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+    |> filter(fn: (r) => r._measurement == "anMeasurement")
+    |> yield(name: "_editor_composition")
+"#
+            .to_string(),
+            composition.to_string()
+        )
+    }
+
+    #[test]
+    fn composition_remove_field_multiple_fields() {
+        let fluxscript = r#"from(bucket: "an-composition")
+        |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+        |> filter(fn: (r) => r._measurement == "anMeasurement")
+        |> filter(fn: (r) => r._field == "firstField" or r._field == "secondField" or r._field == "thirdField")
+        |> yield(name: "_editor_composition")
+    "#;
+        let ast = flux::parser::parse_string("".into(), &fluxscript);
+
+        let mut composition = Composition::new(ast);
+        // DON'T INITIALIZE THIS! WE'RE SIMULATING AN ALREADY INITIALIZED QUERY.
+        composition.remove_field(&"secondField").unwrap();
+
+        assert_eq!(
+            r#"from(bucket: "an-composition")
+    |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+    |> filter(fn: (r) => r._measurement == "anMeasurement")
+    |> filter(fn: (r) => r._field == "firstField" or r._field == "thirdField")
+    |> yield(name: "_editor_composition")
+"#
+            .to_string(),
+            composition.to_string()
+        )
+    }
+
+    #[test]
+    fn composition_remove_field_field_not_exists() {
+        let fluxscript = r#"from(bucket: "an-composition")
+        |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+        |> filter(fn: (r) => r._measurement == "anMeasurement")
+        |> filter(fn: (r) => r._field == "anField")
+        |> yield(name: "_editor_composition")
+    "#;
+        let ast = flux::parser::parse_string("".into(), &fluxscript);
+
+        let mut composition = Composition::new(ast);
+        // DON'T INITIALIZE THIS! WE'RE SIMULATING AN ALREADY INITIALIZED QUERY.
+        assert!(composition.remove_field(&"anotherField").is_err());
     }
 
     #[test]
