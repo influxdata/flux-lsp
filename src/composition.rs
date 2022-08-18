@@ -926,6 +926,62 @@ impl Composition {
 
         Ok(())
     }
+
+    #[allow(dead_code)]
+    fn remove_tag_value(
+        &mut self,
+        tag_key: &str,
+        tag_value: &str,
+    ) -> CompositionResult {
+        let mut visitor =
+            CompositionStatementFinderVisitor::default();
+        flux::ast::walk::walk(
+            &mut visitor,
+            flux::ast::walk::Node::File(&self.file),
+        );
+        if visitor.statement.is_none() {
+            return Err(());
+        }
+        let expr_statement =
+            visitor.statement.expect("Previous check failed.");
+
+        let mut analyzer = CompositionQueryAnalyzer::default();
+        analyzer.analyze(expr_statement.clone());
+
+        let tag_pair = (tag_key.to_string(), tag_value.to_string());
+        let previous_len = analyzer.tag_values.len();
+        analyzer.tag_values.retain(|p| !p.eq(&tag_pair));
+
+        if previous_len == analyzer.tag_values.len() {
+            return Err(());
+        }
+        let statement = analyzer.build();
+
+        self.file.body = self
+            .file
+            .body
+            .iter()
+            .filter(|statement| match statement {
+                ast::Statement::Expr(expression) => {
+                    expr_statement != *expression.as_ref()
+                }
+                _ => true,
+            })
+            .cloned()
+            .collect();
+
+        self.file.body.insert(
+            0,
+            ast::Statement::Expr(Box::new(ast::ExprStmt {
+                base: ast::BaseNode::default(),
+                expression: ast::Expression::PipeExpr(Box::new(
+                    statement,
+                )),
+            })),
+        );
+
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -1243,6 +1299,80 @@ from(bucket: "my-bucket") |> yield(name: "my-result")
             .to_string(),
             composition.to_string()
         )
+    }
+
+    #[test]
+    fn composition_remove_tag_value() {
+        let fluxscript = r#"from(bucket: "an-composition")
+        |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+        |> filter(fn: (r) => r._measurement == "anMeasurement")
+        |> filter(fn: (r) => r._field == "anField")
+        |> filter(fn: (r) => r.tagKey == "tagValue")
+        |> yield(name: "_editor_composition")
+    "#;
+        let ast = flux::parser::parse_string("".into(), &fluxscript);
+
+        let mut composition = Composition::new(ast);
+        // DON'T INITIALIZE THIS! WE'RE SIMULATING AN ALREADY INITIALIZED QUERY.
+        composition
+            .remove_tag_value(&"tagKey", &"tagValue")
+            .unwrap();
+
+        assert_eq!(
+            r#"from(bucket: "an-composition")
+    |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+    |> filter(fn: (r) => r._measurement == "anMeasurement")
+    |> filter(fn: (r) => r._field == "anField")
+    |> yield(name: "_editor_composition")
+"#
+            .to_string(),
+            composition.to_string()
+        )
+    }
+
+    #[test]
+    fn composition_remove_tag_value_multiple_tag_values() {
+        let fluxscript = r#"from(bucket: "an-composition")
+        |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+        |> filter(fn: (r) => r._measurement == "anMeasurement")
+        |> filter(fn: (r) => r.tagKey1 == "tagValue1" and r.tagKey2 == "tagValue2" and r.tagKey3 == "tagValue3")
+        |> yield(name: "_editor_composition")
+    "#;
+        let ast = flux::parser::parse_string("".into(), &fluxscript);
+
+        let mut composition = Composition::new(ast);
+        // DON'T INITIALIZE THIS! WE'RE SIMULATING AN ALREADY INITIALIZED QUERY.
+        composition
+            .remove_tag_value(&"tagKey2", &"tagValue2")
+            .unwrap();
+
+        assert_eq!(
+            r#"from(bucket: "an-composition")
+    |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+    |> filter(fn: (r) => r._measurement == "anMeasurement")
+    |> filter(fn: (r) => r.tagKey1 == "tagValue1" and r.tagKey3 == "tagValue3")
+    |> yield(name: "_editor_composition")
+"#
+            .to_string(),
+            composition.to_string()
+        )
+    }
+
+    #[test]
+    fn composition_remove_tag_value_tag_value_not_exists() {
+        let fluxscript = r#"from(bucket: "an-composition")
+        |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+        |> filter(fn: (r) => r._measurement == "anMeasurement")
+        |> filter(fn: (r) => r.tagKey1 == "tagValue1" and r.tagKey3 == "tagValue3")
+        |> yield(name: "_editor_composition")
+    "#;
+        let ast = flux::parser::parse_string("".into(), &fluxscript);
+
+        let mut composition = Composition::new(ast);
+        // DON'T INITIALIZE THIS! WE'RE SIMULATING AN ALREADY INITIALIZED QUERY.
+        assert!(composition
+            .remove_tag_value(&"tagKey2", &"tagValue2")
+            .is_err());
     }
 
     #[test]
