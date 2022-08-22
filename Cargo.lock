@@ -645,7 +645,7 @@ dependencies = [
 [[package]]
 name = "flux"
 version = "0.154.0"
-source = "git+https://github.com/influxdata/flux?rev=d0ff2cfb#d0ff2cfbd20474784159cc90afa8ba577c2abd5a"
+source = "git+https://github.com/influxdata/flux?tag=v0.180.1#7f1719d78efee78ccd7171bdd3c2062f29293285"
 dependencies = [
  "anyhow",
  "env_logger",
@@ -660,7 +660,7 @@ dependencies = [
 [[package]]
 name = "flux-core"
 version = "0.154.0"
-source = "git+https://github.com/influxdata/flux?rev=d0ff2cfb#d0ff2cfbd20474784159cc90afa8ba577c2abd5a"
+source = "git+https://github.com/influxdata/flux?tag=v0.180.1#7f1719d78efee78ccd7171bdd3c2062f29293285"
 dependencies = [
  "anyhow",
  "chrono",
@@ -679,7 +679,6 @@ dependencies = [
  "pretty",
  "regex",
  "serde",
- "serde-aux",
  "serde_derive",
  "serde_json",
  "structopt",
@@ -1425,17 +1424,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "61ea8d54c77f8315140a05f4c7237403bf38b72704d031543aa1d16abbf517d1"
 dependencies = [
  "serde_derive",
-]
-
-[[package]]
-name = "serde-aux"
-version = "3.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "93abf9799c576f004252b2a05168d58527fb7c54de12e94b4d12fe3475ffad24"
-dependencies = [
- "chrono",
- "serde",
- "serde_json",
 ]
 
 [[package]]
