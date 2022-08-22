@@ -600,7 +600,7 @@ impl<'a> ast::walk::Visitor<'a>
 type CompositionResult = Result<(), ()>;
 
 /// Composition acts as the public entry point into the composition functionality.
-struct Composition {
+pub(crate) struct Composition {
     file: ast::File,
 }
 
@@ -612,8 +612,7 @@ impl ToString for Composition {
 }
 
 impl Composition {
-    #[allow(dead_code)]
-    fn new(file: ast::File) -> Self {
+    pub(crate) fn new(file: ast::File) -> Self {
         Self { file }
     }
 
@@ -621,11 +620,10 @@ impl Composition {
     ///
     /// This must be called before any other composition can be made, as it'll set up the
     /// statement that will be managed by composition.
-    #[allow(dead_code)]
-    fn initialize(
+    pub(crate) fn initialize(
         &mut self,
-        bucket: &str,
-        measurement: Option<&str>,
+        bucket: String,
+        measurement: Option<String>,
     ) -> CompositionResult {
         let mut visitor =
             CompositionStatementFinderVisitor::default();
@@ -635,8 +633,8 @@ impl Composition {
         );
 
         let mut analyzer = CompositionQueryAnalyzer {
-            bucket: bucket.to_string(),
-            measurement: measurement.map(|m| m.to_owned()),
+            bucket,
+            measurement,
             fields: vec![],
             tags: vec![],
             tag_values: vec![],
@@ -670,10 +668,9 @@ impl Composition {
         Ok(())
     }
 
-    #[allow(dead_code)]
-    fn add_measurement(
+    pub(crate) fn add_measurement(
         &mut self,
-        measurement: &str,
+        measurement: String,
     ) -> CompositionResult {
         let mut visitor =
             CompositionStatementFinderVisitor::default();
@@ -692,7 +689,7 @@ impl Composition {
         if analyzer.measurement.is_some() {
             return Err(());
         } else {
-            analyzer.measurement = Some(measurement.into())
+            analyzer.measurement = Some(measurement)
         }
         let statement = analyzer.build();
 
@@ -1096,7 +1093,9 @@ mod tests {
 
         let mut composition = Composition::new(ast);
 
-        composition.initialize(&"an-composition", None).unwrap();
+        composition
+            .initialize(String::from("an-composition"), None)
+            .unwrap();
 
         assert_eq!(
             r#"from(bucket: "an-composition")
@@ -1121,7 +1120,9 @@ from(bucket: "my-bucket") |> yield(name: "my-result")
 
         let mut composition = Composition::new(ast);
 
-        composition.initialize(&"an-composition", None).unwrap();
+        composition
+            .initialize(String::from("an-composition"), None)
+            .unwrap();
 
         assert_eq!(
             r#"from(bucket: "an-composition")
@@ -1143,7 +1144,10 @@ from(bucket: "my-bucket") |> yield(name: "my-result")
         let mut composition = Composition::new(ast);
 
         composition
-            .initialize(&"an-composition", Some("myMeasurement"))
+            .initialize(
+                String::from("an-composition"),
+                Some(String::from("myMeasurement")),
+            )
             .unwrap();
 
         assert_eq!(
@@ -1164,8 +1168,12 @@ from(bucket: "my-bucket") |> yield(name: "my-result")
 
         let mut composition = Composition::new(ast);
 
-        composition.initialize(&"an-composition", None).unwrap();
-        composition.add_measurement(&"myMeasurement").unwrap();
+        composition
+            .initialize(String::from("an-composition"), None)
+            .unwrap();
+        composition
+            .add_measurement(String::from("myMeasurement"))
+            .unwrap();
 
         assert_eq!(
             r#"from(bucket: "an-composition")
@@ -1191,7 +1199,7 @@ from(bucket: "my-bucket") |> yield(name: "my-result")
         // DON'T INITIALIZE THIS! WE'RE SIMULATING AN ALREADY INITIALIZED QUERY.
 
         assert!(composition
-            .add_measurement(&"myMeasurement")
+            .add_measurement(String::from("myMeasurement"))
             .is_err());
     }
 
