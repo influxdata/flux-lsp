@@ -34,7 +34,7 @@ impl<'a> walk::Visitor<'a> for NodeFinderVisitor<'a> {
             let parent = self.node.clone();
             if let Some(parent) = parent {
                 self.node = Some(NodeFinderNode {
-                    node: node.clone(),
+                    node,
                     parent: Some(Box::new(parent)),
                 });
             } else {
