@@ -276,7 +276,6 @@ mod tests {
               "experimental/query",
               "experimental/record",
               "experimental/table",
-              "experimental/universe",
               "experimental/usage",
               "generate",
               "http",
