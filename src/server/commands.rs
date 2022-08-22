@@ -154,3 +154,19 @@ pub struct InjectMeasurementFilterParams {
     pub bucket: String,
     pub name: String,
 }
+
+#[derive(Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CompositionInitParams {
+    pub text_document: lsp::TextDocumentIdentifier,
+    pub bucket: String,
+    pub name: Option<String>,
+}
+
+#[derive(Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FilterParams {
+    pub text_document: lsp::TextDocumentIdentifier,
+    pub name: String,
+    pub value: Option<String>,
+}
