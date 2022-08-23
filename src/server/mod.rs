@@ -17,12 +17,12 @@ use lspower::{
     jsonrpc::Result as RpcResult, lsp, Client, LanguageServer,
 };
 
-use crate::{completion, lang, visitors::semantic};
+use crate::{completion, composition, lang, visitors::semantic};
 
 use self::commands::{
-    InjectFieldFilterParams, InjectMeasurementFilterParams,
-    InjectTagFilterParams, InjectTagValueFilterParams,
-    LspServerCommand,
+    CompositionInitializeParams, InjectFieldFilterParams,
+    InjectMeasurementFilterParams, InjectTagFilterParams,
+    InjectTagValueFilterParams, LspServerCommand, ValueFilterParams,
 };
 use self::types::LspError;
 
@@ -1664,6 +1664,160 @@ impl LanguageServer for LspServer {
                 }
                 Ok(None)
             }
+            Ok(LspServerCommand::CompositionInitialize) => {
+                let command_params: CompositionInitializeParams =
+                    match serde_json::value::from_value(
+                        params.arguments[0].clone(),
+                    ) {
+                        Ok(value) => value,
+                        Err(err) => {
+                            return Err(LspError::InternalError(
+                                format!("{:?}", err),
+                            )
+                            .into())
+                        }
+                    };
+
+                let file = self.store.get_ast_file(
+                    &command_params.text_document.uri,
+                )?;
+                let mut composition =
+                    composition::Composition::new(file);
+                let status = composition.initialize(
+                    command_params.bucket,
+                    command_params.measurement,
+                );
+                if status.is_err() {
+                    return Err(LspError::InternalError(
+                        "Failed to initialize composition."
+                            .to_string(),
+                    )
+                    .into());
+                }
+                let new_text = composition.to_string();
+
+                let last_pos =
+                    line_col::LineColLookup::new(&new_text)
+                        .get(new_text.len());
+
+                let edit = lsp::WorkspaceEdit {
+                    changes: Some(HashMap::from([(
+                        command_params.text_document.uri.clone(),
+                        vec![lsp::TextEdit {
+                            new_text: new_text.clone(),
+                            range: lsp::Range {
+                                start: lsp::Position::default(),
+                                end: lsp::Position {
+                                    line: last_pos.0 as u32,
+                                    character: last_pos.1 as u32,
+                                },
+                            },
+                        }],
+                    )])),
+                    document_changes: None,
+                    change_annotations: None,
+                };
+
+                if let Some(client) = self.get_client() {
+                    match client.apply_edit(edit, None).await {
+                        Ok(response) => {
+                            if response.applied {
+                                self.store.put(
+                                    &command_params.text_document.uri,
+                                    &new_text,
+                                );
+                            }
+                        }
+                        Err(err) => {
+                            return Err(LspError::InternalError(
+                                format!("{:?}", err),
+                            )
+                            .into())
+                        }
+                    };
+                };
+
+                Ok(None)
+            }
+            Ok(LspServerCommand::AddMeasurementFilter) => {
+                let command_params: ValueFilterParams =
+                    match serde_json::value::from_value(
+                        params.arguments[0].clone(),
+                    ) {
+                        Ok(value) => value,
+                        Err(err) => {
+                            return Err(LspError::InternalError(
+                                format!("{:?}", err),
+                            )
+                            .into())
+                        }
+                    };
+
+                let file = self.store.get_ast_file(
+                    &command_params.text_document.uri,
+                )?;
+                let mut composition =
+                    composition::Composition::new(file);
+                let status =
+                    composition.add_measurement(command_params.value);
+                if status.is_err() {
+                    return Err(LspError::InternalError(
+                        "Failed to add measurement to composition."
+                            .to_string(),
+                    )
+                    .into());
+                }
+                let new_text = composition.to_string();
+
+                let last_pos =
+                    line_col::LineColLookup::new(&new_text)
+                        .get(new_text.len());
+
+                let edit = lsp::WorkspaceEdit {
+                    changes: Some(HashMap::from([(
+                        command_params.text_document.uri.clone(),
+                        vec![lsp::TextEdit {
+                            new_text: new_text.clone(),
+                            range: lsp::Range {
+                                start: lsp::Position::default(),
+                                end: lsp::Position {
+                                    line: last_pos.0 as u32,
+                                    character: last_pos.1 as u32,
+                                },
+                            },
+                        }],
+                    )])),
+                    document_changes: None,
+                    change_annotations: None,
+                };
+
+                if let Some(client) = self.get_client() {
+                    match client.apply_edit(edit, None).await {
+                        Ok(response) => {
+                            if response.applied {
+                                self.store.put(
+                                    &command_params.text_document.uri,
+                                    &new_text,
+                                );
+                            }
+                        }
+                        Err(err) => {
+                            return Err(LspError::InternalError(
+                                format!("{:?}", err),
+                            )
+                            .into())
+                        }
+                    };
+                };
+
+                Ok(None)
+            }
+            Ok(LspServerCommand::AddFieldFilter) => todo!(),
+            Ok(LspServerCommand::RemoveFieldFilter) => todo!(),
+            Ok(LspServerCommand::AddTagFilter) => todo!(),
+            Ok(LspServerCommand::RemoveTagFilter) => todo!(),
+            Ok(LspServerCommand::AddTagValueFilter) => todo!(),
+            Ok(LspServerCommand::RemoveTagValueFilter) => todo!(),
             Ok(LspServerCommand::GetFunctionList) => Ok(Some(
                 lang::UNIVERSE
                     .functions()
