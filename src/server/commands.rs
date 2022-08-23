@@ -160,6 +160,13 @@ pub struct CompositionInitializeParams {
 #[serde(rename_all = "camelCase")]
 pub struct ValueFilterParams {
     pub text_document: lsp::TextDocumentIdentifier,
-    pub name: String,
+    pub value: String,
+}
+
+#[derive(Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TagValueFilterParams {
+    pub text_document: lsp::TextDocumentIdentifier,
+    pub tag: String,
     pub value: String,
 }
