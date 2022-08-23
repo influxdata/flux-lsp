@@ -20,9 +20,9 @@ use lspower::{
 use crate::{completion, composition, lang, visitors::semantic};
 
 use self::commands::{
-    CompositionInitParams, FilterParams, InjectFieldFilterParams,
+    CompositionInitializeParams, InjectFieldFilterParams,
     InjectMeasurementFilterParams, InjectTagFilterParams,
-    InjectTagValueFilterParams, LspServerCommand,
+    InjectTagValueFilterParams, LspServerCommand, ValueFilterParams,
 };
 use self::types::LspError;
 
@@ -1665,7 +1665,7 @@ impl LanguageServer for LspServer {
                 Ok(None)
             }
             Ok(LspServerCommand::CompositionInitialize) => {
-                let command_params: CompositionInitParams =
+                let command_params: CompositionInitializeParams =
                     match serde_json::value::from_value(
                         params.arguments[0].clone(),
                     ) {
@@ -1685,7 +1685,7 @@ impl LanguageServer for LspServer {
                     composition::Composition::new(file);
                 let status = composition.initialize(
                     command_params.bucket,
-                    command_params.name,
+                    command_params.measurement,
                 );
                 if status.is_err() {
                     return Err(LspError::InternalError(
@@ -1740,7 +1740,7 @@ impl LanguageServer for LspServer {
                 Ok(None)
             }
             Ok(LspServerCommand::AddMeasurementFilter) => {
-                let command_params: FilterParams =
+                let command_params: ValueFilterParams =
                     match serde_json::value::from_value(
                         params.arguments[0].clone(),
                     ) {
@@ -1759,7 +1759,7 @@ impl LanguageServer for LspServer {
                 let mut composition =
                     composition::Composition::new(file);
                 let status =
-                    composition.add_measurement(command_params.name);
+                    composition.add_measurement(command_params.value);
                 if status.is_err() {
                     return Err(LspError::InternalError(
                         "Failed to add measurement to composition."
@@ -1812,7 +1812,6 @@ impl LanguageServer for LspServer {
 
                 Ok(None)
             }
-            Ok(LspServerCommand::RemoveMeasurementFilter) => todo!(),
             Ok(LspServerCommand::AddFieldFilter) => todo!(),
             Ok(LspServerCommand::RemoveFieldFilter) => todo!(),
             Ok(LspServerCommand::AddTagFilter) => todo!(),

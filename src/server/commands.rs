@@ -8,7 +8,6 @@ pub enum LspServerCommand {
     InjectMeasurementFilter,
     CompositionInitialize,
     AddMeasurementFilter,
-    RemoveMeasurementFilter,
     AddFieldFilter,
     RemoveFieldFilter,
     AddTagFilter,
@@ -49,9 +48,6 @@ impl TryFrom<String> for LspServerCommand {
             }
             "fluxComposition/addTagValueFilter" => {
                 Ok(LspServerCommand::AddTagValueFilter)
-            }
-            "fluxComposition/removeMeasurementFilter" => {
-                Ok(LspServerCommand::RemoveMeasurementFilter)
             }
             "fluxComposition/removeFieldFilter" => {
                 Ok(LspServerCommand::RemoveFieldFilter)
@@ -102,9 +98,6 @@ impl From<LspServerCommand> for String {
             }
             LspServerCommand::AddTagValueFilter => {
                 "fluxComposition/addTagValueFilter".into()
-            }
-            LspServerCommand::RemoveMeasurementFilter => {
-                "fluxComposition/removeMeasurementFilter".into()
             }
             LspServerCommand::RemoveFieldFilter => {
                 "fluxComposition/removeFieldFilter".into()
@@ -157,16 +150,16 @@ pub struct InjectMeasurementFilterParams {
 
 #[derive(Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct CompositionInitParams {
+pub struct CompositionInitializeParams {
     pub text_document: lsp::TextDocumentIdentifier,
     pub bucket: String,
-    pub name: Option<String>,
+    pub measurement: Option<String>,
 }
 
 #[derive(Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct FilterParams {
+pub struct ValueFilterParams {
     pub text_document: lsp::TextDocumentIdentifier,
     pub name: String,
-    pub value: Option<String>,
+    pub value: String,
 }
