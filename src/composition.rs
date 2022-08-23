@@ -823,8 +823,10 @@ impl Composition {
         Ok(())
     }
 
-    #[allow(dead_code)]
-    fn add_tag(&mut self, tag: &str) -> CompositionResult {
+    pub(crate) fn add_tag(
+        &mut self,
+        tag: String,
+    ) -> CompositionResult {
         let mut visitor =
             CompositionStatementFinderVisitor::default();
         flux::ast::walk::walk(
@@ -840,10 +842,10 @@ impl Composition {
         let mut analyzer = CompositionQueryAnalyzer::default();
         analyzer.analyze(expr_statement.clone());
 
-        if analyzer.tags.contains(&tag.to_string()) {
+        if analyzer.tags.contains(&tag) {
             return Err(());
         } else {
-            analyzer.tags.push(tag.to_string());
+            analyzer.tags.push(tag);
         }
         let statement = analyzer.build();
 
@@ -873,8 +875,10 @@ impl Composition {
         Ok(())
     }
 
-    #[allow(dead_code)]
-    fn remove_tag(&mut self, tag: &str) -> CompositionResult {
+    pub(crate) fn remove_tag(
+        &mut self,
+        tag: String,
+    ) -> CompositionResult {
         let mut visitor =
             CompositionStatementFinderVisitor::default();
         flux::ast::walk::walk(
@@ -891,7 +895,7 @@ impl Composition {
         analyzer.analyze(expr_statement.clone());
 
         let previous_len = analyzer.tags.len();
-        analyzer.tags.retain(|t| t != &tag.to_string());
+        analyzer.tags.retain(|t| t != &tag);
 
         if previous_len == analyzer.tags.len() {
             return Err(());
@@ -1520,7 +1524,7 @@ from(bucket: "my-bucket") |> yield(name: "my-result")
 
         let mut composition = Composition::new(ast);
         // DON'T INITIALIZE THIS! WE'RE SIMULATING AN ALREADY INITIALIZED QUERY.
-        composition.add_tag(&"tagKey").unwrap();
+        composition.add_tag(String::from("tagKey")).unwrap();
 
         assert_eq!(
             r#"from(bucket: "an-composition")
@@ -1545,7 +1549,7 @@ from(bucket: "my-bucket") |> yield(name: "my-result")
         let mut composition = Composition::new(ast);
         // DON'T INITIALIZE THIS! WE'RE SIMULATING AN ALREADY INITIALIZED QUERY.
 
-        assert!(composition.add_tag(&"tagKey").is_err());
+        assert!(composition.add_tag(String::from("tagKey")).is_err());
     }
 
     #[test]
@@ -1559,7 +1563,7 @@ from(bucket: "my-bucket") |> yield(name: "my-result")
 
         let mut composition = Composition::new(ast);
         // DON'T INITIALIZE THIS! WE'RE SIMULATING AN ALREADY INITIALIZED QUERY.
-        composition.add_tag(&"tagKey").unwrap();
+        composition.add_tag(String::from("tagKey")).unwrap();
 
         assert_eq!(
             r#"from(bucket: "an-composition")
@@ -1586,7 +1590,7 @@ from(bucket: "my-bucket") |> yield(name: "my-result")
 
         let mut composition = Composition::new(ast);
         // DON'T INITIALIZE THIS! WE'RE SIMULATING AN ALREADY INITIALIZED QUERY.
-        composition.add_tag(&"tagKey2").unwrap();
+        composition.add_tag(String::from("tagKey2")).unwrap();
 
         assert_eq!(
             r#"from(bucket: "an-composition")
@@ -1614,7 +1618,7 @@ from(bucket: "my-bucket") |> yield(name: "my-result")
 
         let mut composition = Composition::new(ast);
         // DON'T INITIALIZE THIS! WE'RE SIMULATING AN ALREADY INITIALIZED QUERY.
-        composition.remove_tag(&"tagKey").unwrap();
+        composition.remove_tag(String::from("tagKey")).unwrap();
 
         assert_eq!(
             r#"from(bucket: "an-composition")
@@ -1640,7 +1644,7 @@ from(bucket: "my-bucket") |> yield(name: "my-result")
 
         let mut composition = Composition::new(ast);
         // DON'T INITIALIZE THIS! WE'RE SIMULATING AN ALREADY INITIALIZED QUERY.
-        composition.remove_tag(&"tagKey2").unwrap();
+        composition.remove_tag(String::from("tagKey2")).unwrap();
 
         assert_eq!(
             r#"from(bucket: "an-composition")
@@ -1666,6 +1670,8 @@ from(bucket: "my-bucket") |> yield(name: "my-result")
 
         let mut composition = Composition::new(ast);
         // DON'T INITIALIZE THIS! WE'RE SIMULATING AN ALREADY INITIALIZED QUERY.
-        assert!(composition.remove_tag(&"tagKey2").is_err());
+        assert!(composition
+            .remove_tag(String::from("tagKey2"))
+            .is_err());
     }
 }
