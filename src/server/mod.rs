@@ -1812,8 +1812,152 @@ impl LanguageServer for LspServer {
 
                 Ok(None)
             }
-            Ok(LspServerCommand::AddFieldFilter) => todo!(),
-            Ok(LspServerCommand::RemoveFieldFilter) => todo!(),
+            Ok(LspServerCommand::AddFieldFilter) => {
+                let command_params: ValueFilterParams =
+                    match serde_json::value::from_value(
+                        params.arguments[0].clone(),
+                    ) {
+                        Ok(value) => value,
+                        Err(err) => {
+                            return Err(LspError::InternalError(
+                                format!("{:?}", err),
+                            )
+                            .into())
+                        }
+                    };
+
+                let file = self.store.get_ast_file(
+                    &command_params.text_document.uri,
+                )?;
+                let mut composition =
+                    composition::Composition::new(file);
+                let status =
+                    composition.add_field(command_params.value);
+                if status.is_err() {
+                    return Err(LspError::InternalError(
+                        "Failed to add field to composition."
+                            .to_string(),
+                    )
+                    .into());
+                }
+                let new_text = composition.to_string();
+
+                let last_pos =
+                    line_col::LineColLookup::new(&new_text)
+                        .get(new_text.len());
+
+                let edit = lsp::WorkspaceEdit {
+                    changes: Some(HashMap::from([(
+                        command_params.text_document.uri.clone(),
+                        vec![lsp::TextEdit {
+                            new_text: new_text.clone(),
+                            range: lsp::Range {
+                                start: lsp::Position::default(),
+                                end: lsp::Position {
+                                    line: last_pos.0 as u32,
+                                    character: last_pos.1 as u32,
+                                },
+                            },
+                        }],
+                    )])),
+                    document_changes: None,
+                    change_annotations: None,
+                };
+
+                if let Some(client) = self.get_client() {
+                    match client.apply_edit(edit, None).await {
+                        Ok(response) => {
+                            if response.applied {
+                                self.store.put(
+                                    &command_params.text_document.uri,
+                                    &new_text,
+                                );
+                            }
+                        }
+                        Err(err) => {
+                            return Err(LspError::InternalError(
+                                format!("{:?}", err),
+                            )
+                            .into())
+                        }
+                    };
+                };
+
+                Ok(None)
+            }
+            Ok(LspServerCommand::RemoveFieldFilter) => {
+                let command_params: ValueFilterParams =
+                    match serde_json::value::from_value(
+                        params.arguments[0].clone(),
+                    ) {
+                        Ok(value) => value,
+                        Err(err) => {
+                            return Err(LspError::InternalError(
+                                format!("{:?}", err),
+                            )
+                            .into())
+                        }
+                    };
+
+                let file = self.store.get_ast_file(
+                    &command_params.text_document.uri,
+                )?;
+                let mut composition =
+                    composition::Composition::new(file);
+                let status =
+                    composition.remove_field(command_params.value);
+                if status.is_err() {
+                    return Err(LspError::InternalError(
+                        "Failed to remove field from composition."
+                            .to_string(),
+                    )
+                    .into());
+                }
+                let new_text = composition.to_string();
+
+                let last_pos =
+                    line_col::LineColLookup::new(&new_text)
+                        .get(new_text.len());
+
+                let edit = lsp::WorkspaceEdit {
+                    changes: Some(HashMap::from([(
+                        command_params.text_document.uri.clone(),
+                        vec![lsp::TextEdit {
+                            new_text: new_text.clone(),
+                            range: lsp::Range {
+                                start: lsp::Position::default(),
+                                end: lsp::Position {
+                                    line: last_pos.0 as u32,
+                                    character: last_pos.1 as u32,
+                                },
+                            },
+                        }],
+                    )])),
+                    document_changes: None,
+                    change_annotations: None,
+                };
+
+                if let Some(client) = self.get_client() {
+                    match client.apply_edit(edit, None).await {
+                        Ok(response) => {
+                            if response.applied {
+                                self.store.put(
+                                    &command_params.text_document.uri,
+                                    &new_text,
+                                );
+                            }
+                        }
+                        Err(err) => {
+                            return Err(LspError::InternalError(
+                                format!("{:?}", err),
+                            )
+                            .into())
+                        }
+                    };
+                };
+
+                Ok(None)
+            }
             Ok(LspServerCommand::AddTagFilter) => todo!(),
             Ok(LspServerCommand::RemoveTagFilter) => todo!(),
             Ok(LspServerCommand::AddTagValueFilter) => todo!(),

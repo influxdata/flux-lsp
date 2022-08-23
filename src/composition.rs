@@ -718,8 +718,10 @@ impl Composition {
         Ok(())
     }
 
-    #[allow(dead_code)]
-    fn add_field(&mut self, field: &str) -> CompositionResult {
+    pub(crate) fn add_field(
+        &mut self,
+        field: String,
+    ) -> CompositionResult {
         let mut visitor =
             CompositionStatementFinderVisitor::default();
         flux::ast::walk::walk(
@@ -735,10 +737,10 @@ impl Composition {
         let mut analyzer = CompositionQueryAnalyzer::default();
         analyzer.analyze(expr_statement.clone());
 
-        if analyzer.fields.contains(&field.to_string()) {
+        if analyzer.fields.contains(&field) {
             return Err(());
         } else {
-            analyzer.fields.push(field.to_string());
+            analyzer.fields.push(field);
         }
         let statement = analyzer.build();
 
@@ -768,8 +770,10 @@ impl Composition {
         Ok(())
     }
 
-    #[allow(dead_code)]
-    fn remove_field(&mut self, field: &str) -> CompositionResult {
+    pub(crate) fn remove_field(
+        &mut self,
+        field: String,
+    ) -> CompositionResult {
         let mut visitor =
             CompositionStatementFinderVisitor::default();
         flux::ast::walk::walk(
@@ -786,7 +790,7 @@ impl Composition {
         analyzer.analyze(expr_statement.clone());
 
         let previous_len = analyzer.fields.len();
-        analyzer.fields.retain(|f| f != &field.to_string());
+        analyzer.fields.retain(|f| f != &field);
 
         if previous_len == analyzer.fields.len() {
             return Err(());
@@ -1213,7 +1217,7 @@ from(bucket: "my-bucket") |> yield(name: "my-result")
 
         let mut composition = Composition::new(ast);
         // DON'T INITIALIZE THIS! WE'RE SIMULATING AN ALREADY INITIALIZED QUERY.
-        composition.add_field(&"myField").unwrap();
+        composition.add_field(String::from("myField")).unwrap();
 
         assert_eq!(
             r#"from(bucket: "an-composition")
@@ -1237,7 +1241,7 @@ from(bucket: "my-bucket") |> yield(name: "my-result")
 
         let mut composition = Composition::new(ast);
         // DON'T INITIALIZE THIS! WE'RE SIMULATING AN ALREADY INITIALIZED QUERY.
-        composition.add_field(&"myField").unwrap();
+        composition.add_field(String::from("myField")).unwrap();
 
         assert_eq!(
             r#"from(bucket: "an-composition")
@@ -1264,7 +1268,9 @@ from(bucket: "my-bucket") |> yield(name: "my-result")
         let mut composition = Composition::new(ast);
         // DON'T INITIALIZE THIS! WE'RE SIMULATING AN ALREADY INITIALIZED QUERY.
 
-        assert!(composition.add_field(&"anField").is_err());
+        assert!(composition
+            .add_field(String::from("anField"))
+            .is_err());
     }
 
     #[test]
@@ -1279,7 +1285,7 @@ from(bucket: "my-bucket") |> yield(name: "my-result")
 
         let mut composition = Composition::new(ast);
         // DON'T INITIALIZE THIS! WE'RE SIMULATING AN ALREADY INITIALIZED QUERY.
-        composition.add_field(&"secondField").unwrap();
+        composition.add_field(String::from("secondField")).unwrap();
 
         assert_eq!(
             r#"from(bucket: "an-composition")
@@ -1305,7 +1311,7 @@ from(bucket: "my-bucket") |> yield(name: "my-result")
 
         let mut composition = Composition::new(ast);
         // DON'T INITIALIZE THIS! WE'RE SIMULATING AN ALREADY INITIALIZED QUERY.
-        composition.remove_field(&"anField").unwrap();
+        composition.remove_field(String::from("anField")).unwrap();
 
         assert_eq!(
             r#"from(bucket: "an-composition")
@@ -1330,7 +1336,9 @@ from(bucket: "my-bucket") |> yield(name: "my-result")
 
         let mut composition = Composition::new(ast);
         // DON'T INITIALIZE THIS! WE'RE SIMULATING AN ALREADY INITIALIZED QUERY.
-        composition.remove_field(&"secondField").unwrap();
+        composition
+            .remove_field(String::from("secondField"))
+            .unwrap();
 
         assert_eq!(
             r#"from(bucket: "an-composition")
@@ -1356,7 +1364,9 @@ from(bucket: "my-bucket") |> yield(name: "my-result")
 
         let mut composition = Composition::new(ast);
         // DON'T INITIALIZE THIS! WE'RE SIMULATING AN ALREADY INITIALIZED QUERY.
-        assert!(composition.remove_field(&"anotherField").is_err());
+        assert!(composition
+            .remove_field(String::from("anotherField"))
+            .is_err());
     }
 
     #[test]
