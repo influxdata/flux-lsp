@@ -3,7 +3,6 @@ mod store;
 mod transform;
 mod types;
 
-use std::cell::RefCell;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
@@ -136,7 +135,6 @@ fn find_references<'a>(
 #[derive(Default)]
 struct LspServerState {
     buckets: Vec<String>,
-    composition: Option<RefCell<composition::Composition>>,
 }
 
 impl LspServerState {
@@ -1680,41 +1678,23 @@ impl LanguageServer for LspServer {
                         }
                     };
 
-                let new_text = match self.state.lock() {
-                    Ok(mut state) => {
-                        if state.composition.is_none() {
-                            let file = self.store.get_ast_file(
-                                &command_params.text_document.uri,
-                            )?;
-                            state.composition = Some(RefCell::new(
-                                composition::Composition::new(file),
-                            ));
-                        }
-                        if let Some(comp) = &state.composition {
-                            let mut composition = comp.borrow_mut();
-                            let res = composition.initialize(
-                                command_params.bucket,
-                                command_params.name,
-                            );
-                            if res.is_err() {
-                                return Err(LspError::InternalError(
-                                    "Failed to update composition."
-                                        .to_string(),
-                                )
-                                .into());
-                            }
-                            composition.to_string()
-                        } else {
-                            return Err(LspError::InternalError(
-                                "Missing composition".to_string(),
-                            )
-                            .into());
-                        }
-                    }
-                    Err(_) => {
-                        return Err(LspError::LockNotAcquired.into())
-                    }
-                };
+                let file = self.store.get_ast_file(
+                    &command_params.text_document.uri,
+                )?;
+                let mut composition =
+                    composition::Composition::new(file);
+                let status = composition.initialize(
+                    command_params.bucket,
+                    command_params.name,
+                );
+                if status.is_err() {
+                    return Err(LspError::InternalError(
+                        "Failed to initialize composition."
+                            .to_string(),
+                    )
+                    .into());
+                }
+                let new_text = composition.to_string();
 
                 let last_pos =
                     line_col::LineColLookup::new(&new_text)
@@ -1773,31 +1753,21 @@ impl LanguageServer for LspServer {
                         }
                     };
 
-                let new_text = match self.state.lock() {
-                    Ok(state) => {
-                        if let Some(comp) = &state.composition {
-                            let mut composition = comp.borrow_mut();
-                            let res = composition
-                                .add_measurement(command_params.name);
-                            if res.is_err() {
-                                return Err(LspError::InternalError(
-                                    "Failed to update composition."
-                                        .to_string(),
-                                )
-                                .into());
-                            }
-                            composition.to_string()
-                        } else {
-                            return Err(LspError::InternalError(
-                                "Missing composition".to_string(),
-                            )
-                            .into());
-                        }
-                    }
-                    Err(_) => {
-                        return Err(LspError::LockNotAcquired.into())
-                    }
-                };
+                let file = self.store.get_ast_file(
+                    &command_params.text_document.uri,
+                )?;
+                let mut composition =
+                    composition::Composition::new(file);
+                let status =
+                    composition.add_measurement(command_params.name);
+                if status.is_err() {
+                    return Err(LspError::InternalError(
+                        "Failed to add measurement to composition."
+                            .to_string(),
+                    )
+                    .into());
+                }
+                let new_text = composition.to_string();
 
                 let last_pos =
                     line_col::LineColLookup::new(&new_text)
