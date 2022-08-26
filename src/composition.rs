@@ -616,6 +616,34 @@ impl Composition {
         Self { file }
     }
 
+    pub(crate) fn composition_string(&self) -> Option<String> {
+        let mut visitor =
+            CompositionStatementFinderVisitor::default();
+        flux::ast::walk::walk(
+            &mut visitor,
+            flux::ast::walk::Node::File(&self.file),
+        );
+
+        if let Some(expr_statement) = visitor.statement {
+            let file = ast::File {
+                base: ast::BaseNode::default(),
+                metadata: "".into(),
+                package: None,
+                name: "".into(),
+                imports: vec![],
+                eof: vec![],
+                body: vec![ast::Statement::Expr(Box::new(
+                    expr_statement,
+                ))],
+            };
+            match flux::formatter::convert_to_string(&file) {
+                Ok(text) => return Some(text),
+                _ => return None,
+            }
+        }
+        None
+    }
+
     /// Initialize an ast::File for use in composition.
     ///
     /// This must be called before any other composition can be made, as it'll set up the
@@ -1041,6 +1069,34 @@ impl Composition {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_composition_string() {
+        let fluxscript = r#"from(bucket: "an-composition")
+|> yield(name: "_editor_composition")
+
+from(bucket: "an-composition")
+|> yield(name: "_another_id")
+"#;
+        let ast = flux::parser::parse_string("".into(), &fluxscript);
+        let composition = Composition::new(ast);
+
+        assert_eq!("from(bucket: \"an-composition\")\n    |> yield(name: \"_editor_composition\")\n".to_string(), composition.composition_string().unwrap());
+    }
+
+    #[test]
+    fn test_composition_string_not_found() {
+        let fluxscript = r#"from(bucket: "an-composition")
+|> yield(name: "_not_a_composition")
+
+from(bucket: "an-composition")
+|> yield(name: "_another_id")
+"#;
+        let ast = flux::parser::parse_string("".into(), &fluxscript);
+        let composition = Composition::new(ast);
+
+        assert!(composition.composition_string().is_none());
+    }
 
     #[test]
     fn test_query_analyzer() {
