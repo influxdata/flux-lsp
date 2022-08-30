@@ -1765,6 +1765,8 @@ impl LanguageServer for LspServer {
                 )?;
                 let mut composition =
                     composition::Composition::new(file);
+                let old_text = composition.composition_string();
+
                 let status =
                     composition.add_measurement(command_params.value);
                 if status.is_err() {
@@ -1776,9 +1778,12 @@ impl LanguageServer for LspServer {
                 }
                 let new_text = composition.to_string();
 
-                let last_pos =
-                    line_col::LineColLookup::new(&new_text)
-                        .get(new_text.len());
+                let last_pos = match old_text {
+                    Some(text) => line_col::LineColLookup::new(&text)
+                        .get(text.len()),
+                    None => line_col::LineColLookup::new(&new_text)
+                        .get(new_text.len()),
+                };
 
                 let edit = lsp::WorkspaceEdit {
                     changes: Some(HashMap::from([(
@@ -1838,6 +1843,8 @@ impl LanguageServer for LspServer {
                 )?;
                 let mut composition =
                     composition::Composition::new(file);
+                let old_text = composition.composition_string();
+
                 let status =
                     composition.add_field(command_params.value);
                 if status.is_err() {
@@ -1849,9 +1856,12 @@ impl LanguageServer for LspServer {
                 }
                 let new_text = composition.to_string();
 
-                let last_pos =
-                    line_col::LineColLookup::new(&new_text)
-                        .get(new_text.len());
+                let last_pos = match old_text {
+                    Some(text) => line_col::LineColLookup::new(&text)
+                        .get(text.len()),
+                    None => line_col::LineColLookup::new(&new_text)
+                        .get(new_text.len()),
+                };
 
                 let edit = lsp::WorkspaceEdit {
                     changes: Some(HashMap::from([(
@@ -1911,6 +1921,8 @@ impl LanguageServer for LspServer {
                 )?;
                 let mut composition =
                     composition::Composition::new(file);
+                let old_text = composition.composition_string();
+
                 let status =
                     composition.remove_field(command_params.value);
                 if status.is_err() {
@@ -1922,9 +1934,12 @@ impl LanguageServer for LspServer {
                 }
                 let new_text = composition.to_string();
 
-                let last_pos =
-                    line_col::LineColLookup::new(&new_text)
-                        .get(new_text.len());
+                let last_pos = match old_text {
+                    Some(text) => line_col::LineColLookup::new(&text)
+                        .get(text.len()),
+                    None => line_col::LineColLookup::new(&new_text)
+                        .get(new_text.len()),
+                };
 
                 let edit = lsp::WorkspaceEdit {
                     changes: Some(HashMap::from([(
@@ -1984,6 +1999,8 @@ impl LanguageServer for LspServer {
                 )?;
                 let mut composition =
                     composition::Composition::new(file);
+                let old_text = composition.composition_string();
+
                 let status =
                     composition.add_tag(command_params.value);
                 if status.is_err() {
@@ -1995,9 +2012,12 @@ impl LanguageServer for LspServer {
                 }
                 let new_text = composition.to_string();
 
-                let last_pos =
-                    line_col::LineColLookup::new(&new_text)
-                        .get(new_text.len());
+                let last_pos = match old_text {
+                    Some(text) => line_col::LineColLookup::new(&text)
+                        .get(text.len()),
+                    None => line_col::LineColLookup::new(&new_text)
+                        .get(new_text.len()),
+                };
 
                 let edit = lsp::WorkspaceEdit {
                     changes: Some(HashMap::from([(
@@ -2057,6 +2077,8 @@ impl LanguageServer for LspServer {
                 )?;
                 let mut composition =
                     composition::Composition::new(file);
+                let old_text = composition.composition_string();
+
                 let status =
                     composition.remove_tag(command_params.value);
                 if status.is_err() {
@@ -2068,9 +2090,12 @@ impl LanguageServer for LspServer {
                 }
                 let new_text = composition.to_string();
 
-                let last_pos =
-                    line_col::LineColLookup::new(&new_text)
-                        .get(new_text.len());
+                let last_pos = match old_text {
+                    Some(text) => line_col::LineColLookup::new(&text)
+                        .get(text.len()),
+                    None => line_col::LineColLookup::new(&new_text)
+                        .get(new_text.len()),
+                };
 
                 let edit = lsp::WorkspaceEdit {
                     changes: Some(HashMap::from([(
@@ -2130,6 +2155,8 @@ impl LanguageServer for LspServer {
                 )?;
                 let mut composition =
                     composition::Composition::new(file);
+                let old_text = composition.composition_string();
+
                 let status = composition.add_tag_value(
                     command_params.tag,
                     command_params.value,
@@ -2143,9 +2170,12 @@ impl LanguageServer for LspServer {
                 }
                 let new_text = composition.to_string();
 
-                let last_pos =
-                    line_col::LineColLookup::new(&new_text)
-                        .get(new_text.len());
+                let last_pos = match old_text {
+                    Some(text) => line_col::LineColLookup::new(&text)
+                        .get(text.len()),
+                    None => line_col::LineColLookup::new(&new_text)
+                        .get(new_text.len()),
+                };
 
                 let edit = lsp::WorkspaceEdit {
                     changes: Some(HashMap::from([(
@@ -2205,6 +2235,8 @@ impl LanguageServer for LspServer {
                 )?;
                 let mut composition =
                     composition::Composition::new(file);
+                let old_text = composition.composition_string();
+
                 let status = composition.remove_tag_value(
                     command_params.tag,
                     command_params.value,
@@ -2218,9 +2250,12 @@ impl LanguageServer for LspServer {
                 }
                 let new_text = composition.to_string();
 
-                let last_pos =
-                    line_col::LineColLookup::new(&new_text)
-                        .get(new_text.len());
+                let last_pos = match old_text {
+                    Some(text) => line_col::LineColLookup::new(&text)
+                        .get(text.len()),
+                    None => line_col::LineColLookup::new(&new_text)
+                        .get(new_text.len()),
+                };
 
                 let edit = lsp::WorkspaceEdit {
                     changes: Some(HashMap::from([(
