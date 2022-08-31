@@ -153,7 +153,14 @@ pub struct InjectMeasurementFilterParams {
 pub struct CompositionInitializeParams {
     pub text_document: lsp::TextDocumentIdentifier,
     pub bucket: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub measurement: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fields: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tags: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tag_values: Option<Vec<(String, String)>>,
 }
 
 #[derive(Deserialize, Serialize)]
