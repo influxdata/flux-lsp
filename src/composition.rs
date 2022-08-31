@@ -1159,7 +1159,13 @@ from(bucket: "an-composition")
         let mut composition = Composition::new(ast);
 
         composition
-            .initialize(String::from("an-composition"), None, None, None, None)
+            .initialize(
+                String::from("an-composition"),
+                None,
+                None,
+                None,
+                None,
+            )
             .unwrap();
 
         assert_eq!(
@@ -1186,7 +1192,13 @@ from(bucket: "my-bucket") |> yield(name: "my-result")
         let mut composition = Composition::new(ast);
 
         composition
-            .initialize(String::from("an-composition"), None, None, None, None)
+            .initialize(
+                String::from("an-composition"),
+                None,
+                None,
+                None,
+                None,
+            )
             .unwrap();
 
         assert_eq!(
@@ -1214,7 +1226,7 @@ from(bucket: "my-bucket") |> yield(name: "my-result")
                 Some(String::from("myMeasurement")),
                 None,
                 None,
-                None
+                None,
             )
             .unwrap();
 
@@ -1239,7 +1251,16 @@ from(bucket: "my-bucket") |> yield(name: "my-result")
         let mut composition = Composition::new(ast);
 
         composition
-            .initialize(String::from("an-composition"), Some("myMeasurement".into()), Some(vec!["myField".into(), "myField2".into()]), Some(vec!["myTag".into()]), Some(vec![("myTag".into(), "myTagValue".into()), ("myTag".into(), "myTagValue2".into())]))
+            .initialize(
+                String::from("an-composition"),
+                Some("myMeasurement".into()),
+                Some(vec!["myField".into(), "myField2".into()]),
+                Some(vec!["myTag".into()]),
+                Some(vec![
+                    ("myTag".into(), "myTagValue".into()),
+                    ("myTag".into(), "myTagValue2".into()),
+                ]),
+            )
             .unwrap();
 
         assert_eq!(
