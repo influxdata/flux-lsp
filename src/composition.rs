@@ -652,6 +652,9 @@ impl Composition {
         &mut self,
         bucket: String,
         measurement: Option<String>,
+        fields: Option<Vec<String>>,
+        tags: Option<Vec<String>>,
+        tag_values: Option<Vec<(String, String)>>,
     ) -> CompositionResult {
         let mut visitor =
             CompositionStatementFinderVisitor::default();
@@ -663,9 +666,9 @@ impl Composition {
         let mut analyzer = CompositionQueryAnalyzer {
             bucket,
             measurement,
-            fields: vec![],
-            tags: vec![],
-            tag_values: vec![],
+            fields: fields.unwrap_or_default(),
+            tags: tags.unwrap_or_default(),
+            tag_values: tag_values.unwrap_or_default(),
         };
         let statement = analyzer.build();
 
@@ -1156,7 +1159,7 @@ from(bucket: "an-composition")
         let mut composition = Composition::new(ast);
 
         composition
-            .initialize(String::from("an-composition"), None)
+            .initialize(String::from("an-composition"), None, None, None, None)
             .unwrap();
 
         assert_eq!(
@@ -1183,7 +1186,7 @@ from(bucket: "my-bucket") |> yield(name: "my-result")
         let mut composition = Composition::new(ast);
 
         composition
-            .initialize(String::from("an-composition"), None)
+            .initialize(String::from("an-composition"), None, None, None, None)
             .unwrap();
 
         assert_eq!(
@@ -1209,6 +1212,9 @@ from(bucket: "my-bucket") |> yield(name: "my-result")
             .initialize(
                 String::from("an-composition"),
                 Some(String::from("myMeasurement")),
+                None,
+                None,
+                None
             )
             .unwrap();
 
@@ -1223,16 +1229,39 @@ from(bucket: "my-bucket") |> yield(name: "my-result")
         );
     }
 
+    /// Initializing composition with fields, tags, and tag values will populate the various
+    /// `filter` calls and return the complete query.
     #[test]
-    fn composition_add_measurement() {
+    fn composition_initialize_with_extras() {
         let fluxscript = r#""#;
         let ast = flux::parser::parse_string("".into(), &fluxscript);
 
         let mut composition = Composition::new(ast);
 
         composition
-            .initialize(String::from("an-composition"), None)
+            .initialize(String::from("an-composition"), Some("myMeasurement".into()), Some(vec!["myField".into(), "myField2".into()]), Some(vec!["myTag".into()]), Some(vec![("myTag".into(), "myTagValue".into()), ("myTag".into(), "myTagValue2".into())]))
             .unwrap();
+
+        assert_eq!(
+            r#"from(bucket: "an-composition")
+    |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+    |> filter(fn: (r) => r._measurement == "myMeasurement")
+    |> filter(fn: (r) => r._field == "myField" or r._field == "myField2")
+    |> filter(fn: (r) => exists r.myTag)
+    |> filter(fn: (r) => r.myTag == "myTagValue" and r.myTag == "myTagValue2")
+    |> yield(name: "_editor_composition")
+"#
+            .to_string(),
+            composition.to_string()
+        );
+    }
+
+    #[test]
+    fn composition_add_measurement() {
+        let fluxscript = r#"from(bucket: "an-composition") |> range(start: v.timeRangeStart, stop: v.timeRangeStop) |> yield(name: "_editor_composition")"#;
+        let ast = flux::parser::parse_string("".into(), &fluxscript);
+        let mut composition = Composition::new(ast);
+
         composition
             .add_measurement(String::from("myMeasurement"))
             .unwrap();

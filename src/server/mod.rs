@@ -1690,6 +1690,9 @@ impl LanguageServer for LspServer {
                 let status = composition.initialize(
                     command_params.bucket,
                     command_params.measurement,
+                    command_params.fields,
+                    command_params.tags,
+                    command_params.tag_values,
                 );
                 if status.is_err() {
                     return Err(LspError::InternalError(
