@@ -1102,6 +1102,35 @@ from(bucket: "an-composition")
     }
 
     #[test]
+    fn test_composition_string_only_returns_composition() {
+        let fluxscript = r#"from(bucket: "an-composition")
+|> yield(name: "_editor_composition")
+
+query1 = from(bucket: "an-composition")
+"#;
+        let ast = flux::parser::parse_string("".into(), &fluxscript);
+        let composition = Composition::new(ast);
+
+        assert_eq!("from(bucket: \"an-composition\")\n    |> yield(name: \"_editor_composition\")\n".to_string(), composition.composition_string().unwrap());
+    }
+
+    #[test]
+    fn test_composition_string_will_return_updated_composition() {
+        let fluxscript = r#"from(bucket: "an-composition")
+|> yield(name: "_editor_composition")
+
+query1 = from(bucket: "an-composition")
+"#;
+        let ast = flux::parser::parse_string("".into(), &fluxscript);
+        let mut composition = Composition::new(ast);
+        composition
+            .add_measurement(String::from("myMeasurement"))
+            .unwrap();
+
+        assert_eq!("from(bucket: \"an-composition\")\n    |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n    |> filter(fn: (r) => r._measurement == \"myMeasurement\")\n    |> yield(name: \"_editor_composition\")\n".to_string(), composition.composition_string().unwrap());
+    }
+
+    #[test]
     fn test_query_analyzer() {
         let fluxscript = r#"from(bucket: "an-composition")
 |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
