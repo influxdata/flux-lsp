@@ -1,6 +1,6 @@
 [package]
 name = "flux-lsp"
-version = "0.8.32"
+version = "0.8.33"
 authors = ["Flux Developers <flux-developers@influxdata.com>"]
 edition = "2021"
 license = "MIT"
