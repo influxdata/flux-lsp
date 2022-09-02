@@ -1701,7 +1701,9 @@ impl LanguageServer for LspServer {
                     )
                     .into());
                 }
-                let new_text = composition.to_string();
+                let new_text = composition
+                    .composition_string()
+                    .expect("bad composition state");
 
                 let last_pos = match old_text {
                     Some(text) => line_col::LineColLookup::new(&text)
@@ -1779,7 +1781,9 @@ impl LanguageServer for LspServer {
                     )
                     .into());
                 }
-                let new_text = composition.to_string();
+                let new_text = composition
+                    .composition_string()
+                    .expect("bad composition state");
 
                 let last_pos = match old_text {
                     Some(text) => line_col::LineColLookup::new(&text)
@@ -1857,7 +1861,9 @@ impl LanguageServer for LspServer {
                     )
                     .into());
                 }
-                let new_text = composition.to_string();
+                let new_text = composition
+                    .composition_string()
+                    .expect("bad composition state");
 
                 let last_pos = match old_text {
                     Some(text) => line_col::LineColLookup::new(&text)
@@ -1935,7 +1941,9 @@ impl LanguageServer for LspServer {
                     )
                     .into());
                 }
-                let new_text = composition.to_string();
+                let new_text = composition
+                    .composition_string()
+                    .expect("bad composition state");
 
                 let last_pos = match old_text {
                     Some(text) => line_col::LineColLookup::new(&text)
@@ -2013,7 +2021,9 @@ impl LanguageServer for LspServer {
                     )
                     .into());
                 }
-                let new_text = composition.to_string();
+                let new_text = composition
+                    .composition_string()
+                    .expect("bad composition state");
 
                 let last_pos = match old_text {
                     Some(text) => line_col::LineColLookup::new(&text)
@@ -2091,7 +2101,9 @@ impl LanguageServer for LspServer {
                     )
                     .into());
                 }
-                let new_text = composition.to_string();
+                let new_text = composition
+                    .composition_string()
+                    .expect("bad composition state");
 
                 let last_pos = match old_text {
                     Some(text) => line_col::LineColLookup::new(&text)
@@ -2171,7 +2183,9 @@ impl LanguageServer for LspServer {
                     )
                     .into());
                 }
-                let new_text = composition.to_string();
+                let new_text = composition
+                    .composition_string()
+                    .expect("bad composition state");
 
                 let last_pos = match old_text {
                     Some(text) => line_col::LineColLookup::new(&text)
@@ -2251,7 +2265,9 @@ impl LanguageServer for LspServer {
                     )
                     .into());
                 }
-                let new_text = composition.to_string();
+                let new_text = composition
+                    .composition_string()
+                    .expect("bad composition state");
 
                 let last_pos = match old_text {
                     Some(text) => line_col::LineColLookup::new(&text)
