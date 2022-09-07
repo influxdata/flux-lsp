@@ -1705,6 +1705,9 @@ impl LanguageServer for LspServer {
                     .composition_string()
                     .expect("bad composition state");
 
+                // index 0 is line 1, char 1 for line_col::LineColLookup.
+                // Will need to convert to zero indexing for applyEdit. (Range is zero indexed.)
+                // https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#range
                 let last_pos = match old_text {
                     Some(text) => line_col::LineColLookup::new(&text)
                         .get(text.len()),
@@ -1720,8 +1723,8 @@ impl LanguageServer for LspServer {
                             range: lsp::Range {
                                 start: lsp::Position::default(),
                                 end: lsp::Position {
-                                    line: last_pos.0 as u32,
-                                    character: last_pos.1 as u32,
+                                    line: last_pos.0 as u32 - 1,
+                                    character: last_pos.1 as u32 - 1,
                                 },
                             },
                         }],
@@ -1785,6 +1788,9 @@ impl LanguageServer for LspServer {
                     .composition_string()
                     .expect("bad composition state");
 
+                // index 0 is line 1, char 1 for line_col::LineColLookup.
+                // Will need to convert to zero indexing for applyEdit. (Range is zero indexed.)
+                // https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#range
                 let last_pos = match old_text {
                     Some(text) => line_col::LineColLookup::new(&text)
                         .get(text.len()),
@@ -1800,8 +1806,8 @@ impl LanguageServer for LspServer {
                             range: lsp::Range {
                                 start: lsp::Position::default(),
                                 end: lsp::Position {
-                                    line: last_pos.0 as u32,
-                                    character: last_pos.1 as u32,
+                                    line: last_pos.0 as u32 - 1,
+                                    character: last_pos.1 as u32 - 1,
                                 },
                             },
                         }],
@@ -1865,6 +1871,9 @@ impl LanguageServer for LspServer {
                     .composition_string()
                     .expect("bad composition state");
 
+                // index 0 is line 1, char 1 for line_col::LineColLookup.
+                // Will need to convert to zero indexing for applyEdit. (Range is zero indexed.)
+                // https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#range
                 let last_pos = match old_text {
                     Some(text) => line_col::LineColLookup::new(&text)
                         .get(text.len()),
@@ -1880,8 +1889,8 @@ impl LanguageServer for LspServer {
                             range: lsp::Range {
                                 start: lsp::Position::default(),
                                 end: lsp::Position {
-                                    line: last_pos.0 as u32,
-                                    character: last_pos.1 as u32,
+                                    line: last_pos.0 as u32 - 1,
+                                    character: last_pos.1 as u32 - 1,
                                 },
                             },
                         }],
@@ -1945,6 +1954,9 @@ impl LanguageServer for LspServer {
                     .composition_string()
                     .expect("bad composition state");
 
+                // index 0 is line 1, char 1 for line_col::LineColLookup.
+                // Will need to convert to zero indexing for applyEdit. (Range is zero indexed.)
+                // https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#range
                 let last_pos = match old_text {
                     Some(text) => line_col::LineColLookup::new(&text)
                         .get(text.len()),
@@ -1960,8 +1972,8 @@ impl LanguageServer for LspServer {
                             range: lsp::Range {
                                 start: lsp::Position::default(),
                                 end: lsp::Position {
-                                    line: last_pos.0 as u32,
-                                    character: last_pos.1 as u32,
+                                    line: last_pos.0 as u32 - 1,
+                                    character: last_pos.1 as u32 - 1,
                                 },
                             },
                         }],
@@ -2025,6 +2037,9 @@ impl LanguageServer for LspServer {
                     .composition_string()
                     .expect("bad composition state");
 
+                // index 0 is line 1, char 1 for line_col::LineColLookup.
+                // Will need to convert to zero indexing for applyEdit. (Range is zero indexed.)
+                // https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#range
                 let last_pos = match old_text {
                     Some(text) => line_col::LineColLookup::new(&text)
                         .get(text.len()),
@@ -2040,8 +2055,8 @@ impl LanguageServer for LspServer {
                             range: lsp::Range {
                                 start: lsp::Position::default(),
                                 end: lsp::Position {
-                                    line: last_pos.0 as u32,
-                                    character: last_pos.1 as u32,
+                                    line: last_pos.0 as u32 - 1,
+                                    character: last_pos.1 as u32 - 1,
                                 },
                             },
                         }],
@@ -2105,6 +2120,9 @@ impl LanguageServer for LspServer {
                     .composition_string()
                     .expect("bad composition state");
 
+                // index 0 is line 1, char 1 for line_col::LineColLookup.
+                // Will need to convert to zero indexing for applyEdit. (Range is zero indexed.)
+                // https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#range
                 let last_pos = match old_text {
                     Some(text) => line_col::LineColLookup::new(&text)
                         .get(text.len()),
@@ -2120,8 +2138,8 @@ impl LanguageServer for LspServer {
                             range: lsp::Range {
                                 start: lsp::Position::default(),
                                 end: lsp::Position {
-                                    line: last_pos.0 as u32,
-                                    character: last_pos.1 as u32,
+                                    line: last_pos.0 as u32 - 1,
+                                    character: last_pos.1 as u32 - 1,
                                 },
                             },
                         }],
@@ -2187,6 +2205,9 @@ impl LanguageServer for LspServer {
                     .composition_string()
                     .expect("bad composition state");
 
+                // index 0 is line 1, char 1 for line_col::LineColLookup.
+                // Will need to convert to zero indexing for applyEdit. (Range is zero indexed.)
+                // https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#range
                 let last_pos = match old_text {
                     Some(text) => line_col::LineColLookup::new(&text)
                         .get(text.len()),
@@ -2202,8 +2223,8 @@ impl LanguageServer for LspServer {
                             range: lsp::Range {
                                 start: lsp::Position::default(),
                                 end: lsp::Position {
-                                    line: last_pos.0 as u32,
-                                    character: last_pos.1 as u32,
+                                    line: last_pos.0 as u32 - 1,
+                                    character: last_pos.1 as u32 - 1,
                                 },
                             },
                         }],
@@ -2269,6 +2290,9 @@ impl LanguageServer for LspServer {
                     .composition_string()
                     .expect("bad composition state");
 
+                // index 0 is line 1, char 1 for line_col::LineColLookup.
+                // Will need to convert to zero indexing for applyEdit. (Range is zero indexed.)
+                // https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#range
                 let last_pos = match old_text {
                     Some(text) => line_col::LineColLookup::new(&text)
                         .get(text.len()),
@@ -2284,8 +2308,8 @@ impl LanguageServer for LspServer {
                             range: lsp::Range {
                                 start: lsp::Position::default(),
                                 end: lsp::Position {
-                                    line: last_pos.0 as u32,
-                                    character: last_pos.1 as u32,
+                                    line: last_pos.0 as u32 - 1,
+                                    character: last_pos.1 as u32 - 1,
                                 },
                             },
                         }],
