@@ -314,7 +314,7 @@ impl LspServer {
                 let mut list: Vec<Box<dyn completion::Completable>> =
                     vec![];
                 if let Some(import) =
-                    completion::get_imports(&sem_pkg)
+                    completion::get_imports(sem_pkg)
                         .iter()
                         .find(|x| x.name == identifier.name)
                 {
@@ -345,7 +345,7 @@ impl LspServer {
                     ),
                     sem_pkg
                 );
-                let imports = completion::get_imports(&sem_pkg);
+                let imports = completion::get_imports(sem_pkg);
                 Some(
                     vec![
                         visitor
@@ -1034,10 +1034,6 @@ impl LanguageServer for LspServer {
             ),
             ast_pkg
         );
-        dbg!((
-            &params,
-            &visitor.node.as_ref().map(|node| &node.node)
-        ));
         let items = match visitor.node {
             Some(walk_node) => match walk_node.node {
                 AstNode::CallExpr(call) => {
@@ -1061,7 +1057,7 @@ impl LanguageServer for LspServer {
                                 == identifier.base.location.start =>
                         {
                             match self.complete_member_expression(
-                                &sem_pkg, &member,
+                                &sem_pkg, member,
                             ) {
                                 Some(items) => items,
                                 None => return Ok(None),
@@ -1167,7 +1163,7 @@ impl LanguageServer for LspServer {
                 }
                 AstNode::MemberExpr(member) => {
                     match self
-                        .complete_member_expression(&sem_pkg, &member)
+                        .complete_member_expression(&sem_pkg, member)
                     {
                         Some(items) => items,
                         None => return Ok(None),
