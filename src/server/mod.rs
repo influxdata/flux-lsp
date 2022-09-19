@@ -1005,11 +1005,10 @@ impl LanguageServer for LspServer {
 
                     let builtin_completions: Vec<
                         lsp::CompletionItem,
-                    > = lang::UNIVERSE.exports.iter().filter(|(key, val)| {
-                            // Don't allow users to "discover" private-ish functionality.
+                    > = lang::UNIVERSE.iter().filter(|(key, val)| {
                             // Filter out irrelevent items that won't match.
                             // Only pass expressions that have completion support.
-                            !key.starts_with('_') && fuzzy_match(key, &identifier.name) &&
+                            fuzzy_match(key, &identifier.name) &&
                             match &val.expr {
                                 MonoType::Fun(_) | MonoType::Builtin(_) => true,
                                 MonoType::Collection(collection) => collection.collection == CollectionType::Array,
@@ -1084,10 +1083,7 @@ impl LanguageServer for LspServer {
                                         completion::walk_package(
                                             &package.path,
                                             &mut list,
-                                            &package
-                                                .exports
-                                                .typ()
-                                                .expr,
+                                            &package.typ(),
                                         );
                                     }
                                 }
@@ -1099,10 +1095,7 @@ impl LanguageServer for LspServer {
                                         completion::walk_package(
                                             &package.path,
                                             &mut list,
-                                            &package
-                                                .exports
-                                                .typ()
-                                                .expr,
+                                            &package.typ(),
                                         );
                                     }
                                 }

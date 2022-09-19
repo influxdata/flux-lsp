@@ -53,9 +53,7 @@ impl Stdlib {
 pub struct Package {
     pub name: String,
     pub path: String,
-    // XXX: rockstar (15 Jul 2022) - exports probably shouldn't be public, but
-    // for the sake of migration, this is the easiest path forward.
-    pub exports: flux::semantic::PackageExports,
+    exports: flux::semantic::PackageExports,
 }
 
 impl Package {
@@ -102,6 +100,28 @@ impl Package {
     /// Get a function by name from the package.
     pub fn function(&self, name: &str) -> Option<Function> {
         self.functions().find(|function| function.name == name)
+    }
+
+    /// Returns an iterator over all exports
+    ///
+    ///
+    // `flux::semantic::types::PackageExports` also uses this
+    // not-quite-an-iterator implementation. This serves as a layer in
+    // front of that implementation.
+    pub fn iter(
+        &self,
+    ) -> impl Iterator<Item = (&str, &flux::semantic::types::PolyType)> + '_
+    {
+        self.exports.iter().filter(|(key, _val)| {
+            // Don't allow users to "discover" private-ish functionality, i.e. symbols
+            // that start with an underscore.
+            !key.starts_with('_')
+        })
+    }
+
+    /// Get the package monotype.
+    pub fn typ(&self) -> flux::semantic::types::MonoType {
+        self.exports.typ().expr
     }
 }
 
