@@ -1440,7 +1440,7 @@ x + 1
 #[test]
 async fn test_hover_binding() {
     let fluxscript = r#"x = "asd"
-builtin builtin_ : (v: int) => int
+builtin builtin_ : (v: A) => A where A: Numeric
 option option_ = 123
 1
 "#;
@@ -1472,7 +1472,7 @@ option option_ = 123
         Some(lsp::Hover {
             contents: lsp::HoverContents::Scalar(
                 lsp::MarkedString::String(
-                    "type: (v: int) => int".to_string()
+                    "type: (v: A) => A where A: Numeric".to_string()
                 )
             ),
             range: None,
@@ -1587,6 +1587,32 @@ x = 1
         Some(lsp::Hover {
             contents: lsp::HoverContents::Scalar(
                 lsp::MarkedString::String("type: int".to_string())
+            ),
+            range: None,
+        })
+    );
+}
+
+#[test]
+async fn test_hover_on_polymorphic_identifier() {
+    let fluxscript = r#"
+f = (x) => x + x
+        // ^
+"#;
+    let server = create_server();
+    open_file(&server, fluxscript.to_string(), None).await;
+
+    let params = hover_params(position_of(fluxscript));
+
+    let result = server.hover(params).await.unwrap();
+
+    assert_eq!(
+        result,
+        Some(lsp::Hover {
+            contents: lsp::HoverContents::Scalar(
+                lsp::MarkedString::String(
+                    "type: A where A: Addable".to_string()
+                )
             ),
             range: None,
         })
