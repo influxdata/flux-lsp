@@ -2335,7 +2335,7 @@ impl LanguageServer for LspServer {
             Ok(LspServerCommand::GetFunctionList) => Ok(Some({
                 let mut functions = lang::UNIVERSE
                     .functions()
-                    .map(|function| function.name.clone())
+                    .map(|function| function.name)
                     .collect::<Vec<String>>();
                 functions.sort();
                 functions.into()
