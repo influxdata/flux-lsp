@@ -313,10 +313,9 @@ impl LspServer {
                 // up when recursive support for member expressions is implemented.
                 let mut list: Vec<Box<dyn completion::Completable>> =
                     vec![];
-                if let Some(import) =
-                    completion::get_imports(sem_pkg)
-                        .iter()
-                        .find(|x| x.name == identifier.name)
+                if let Some(import) = completion::get_imports(sem_pkg)
+                    .iter()
+                    .find(|x| x.name == identifier.name)
                 {
                     for package in lang::STDLIB.packages() {
                         if package.path == import.path {

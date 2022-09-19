@@ -2898,9 +2898,7 @@ sql"#;
 
 #[test]
 async fn test_member_completion() {
-
-    let fluxscript =
-    r#"
+    let fluxscript = r#"
 import "json"
 
 from(bucket: "bucket")
@@ -2910,7 +2908,6 @@ from(bucket: "bucket")
   |> map(fn: (r) => (json.(v: r._value)))
                       // ^
   "#;
-
 
     let server = create_server();
     open_file(&server, fluxscript.to_string(), None).await;
@@ -2952,14 +2949,12 @@ from(bucket: "bucket")
             }
           ]
         }"#]]
-        .assert_eq(&serde_json::to_string_pretty(&result).unwrap());
+    .assert_eq(&serde_json::to_string_pretty(&result).unwrap());
 }
 
 #[test]
 async fn test_member_completion_2() {
-
-    let fluxscript =
-    r#"
+    let fluxscript = r#"
 import "json"
 
 from(bucket: "bucket")
@@ -2969,7 +2964,6 @@ from(bucket: "bucket")
   |> map(fn: (r) => (json.(v: r._value)))
                     // ^
   "#;
-
 
     let server = create_server();
     open_file(&server, fluxscript.to_string(), None).await;
@@ -3023,7 +3017,7 @@ from(bucket: "bucket")
             }
           ]
         }"#]]
-        .assert_eq(&serde_json::to_string_pretty(&result).unwrap());
+    .assert_eq(&serde_json::to_string_pretty(&result).unwrap());
 }
 
 use crate::visitors::ast::{
