@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use flux::ast::walk::Node as AstNode;
-use flux::ast::Expression as AstExpression;
+use flux::ast::{self, Expression as AstExpression};
 use flux::semantic::nodes::{
     ErrorKind as SemanticNodeErrorKind, Package as SemanticPackage,
 };
@@ -299,6 +299,74 @@ impl LspServer {
         });
 
         diagnostic_map
+    }
+
+    fn complete_member_expression(
+        &self,
+        sem_pkg: &SemanticPackage,
+        member: &ast::MemberExpr,
+    ) -> Option<Vec<lsp::CompletionItem>> {
+        match &member.object {
+            AstExpression::Identifier(identifier) => {
+                // XXX: rockstar (6 Jul 2022) - This is the last holdout from the previous
+                // completion code. There is a bit of indirection/cruft here that can be cleaned
+                // up when recursive support for member expressions is implemented.
+                let mut list: Vec<Box<dyn completion::Completable>> =
+                    vec![];
+                if let Some(import) = completion::get_imports(sem_pkg)
+                    .iter()
+                    .find(|x| x.name == identifier.name)
+                {
+                    for package in lang::STDLIB.packages() {
+                        if package.path == import.path {
+                            completion::walk_package(
+                                &package.path,
+                                &mut list,
+                                &package.exports.typ().expr,
+                            );
+                        }
+                    }
+                } else {
+                    for package in lang::STDLIB.packages() {
+                        if package.name == identifier.name {
+                            completion::walk_package(
+                                &package.path,
+                                &mut list,
+                                &package.exports.typ().expr,
+                            );
+                        }
+                    }
+                }
+
+                let visitor = crate::walk_semantic_package!(
+                    completion::CompletableObjectFinderVisitor::new(
+                        &identifier.name
+                    ),
+                    sem_pkg
+                );
+                let imports = completion::get_imports(sem_pkg);
+                Some(
+                    vec![
+                        visitor
+                            .completables
+                            .iter()
+                            .map(|completable| {
+                                completable.completion_item(&imports)
+                            })
+                            .collect::<Vec<lsp::CompletionItem>>(),
+                        list.iter()
+                            .map(|completable| {
+                                completable.completion_item(&imports)
+                            })
+                            .collect(),
+                    ]
+                    .into_iter()
+                    .flatten()
+                    .collect(),
+                )
+            }
+            _ => None,
+        }
     }
 }
 
@@ -973,12 +1041,36 @@ impl LanguageServer for LspServer {
                     )
                 }
                 AstNode::Identifier(identifier) => {
-                    // XXX: rockstar (6 Jul 2022) - This is helping to complete packages that
-                    // have never been imported. That's probably not a great pattern.
-                    let stdlib_completions: Vec<lsp::CompletionItem> =
-                        lang::STDLIB
-                            .fuzzy_matches(&identifier.name)
-                            .map(|package| lsp::CompletionItem {
+                    match walk_node
+                        .parent
+                        .as_ref()
+                        .map(|node| &node.node)
+                    {
+                        // The identifier is a member property so do member completion
+                        Some(AstNode::MemberExpr(member))
+                            if member
+                                .property
+                                .base()
+                                .location
+                                .start
+                                == identifier.base.location.start =>
+                        {
+                            match self.complete_member_expression(
+                                &sem_pkg, member,
+                            ) {
+                                Some(items) => items,
+                                None => return Ok(None),
+                            }
+                        }
+                        _ => {
+                            // XXX: rockstar (6 Jul 2022) - This is helping to complete packages that
+                            // have never been imported. That's probably not a great pattern.
+                            let stdlib_completions: Vec<
+                                lsp::CompletionItem,
+                            > = lang::STDLIB
+                                .fuzzy_matches(&identifier.name)
+                                .map(|package| {
+                                    lsp::CompletionItem {
                                 label: package.path.clone(),
                                 detail: Some("Package".into()),
                                 documentation: Some(
@@ -1000,10 +1092,11 @@ impl LanguageServer for LspServer {
                                 ),
                                 sort_text: Some(package.path),
                                 ..lsp::CompletionItem::default()
-                            })
-                            .collect();
+                            }
+                                })
+                                .collect();
 
-                    let builtin_completions: Vec<
+                            let builtin_completions: Vec<
                         lsp::CompletionItem,
                     > = lang::UNIVERSE.exports.iter().filter(|(key, val)| {
                             // Don't allow users to "discover" private-ish functionality.
@@ -1057,66 +1150,22 @@ impl LanguageServer for LspServer {
                             }
                         }).collect();
 
-                    vec![stdlib_completions, builtin_completions]
-                        .into_iter()
-                        .flatten()
-                        .collect()
+                            vec![
+                                stdlib_completions,
+                                builtin_completions,
+                            ]
+                            .into_iter()
+                            .flatten()
+                            .collect()
+                        }
+                    }
                 }
                 AstNode::MemberExpr(member) => {
-                    match &member.object {
-                        AstExpression::Identifier(identifier) => {
-                            // XXX: rockstar (6 Jul 2022) - This is the last holdout from the previous
-                            // completion code. There is a bit of indirection/cruft here that can be cleaned
-                            // up when recursive support for member expressions is implemented.
-                            let mut list: Vec<
-                                Box<dyn completion::Completable>,
-                            > = vec![];
-                            if let Some(import) =
-                                completion::get_imports(&sem_pkg)
-                                    .iter()
-                                    .find(|x| {
-                                        x.name == identifier.name
-                                    })
-                            {
-                                for package in lang::STDLIB.packages()
-                                {
-                                    if package.path == import.path {
-                                        completion::walk_package(
-                                            &package.path,
-                                            &mut list,
-                                            &package
-                                                .exports
-                                                .typ()
-                                                .expr,
-                                        );
-                                    }
-                                }
-                            } else {
-                                for package in lang::STDLIB.packages()
-                                {
-                                    if package.name == identifier.name
-                                    {
-                                        completion::walk_package(
-                                            &package.path,
-                                            &mut list,
-                                            &package
-                                                .exports
-                                                .typ()
-                                                .expr,
-                                        );
-                                    }
-                                }
-                            }
-
-                            let visitor = crate::walk_semantic_package!(completion::CompletableObjectFinderVisitor::new(&identifier.name), sem_pkg);
-                            let imports =
-                                completion::get_imports(&sem_pkg);
-                            vec![
-                                visitor.completables.iter().map(|completable| completable.completion_item(&imports)).collect::<Vec<lsp::CompletionItem>>(),
-                                list.iter().map(|completable| completable.completion_item(&imports)).collect(),
-                            ].into_iter().flatten().collect()
-                        }
-                        _ => return Ok(None),
+                    match self
+                        .complete_member_expression(&sem_pkg, member)
+                    {
+                        Some(items) => items,
+                        None => return Ok(None),
                     }
                 }
                 AstNode::ObjectExpr(_) => {
