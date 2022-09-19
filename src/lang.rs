@@ -75,9 +75,9 @@ impl Package {
     }
 
     /// Get all functions in the package.
-    pub fn functions(&self) -> Vec<Function> {
+    pub fn functions(&self) -> impl Iterator<Item = Function> {
         if let MonoType::Record(record) = self.exports.typ().expr {
-            let mut functions: Vec<Function> = record
+            record
                 .fields()
                 .filter(|property| {
                     matches!(&property.v, MonoType::Fun(_))
@@ -92,25 +92,16 @@ impl Package {
                         "Previous filter function failed"
                     ),
                 })
-                .collect();
-            // Sort the functions into alphabetical order, plz.
-            // XXX: rockstar (15 Jul 2022) - This function currently returns a `Vec` specifically
-            // because of this requirement. It's probably _better_ to sort an iterator, but that
-            // isn't the best idea at the current introduction of this code.
-            functions.sort();
-            functions
+                .collect::<Vec<Function>>()
+                .into_iter()
         } else {
-            log::warn!("Package is not actually a flux package.");
-            vec![]
+            unreachable!("Package is not actually a flux package.");
         }
     }
 
     /// Get a function by name from the package.
     pub fn function(&self, name: &str) -> Option<Function> {
-        self.functions()
-            .iter()
-            .find(|function| function.name == name)
-            .cloned()
+        self.functions().find(|function| function.name == name)
     }
 }
 
@@ -336,6 +327,11 @@ mod tests {
     /// other package.
     #[test]
     fn get_universe_functions() {
+        let mut functions = UNIVERSE
+            .functions()
+            .map(|function| function.name.clone())
+            .collect::<Vec<String>>();
+        functions.sort();
         expect_test::expect![[r#"
             [
               "aggregateWindow",
@@ -448,14 +444,7 @@ mod tests {
               "yield"
             ]"#]]
         .assert_eq(
-            &serde_json::to_string_pretty(
-                &UNIVERSE
-                    .functions()
-                    .iter()
-                    .map(|function| function.name.clone())
-                    .collect::<Vec<String>>(),
-            )
-            .unwrap(),
+            &serde_json::to_string_pretty(&functions).unwrap(),
         );
     }
 
@@ -473,7 +462,6 @@ mod tests {
         .assert_eq(
             &serde_json::to_string_pretty(
                 &functions
-                    .iter()
                     .map(|function| function.name.clone())
                     .collect::<Vec<String>>(),
             )

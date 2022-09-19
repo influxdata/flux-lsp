@@ -2339,13 +2339,14 @@ impl LanguageServer for LspServer {
 
                 Ok(None)
             }
-            Ok(LspServerCommand::GetFunctionList) => Ok(Some(
-                lang::UNIVERSE
+            Ok(LspServerCommand::GetFunctionList) => Ok(Some({
+                let mut functions = lang::UNIVERSE
                     .functions()
-                    .iter()
                     .map(|function| function.name.clone())
-                    .collect(),
-            )),
+                    .collect::<Vec<String>>();
+                functions.sort();
+                functions.into()
+            })),
             Err(_err) => {
                 return Err(
                     LspError::InvalidCommand(params.command).into()
