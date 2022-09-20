@@ -919,11 +919,11 @@ impl LanguageServer for LspServer {
             });
             if let Some(typ) = hover_type {
                 return Ok(Some(lsp::Hover {
-                    contents: lsp::HoverContents::Scalar(
-                        lsp::MarkedString::String(format!(
-                            "type: {}",
-                            typ
-                        )),
+                    contents: lsp::HoverContents::Markup(
+                        lsp::MarkupContent {
+                            kind: lsp::MarkupKind::Markdown,
+                            value: format!("```flux\n{}\n```", typ),
+                        },
                     ),
                     range: None,
                 }));
