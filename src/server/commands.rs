@@ -89,31 +89,6 @@ impl From<LspServerCommand> for String {
 
 #[derive(Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct InjectTagValueFilterParams {
-    pub text_document: lsp::TextDocumentIdentifier,
-    pub bucket: String,
-    pub name: String,
-    pub value: String,
-}
-
-#[derive(Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct InjectFieldFilterParams {
-    pub text_document: lsp::TextDocumentIdentifier,
-    pub bucket: String,
-    pub name: String,
-}
-
-#[derive(Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct InjectMeasurementFilterParams {
-    pub text_document: lsp::TextDocumentIdentifier,
-    pub bucket: String,
-    pub name: String,
-}
-
-#[derive(Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
 pub struct CompositionInitializeParams {
     pub text_document: lsp::TextDocumentIdentifier,
     pub bucket: String,
