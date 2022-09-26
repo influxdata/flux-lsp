@@ -19,6 +19,7 @@ use flux::semantic::{walk, ErrorKind};
 use lspower::{
     jsonrpc::Result as RpcResult, lsp, Client, LanguageServer,
 };
+use strum::IntoEnumIterator;
 
 use crate::{completion, composition, lang, visitors::semantic};
 
@@ -413,7 +414,7 @@ impl LanguageServer for LspServer {
                     true,
                 )),
                 execute_command_provider: Some(lsp::ExecuteCommandOptions {
-                    commands: vec![],
+                    commands: commands::LspServerCommand::iter().map(|command| command.into()).collect::<Vec<String>>(),
                     work_done_progress_options: lsp::WorkDoneProgressOptions {
                         work_done_progress: None,
                     }

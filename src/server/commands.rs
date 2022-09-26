@@ -1,6 +1,8 @@
 use lspower::lsp;
 use serde::{Deserialize, Serialize};
+use strum_macros::EnumIter;
 
+#[derive(EnumIter)]
 pub enum LspServerCommand {
     CompositionInitialize,
     AddMeasurementFilter,
