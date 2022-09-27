@@ -645,7 +645,7 @@ dependencies = [
 [[package]]
 name = "flux"
 version = "0.154.0"
-source = "git+https://github.com/influxdata/flux?tag=v0.183.0#e0cfb6641e20c78c9c0c4a45f681fcc5bc0ef683"
+source = "git+https://github.com/influxdata/flux?tag=v0.184.2#1dae302f518e94526aadff4aef0c62ee945cd43d"
 dependencies = [
  "anyhow",
  "env_logger",
@@ -660,7 +660,7 @@ dependencies = [
 [[package]]
 name = "flux-core"
 version = "0.154.0"
-source = "git+https://github.com/influxdata/flux?tag=v0.183.0#e0cfb6641e20c78c9c0c4a45f681fcc5bc0ef683"
+source = "git+https://github.com/influxdata/flux?tag=v0.184.2#1dae302f518e94526aadff4aef0c62ee945cd43d"
 dependencies = [
  "anyhow",
  "chrono",
