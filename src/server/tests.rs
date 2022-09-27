@@ -1440,7 +1440,7 @@ x + 1
 #[test]
 async fn test_hover_binding() {
     let fluxscript = r#"x = "asd"
-builtin builtin_ : (v: int) => int
+builtin builtin_ : (v: A) => A where A: Numeric
 option option_ = 123
 1
 "#;
@@ -1472,7 +1472,7 @@ option option_ = 123
         Some(lsp::Hover {
             contents: lsp::HoverContents::Scalar(
                 lsp::MarkedString::String(
-                    "type: (v: int) => int".to_string()
+                    "type: (v: A) => A where A: Numeric".to_string()
                 )
             ),
             range: None,
@@ -1587,6 +1587,32 @@ x = 1
         Some(lsp::Hover {
             contents: lsp::HoverContents::Scalar(
                 lsp::MarkedString::String("type: int".to_string())
+            ),
+            range: None,
+        })
+    );
+}
+
+#[test]
+async fn test_hover_on_polymorphic_identifier() {
+    let fluxscript = r#"
+f = (x) => x + x
+        // ^
+"#;
+    let server = create_server();
+    open_file(&server, fluxscript.to_string(), None).await;
+
+    let params = hover_params(position_of(fluxscript));
+
+    let result = server.hover(params).await.unwrap();
+
+    assert_eq!(
+        result,
+        Some(lsp::Hover {
+            contents: lsp::HoverContents::Scalar(
+                lsp::MarkedString::String(
+                    "type: A where A: Addable".to_string()
+                )
             ),
             range: None,
         })
@@ -2901,6 +2927,130 @@ sql"#;
     .assert_eq(&serde_json::to_string_pretty(&result).unwrap());
 }
 
+#[test]
+async fn test_member_completion() {
+    let fluxscript = r#"
+import "json"
+
+from(bucket: "bucket")
+  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+  |> filter(fn: (r) => r["_measurement"] == "measurement")
+  |> filter(fn: (r) => r["_field"] == "request")
+  |> map(fn: (r) => (json.(v: r._value)))
+                      // ^
+  "#;
+
+    let server = create_server();
+    open_file(&server, fluxscript.to_string(), None).await;
+
+    let params = lsp::CompletionParams {
+        text_document_position: lsp::TextDocumentPositionParams {
+            text_document: lsp::TextDocumentIdentifier {
+                uri: lsp::Url::parse("file:///home/user/file.flux")
+                    .unwrap(),
+            },
+            position: position_of(fluxscript),
+        },
+        work_done_progress_params: lsp::WorkDoneProgressParams {
+            work_done_token: None,
+        },
+        partial_result_params: lsp::PartialResultParams {
+            partial_result_token: None,
+        },
+        context: Some(lsp::CompletionContext {
+            trigger_kind: lsp::CompletionTriggerKind::INVOKED,
+            trigger_character: None,
+        }),
+    };
+
+    let result =
+        server.completion(params.clone()).await.unwrap().unwrap();
+
+    expect_test::expect![[r#"
+        {
+          "isIncomplete": false,
+          "items": [
+            {
+              "label": "encode",
+              "kind": 3,
+              "detail": "(v:A) -> bytes",
+              "sortText": "encode",
+              "filterText": "encode",
+              "insertTextFormat": 2
+            }
+          ]
+        }"#]]
+    .assert_eq(&serde_json::to_string_pretty(&result).unwrap());
+}
+
+#[test]
+async fn test_member_completion_2() {
+    let fluxscript = r#"
+import "json"
+
+from(bucket: "bucket")
+  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+  |> filter(fn: (r) => r["_measurement"] == "measurement")
+  |> filter(fn: (r) => r["_field"] == "request")
+  |> map(fn: (r) => (json.(v: r._value)))
+                    // ^
+  "#;
+
+    let server = create_server();
+    open_file(&server, fluxscript.to_string(), None).await;
+
+    let params = lsp::CompletionParams {
+        text_document_position: lsp::TextDocumentPositionParams {
+            text_document: lsp::TextDocumentIdentifier {
+                uri: lsp::Url::parse("file:///home/user/file.flux")
+                    .unwrap(),
+            },
+            position: position_of(fluxscript),
+        },
+        work_done_progress_params: lsp::WorkDoneProgressParams {
+            work_done_token: None,
+        },
+        partial_result_params: lsp::PartialResultParams {
+            partial_result_token: None,
+        },
+        context: Some(lsp::CompletionContext {
+            trigger_kind: lsp::CompletionTriggerKind::INVOKED,
+            trigger_character: None,
+        }),
+    };
+
+    let result =
+        server.completion(params.clone()).await.unwrap().unwrap();
+
+    expect_test::expect![[r#"
+        {
+          "isIncomplete": false,
+          "items": [
+            {
+              "label": "experimental/json",
+              "kind": 9,
+              "detail": "Package",
+              "documentation": "experimental/json",
+              "sortText": "experimental/json",
+              "filterText": "json",
+              "insertText": "experimental/json",
+              "insertTextFormat": 1
+            },
+            {
+              "label": "json",
+              "kind": 9,
+              "detail": "Package",
+              "documentation": "json",
+              "sortText": "json",
+              "filterText": "json",
+              "insertText": "json",
+              "insertTextFormat": 1
+            }
+          ]
+        }"#]]
+    .assert_eq(&serde_json::to_string_pretty(&result).unwrap());
+}
+
 use crate::visitors::ast::{
     SEMANTIC_TOKEN_KEYWORD, SEMANTIC_TOKEN_NUMBER,
     SEMANTIC_TOKEN_STRING,
@@ -3457,7 +3607,7 @@ async fn compute_diagnostics_non_errors() {
 
     let filename: String = "file:///path/to/script.flux".into();
     let fluxscript = r#"import "experimental"
-        
+
 from(bucket: "my-bucket")
 |> range(start: -100d)
 |> filter(fn: (r) => r.value == "b")

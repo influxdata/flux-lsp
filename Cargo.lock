@@ -645,7 +645,7 @@ dependencies = [
 [[package]]
 name = "flux"
 version = "0.154.0"
-source = "git+https://github.com/influxdata/flux?tag=v0.183.0#e0cfb6641e20c78c9c0c4a45f681fcc5bc0ef683"
+source = "git+https://github.com/influxdata/flux?tag=v0.184.2#1dae302f518e94526aadff4aef0c62ee945cd43d"
 dependencies = [
  "anyhow",
  "env_logger",
@@ -660,7 +660,7 @@ dependencies = [
 [[package]]
 name = "flux-core"
 version = "0.154.0"
-source = "git+https://github.com/influxdata/flux?tag=v0.183.0#e0cfb6641e20c78c9c0c4a45f681fcc5bc0ef683"
+source = "git+https://github.com/influxdata/flux?tag=v0.184.2#1dae302f518e94526aadff4aef0c62ee945cd43d"
 dependencies = [
  "anyhow",
  "chrono",
@@ -688,7 +688,7 @@ dependencies = [
 
 [[package]]
 name = "flux-lsp"
-version = "0.8.34"
+version = "0.8.35"
 dependencies = [
  "Inflector",
  "async-std",
@@ -711,6 +711,8 @@ dependencies = [
  "serde",
  "serde_json",
  "simplelog",
+ "strum",
+ "strum_macros",
  "tokio",
  "tower-service",
  "wasm-bindgen",
@@ -1385,6 +1387,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "rustversion"
+version = "1.0.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "97477e48b4cf8603ad5f7aaf897467cf42ab4218a38ef76fb14c2d6773a6d6a8"
+
+[[package]]
 name = "ryu"
 version = "1.0.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1535,6 +1543,25 @@ dependencies = [
  "proc-macro-error",
  "proc-macro2",
  "quote",
+ "syn",
+]
+
+[[package]]
+name = "strum"
+version = "0.24.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "063e6045c0e62079840579a7e47a355ae92f60eb74daaf156fb1e84ba164e63f"
+
+[[package]]
+name = "strum_macros"
+version = "0.24.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1e385be0d24f186b4ce2f9982191e7101bb737312ad61c1f2f984f34bcf85d59"
+dependencies = [
+ "heck 0.4.0",
+ "proc-macro2",
+ "quote",
+ "rustversion",
  "syn",
 ]
 

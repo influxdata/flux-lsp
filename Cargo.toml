@@ -1,6 +1,6 @@
 [package]
 name = "flux-lsp"
-version = "0.8.34"
+version = "0.8.35"
 authors = ["Flux Developers <flux-developers@influxdata.com>"]
 edition = "2021"
 license = "MIT"
@@ -39,7 +39,7 @@ clap = { version = "3.1.9", features = ["derive"], optional = true }
 combinations = "0.1.0"
 console_error_panic_hook = { version = "0.1.7", optional = true }
 console_log = { version = "0.2", optional = true }
-flux = { git = "https://github.com/influxdata/flux", tag = "v0.183.0", features = ["lsp"], default-features = false }
+flux = { git = "https://github.com/influxdata/flux", tag = "v0.184.2", features = ["lsp"], default-features = false }
 futures = { version = "0.3.21", optional = true }
 Inflector = "0.11.4"
 js-sys = { version = "0.3.57", optional = true }
@@ -50,6 +50,8 @@ lspower = { version = "1.5.0", default-features = false, optional = true }
 serde = { version = "1.0.137", features = ["derive"] }
 serde_json = "1.0.79"
 simplelog = { version = "0.12.0", optional = true }
+strum = "0.24.1"
+strum_macros = "0.24.3"
 tokio = { version = "1.17.0", features = ["io-std", "io-util", "macros", "net", "rt-multi-thread"], optional = true }
 tower-service = { version = "0.3.1", optional = true }
 wasm-bindgen = { version = "0.2.80", features = ["serde-serialize"], optional = true }
