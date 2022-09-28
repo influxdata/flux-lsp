@@ -997,7 +997,10 @@ impl LanguageServer for LspServer {
                     contents: lsp::HoverContents::Markup(
                         lsp::MarkupContent {
                             kind: lsp::MarkupKind::Markdown,
-                            value: format!("```flux\n{}\n```", typ),
+                            value: format!(
+                                "```flux\ntype: {}\n```",
+                                typ
+                            ),
                         },
                     ),
                     range: None,
