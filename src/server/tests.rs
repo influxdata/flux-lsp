@@ -1429,8 +1429,11 @@ x + 1
     assert_eq!(
         result,
         Some(lsp::Hover {
-            contents: lsp::HoverContents::Scalar(
-                lsp::MarkedString::String("type: int".to_string())
+            contents: lsp::HoverContents::Markup(
+                lsp::MarkupContent {
+                    kind: lsp::MarkupKind::Markdown,
+                    value: String::from("```flux\ntype: int\n```")
+                }
             ),
             range: None,
         })
@@ -1455,8 +1458,11 @@ option option_ = 123
     assert_eq!(
         result,
         Some(lsp::Hover {
-            contents: lsp::HoverContents::Scalar(
-                lsp::MarkedString::String("type: string".to_string())
+            contents: lsp::HoverContents::Markup(
+                lsp::MarkupContent {
+                    kind: lsp::MarkupKind::Markdown,
+                    value: String::from("```flux\ntype: string\n```")
+                }
             ),
             range: None,
         })
@@ -1470,10 +1476,11 @@ option option_ = 123
     assert_eq!(
         result,
         Some(lsp::Hover {
-            contents: lsp::HoverContents::Scalar(
-                lsp::MarkedString::String(
-                    "type: (v: A) => A where A: Numeric".to_string()
-                )
+            contents: lsp::HoverContents::Markup(
+                lsp::MarkupContent {
+                    kind: lsp::MarkupKind::Markdown,
+                    value: String::from("```flux\ntype: (v: A) => A where A: Numeric\n```")
+                }
             ),
             range: None,
         })
@@ -1487,8 +1494,11 @@ option option_ = 123
     assert_eq!(
         result,
         Some(lsp::Hover {
-            contents: lsp::HoverContents::Scalar(
-                lsp::MarkedString::String("type: int".to_string())
+            contents: lsp::HoverContents::Markup(
+                lsp::MarkupContent {
+                    kind: lsp::MarkupKind::Markdown,
+                    value: String::from("```flux\ntype: int\n```")
+                }
             ),
             range: None,
         })
@@ -1510,8 +1520,11 @@ async fn test_hover_argument() {
     assert_eq!(
         result,
         Some(lsp::Hover {
-            contents: lsp::HoverContents::Scalar(
-                lsp::MarkedString::String("type: int".to_string())
+            contents: lsp::HoverContents::Markup(
+                lsp::MarkupContent {
+                    kind: lsp::MarkupKind::Markdown,
+                    value: String::from("```flux\ntype: int\n```")
+                }
             ),
             range: None,
         })
@@ -1535,8 +1548,11 @@ y = f(x: 1)
     assert_eq!(
         result,
         Some(lsp::Hover {
-            contents: lsp::HoverContents::Scalar(
-                lsp::MarkedString::String("type: int".to_string())
+            contents: lsp::HoverContents::Markup(
+                lsp::MarkupContent {
+                    kind: lsp::MarkupKind::Markdown,
+                    value: String::from("```flux\ntype: int\n```")
+                }
             ),
             range: None,
         })
@@ -1559,8 +1575,11 @@ async fn test_hover_record_property() {
     assert_eq!(
         result,
         Some(lsp::Hover {
-            contents: lsp::HoverContents::Scalar(
-                lsp::MarkedString::String("type: string".to_string())
+            contents: lsp::HoverContents::Markup(
+                lsp::MarkupContent {
+                    kind: lsp::MarkupKind::Markdown,
+                    value: String::from("```flux\ntype: string\n```")
+                }
             ),
             range: None,
         })
@@ -1585,8 +1604,11 @@ x = 1
     assert_eq!(
         result,
         Some(lsp::Hover {
-            contents: lsp::HoverContents::Scalar(
-                lsp::MarkedString::String("type: int".to_string())
+            contents: lsp::HoverContents::Markup(
+                lsp::MarkupContent {
+                    kind: lsp::MarkupKind::Markdown,
+                    value: String::from("```flux\ntype: int\n```")
+                }
             ),
             range: None,
         })
@@ -1609,10 +1631,13 @@ f = (x) => x + x
     assert_eq!(
         result,
         Some(lsp::Hover {
-            contents: lsp::HoverContents::Scalar(
-                lsp::MarkedString::String(
-                    "type: A where A: Addable".to_string()
-                )
+            contents: lsp::HoverContents::Markup(
+                lsp::MarkupContent {
+                    kind: lsp::MarkupKind::Markdown,
+                    value: String::from(
+                        "```flux\ntype: A where A: Addable\n```"
+                    )
+                }
             ),
             range: None,
         })
