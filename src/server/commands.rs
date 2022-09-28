@@ -8,8 +8,6 @@ pub enum LspServerCommand {
     AddMeasurementFilter,
     AddFieldFilter,
     RemoveFieldFilter,
-    AddTagFilter,
-    RemoveTagFilter,
     AddTagValueFilter,
     RemoveTagValueFilter,
     GetFunctionList,
@@ -29,17 +27,11 @@ impl TryFrom<String> for LspServerCommand {
             "fluxComposition/addFieldFilter" => {
                 Ok(LspServerCommand::AddFieldFilter)
             }
-            "fluxComposition/addTagFilter" => {
-                Ok(LspServerCommand::AddTagFilter)
-            }
             "fluxComposition/addTagValueFilter" => {
                 Ok(LspServerCommand::AddTagValueFilter)
             }
             "fluxComposition/removeFieldFilter" => {
                 Ok(LspServerCommand::RemoveFieldFilter)
-            }
-            "fluxComposition/removeTagFilter" => {
-                Ok(LspServerCommand::RemoveTagFilter)
             }
             "fluxComposition/removeTagValueFilter" => {
                 Ok(LspServerCommand::RemoveTagValueFilter)
@@ -67,17 +59,11 @@ impl From<LspServerCommand> for String {
             LspServerCommand::AddFieldFilter => {
                 "fluxComposition/addFieldFilter".into()
             }
-            LspServerCommand::AddTagFilter => {
-                "fluxComposition/addTagFilter".into()
-            }
             LspServerCommand::AddTagValueFilter => {
                 "fluxComposition/addTagValueFilter".into()
             }
             LspServerCommand::RemoveFieldFilter => {
                 "fluxComposition/removeFieldFilter".into()
-            }
-            LspServerCommand::RemoveTagFilter => {
-                "fluxComposition/removeTagFilter".into()
             }
             LspServerCommand::RemoveTagValueFilter => {
                 "fluxComposition/removeTagValueFilter".into()
@@ -98,6 +84,10 @@ pub struct CompositionInitializeParams {
     pub measurement: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub fields: Option<Vec<String>>,
+    #[deprecated(
+        since = "0.8.36",
+        note = "tag filters are no longer supported"
+    )]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tags: Option<Vec<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
