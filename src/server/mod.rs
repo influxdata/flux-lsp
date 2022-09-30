@@ -158,6 +158,7 @@ pub struct LspServer {
     diagnostics: Vec<Diagnostic>,
     store: store::Store,
     state: Mutex<LspServerState>,
+    client_capability: Option<lsp::HoverClientCapabilities>,
 }
 
 impl LspServer {
@@ -172,6 +173,9 @@ impl LspServer {
             ],
             store: store::Store::default(),
             state: Mutex::new(LspServerState::default()),
+            client_capability: Some(
+                lsp::HoverClientCapabilities::default(),
+            ),
         }
     }
 
@@ -376,8 +380,23 @@ impl LspServer {
 impl LanguageServer for LspServer {
     async fn initialize(
         &self,
-        _: lsp::InitializeParams,
+        params: lsp::InitializeParams,
     ) -> RpcResult<lsp::InitializeResult> {
+        let client_capability: Option<lsp::HoverClientCapabilities> =
+            match params.capabilities.text_document {
+                Some(text_document) => text_document.hover,
+                None => Some(lsp::HoverClientCapabilities {
+                    dynamic_registration: Some(false),
+                    content_format: Some(vec![
+                        lsp::MarkupKind::PlainText,
+                    ]),
+                }),
+            };
+        println!(
+            "self.client_capability\n{:#?}\nclient_capability\n{:#?}",
+            self.client_capability, client_capability
+        );
+
         Ok(lsp::InitializeResult {
             capabilities: lsp::ServerCapabilities {
                 call_hierarchy_provider: None,
