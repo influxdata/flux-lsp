@@ -158,7 +158,7 @@ pub struct LspServer {
     diagnostics: Vec<Diagnostic>,
     store: store::Store,
     state: Mutex<LspServerState>,
-    client_capability: RwLock<lsp::HoverClientCapabilities>,
+    client_capabilities: RwLock<lsp::ClientCapabilities>,
 }
 
 impl LspServer {
@@ -173,8 +173,8 @@ impl LspServer {
             ],
             store: store::Store::default(),
             state: Mutex::new(LspServerState::default()),
-            client_capability: RwLock::new(
-                lsp::HoverClientCapabilities::default(),
+            client_capabilities: RwLock::new(
+                lsp::ClientCapabilities::default(),
             ),
         }
     }
@@ -382,16 +382,12 @@ impl LanguageServer for LspServer {
         &self,
         params: lsp::InitializeParams,
     ) -> RpcResult<lsp::InitializeResult> {
-        let mut cc = self.client_capability.write().unwrap();
-        *cc = match params.capabilities.text_document {
-            Some(text_document) => text_document.hover.unwrap(),
-            None => lsp::HoverClientCapabilities {
-                dynamic_registration: Some(false),
-                content_format: Some(vec![
-                    lsp::MarkupKind::PlainText,
-                ]),
-            },
-        };
+        match self.client_capabilities.write() {
+            Ok(mut client_capabilities) => {
+                *client_capabilities = params.capabilities;
+            }
+            Err(err) => log::error!("{}", err),
+        }
 
         Ok(lsp::InitializeResult {
             capabilities: lsp::ServerCapabilities {
@@ -1008,36 +1004,44 @@ impl LanguageServer for LspServer {
                     _ => None,
                 });
             if let Some(typ) = hover_type {
-                let cc: lsp::HoverClientCapabilities =
-                    (*(self.client_capability.read().unwrap()))
-                        .clone();
-                let content_format: Option<Vec<lsp::MarkupKind>> =
-                    cc.content_format;
-                let hover_contents: lsp::HoverContents =
-                    match content_format {
-                        Some(fms) => {
-                            if fms
-                                .contains(&lsp::MarkupKind::Markdown)
+                let supports_markdown = match self
+                    .client_capabilities
+                    .read()
+                {
+                    Ok(client_capabilities) => {
+                        if let Some(text_document) =
+                            (*client_capabilities)
+                                .text_document
+                                .as_ref()
+                        {
+                            if let Some(hover) =
+                                text_document.hover.as_ref()
                             {
-                                lsp::HoverContents::Markup(
-                                    lsp::MarkupContent {
-                                        kind:
-                                            lsp::MarkupKind::Markdown,
-                                        value: format!(
-                                            "```flux\ntype: {}\n```",
-                                            typ
-                                        ),
-                                    },
-                                )
+                                hover.content_format.as_ref().map_or(false, |formats| formats.contains(&lsp::MarkupKind::Markdown))
                             } else {
-                                lsp::HoverContents::Scalar(
-                                    lsp::MarkedString::String(
-                                        format!("type: {}", typ),
-                                    ),
-                                )
+                                false
                             }
+                        } else {
+                            false
                         }
-                        None => lsp::HoverContents::Scalar(
+                    }
+                    Err(err) => {
+                        log::error!("{}", err);
+                        false
+                    }
+                };
+                let hover_contents: lsp::HoverContents =
+                    match supports_markdown {
+                        true => lsp::HoverContents::Markup(
+                            lsp::MarkupContent {
+                                kind: lsp::MarkupKind::Markdown,
+                                value: format!(
+                                    "```flux\ntype: {}\n```",
+                                    typ
+                                ),
+                            },
+                        ),
+                        false => lsp::HoverContents::Scalar(
                             lsp::MarkedString::String(format!(
                                 "type: {}",
                                 typ
