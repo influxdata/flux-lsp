@@ -6,8 +6,6 @@
 /// This module _only_ operates on an AST. It will never operate on semantic graph.
 use flux::ast;
 
-static YIELD_IDENTIFIER: &str = "_editor_composition";
-
 macro_rules! from {
     ($bucket_name:expr) => {
         ast::CallExpr {
@@ -268,45 +266,6 @@ macro_rules! filter {
     };
 }
 
-macro_rules! yield_ {
-    () => {
-        ast::CallExpr {
-            arguments: vec![ast::Expression::Object(Box::new(
-                ast::ObjectExpr {
-                    base: ast::BaseNode::default(),
-                    properties: vec![ast::Property {
-                        base: ast::BaseNode::default(),
-                        key: ast::PropertyKey::Identifier(
-                            ast::Identifier {
-                                base: ast::BaseNode::default(),
-                                name: "name".into(),
-                            },
-                        ),
-                        value: Some(ast::Expression::StringLit(
-                            ast::StringLit {
-                                base: ast::BaseNode::default(),
-                                value: YIELD_IDENTIFIER.into(),
-                            },
-                        )),
-                        comma: vec![],
-                        separator: vec![],
-                    }],
-                    lbrace: vec![],
-                    rbrace: vec![],
-                    with: None,
-                },
-            ))],
-            base: ast::BaseNode::default(),
-            callee: ast::Expression::Identifier(ast::Identifier {
-                base: ast::BaseNode::default(),
-                name: "yield".into(),
-            }),
-            lparen: vec![],
-            rparen: vec![],
-        }
-    };
-}
-
 macro_rules! pipe {
     ($a:expr, $b:expr) => {
         ast::PipeExpr {
@@ -339,7 +298,7 @@ impl CompositionQueryAnalyzer {
         );
     }
 
-    fn build(&mut self) -> ast::PipeExpr {
+    fn build(&mut self) -> ast::Expression {
         let mut inner = ast::Expression::PipeExpr(Box::new(pipe!(
             ast::Expression::Call(Box::new(from!(self
                 .bucket
@@ -384,7 +343,7 @@ impl CompositionQueryAnalyzer {
                 )
             )));
         }
-        pipe!(inner, yield_!())
+        inner
     }
 }
 
@@ -556,9 +515,7 @@ impl Composition {
             0,
             ast::Statement::Expr(Box::new(ast::ExprStmt {
                 base: ast::BaseNode::default(),
-                expression: ast::Expression::PipeExpr(Box::new(
-                    statement,
-                )),
+                expression: statement,
             })),
         );
         Ok(())
@@ -601,9 +558,7 @@ impl Composition {
             0,
             ast::Statement::Expr(Box::new(ast::ExprStmt {
                 base: ast::BaseNode::default(),
-                expression: ast::Expression::PipeExpr(Box::new(
-                    statement,
-                )),
+                expression: statement,
             })),
         );
         Ok(())
@@ -647,9 +602,7 @@ impl Composition {
             0,
             ast::Statement::Expr(Box::new(ast::ExprStmt {
                 base: ast::BaseNode::default(),
-                expression: ast::Expression::PipeExpr(Box::new(
-                    statement,
-                )),
+                expression: statement,
             })),
         );
 
@@ -695,9 +648,7 @@ impl Composition {
             0,
             ast::Statement::Expr(Box::new(ast::ExprStmt {
                 base: ast::BaseNode::default(),
-                expression: ast::Expression::PipeExpr(Box::new(
-                    statement,
-                )),
+                expression: statement,
             })),
         );
 
@@ -744,9 +695,7 @@ impl Composition {
             0,
             ast::Statement::Expr(Box::new(ast::ExprStmt {
                 base: ast::BaseNode::default(),
-                expression: ast::Expression::PipeExpr(Box::new(
-                    statement,
-                )),
+                expression: statement,
             })),
         );
 
@@ -794,9 +743,7 @@ impl Composition {
             0,
             ast::Statement::Expr(Box::new(ast::ExprStmt {
                 base: ast::BaseNode::default(),
-                expression: ast::Expression::PipeExpr(Box::new(
-                    statement,
-                )),
+                expression: statement,
             })),
         );
 
@@ -819,7 +766,9 @@ from(bucket: "an-composition")
         let ast = flux::parser::parse_string("".into(), &fluxscript);
         let composition = Composition::new(ast);
 
-        assert_eq!("from(bucket: \"an-composition\")\n    |> yield(name: \"_editor_composition\")\n".to_string(), composition.composition_string().unwrap());
+        assert_eq!(r#"from(bucket: "an-composition")
+    |> yield(name: "_editor_composition")
+"#.to_string(), composition.composition_string().unwrap());
     }
 
     #[test]
@@ -832,7 +781,9 @@ query1 = from(bucket: "an-composition")
         let ast = flux::parser::parse_string("".into(), &fluxscript);
         let composition = Composition::new(ast);
 
-        assert_eq!("from(bucket: \"an-composition\")\n    |> yield(name: \"_editor_composition\")\n".to_string(), composition.composition_string().unwrap());
+        assert_eq!(r#"from(bucket: "an-composition")
+    |> yield(name: "_editor_composition")
+"#.to_string(), composition.composition_string().unwrap());
     }
 
     #[test]
@@ -848,7 +799,10 @@ query1 = from(bucket: "an-composition")
             .add_measurement(String::from("myMeasurement"))
             .unwrap();
 
-        assert_eq!("from(bucket: \"an-composition\")\n    |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n    |> filter(fn: (r) => r._measurement == \"myMeasurement\")\n    |> yield(name: \"_editor_composition\")\n".to_string(), composition.composition_string().unwrap());
+        assert_eq!(r#"from(bucket: "an-composition")
+    |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+    |> filter(fn: (r) => r._measurement == "myMeasurement")
+"#.to_string(), composition.composition_string().unwrap());
     }
 
     #[test]
@@ -915,9 +869,7 @@ query1 = from(bucket: "an-composition")
             .unwrap();
 
         assert_eq!(
-            r#"from(bucket: "an-composition")
-    |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
-    |> yield(name: "_editor_composition")
+            r#"from(bucket: "an-composition") |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
 "#
             .to_string(),
             composition.to_string()
@@ -946,9 +898,7 @@ query1 = from(bucket: "an-composition")
             .unwrap();
 
         assert_eq!(
-            r#"from(bucket: "an-composition")
-    |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
-    |> yield(name: "_editor_composition")
+            r#"from(bucket: "an-composition") |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
 "#
             .to_string(),
             composition.to_string()
@@ -977,7 +927,6 @@ query1 = from(bucket: "an-composition")
             r#"from(bucket: "an-composition")
     |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
     |> filter(fn: (r) => r._measurement == "myMeasurement")
-    |> yield(name: "_editor_composition")
 "#
             .to_string(),
             composition.to_string()
@@ -1011,7 +960,6 @@ query1 = from(bucket: "an-composition")
     |> filter(fn: (r) => r._measurement == "myMeasurement")
     |> filter(fn: (r) => r._field == "myField" or r._field == "myField2")
     |> filter(fn: (r) => r.myTag == "myTagValue" and r.myTag == "myTagValue2")
-    |> yield(name: "_editor_composition")
 "#
             .to_string(),
             composition.to_string()
@@ -1032,7 +980,6 @@ query1 = from(bucket: "an-composition")
             r#"from(bucket: "an-composition")
     |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
     |> filter(fn: (r) => r._measurement == "myMeasurement")
-    |> yield(name: "_editor_composition")
 "#
             .to_string(),
             composition.to_string()
@@ -1072,7 +1019,6 @@ query1 = from(bucket: "an-composition")
             r#"from(bucket: "an-composition")
     |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
     |> filter(fn: (r) => r._field == "myField")
-    |> yield(name: "_editor_composition")
 "#
             .to_string(),
             composition.to_string()
@@ -1097,7 +1043,6 @@ query1 = from(bucket: "an-composition")
     |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
     |> filter(fn: (r) => r._measurement == "anMeasurement")
     |> filter(fn: (r) => r._field == "myField")
-    |> yield(name: "_editor_composition")
 "#
             .to_string(),
             composition.to_string()
@@ -1141,7 +1086,6 @@ query1 = from(bucket: "an-composition")
     |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
     |> filter(fn: (r) => r._measurement == "anMeasurement")
     |> filter(fn: (r) => r._field == "firstField" or r._field == "secondField")
-    |> yield(name: "_editor_composition")
 "#
             .to_string(),
             composition.to_string()
@@ -1166,7 +1110,6 @@ query1 = from(bucket: "an-composition")
             r#"from(bucket: "an-composition")
     |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
     |> filter(fn: (r) => r._measurement == "anMeasurement")
-    |> yield(name: "_editor_composition")
 "#
             .to_string(),
             composition.to_string()
@@ -1194,7 +1137,6 @@ query1 = from(bucket: "an-composition")
     |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
     |> filter(fn: (r) => r._measurement == "anMeasurement")
     |> filter(fn: (r) => r._field == "firstField" or r._field == "thirdField")
-    |> yield(name: "_editor_composition")
 "#
             .to_string(),
             composition.to_string()
@@ -1239,7 +1181,6 @@ query1 = from(bucket: "an-composition")
             r#"from(bucket: "an-composition")
     |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
     |> filter(fn: (r) => r.tagKey == "tagValue")
-    |> yield(name: "_editor_composition")
 "#
             .to_string(),
             composition.to_string()
@@ -1291,7 +1232,6 @@ query1 = from(bucket: "an-composition")
     |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
     |> filter(fn: (r) => r._measurement == "anMeasurement")
     |> filter(fn: (r) => r.tagKey1 == "tagValue1" and r.tagKey2 == "tagValue2")
-    |> yield(name: "_editor_composition")
 "#
             .to_string(),
             composition.to_string()
@@ -1323,7 +1263,6 @@ query1 = from(bucket: "an-composition")
     |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
     |> filter(fn: (r) => r._measurement == "anMeasurement")
     |> filter(fn: (r) => r._field == "anField")
-    |> yield(name: "_editor_composition")
 "#
             .to_string(),
             composition.to_string()
@@ -1354,7 +1293,6 @@ query1 = from(bucket: "an-composition")
     |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
     |> filter(fn: (r) => r._measurement == "anMeasurement")
     |> filter(fn: (r) => r.tagKey1 == "tagValue1" and r.tagKey3 == "tagValue3")
-    |> yield(name: "_editor_composition")
 "#
             .to_string(),
             composition.to_string()
