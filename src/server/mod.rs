@@ -3,7 +3,7 @@ mod store;
 mod types;
 
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, RwLock};
 
 use flux::ast::walk::Node as AstNode;
 use flux::ast::{self, Expression as AstExpression};
@@ -158,7 +158,7 @@ pub struct LspServer {
     diagnostics: Vec<Diagnostic>,
     store: store::Store,
     state: Mutex<LspServerState>,
-    client_capability: Option<lsp::HoverClientCapabilities>,
+    client_capability: RwLock<lsp::HoverClientCapabilities>,
 }
 
 impl LspServer {
@@ -173,7 +173,7 @@ impl LspServer {
             ],
             store: store::Store::default(),
             state: Mutex::new(LspServerState::default()),
-            client_capability: Some(
+            client_capability: RwLock::new(
                 lsp::HoverClientCapabilities::default(),
             ),
         }
@@ -382,20 +382,16 @@ impl LanguageServer for LspServer {
         &self,
         params: lsp::InitializeParams,
     ) -> RpcResult<lsp::InitializeResult> {
-        let client_capability: Option<lsp::HoverClientCapabilities> =
-            match params.capabilities.text_document {
-                Some(text_document) => text_document.hover,
-                None => Some(lsp::HoverClientCapabilities {
-                    dynamic_registration: Some(false),
-                    content_format: Some(vec![
-                        lsp::MarkupKind::PlainText,
-                    ]),
-                }),
-            };
-        println!(
-            "self.client_capability\n{:#?}\nclient_capability\n{:#?}",
-            self.client_capability, client_capability
-        );
+        let mut cc = self.client_capability.write().unwrap();
+        *cc = match params.capabilities.text_document {
+            Some(text_document) => text_document.hover.unwrap(),
+            None => lsp::HoverClientCapabilities {
+                dynamic_registration: Some(false),
+                content_format: Some(vec![
+                    lsp::MarkupKind::PlainText,
+                ]),
+            },
+        };
 
         Ok(lsp::InitializeResult {
             capabilities: lsp::ServerCapabilities {
