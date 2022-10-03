@@ -89,76 +89,6 @@ async fn test_initialized() {
 }
 
 #[test]
-async fn test_initialized_with_client_capabilities() {
-    let server = create_server();
-
-    let params = lsp::InitializeParams {
-        capabilities: lsp::ClientCapabilities {
-            workspace: None,
-            text_document: Some(
-                lsp::TextDocumentClientCapabilities {
-                    synchronization: None,
-                    completion: None,
-                    hover: Some(lsp::HoverClientCapabilities {
-                        dynamic_registration: Some(true),
-                        content_format: Some(vec![
-                            lsp::MarkupKind::Markdown,
-                        ]),
-                    }),
-                    signature_help: None,
-                    references: None,
-                    document_highlight: None,
-                    document_symbol: None,
-                    formatting: None,
-                    range_formatting: None,
-                    on_type_formatting: None,
-                    declaration: None,
-                    definition: None,
-                    type_definition: None,
-                    implementation: None,
-                    code_action: None,
-                    code_lens: None,
-                    document_link: None,
-                    color_provider: None,
-                    rename: None,
-                    publish_diagnostics: None,
-                    folding_range: None,
-                    selection_range: None,
-                    linked_editing_range: None,
-                    call_hierarchy: None,
-                    semantic_tokens: None,
-                    moniker: None,
-                },
-            ),
-            window: None,
-            general: None,
-            experimental: None,
-        },
-        client_info: None,
-        initialization_options: None,
-        locale: None,
-        process_id: None,
-        root_path: None,
-        root_uri: None,
-        trace: None,
-        workspace_folders: None,
-    };
-
-    server.initialize(params).await.unwrap();
-    let server_client_capability =
-        server.client_capability.read().unwrap();
-
-    assert_eq!(
-        (*server_client_capability).dynamic_registration,
-        Some(true)
-    );
-    assert_eq!(
-        (*server_client_capability).content_format,
-        Some(vec![lsp::MarkupKind::Markdown])
-    );
-}
-
-#[test]
 async fn test_shutdown() {
     let server = create_server();
 
@@ -1518,37 +1448,14 @@ x + 1
             workspace: None,
             text_document: Some(
                 lsp::TextDocumentClientCapabilities {
-                    synchronization: None,
-                    completion: None,
                     hover: Some(lsp::HoverClientCapabilities {
                         dynamic_registration: Some(true),
                         content_format: Some(vec![
+                            lsp::MarkupKind::PlainText,
                             lsp::MarkupKind::Markdown,
                         ]),
                     }),
-                    signature_help: None,
-                    references: None,
-                    document_highlight: None,
-                    document_symbol: None,
-                    formatting: None,
-                    range_formatting: None,
-                    on_type_formatting: None,
-                    declaration: None,
-                    definition: None,
-                    type_definition: None,
-                    implementation: None,
-                    code_action: None,
-                    code_lens: None,
-                    document_link: None,
-                    color_provider: None,
-                    rename: None,
-                    publish_diagnostics: None,
-                    folding_range: None,
-                    selection_range: None,
-                    linked_editing_range: None,
-                    call_hierarchy: None,
-                    semantic_tokens: None,
-                    moniker: None,
+                    ..Default::default()
                 },
             ),
             window: None,
