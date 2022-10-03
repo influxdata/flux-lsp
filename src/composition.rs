@@ -458,63 +458,6 @@ impl<'a> ast::walk::Visitor<'a> for CompositionQueryAnalyzer {
     }
 }
 
-/// Find the composition statement.
-///
-/// The composition statement is identified as follows: a `from` function that contains
-/// a yield with the name "_editor_composition".
-#[derive(Default)]
-struct CompositionStatementFinderVisitor {
-    statement: Option<ast::ExprStmt>,
-}
-
-impl<'a> ast::walk::Visitor<'a>
-    for CompositionStatementFinderVisitor
-{
-    fn visit(&mut self, node: ast::walk::Node<'a>) -> bool {
-        if self.statement.is_some() {
-            // If the statement was found, don't keep looking.
-            return false;
-        }
-
-        if let ast::walk::Node::ExprStmt(expr_statement) = node {
-            if let ast::Expression::PipeExpr(expr) =
-                &expr_statement.expression
-            {
-                if let ast::Expression::Identifier(identifier) =
-                    &expr.call.callee
-                {
-                    if identifier.name == "yield" {
-                        expr.call.arguments.iter().any(|argument| {
-                            if let ast::Expression::Object(object) = argument {
-                                object.properties.iter().any(|property| {
-                                    if let ast::PropertyKey::Identifier(key) = &property.key {
-                                        if key.name == "name" {
-                                            // Because we would have generated this statement, we'll always be able to
-                                            // assert the simplicity of the yield name, i.e. it won't be a deeply nested
-                                            // expression.
-                                            if let Some(ast::Expression::StringLit(literal)) = &property.value {
-                                                if literal.value == YIELD_IDENTIFIER {
-                                                    self.statement = Some(expr_statement.clone());
-                                                    return true;
-                                                }
-                                            }
-                                        }
-                                    }
-                                    false
-                                })
-                            } else {
-                                false
-                            }
-                        });
-                        return false;
-                    }
-                }
-            }
-        }
-        true
-    }
-}
-
 type CompositionResult = Result<(), ()>;
 
 /// Composition acts as the public entry point into the composition functionality.
@@ -534,14 +477,18 @@ impl Composition {
         Self { file }
     }
 
+    /// Find the composition statement
+    ///
+    /// The composition statement is defined as the first expression statement in the file.
     fn find_composition_statement(&self) -> Option<ast::ExprStmt> {
-        let mut visitor =
-            CompositionStatementFinderVisitor::default();
-        flux::ast::walk::walk(
-            &mut visitor,
-            flux::ast::walk::Node::File(&self.file),
-        );
-        visitor.statement
+        match self.file.body.iter().find(|statement| {
+            matches!(statement, ast::Statement::Expr(_))
+        }) {
+            Some(ast::Statement::Expr(expression_statement)) => {
+                Some(*expression_statement.clone())
+            }
+            _ => None,
+        }
     }
 
     pub(crate) fn composition_string(&self) -> Option<String> {
@@ -571,6 +518,9 @@ impl Composition {
     ///
     /// This must be called before any other composition can be made, as it'll set up the
     /// statement that will be managed by composition.
+    ///
+    /// Note: this call is destructive! If there are statements in this file already, they'll be removed and
+    /// replaced with the composition statement.
     pub(crate) fn initialize(
         &mut self,
         bucket: String,
@@ -873,20 +823,6 @@ from(bucket: "an-composition")
     }
 
     #[test]
-    fn test_composition_string_not_found() {
-        let fluxscript = r#"from(bucket: "an-composition")
-|> yield(name: "_not_a_composition")
-
-from(bucket: "an-composition")
-|> yield(name: "_another_id")
-"#;
-        let ast = flux::parser::parse_string("".into(), &fluxscript);
-        let composition = Composition::new(ast);
-
-        assert!(composition.composition_string().is_none());
-    }
-
-    #[test]
     fn test_composition_string_only_returns_composition() {
         let fluxscript = r#"from(bucket: "an-composition")
 |> yield(name: "_editor_composition")
@@ -926,37 +862,38 @@ query1 = from(bucket: "an-composition")
 |> filter(fn: (r) => r.myOtherTag == "anotherValue")
 |> filter(fn: (r) => exists r.anotherTag)
 |> yield(name: "_editor_composition")"#;
-        let ast = flux::parser::parse_string("".into(), &fluxscript);
+        let parsed_ast =
+            flux::parser::parse_string("".into(), &fluxscript);
 
-        let mut visitor =
-            CompositionStatementFinderVisitor::default();
-        flux::ast::walk::walk(
-            &mut visitor,
-            flux::ast::walk::Node::File(&ast),
-        );
-        let expr_statement =
-            visitor.statement.expect("Previous check failed.");
+        if let ast::Statement::Expr(expr_statement) =
+            parsed_ast.body[0].clone()
+        {
+            let mut analyzer = CompositionQueryAnalyzer::default();
+            analyzer.analyze(*expr_statement);
 
-        let mut analyzer = CompositionQueryAnalyzer::default();
-        analyzer.analyze(expr_statement.clone());
+            assert_eq!("an-composition".to_string(), analyzer.bucket);
 
-        assert_eq!("an-composition".to_string(), analyzer.bucket);
-
-        assert_eq!(
-            Some("myMeasurement".to_string()),
-            analyzer.measurement
-        );
-        assert_eq!(vec!["myField", "myOtherField"], analyzer.fields);
-        assert_eq!(
-            vec![
-                ("myTag".to_string(), "anValue".to_string()),
-                (
-                    "myOtherTag".to_string(),
-                    "anotherValue".to_string()
-                )
-            ],
-            analyzer.tag_values
-        );
+            assert_eq!(
+                Some("myMeasurement".to_string()),
+                analyzer.measurement
+            );
+            assert_eq!(
+                vec!["myField", "myOtherField"],
+                analyzer.fields
+            );
+            assert_eq!(
+                vec![
+                    ("myTag".to_string(), "anValue".to_string()),
+                    (
+                        "myOtherTag".to_string(),
+                        "anotherValue".to_string()
+                    )
+                ],
+                analyzer.tag_values
+            );
+        } else {
+            assert!(false);
+        }
     }
 
     /// Initializing composition for a file will add a composition-owned statement
@@ -981,7 +918,6 @@ query1 = from(bucket: "an-composition")
             r#"from(bucket: "an-composition")
     |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
     |> yield(name: "_editor_composition")
-from(bucket: "my-bucket") |> yield(name: "my-result")
 "#
             .to_string(),
             composition.to_string()
