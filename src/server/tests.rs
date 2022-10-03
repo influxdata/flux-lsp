@@ -1606,7 +1606,6 @@ option option_ = 123
             contents: lsp::HoverContents::Scalar(
                 lsp::MarkedString::String("type: string".to_string())
             ),
-
             range: None,
         })
     );
