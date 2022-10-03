@@ -3,7 +3,7 @@ mod store;
 mod types;
 
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, RwLock};
 
 use flux::ast::walk::Node as AstNode;
 use flux::ast::{self, Expression as AstExpression};
@@ -157,7 +157,7 @@ pub struct LspServer {
     client: Arc<Mutex<Option<Client>>>,
     diagnostics: Vec<Diagnostic>,
     store: store::Store,
-    state: Mutex<LspServerState>,
+    state: RwLock<LspServerState>,
 }
 
 impl LspServer {
@@ -171,7 +171,7 @@ impl LspServer {
                 super::diagnostics::prefer_camel_case,
             ],
             store: store::Store::default(),
-            state: Mutex::new(LspServerState::default()),
+            state: RwLock::new(LspServerState::default()),
         }
     }
 
@@ -569,7 +569,7 @@ impl LanguageServer for LspServer {
                     buckets,
                 )) = settings.get("buckets")
                 {
-                    match self.state.lock() {
+                    match self.state.write() {
                         Ok(mut state) => {
                             state.set_buckets(
                                 buckets
