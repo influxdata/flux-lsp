@@ -1499,6 +1499,81 @@ x + 1
     assert_eq!(
         result,
         Some(lsp::Hover {
+            contents: lsp::HoverContents::Scalar(
+                lsp::MarkedString::String("type: int".to_string())
+            ),
+            range: None,
+        })
+    );
+}
+
+#[test]
+async fn test_hover_with_markdown() {
+    let fluxscript = r#"x = 1
+x + 1
+"#;
+    let server = create_server();
+    let params = lsp::InitializeParams {
+        capabilities: lsp::ClientCapabilities {
+            workspace: None,
+            text_document: Some(
+                lsp::TextDocumentClientCapabilities {
+                    synchronization: None,
+                    completion: None,
+                    hover: Some(lsp::HoverClientCapabilities {
+                        dynamic_registration: Some(true),
+                        content_format: Some(vec![
+                            lsp::MarkupKind::Markdown,
+                        ]),
+                    }),
+                    signature_help: None,
+                    references: None,
+                    document_highlight: None,
+                    document_symbol: None,
+                    formatting: None,
+                    range_formatting: None,
+                    on_type_formatting: None,
+                    declaration: None,
+                    definition: None,
+                    type_definition: None,
+                    implementation: None,
+                    code_action: None,
+                    code_lens: None,
+                    document_link: None,
+                    color_provider: None,
+                    rename: None,
+                    publish_diagnostics: None,
+                    folding_range: None,
+                    selection_range: None,
+                    linked_editing_range: None,
+                    call_hierarchy: None,
+                    semantic_tokens: None,
+                    moniker: None,
+                },
+            ),
+            window: None,
+            general: None,
+            experimental: None,
+        },
+        client_info: None,
+        initialization_options: None,
+        locale: None,
+        process_id: None,
+        root_path: None,
+        root_uri: None,
+        trace: None,
+        workspace_folders: None,
+    };
+    server.initialize(params).await.unwrap();
+    open_file(&server, fluxscript.to_string(), None).await;
+
+    let params = hover_params(lsp::Position::new(1, 1));
+
+    let result = server.hover(params).await.unwrap();
+
+    assert_eq!(
+        result,
+        Some(lsp::Hover {
             contents: lsp::HoverContents::Markup(
                 lsp::MarkupContent {
                     kind: lsp::MarkupKind::Markdown,
@@ -1528,12 +1603,10 @@ option option_ = 123
     assert_eq!(
         result,
         Some(lsp::Hover {
-            contents: lsp::HoverContents::Markup(
-                lsp::MarkupContent {
-                    kind: lsp::MarkupKind::Markdown,
-                    value: String::from("```flux\ntype: string\n```")
-                }
+            contents: lsp::HoverContents::Scalar(
+                lsp::MarkedString::String("type: string".to_string())
             ),
+
             range: None,
         })
     );
@@ -1546,11 +1619,10 @@ option option_ = 123
     assert_eq!(
         result,
         Some(lsp::Hover {
-            contents: lsp::HoverContents::Markup(
-                lsp::MarkupContent {
-                    kind: lsp::MarkupKind::Markdown,
-                    value: String::from("```flux\ntype: (v: A) => A where A: Numeric\n```")
-                }
+            contents: lsp::HoverContents::Scalar(
+                lsp::MarkedString::String(
+                    "type: (v: A) => A where A: Numeric".to_string()
+                )
             ),
             range: None,
         })
@@ -1564,11 +1636,8 @@ option option_ = 123
     assert_eq!(
         result,
         Some(lsp::Hover {
-            contents: lsp::HoverContents::Markup(
-                lsp::MarkupContent {
-                    kind: lsp::MarkupKind::Markdown,
-                    value: String::from("```flux\ntype: int\n```")
-                }
+            contents: lsp::HoverContents::Scalar(
+                lsp::MarkedString::String("type: int".to_string())
             ),
             range: None,
         })
@@ -1590,11 +1659,8 @@ async fn test_hover_argument() {
     assert_eq!(
         result,
         Some(lsp::Hover {
-            contents: lsp::HoverContents::Markup(
-                lsp::MarkupContent {
-                    kind: lsp::MarkupKind::Markdown,
-                    value: String::from("```flux\ntype: int\n```")
-                }
+            contents: lsp::HoverContents::Scalar(
+                lsp::MarkedString::String("type: int".to_string())
             ),
             range: None,
         })
@@ -1618,11 +1684,8 @@ y = f(x: 1)
     assert_eq!(
         result,
         Some(lsp::Hover {
-            contents: lsp::HoverContents::Markup(
-                lsp::MarkupContent {
-                    kind: lsp::MarkupKind::Markdown,
-                    value: String::from("```flux\ntype: int\n```")
-                }
+            contents: lsp::HoverContents::Scalar(
+                lsp::MarkedString::String("type: int".to_string())
             ),
             range: None,
         })
@@ -1645,11 +1708,8 @@ async fn test_hover_record_property() {
     assert_eq!(
         result,
         Some(lsp::Hover {
-            contents: lsp::HoverContents::Markup(
-                lsp::MarkupContent {
-                    kind: lsp::MarkupKind::Markdown,
-                    value: String::from("```flux\ntype: string\n```")
-                }
+            contents: lsp::HoverContents::Scalar(
+                lsp::MarkedString::String("type: string".to_string())
             ),
             range: None,
         })
@@ -1674,11 +1734,8 @@ x = 1
     assert_eq!(
         result,
         Some(lsp::Hover {
-            contents: lsp::HoverContents::Markup(
-                lsp::MarkupContent {
-                    kind: lsp::MarkupKind::Markdown,
-                    value: String::from("```flux\ntype: int\n```")
-                }
+            contents: lsp::HoverContents::Scalar(
+                lsp::MarkedString::String("type: int".to_string())
             ),
             range: None,
         })
@@ -1701,13 +1758,10 @@ f = (x) => x + x
     assert_eq!(
         result,
         Some(lsp::Hover {
-            contents: lsp::HoverContents::Markup(
-                lsp::MarkupContent {
-                    kind: lsp::MarkupKind::Markdown,
-                    value: String::from(
-                        "```flux\ntype: A where A: Addable\n```"
-                    )
-                }
+            contents: lsp::HoverContents::Scalar(
+                lsp::MarkedString::String(
+                    "type: A where A: Addable".to_string()
+                )
             ),
             range: None,
         })

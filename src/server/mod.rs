@@ -1008,16 +1008,45 @@ impl LanguageServer for LspServer {
                     _ => None,
                 });
             if let Some(typ) = hover_type {
-                return Ok(Some(lsp::Hover {
-                    contents: lsp::HoverContents::Markup(
-                        lsp::MarkupContent {
-                            kind: lsp::MarkupKind::Markdown,
-                            value: format!(
-                                "```flux\ntype: {}\n```",
+                let cc: lsp::HoverClientCapabilities =
+                    (*(self.client_capability.read().unwrap()))
+                        .clone();
+                let content_format: Option<Vec<lsp::MarkupKind>> =
+                    cc.content_format;
+                let hover_contents: lsp::HoverContents =
+                    match content_format {
+                        Some(fms) => {
+                            if fms
+                                .contains(&lsp::MarkupKind::Markdown)
+                            {
+                                lsp::HoverContents::Markup(
+                                    lsp::MarkupContent {
+                                        kind:
+                                            lsp::MarkupKind::Markdown,
+                                        value: format!(
+                                            "```flux\ntype: {}\n```",
+                                            typ
+                                        ),
+                                    },
+                                )
+                            } else {
+                                lsp::HoverContents::Scalar(
+                                    lsp::MarkedString::String(
+                                        format!("type: {}", typ),
+                                    ),
+                                )
+                            }
+                        }
+                        None => lsp::HoverContents::Scalar(
+                            lsp::MarkedString::String(format!(
+                                "type: {}",
                                 typ
-                            ),
-                        },
-                    ),
+                            )),
+                        ),
+                    };
+
+                return Ok(Some(lsp::Hover {
+                    contents: hover_contents,
                     range: None,
                 }));
             }
