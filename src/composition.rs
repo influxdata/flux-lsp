@@ -534,15 +534,20 @@ impl Composition {
         Self { file }
     }
 
-    pub(crate) fn composition_string(&self) -> Option<String> {
+    fn find_composition_statement(&self) -> Option<ast::ExprStmt> {
         let mut visitor =
             CompositionStatementFinderVisitor::default();
         flux::ast::walk::walk(
             &mut visitor,
             flux::ast::walk::Node::File(&self.file),
         );
+        visitor.statement
+    }
 
-        if let Some(expr_statement) = visitor.statement {
+    pub(crate) fn composition_string(&self) -> Option<String> {
+        if let Some(expr_statement) =
+            self.find_composition_statement()
+        {
             let file = ast::File {
                 base: ast::BaseNode::default(),
                 metadata: "".into(),
@@ -573,13 +578,6 @@ impl Composition {
         fields: Option<Vec<String>>,
         tag_values: Option<Vec<(String, String)>>,
     ) -> CompositionResult {
-        let mut visitor =
-            CompositionStatementFinderVisitor::default();
-        flux::ast::walk::walk(
-            &mut visitor,
-            flux::ast::walk::Node::File(&self.file),
-        );
-
         let mut analyzer = CompositionQueryAnalyzer {
             bucket,
             measurement,
@@ -587,8 +585,9 @@ impl Composition {
             tag_values: tag_values.unwrap_or_default(),
         };
         let statement = analyzer.build();
-
-        if let Some(expr_statement) = visitor.statement {
+        if let Some(expr_statement) =
+            self.find_composition_statement()
+        {
             self.file.body = self
                 .file
                 .body
@@ -619,17 +618,12 @@ impl Composition {
         &mut self,
         measurement: String,
     ) -> CompositionResult {
-        let mut visitor =
-            CompositionStatementFinderVisitor::default();
-        flux::ast::walk::walk(
-            &mut visitor,
-            flux::ast::walk::Node::File(&self.file),
-        );
-        if visitor.statement.is_none() {
+        let statement = self.find_composition_statement();
+        if statement.is_none() {
             return Err(());
         }
         let expr_statement =
-            visitor.statement.expect("Previous check failed.");
+            statement.expect("Previous check failed.");
 
         let mut analyzer = CompositionQueryAnalyzer::default();
         analyzer.analyze(expr_statement.clone());
@@ -669,17 +663,12 @@ impl Composition {
         &mut self,
         field: String,
     ) -> CompositionResult {
-        let mut visitor =
-            CompositionStatementFinderVisitor::default();
-        flux::ast::walk::walk(
-            &mut visitor,
-            flux::ast::walk::Node::File(&self.file),
-        );
-        if visitor.statement.is_none() {
+        let statement = self.find_composition_statement();
+        if statement.is_none() {
             return Err(());
         }
         let expr_statement =
-            visitor.statement.expect("Previous check failed.");
+            statement.expect("Previous check failed.");
 
         let mut analyzer = CompositionQueryAnalyzer::default();
         analyzer.analyze(expr_statement.clone());
@@ -721,17 +710,12 @@ impl Composition {
         &mut self,
         field: String,
     ) -> CompositionResult {
-        let mut visitor =
-            CompositionStatementFinderVisitor::default();
-        flux::ast::walk::walk(
-            &mut visitor,
-            flux::ast::walk::Node::File(&self.file),
-        );
-        if visitor.statement.is_none() {
+        let statement = self.find_composition_statement();
+        if statement.is_none() {
             return Err(());
         }
         let expr_statement =
-            visitor.statement.expect("Previous check failed.");
+            statement.expect("Previous check failed.");
 
         let mut analyzer = CompositionQueryAnalyzer::default();
         analyzer.analyze(expr_statement.clone());
@@ -775,17 +759,12 @@ impl Composition {
         tag_key: String,
         tag_value: String,
     ) -> CompositionResult {
-        let mut visitor =
-            CompositionStatementFinderVisitor::default();
-        flux::ast::walk::walk(
-            &mut visitor,
-            flux::ast::walk::Node::File(&self.file),
-        );
-        if visitor.statement.is_none() {
+        let statement = self.find_composition_statement();
+        if statement.is_none() {
             return Err(());
         }
         let expr_statement =
-            visitor.statement.expect("Previous check failed.");
+            statement.expect("Previous check failed.");
 
         let mut analyzer = CompositionQueryAnalyzer::default();
         analyzer.analyze(expr_statement.clone());
@@ -829,17 +808,12 @@ impl Composition {
         tag_key: String,
         tag_value: String,
     ) -> CompositionResult {
-        let mut visitor =
-            CompositionStatementFinderVisitor::default();
-        flux::ast::walk::walk(
-            &mut visitor,
-            flux::ast::walk::Node::File(&self.file),
-        );
-        if visitor.statement.is_none() {
+        let statement = self.find_composition_statement();
+        if statement.is_none() {
             return Err(());
         }
         let expr_statement =
-            visitor.statement.expect("Previous check failed.");
+            statement.expect("Previous check failed.");
 
         let mut analyzer = CompositionQueryAnalyzer::default();
         analyzer.analyze(expr_statement.clone());
