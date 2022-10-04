@@ -589,18 +589,12 @@ impl Composition {
         let statement = analyzer.build();
 
         if let Some(expr_statement) = visitor.statement {
-            self.file.body = self
-                .file
-                .body
-                .iter()
-                .filter(|statement| match statement {
-                    ast::Statement::Expr(expression) => {
-                        expr_statement != *expression.as_ref()
-                    }
-                    _ => true,
-                })
-                .cloned()
-                .collect();
+            self.file.body.retain(|statement| match statement {
+                ast::Statement::Expr(expression) => {
+                    expr_statement != *expression.as_ref()
+                }
+                _ => true,
+            });
         }
 
         self.file.body.insert(
@@ -640,18 +634,12 @@ impl Composition {
         }
         let statement = analyzer.build();
 
-        self.file.body = self
-            .file
-            .body
-            .iter()
-            .filter(|statement| match statement {
-                ast::Statement::Expr(expression) => {
-                    expr_statement != *expression.as_ref()
-                }
-                _ => true,
-            })
-            .cloned()
-            .collect();
+        self.file.body.retain(|statement| match statement {
+            ast::Statement::Expr(expression) => {
+                expr_statement != *expression.as_ref()
+            }
+            _ => true,
+        });
 
         self.file.body.insert(
             0,
@@ -691,18 +679,12 @@ impl Composition {
         }
         let statement = analyzer.build();
 
-        self.file.body = self
-            .file
-            .body
-            .iter()
-            .filter(|statement| match statement {
-                ast::Statement::Expr(expression) => {
-                    expr_statement != *expression.as_ref()
-                }
-                _ => true,
-            })
-            .cloned()
-            .collect();
+        self.file.body.retain(|statement| match statement {
+            ast::Statement::Expr(expression) => {
+                expr_statement != *expression.as_ref()
+            }
+            _ => true,
+        });
 
         self.file.body.insert(
             0,
@@ -744,18 +726,12 @@ impl Composition {
         }
         let statement = analyzer.build();
 
-        self.file.body = self
-            .file
-            .body
-            .iter()
-            .filter(|statement| match statement {
-                ast::Statement::Expr(expression) => {
-                    expr_statement != *expression.as_ref()
-                }
-                _ => true,
-            })
-            .cloned()
-            .collect();
+        self.file.body.retain(|statement| match statement {
+            ast::Statement::Expr(expression) => {
+                expr_statement != *expression.as_ref()
+            }
+            _ => true,
+        });
 
         self.file.body.insert(
             0,
@@ -798,18 +774,12 @@ impl Composition {
         }
         let statement = analyzer.build();
 
-        self.file.body = self
-            .file
-            .body
-            .iter()
-            .filter(|statement| match statement {
-                ast::Statement::Expr(expression) => {
-                    expr_statement != *expression.as_ref()
-                }
-                _ => true,
-            })
-            .cloned()
-            .collect();
+        self.file.body.retain(|statement| match statement {
+            ast::Statement::Expr(expression) => {
+                expr_statement != *expression.as_ref()
+            }
+            _ => true,
+        });
 
         self.file.body.insert(
             0,
@@ -853,18 +823,12 @@ impl Composition {
         }
         let statement = analyzer.build();
 
-        self.file.body = self
-            .file
-            .body
-            .iter()
-            .filter(|statement| match statement {
-                ast::Statement::Expr(expression) => {
-                    expr_statement != *expression.as_ref()
-                }
-                _ => true,
-            })
-            .cloned()
-            .collect();
+        self.file.body.retain(|statement| match statement {
+            ast::Statement::Expr(expression) => {
+                expr_statement != *expression.as_ref()
+            }
+            _ => true,
+        });
 
         self.file.body.insert(
             0,
