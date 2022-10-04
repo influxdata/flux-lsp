@@ -1430,7 +1430,7 @@ x + 1
         result,
         Some(lsp::Hover {
             contents: lsp::HoverContents::Scalar(
-                lsp::MarkedString::String("type: int".to_string())
+                lsp::MarkedString::String("int".to_string())
             ),
             range: None,
         })
@@ -1484,7 +1484,7 @@ x + 1
             contents: lsp::HoverContents::Markup(
                 lsp::MarkupContent {
                     kind: lsp::MarkupKind::Markdown,
-                    value: String::from("```flux\ntype: int\n```")
+                    value: String::from("```flux\nint\n```")
                 }
             ),
             range: None,
@@ -1511,7 +1511,7 @@ option option_ = 123
         result,
         Some(lsp::Hover {
             contents: lsp::HoverContents::Scalar(
-                lsp::MarkedString::String("type: string".to_string())
+                lsp::MarkedString::String("string".to_string())
             ),
             range: None,
         })
@@ -1527,7 +1527,7 @@ option option_ = 123
         Some(lsp::Hover {
             contents: lsp::HoverContents::Scalar(
                 lsp::MarkedString::String(
-                    "type: (v: A) => A where A: Numeric".to_string()
+                    "(v: A) => A where A: Numeric".to_string()
                 )
             ),
             range: None,
@@ -1543,7 +1543,7 @@ option option_ = 123
         result,
         Some(lsp::Hover {
             contents: lsp::HoverContents::Scalar(
-                lsp::MarkedString::String("type: int".to_string())
+                lsp::MarkedString::String("int".to_string())
             ),
             range: None,
         })
@@ -1566,7 +1566,7 @@ async fn test_hover_argument() {
         result,
         Some(lsp::Hover {
             contents: lsp::HoverContents::Scalar(
-                lsp::MarkedString::String("type: int".to_string())
+                lsp::MarkedString::String("int".to_string())
             ),
             range: None,
         })
@@ -1591,7 +1591,7 @@ y = f(x: 1)
         result,
         Some(lsp::Hover {
             contents: lsp::HoverContents::Scalar(
-                lsp::MarkedString::String("type: int".to_string())
+                lsp::MarkedString::String("int".to_string())
             ),
             range: None,
         })
@@ -1615,7 +1615,7 @@ async fn test_hover_record_property() {
         result,
         Some(lsp::Hover {
             contents: lsp::HoverContents::Scalar(
-                lsp::MarkedString::String("type: string".to_string())
+                lsp::MarkedString::String("string".to_string())
             ),
             range: None,
         })
@@ -1641,7 +1641,7 @@ x = 1
         result,
         Some(lsp::Hover {
             contents: lsp::HoverContents::Scalar(
-                lsp::MarkedString::String("type: int".to_string())
+                lsp::MarkedString::String("int".to_string())
             ),
             range: None,
         })
@@ -1666,7 +1666,7 @@ f = (x) => x + x
         Some(lsp::Hover {
             contents: lsp::HoverContents::Scalar(
                 lsp::MarkedString::String(
-                    "type: A where A: Addable".to_string()
+                    "A where A: Addable".to_string()
                 )
             ),
             range: None,

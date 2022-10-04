@@ -1036,14 +1036,14 @@ impl LanguageServer for LspServer {
                             lsp::MarkupContent {
                                 kind: lsp::MarkupKind::Markdown,
                                 value: format!(
-                                    "```flux\ntype: {}\n```",
+                                    "```flux\n{}\n```",
                                     typ
                                 ),
                             },
                         ),
                         false => lsp::HoverContents::Scalar(
                             lsp::MarkedString::String(format!(
-                                "type: {}",
+                                "{}",
                                 typ
                             )),
                         ),
