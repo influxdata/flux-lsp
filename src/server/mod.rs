@@ -3,7 +3,7 @@ mod store;
 mod types;
 
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, RwLock};
 
 use flux::ast::walk::Node as AstNode;
 use flux::ast::{self, Expression as AstExpression};
@@ -158,6 +158,7 @@ pub struct LspServer {
     diagnostics: Vec<Diagnostic>,
     store: store::Store,
     state: Mutex<LspServerState>,
+    client_capabilities: RwLock<lsp::ClientCapabilities>,
 }
 
 impl LspServer {
@@ -172,6 +173,9 @@ impl LspServer {
             ],
             store: store::Store::default(),
             state: Mutex::new(LspServerState::default()),
+            client_capabilities: RwLock::new(
+                lsp::ClientCapabilities::default(),
+            ),
         }
     }
 
@@ -376,8 +380,15 @@ impl LspServer {
 impl LanguageServer for LspServer {
     async fn initialize(
         &self,
-        _: lsp::InitializeParams,
+        params: lsp::InitializeParams,
     ) -> RpcResult<lsp::InitializeResult> {
+        match self.client_capabilities.write() {
+            Ok(mut client_capabilities) => {
+                *client_capabilities = params.capabilities;
+            }
+            Err(err) => log::error!("{}", err),
+        }
+
         Ok(lsp::InitializeResult {
             capabilities: lsp::ServerCapabilities {
                 call_hierarchy_provider: None,
@@ -993,13 +1004,50 @@ impl LanguageServer for LspServer {
                     _ => None,
                 });
             if let Some(typ) = hover_type {
+                let supports_markdown = match self
+                    .client_capabilities
+                    .read()
+                {
+                    Ok(client_capabilities) => {
+                        if let Some(text_document) =
+                            (*client_capabilities)
+                                .text_document
+                                .as_ref()
+                        {
+                            if let Some(hover) =
+                                text_document.hover.as_ref()
+                            {
+                                hover.content_format.as_ref().map_or(false, |formats| formats.contains(&lsp::MarkupKind::Markdown))
+                            } else {
+                                false
+                            }
+                        } else {
+                            false
+                        }
+                    }
+                    Err(err) => {
+                        log::error!("{}", err);
+                        false
+                    }
+                };
+                let hover_contents: lsp::HoverContents =
+                    match supports_markdown {
+                        true => lsp::HoverContents::Markup(
+                            lsp::MarkupContent {
+                                kind: lsp::MarkupKind::Markdown,
+                                value: format!(
+                                    "```flux\n{}\n```",
+                                    typ
+                                ),
+                            },
+                        ),
+                        false => lsp::HoverContents::Scalar(
+                            lsp::MarkedString::String(typ),
+                        ),
+                    };
+
                 return Ok(Some(lsp::Hover {
-                    contents: lsp::HoverContents::Scalar(
-                        lsp::MarkedString::String(format!(
-                            "type: {}",
-                            typ
-                        )),
-                    ),
+                    contents: hover_contents,
                     range: None,
                 }));
             }
