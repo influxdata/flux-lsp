@@ -1042,9 +1042,7 @@ impl LanguageServer for LspServer {
                             },
                         ),
                         false => lsp::HoverContents::Scalar(
-                            lsp::MarkedString::String(
-                                typ.to_string(),
-                            ),
+                            lsp::MarkedString::String(typ),
                         ),
                     };
 
