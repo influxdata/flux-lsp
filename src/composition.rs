@@ -943,7 +943,9 @@ query1 = from(bucket: "an-composition")
 
     #[test]
     fn test_query_analyzer() {
-        let fluxscript = r#"from(bucket: "an-composition")
+        let fluxscript = r#"import "lib"
+
+from(bucket: "an-composition")
 |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
 |> filter(fn: (r) => r._measurement == "myMeasurement")
 |> filter(fn: (r) => r._field == "myField" || r._field == "myOtherField")
@@ -1037,6 +1039,35 @@ from(bucket: "my-bucket") |> yield(name: "my-result")
 
         assert_eq!(
             r#"from(bucket: "an-composition")
+    |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+    |> yield(name: "_editor_composition")
+"#
+            .to_string(),
+            composition.to_string()
+        );
+    }
+
+    /// Initializing composition on a file which has import statements on first lines.
+    #[test]
+    fn composition_initialize_import_statement() {
+        let fluxscript = r#"import "lib""#;
+        let ast = flux::parser::parse_string("".into(), &fluxscript);
+
+        let mut composition = Composition::new(ast);
+
+        composition
+            .initialize(
+                String::from("an-composition"),
+                None,
+                None,
+                None,
+            )
+            .unwrap();
+
+        assert_eq!(
+            r#"import "lib"
+
+from(bucket: "an-composition")
     |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
     |> yield(name: "_editor_composition")
 "#
@@ -1144,6 +1175,35 @@ from(bucket: "my-bucket") |> yield(name: "my-result")
         assert!(composition
             .add_measurement(String::from("myMeasurement"))
             .is_err());
+    }
+
+    /// Modify existing composition, while retaining import statements on first lines.
+    #[test]
+    fn composition_add_measurement_import_statement() {
+        let fluxscript = r#"import "lib"
+
+from(bucket: "an-composition")
+    |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+    |> yield(name: "_editor_composition")
+"#;
+        let ast = flux::parser::parse_string("".into(), &fluxscript);
+        let mut composition = Composition::new(ast);
+
+        composition
+            .add_measurement(String::from("myMeasurement"))
+            .unwrap();
+
+        assert_eq!(
+            r#"import "lib"
+
+from(bucket: "an-composition")
+    |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+    |> filter(fn: (r) => r._measurement == "myMeasurement")
+    |> yield(name: "_editor_composition")
+"#
+            .to_string(),
+            composition.to_string()
+        );
     }
 
     #[test]
