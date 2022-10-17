@@ -312,6 +312,13 @@ macro_rules! pipe {
             call: $b,
         }
     };
+    ($a:expr, $b:expr, $base_node: expr) => {
+        ast::PipeExpr {
+            argument: $a,
+            base: $base_node,
+            call: $b,
+        }
+    };
 }
 
 /// Analyze a query, understanding the various filters applied.
@@ -324,6 +331,7 @@ struct CompositionQueryAnalyzer {
     measurement: Option<String>,
     fields: Vec<String>,
     tag_values: Vec<(String, String)>, // (TagName, TagValue)
+    start_position: ast::Position,
 }
 
 impl CompositionQueryAnalyzer {
@@ -381,7 +389,17 @@ impl CompositionQueryAnalyzer {
                 )
             )));
         }
-        pipe!(inner, yield_!())
+        let base_node = ast::BaseNode {
+            errors: vec![],
+            comments: vec![],
+            location: ast::SourceLocation {
+                start: self.start_position, // retain start location of existing composition
+                end: ast::Position::default(), // will not use
+                file: None,
+                source: None,
+            },
+        };
+        pipe!(inner, yield_!(), base_node)
     }
 }
 
@@ -446,6 +464,16 @@ impl<'a> ast::walk::Visitor<'a> for CompositionQueryAnalyzer {
                             },
                         }
                         }
+                    }
+                }
+            }
+            ast::walk::Node::PipeExpr(pipe_expr) => {
+                if let ast::Expression::Identifier(identifier) =
+                    &pipe_expr.call.callee
+                {
+                    if identifier.name == "yield" {
+                        self.start_position =
+                            pipe_expr.base.location.start
                     }
                 }
             }
@@ -531,7 +559,9 @@ impl Composition {
         Self { file }
     }
 
-    pub(crate) fn composition_string(&self) -> Option<String> {
+    pub(crate) fn composition_string(
+        &self,
+    ) -> Option<(String, (ast::Position, ast::Position))> {
         let mut visitor =
             CompositionStatementFinderVisitor::default();
         flux::ast::walk::walk(
@@ -548,11 +578,32 @@ impl Composition {
                 imports: vec![],
                 eof: vec![],
                 body: vec![ast::Statement::Expr(Box::new(
-                    expr_statement,
+                    expr_statement.to_owned(),
                 ))],
             };
-            match flux::formatter::convert_to_string(&file) {
-                Ok(text) => return Some(text),
+            match (
+                flux::formatter::convert_to_string(&file),
+                &expr_statement.expression,
+            ) {
+                (Ok(text), ast::Expression::PipeExpr(pipe_expr)) => {
+                    let start_pos = pipe_expr.base.location.start;
+                    let (line_size, _) =
+                        line_col::LineColLookup::new(&text)
+                            .get(text.len());
+
+                    return Some((
+                        text,
+                        (
+                            start_pos,
+                            ast::Position {
+                                line: start_pos.line
+                                    + line_size as u32
+                                    - 1, // don't double count startLine
+                                column: 1,
+                            },
+                        ),
+                    ));
+                }
                 _ => return None,
             }
         }
@@ -577,22 +628,50 @@ impl Composition {
             flux::ast::walk::Node::File(&self.file),
         );
 
+        // How to choose start position, in order of precedence:
+        //     1. position of previous composition
+        //     2. before all existing statements
+        //     3. if no stmts, then after imports are done
+        let mut start_position = match (
+            self.file.body.first(),
+            self.file.imports.last(),
+        ) {
+            (Some(stmt), _) => stmt.base().location.start,
+            (None, Some(import)) => ast::Position {
+                line: import.base.location.end.line + 1,
+                column: 0,
+            },
+            _ => ast::Position::default(),
+        };
+
+        if let Some(expr_statement) = visitor.statement {
+            self.file.body = self
+                .file
+                .body
+                .iter()
+                .filter(|statement| match statement {
+                    ast::Statement::Expr(expression) => {
+                        if expr_statement == *expression.as_ref() {
+                            start_position =
+                                expression.base.location.start;
+                            return false;
+                        }
+                        true
+                    }
+                    _ => true,
+                })
+                .cloned()
+                .collect();
+        }
+
         let mut analyzer = CompositionQueryAnalyzer {
             bucket,
             measurement,
             fields: fields.unwrap_or_default(),
             tag_values: tag_values.unwrap_or_default(),
+            start_position,
         };
         let statement = analyzer.build();
-
-        if let Some(expr_statement) = visitor.statement {
-            self.file.body.retain(|statement| match statement {
-                ast::Statement::Expr(expression) => {
-                    expr_statement != *expression.as_ref()
-                }
-                _ => true,
-            });
-        }
 
         self.file.body.insert(
             0,
@@ -848,24 +927,39 @@ mod tests {
     #[test]
     fn test_composition_string() {
         let fluxscript = r#"from(bucket: "an-composition")
-|> yield(name: "_editor_composition")
+    |> yield(name: "_editor_composition")
 
 from(bucket: "an-composition")
-|> yield(name: "_another_id")
+    |> yield(name: "_another_id")
 "#;
         let ast = flux::parser::parse_string("".into(), &fluxscript);
         let composition = Composition::new(ast);
+        let (composition_string, range_pos) =
+            composition.composition_string().unwrap();
 
-        assert_eq!("from(bucket: \"an-composition\")\n    |> yield(name: \"_editor_composition\")\n".to_string(), composition.composition_string().unwrap());
+        assert_eq!(
+            r#"from(bucket: "an-composition")
+    |> yield(name: "_editor_composition")
+"#
+            .to_string(),
+            composition_string
+        );
+        assert_eq!(
+            (
+                ast::Position { line: 1, column: 1 },
+                ast::Position { line: 3, column: 1 }
+            ),
+            range_pos,
+        );
     }
 
     #[test]
     fn test_composition_string_not_found() {
         let fluxscript = r#"from(bucket: "an-composition")
-|> yield(name: "_not_a_composition")
+    |> yield(name: "_not_a_composition")
 
 from(bucket: "an-composition")
-|> yield(name: "_another_id")
+    |> yield(name: "_another_id")
 "#;
         let ast = flux::parser::parse_string("".into(), &fluxscript);
         let composition = Composition::new(ast);
@@ -875,21 +969,115 @@ from(bucket: "an-composition")
 
     #[test]
     fn test_composition_string_only_returns_composition() {
-        let fluxscript = r#"from(bucket: "an-composition")
-|> yield(name: "_editor_composition")
+        let fluxscript = r#"import "lib"
+from(bucket: "an-composition")
+    |> yield(name: "_editor_composition")
 
 query1 = from(bucket: "an-composition")
 "#;
         let ast = flux::parser::parse_string("".into(), &fluxscript);
         let composition = Composition::new(ast);
+        let (composition_string, range_pos) =
+            composition.composition_string().unwrap();
 
-        assert_eq!("from(bucket: \"an-composition\")\n    |> yield(name: \"_editor_composition\")\n".to_string(), composition.composition_string().unwrap());
+        assert_eq!(
+            r#"from(bucket: "an-composition")
+    |> yield(name: "_editor_composition")
+"#
+            .to_string(),
+            composition_string
+        );
+        assert_eq!(
+            (
+                ast::Position { line: 2, column: 1 },
+                ast::Position { line: 4, column: 1 }
+            ),
+            range_pos,
+        );
+    }
+
+    #[test]
+    fn test_composition_string_will_return_initialized_composition() {
+        let fluxscript = r#"import "lib"
+query1 = from(bucket: "an-composition")
+"#;
+        let ast = flux::parser::parse_string("".into(), &fluxscript);
+        let mut composition = Composition::new(ast);
+        composition
+            .initialize(
+                String::from("myBucket"),
+                Some(String::from("myMeasurement")),
+                None,
+                None,
+            )
+            .unwrap();
+        let (composition_string, range_pos) =
+            composition.composition_string().unwrap();
+
+        assert_eq!(
+            r#"from(bucket: "myBucket")
+    |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+    |> filter(fn: (r) => r._measurement == "myMeasurement")
+    |> yield(name: "_editor_composition")
+"#
+            .to_string(),
+            composition_string
+        );
+        assert_eq!(
+            (
+                ast::Position { line: 2, column: 1 },
+                ast::Position { line: 6, column: 1 }
+            ),
+            range_pos,
+        );
+    }
+
+    #[test]
+    fn test_composition_string_will_return_reset_composition() {
+        let fluxscript = r#"import "lib"
+from(bucket: "myBucket")
+    |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+    |> filter(fn: (r) => r._measurement == "myMeasurement")
+    |> yield(name: "_editor_composition")
+
+query1 = from(bucket: "an-composition")
+"#;
+        let ast = flux::parser::parse_string("".into(), &fluxscript);
+        let mut composition = Composition::new(ast);
+        composition
+            .initialize(
+                String::from("myBucket"),
+                Some(String::from("myMeasurement")),
+                None,
+                None,
+            )
+            .unwrap();
+        let (composition_string, range_pos) =
+            composition.composition_string().unwrap();
+
+        assert_eq!(
+            r#"from(bucket: "myBucket")
+    |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+    |> filter(fn: (r) => r._measurement == "myMeasurement")
+    |> yield(name: "_editor_composition")
+"#
+            .to_string(),
+            composition_string
+        );
+        assert_eq!(
+            (
+                ast::Position { line: 2, column: 1 },
+                ast::Position { line: 6, column: 1 }
+            ),
+            range_pos,
+        );
     }
 
     #[test]
     fn test_composition_string_will_return_updated_composition() {
-        let fluxscript = r#"from(bucket: "an-composition")
-|> yield(name: "_editor_composition")
+        let fluxscript = r#"import "lib"
+from(bucket: "an-composition")
+    |> yield(name: "_editor_composition")
 
 query1 = from(bucket: "an-composition")
 "#;
@@ -898,8 +1086,25 @@ query1 = from(bucket: "an-composition")
         composition
             .add_measurement(String::from("myMeasurement"))
             .unwrap();
+        let (composition_string, range_pos) =
+            composition.composition_string().unwrap();
 
-        assert_eq!("from(bucket: \"an-composition\")\n    |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n    |> filter(fn: (r) => r._measurement == \"myMeasurement\")\n    |> yield(name: \"_editor_composition\")\n".to_string(), composition.composition_string().unwrap());
+        assert_eq!(
+            r#"from(bucket: "an-composition")
+    |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+    |> filter(fn: (r) => r._measurement == "myMeasurement")
+    |> yield(name: "_editor_composition")
+"#
+            .to_string(),
+            composition_string
+        );
+        assert_eq!(
+            (
+                ast::Position { line: 2, column: 1 },
+                ast::Position { line: 6, column: 1 }
+            ),
+            range_pos,
+        );
     }
 
     #[test]

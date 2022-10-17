@@ -1474,26 +1474,25 @@ impl LanguageServer for LspServer {
                     .composition_string()
                     .expect("bad composition state");
 
-                // index 0 is line 1, char 1 for line_col::LineColLookup.
-                // Will need to convert to zero indexing for applyEdit. (Range is zero indexed.)
-                // https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#range
                 let last_pos = match old_text {
-                    Some(text) => line_col::LineColLookup::new(&text)
-                        .get(text.len()),
-                    None => line_col::LineColLookup::new(&new_text)
-                        .get(new_text.len()),
+                    Some((_, range_pos)) => range_pos,
+                    // applyEdit insertion point should be at Postion.start for new_text
+                    None => (new_text.1 .0, new_text.1 .1),
                 };
 
                 let edit = lsp::WorkspaceEdit {
                     changes: Some(HashMap::from([(
                         command_params.text_document.uri.clone(),
                         vec![lsp::TextEdit {
-                            new_text: new_text.clone(),
+                            new_text: new_text.0.clone(),
                             range: lsp::Range {
-                                start: lsp::Position::default(),
+                                start: lsp::Position {
+                                    line: last_pos.0.line,
+                                    character: last_pos.0.column,
+                                },
                                 end: lsp::Position {
-                                    line: last_pos.0 as u32 - 1,
-                                    character: last_pos.1 as u32 - 1,
+                                    line: last_pos.1.line,
+                                    character: last_pos.1.column,
                                 },
                             },
                         }],
@@ -1557,26 +1556,27 @@ impl LanguageServer for LspServer {
                     .composition_string()
                     .expect("bad composition state");
 
-                // index 0 is line 1, char 1 for line_col::LineColLookup.
-                // Will need to convert to zero indexing for applyEdit. (Range is zero indexed.)
-                // https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#range
                 let last_pos = match old_text {
-                    Some(text) => line_col::LineColLookup::new(&text)
-                        .get(text.len()),
-                    None => line_col::LineColLookup::new(&new_text)
-                        .get(new_text.len()),
+                    Some((_, range_pos)) => range_pos,
+                    None => (
+                        ast::Position::default(),
+                        ast::Position::default(),
+                    ),
                 };
 
                 let edit = lsp::WorkspaceEdit {
                     changes: Some(HashMap::from([(
                         command_params.text_document.uri.clone(),
                         vec![lsp::TextEdit {
-                            new_text: new_text.clone(),
+                            new_text: new_text.0.clone(),
                             range: lsp::Range {
-                                start: lsp::Position::default(),
+                                start: lsp::Position {
+                                    line: last_pos.0.line,
+                                    character: last_pos.0.column,
+                                },
                                 end: lsp::Position {
-                                    line: last_pos.0 as u32 - 1,
-                                    character: last_pos.1 as u32 - 1,
+                                    line: last_pos.1.line,
+                                    character: last_pos.1.column,
                                 },
                             },
                         }],
@@ -1640,26 +1640,27 @@ impl LanguageServer for LspServer {
                     .composition_string()
                     .expect("bad composition state");
 
-                // index 0 is line 1, char 1 for line_col::LineColLookup.
-                // Will need to convert to zero indexing for applyEdit. (Range is zero indexed.)
-                // https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#range
                 let last_pos = match old_text {
-                    Some(text) => line_col::LineColLookup::new(&text)
-                        .get(text.len()),
-                    None => line_col::LineColLookup::new(&new_text)
-                        .get(new_text.len()),
+                    Some((_, range_pos)) => range_pos,
+                    None => (
+                        ast::Position::default(),
+                        ast::Position::default(),
+                    ),
                 };
 
                 let edit = lsp::WorkspaceEdit {
                     changes: Some(HashMap::from([(
                         command_params.text_document.uri.clone(),
                         vec![lsp::TextEdit {
-                            new_text: new_text.clone(),
+                            new_text: new_text.0.clone(),
                             range: lsp::Range {
-                                start: lsp::Position::default(),
+                                start: lsp::Position {
+                                    line: last_pos.0.line,
+                                    character: last_pos.0.column,
+                                },
                                 end: lsp::Position {
-                                    line: last_pos.0 as u32 - 1,
-                                    character: last_pos.1 as u32 - 1,
+                                    line: last_pos.1.line,
+                                    character: last_pos.1.column,
                                 },
                             },
                         }],
@@ -1723,26 +1724,27 @@ impl LanguageServer for LspServer {
                     .composition_string()
                     .expect("bad composition state");
 
-                // index 0 is line 1, char 1 for line_col::LineColLookup.
-                // Will need to convert to zero indexing for applyEdit. (Range is zero indexed.)
-                // https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#range
                 let last_pos = match old_text {
-                    Some(text) => line_col::LineColLookup::new(&text)
-                        .get(text.len()),
-                    None => line_col::LineColLookup::new(&new_text)
-                        .get(new_text.len()),
+                    Some((_, range_pos)) => range_pos,
+                    None => (
+                        ast::Position::default(),
+                        ast::Position::default(),
+                    ),
                 };
 
                 let edit = lsp::WorkspaceEdit {
                     changes: Some(HashMap::from([(
                         command_params.text_document.uri.clone(),
                         vec![lsp::TextEdit {
-                            new_text: new_text.clone(),
+                            new_text: new_text.0.clone(),
                             range: lsp::Range {
-                                start: lsp::Position::default(),
+                                start: lsp::Position {
+                                    line: last_pos.0.line,
+                                    character: last_pos.0.column,
+                                },
                                 end: lsp::Position {
-                                    line: last_pos.0 as u32 - 1,
-                                    character: last_pos.1 as u32 - 1,
+                                    line: last_pos.1.line,
+                                    character: last_pos.1.column,
                                 },
                             },
                         }],
@@ -1808,26 +1810,27 @@ impl LanguageServer for LspServer {
                     .composition_string()
                     .expect("bad composition state");
 
-                // index 0 is line 1, char 1 for line_col::LineColLookup.
-                // Will need to convert to zero indexing for applyEdit. (Range is zero indexed.)
-                // https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#range
                 let last_pos = match old_text {
-                    Some(text) => line_col::LineColLookup::new(&text)
-                        .get(text.len()),
-                    None => line_col::LineColLookup::new(&new_text)
-                        .get(new_text.len()),
+                    Some((_, range_pos)) => range_pos,
+                    None => (
+                        ast::Position::default(),
+                        ast::Position::default(),
+                    ),
                 };
 
                 let edit = lsp::WorkspaceEdit {
                     changes: Some(HashMap::from([(
                         command_params.text_document.uri.clone(),
                         vec![lsp::TextEdit {
-                            new_text: new_text.clone(),
+                            new_text: new_text.0.clone(),
                             range: lsp::Range {
-                                start: lsp::Position::default(),
+                                start: lsp::Position {
+                                    line: last_pos.0.line,
+                                    character: last_pos.0.column,
+                                },
                                 end: lsp::Position {
-                                    line: last_pos.0 as u32 - 1,
-                                    character: last_pos.1 as u32 - 1,
+                                    line: last_pos.1.line,
+                                    character: last_pos.1.column,
                                 },
                             },
                         }],
@@ -1893,26 +1896,27 @@ impl LanguageServer for LspServer {
                     .composition_string()
                     .expect("bad composition state");
 
-                // index 0 is line 1, char 1 for line_col::LineColLookup.
-                // Will need to convert to zero indexing for applyEdit. (Range is zero indexed.)
-                // https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#range
                 let last_pos = match old_text {
-                    Some(text) => line_col::LineColLookup::new(&text)
-                        .get(text.len()),
-                    None => line_col::LineColLookup::new(&new_text)
-                        .get(new_text.len()),
+                    Some((_, range_pos)) => range_pos,
+                    None => (
+                        ast::Position::default(),
+                        ast::Position::default(),
+                    ),
                 };
 
                 let edit = lsp::WorkspaceEdit {
                     changes: Some(HashMap::from([(
                         command_params.text_document.uri.clone(),
                         vec![lsp::TextEdit {
-                            new_text: new_text.clone(),
+                            new_text: new_text.0.clone(),
                             range: lsp::Range {
-                                start: lsp::Position::default(),
+                                start: lsp::Position {
+                                    line: last_pos.0.line,
+                                    character: last_pos.0.column,
+                                },
                                 end: lsp::Position {
-                                    line: last_pos.0 as u32 - 1,
-                                    character: last_pos.1 as u32 - 1,
+                                    line: last_pos.1.line,
+                                    character: last_pos.1.column,
                                 },
                             },
                         }],
