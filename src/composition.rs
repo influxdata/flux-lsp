@@ -208,9 +208,6 @@ fn chained_binary_eq_expr(
 }
 
 macro_rules! filter {
-    ($values:expr, $operator:expr) => {
-        filter!(None, $values, $operator, chained_exists_expr($operator, $values).unwrap())
-    };
     ($key:expr, $values:expr, $operator:expr) => {
         filter!($key, $values, $operator, chained_binary_eq_expr($operator, $key, $values).unwrap())
     };
