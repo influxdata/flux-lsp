@@ -1508,7 +1508,7 @@ impl LanguageServer for LspServer {
                             if response.applied {
                                 self.store.put(
                                     &command_params.text_document.uri,
-                                    &new_text,
+                                    composition.to_string().as_str(),
                                 );
                             }
                         }
@@ -1591,7 +1591,7 @@ impl LanguageServer for LspServer {
                             if response.applied {
                                 self.store.put(
                                     &command_params.text_document.uri,
-                                    &new_text,
+                                    composition.to_string().as_str(),
                                 );
                             }
                         }
@@ -1674,7 +1674,7 @@ impl LanguageServer for LspServer {
                             if response.applied {
                                 self.store.put(
                                     &command_params.text_document.uri,
-                                    &new_text,
+                                    composition.to_string().as_str(),
                                 );
                             }
                         }
@@ -1757,7 +1757,7 @@ impl LanguageServer for LspServer {
                             if response.applied {
                                 self.store.put(
                                     &command_params.text_document.uri,
-                                    &new_text,
+                                    composition.to_string().as_str(),
                                 );
                             }
                         }
@@ -1842,7 +1842,7 @@ impl LanguageServer for LspServer {
                             if response.applied {
                                 self.store.put(
                                     &command_params.text_document.uri,
-                                    &new_text,
+                                    composition.to_string().as_str(),
                                 );
                             }
                         }
@@ -1927,7 +1927,7 @@ impl LanguageServer for LspServer {
                             if response.applied {
                                 self.store.put(
                                     &command_params.text_document.uri,
-                                    &new_text,
+                                    composition.to_string().as_str(),
                                 );
                             }
                         }
