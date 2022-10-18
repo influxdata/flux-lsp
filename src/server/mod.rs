@@ -1506,14 +1506,7 @@ impl LanguageServer for LspServer {
 
                 if let Some(client) = self.get_client() {
                     match client.apply_edit(edit, None).await {
-                        Ok(response) => {
-                            if response.applied {
-                                self.store.put(
-                                    &command_params.text_document.uri,
-                                    composition.to_string().as_str(),
-                                );
-                            }
-                        }
+                        Ok(_) => {}
                         Err(err) => {
                             return Err(LspError::InternalError(
                                 format!("{:?}", err),
@@ -1593,14 +1586,7 @@ impl LanguageServer for LspServer {
 
                 if let Some(client) = self.get_client() {
                     match client.apply_edit(edit, None).await {
-                        Ok(response) => {
-                            if response.applied {
-                                self.store.put(
-                                    &command_params.text_document.uri,
-                                    composition.to_string().as_str(),
-                                );
-                            }
-                        }
+                        Ok(_) => {}
                         Err(err) => {
                             return Err(LspError::InternalError(
                                 format!("{:?}", err),
@@ -1680,14 +1666,7 @@ impl LanguageServer for LspServer {
 
                 if let Some(client) = self.get_client() {
                     match client.apply_edit(edit, None).await {
-                        Ok(response) => {
-                            if response.applied {
-                                self.store.put(
-                                    &command_params.text_document.uri,
-                                    composition.to_string().as_str(),
-                                );
-                            }
-                        }
+                        Ok(_) => {}
                         Err(err) => {
                             return Err(LspError::InternalError(
                                 format!("{:?}", err),
@@ -1767,14 +1746,7 @@ impl LanguageServer for LspServer {
 
                 if let Some(client) = self.get_client() {
                     match client.apply_edit(edit, None).await {
-                        Ok(response) => {
-                            if response.applied {
-                                self.store.put(
-                                    &command_params.text_document.uri,
-                                    composition.to_string().as_str(),
-                                );
-                            }
-                        }
+                        Ok(_) => {}
                         Err(err) => {
                             return Err(LspError::InternalError(
                                 format!("{:?}", err),
@@ -1856,14 +1828,7 @@ impl LanguageServer for LspServer {
 
                 if let Some(client) = self.get_client() {
                     match client.apply_edit(edit, None).await {
-                        Ok(response) => {
-                            if response.applied {
-                                self.store.put(
-                                    &command_params.text_document.uri,
-                                    composition.to_string().as_str(),
-                                );
-                            }
-                        }
+                        Ok(_) => {}
                         Err(err) => {
                             return Err(LspError::InternalError(
                                 format!("{:?}", err),
@@ -1945,14 +1910,7 @@ impl LanguageServer for LspServer {
 
                 if let Some(client) = self.get_client() {
                     match client.apply_edit(edit, None).await {
-                        Ok(response) => {
-                            if response.applied {
-                                self.store.put(
-                                    &command_params.text_document.uri,
-                                    composition.to_string().as_str(),
-                                );
-                            }
-                        }
+                        Ok(_) => {}
                         Err(err) => {
                             return Err(LspError::InternalError(
                                 format!("{:?}", err),
