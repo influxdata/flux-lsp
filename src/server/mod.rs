@@ -1455,7 +1455,7 @@ impl LanguageServer for LspServer {
                 )?;
                 let mut composition =
                     composition::Composition::new(file);
-                let old_text = composition.composition_string();
+                let old_text = composition.source_location();
 
                 let status = composition.initialize(
                     command_params.bucket,
@@ -1471,20 +1471,23 @@ impl LanguageServer for LspServer {
                     .into());
                 }
                 let new_text = composition
-                    .composition_string()
+                    .source_location()
                     .expect("bad composition state");
 
                 let last_pos = match old_text {
-                    Some((_, range_pos)) => range_pos,
-                    // applyEdit insertion point should be at Postion.start for new_text
-                    None => (new_text.1 .0, new_text.1 .1),
+                    Some(ast::SourceLocation {
+                        start, end, ..
+                    }) => (start, end),
+                    // This is the initialize() method, which is the only place where we may not have old_text.
+                    // In that case --> the new_text has the position we should use.
+                    None => (new_text.start, new_text.end),
                 };
 
                 let edit = lsp::WorkspaceEdit {
                     changes: Some(HashMap::from([(
                         command_params.text_document.uri.clone(),
                         vec![lsp::TextEdit {
-                            new_text: new_text.0.clone(),
+                            new_text: new_text.source.expect("composition source_location is missing the source"),
                             range: lsp::Range {
                                 start: lsp::Position {
                                     line: last_pos.0.line,
@@ -1541,7 +1544,7 @@ impl LanguageServer for LspServer {
                 )?;
                 let mut composition =
                     composition::Composition::new(file);
-                let old_text = composition.composition_string();
+                let old_text = composition.source_location();
 
                 let status =
                     composition.add_measurement(command_params.value);
@@ -1553,11 +1556,14 @@ impl LanguageServer for LspServer {
                     .into());
                 }
                 let new_text = composition
-                    .composition_string()
+                    .source_location()
                     .expect("bad composition state");
 
                 let last_pos = match old_text {
-                    Some((_, range_pos)) => range_pos,
+                    Some(ast::SourceLocation {
+                        start, end, ..
+                    }) => (start, end),
+                    // applyEdit insertion point should be at Postion.start for new_text
                     None => (
                         ast::Position::default(),
                         ast::Position::default(),
@@ -1568,7 +1574,7 @@ impl LanguageServer for LspServer {
                     changes: Some(HashMap::from([(
                         command_params.text_document.uri.clone(),
                         vec![lsp::TextEdit {
-                            new_text: new_text.0.clone(),
+                            new_text: new_text.source.expect("composition source_location is missing the source"),
                             range: lsp::Range {
                                 start: lsp::Position {
                                     line: last_pos.0.line,
@@ -1625,7 +1631,7 @@ impl LanguageServer for LspServer {
                 )?;
                 let mut composition =
                     composition::Composition::new(file);
-                let old_text = composition.composition_string();
+                let old_text = composition.source_location();
 
                 let status =
                     composition.add_field(command_params.value);
@@ -1637,11 +1643,14 @@ impl LanguageServer for LspServer {
                     .into());
                 }
                 let new_text = composition
-                    .composition_string()
+                    .source_location()
                     .expect("bad composition state");
 
                 let last_pos = match old_text {
-                    Some((_, range_pos)) => range_pos,
+                    Some(ast::SourceLocation {
+                        start, end, ..
+                    }) => (start, end),
+                    // applyEdit insertion point should be at Postion.start for new_text
                     None => (
                         ast::Position::default(),
                         ast::Position::default(),
@@ -1652,7 +1661,7 @@ impl LanguageServer for LspServer {
                     changes: Some(HashMap::from([(
                         command_params.text_document.uri.clone(),
                         vec![lsp::TextEdit {
-                            new_text: new_text.0.clone(),
+                            new_text: new_text.source.expect("composition source_location is missing the source"),
                             range: lsp::Range {
                                 start: lsp::Position {
                                     line: last_pos.0.line,
@@ -1709,7 +1718,7 @@ impl LanguageServer for LspServer {
                 )?;
                 let mut composition =
                     composition::Composition::new(file);
-                let old_text = composition.composition_string();
+                let old_text = composition.source_location();
 
                 let status =
                     composition.remove_field(command_params.value);
@@ -1721,11 +1730,14 @@ impl LanguageServer for LspServer {
                     .into());
                 }
                 let new_text = composition
-                    .composition_string()
+                    .source_location()
                     .expect("bad composition state");
 
                 let last_pos = match old_text {
-                    Some((_, range_pos)) => range_pos,
+                    Some(ast::SourceLocation {
+                        start, end, ..
+                    }) => (start, end),
+                    // applyEdit insertion point should be at Postion.start for new_text
                     None => (
                         ast::Position::default(),
                         ast::Position::default(),
@@ -1736,7 +1748,7 @@ impl LanguageServer for LspServer {
                     changes: Some(HashMap::from([(
                         command_params.text_document.uri.clone(),
                         vec![lsp::TextEdit {
-                            new_text: new_text.0.clone(),
+                            new_text: new_text.source.expect("composition source_location is missing the source"),
                             range: lsp::Range {
                                 start: lsp::Position {
                                     line: last_pos.0.line,
@@ -1793,7 +1805,7 @@ impl LanguageServer for LspServer {
                 )?;
                 let mut composition =
                     composition::Composition::new(file);
-                let old_text = composition.composition_string();
+                let old_text = composition.source_location();
 
                 let status = composition.add_tag_value(
                     command_params.tag,
@@ -1807,11 +1819,14 @@ impl LanguageServer for LspServer {
                     .into());
                 }
                 let new_text = composition
-                    .composition_string()
+                    .source_location()
                     .expect("bad composition state");
 
                 let last_pos = match old_text {
-                    Some((_, range_pos)) => range_pos,
+                    Some(ast::SourceLocation {
+                        start, end, ..
+                    }) => (start, end),
+                    // applyEdit insertion point should be at Postion.start for new_text
                     None => (
                         ast::Position::default(),
                         ast::Position::default(),
@@ -1822,7 +1837,7 @@ impl LanguageServer for LspServer {
                     changes: Some(HashMap::from([(
                         command_params.text_document.uri.clone(),
                         vec![lsp::TextEdit {
-                            new_text: new_text.0.clone(),
+                            new_text: new_text.source.expect("composition source_location is missing the source"),
                             range: lsp::Range {
                                 start: lsp::Position {
                                     line: last_pos.0.line,
@@ -1879,7 +1894,7 @@ impl LanguageServer for LspServer {
                 )?;
                 let mut composition =
                     composition::Composition::new(file);
-                let old_text = composition.composition_string();
+                let old_text = composition.source_location();
 
                 let status = composition.remove_tag_value(
                     command_params.tag,
@@ -1893,11 +1908,14 @@ impl LanguageServer for LspServer {
                     .into());
                 }
                 let new_text = composition
-                    .composition_string()
+                    .source_location()
                     .expect("bad composition state");
 
                 let last_pos = match old_text {
-                    Some((_, range_pos)) => range_pos,
+                    Some(ast::SourceLocation {
+                        start, end, ..
+                    }) => (start, end),
+                    // applyEdit insertion point should be at Postion.start for new_text
                     None => (
                         ast::Position::default(),
                         ast::Position::default(),
@@ -1908,7 +1926,7 @@ impl LanguageServer for LspServer {
                     changes: Some(HashMap::from([(
                         command_params.text_document.uri.clone(),
                         vec![lsp::TextEdit {
-                            new_text: new_text.0.clone(),
+                            new_text: new_text.source.expect("composition source_location is missing the source"),
                             range: lsp::Range {
                                 start: lsp::Position {
                                     line: last_pos.0.line,

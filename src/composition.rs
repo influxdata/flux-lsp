@@ -559,9 +559,9 @@ impl Composition {
         Self { file }
     }
 
-    pub(crate) fn composition_string(
+    pub(crate) fn source_location(
         &self,
-    ) -> Option<(String, (ast::Position, ast::Position))> {
+    ) -> Option<ast::SourceLocation> {
         let mut visitor =
             CompositionStatementFinderVisitor::default();
         flux::ast::walk::walk(
@@ -578,7 +578,7 @@ impl Composition {
                 imports: vec![],
                 eof: vec![],
                 body: vec![ast::Statement::Expr(Box::new(
-                    expr_statement.to_owned(),
+                    expr_statement.clone(),
                 ))],
             };
             match (
@@ -591,18 +591,16 @@ impl Composition {
                         line_col::LineColLookup::new(&text)
                             .get(text.len());
 
-                    return Some((
-                        text,
-                        (
-                            start_pos,
-                            ast::Position {
-                                line: start_pos.line
-                                    + line_size as u32
-                                    - 1, // don't double count startLine
-                                column: 1,
-                            },
-                        ),
-                    ));
+                    return Some(ast::SourceLocation {
+                        start: start_pos,
+                        end: ast::Position {
+                            line: start_pos.line + line_size as u32
+                                - 1, // don't double count startLine
+                            column: 1,
+                        },
+                        source: Some(text),
+                        file: None,
+                    });
                 }
                 _ => return None,
             }
@@ -925,46 +923,45 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_composition_string() {
+    fn test_source_location() {
         let fluxscript = r#"from(bucket: "an-composition")
-    |> yield(name: "_editor_composition")
+|> yield(name: "_editor_composition")
 
 from(bucket: "an-composition")
-    |> yield(name: "_another_id")
+|> yield(name: "_another_id")
 "#;
         let ast = flux::parser::parse_string("".into(), &fluxscript);
         let composition = Composition::new(ast);
-        let (composition_string, range_pos) =
-            composition.composition_string().unwrap();
+        let source_location = composition.source_location().unwrap();
 
         assert_eq!(
-            r#"from(bucket: "an-composition")
+            ast::SourceLocation {
+                file: None,
+                source: Some(
+                    r#"from(bucket: "an-composition")
     |> yield(name: "_editor_composition")
 "#
-            .to_string(),
-            composition_string
-        );
-        assert_eq!(
-            (
-                ast::Position { line: 1, column: 1 },
-                ast::Position { line: 3, column: 1 }
-            ),
-            range_pos,
+                    .to_string()
+                ),
+                start: ast::Position { line: 1, column: 1 },
+                end: ast::Position { line: 3, column: 1 }
+            },
+            source_location
         );
     }
 
     #[test]
     fn test_composition_string_not_found() {
         let fluxscript = r#"from(bucket: "an-composition")
-    |> yield(name: "_not_a_composition")
+|> yield(name: "_not_a_composition")
 
 from(bucket: "an-composition")
-    |> yield(name: "_another_id")
+|> yield(name: "_another_id")
 "#;
         let ast = flux::parser::parse_string("".into(), &fluxscript);
         let composition = Composition::new(ast);
 
-        assert!(composition.composition_string().is_none());
+        assert!(composition.source_location().is_none());
     }
 
     #[test]
@@ -977,22 +974,21 @@ query1 = from(bucket: "an-composition")
 "#;
         let ast = flux::parser::parse_string("".into(), &fluxscript);
         let composition = Composition::new(ast);
-        let (composition_string, range_pos) =
-            composition.composition_string().unwrap();
+        let source_location = composition.source_location().unwrap();
 
         assert_eq!(
-            r#"from(bucket: "an-composition")
+            ast::SourceLocation {
+                file: None,
+                source: Some(
+                    r#"from(bucket: "an-composition")
     |> yield(name: "_editor_composition")
 "#
-            .to_string(),
-            composition_string
-        );
-        assert_eq!(
-            (
-                ast::Position { line: 2, column: 1 },
-                ast::Position { line: 4, column: 1 }
-            ),
-            range_pos,
+                    .to_string()
+                ),
+                start: ast::Position { line: 2, column: 1 },
+                end: ast::Position { line: 4, column: 1 }
+            },
+            source_location
         );
     }
 
@@ -1011,24 +1007,23 @@ query1 = from(bucket: "an-composition")
                 None,
             )
             .unwrap();
-        let (composition_string, range_pos) =
-            composition.composition_string().unwrap();
+        let source_location = composition.source_location().unwrap();
 
         assert_eq!(
-            r#"from(bucket: "myBucket")
+            ast::SourceLocation {
+                file: None,
+                source: Some(
+                    r#"from(bucket: "myBucket")
     |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
     |> filter(fn: (r) => r._measurement == "myMeasurement")
     |> yield(name: "_editor_composition")
 "#
-            .to_string(),
-            composition_string
-        );
-        assert_eq!(
-            (
-                ast::Position { line: 2, column: 1 },
-                ast::Position { line: 6, column: 1 }
-            ),
-            range_pos,
+                    .to_string()
+                ),
+                start: ast::Position { line: 2, column: 1 },
+                end: ast::Position { line: 6, column: 1 }
+            },
+            source_location
         );
     }
 
@@ -1052,24 +1047,23 @@ query1 = from(bucket: "an-composition")
                 None,
             )
             .unwrap();
-        let (composition_string, range_pos) =
-            composition.composition_string().unwrap();
+        let source_location = composition.source_location().unwrap();
 
         assert_eq!(
-            r#"from(bucket: "myBucket")
+            ast::SourceLocation {
+                file: None,
+                source: Some(
+                    r#"from(bucket: "myBucket")
     |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
     |> filter(fn: (r) => r._measurement == "myMeasurement")
     |> yield(name: "_editor_composition")
 "#
-            .to_string(),
-            composition_string
-        );
-        assert_eq!(
-            (
-                ast::Position { line: 2, column: 1 },
-                ast::Position { line: 6, column: 1 }
-            ),
-            range_pos,
+                    .to_string()
+                ),
+                start: ast::Position { line: 2, column: 1 },
+                end: ast::Position { line: 6, column: 1 }
+            },
+            source_location
         );
     }
 
@@ -1086,24 +1080,23 @@ query1 = from(bucket: "an-composition")
         composition
             .add_measurement(String::from("myMeasurement"))
             .unwrap();
-        let (composition_string, range_pos) =
-            composition.composition_string().unwrap();
+        let source_location = composition.source_location().unwrap();
 
         assert_eq!(
-            r#"from(bucket: "an-composition")
+            ast::SourceLocation {
+                file: None,
+                source: Some(
+                    r#"from(bucket: "an-composition")
     |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
     |> filter(fn: (r) => r._measurement == "myMeasurement")
     |> yield(name: "_editor_composition")
 "#
-            .to_string(),
-            composition_string
-        );
-        assert_eq!(
-            (
-                ast::Position { line: 2, column: 1 },
-                ast::Position { line: 6, column: 1 }
-            ),
-            range_pos,
+                    .to_string()
+                ),
+                start: ast::Position { line: 2, column: 1 },
+                end: ast::Position { line: 6, column: 1 }
+            },
+            source_location
         );
     }
 
