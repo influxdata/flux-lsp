@@ -637,7 +637,7 @@ impl Composition {
             (Some(stmt), _) => stmt.base().location.start,
             (None, Some(import)) => ast::Position {
                 line: import.base.location.end.line + 1,
-                column: 0,
+                column: 1,
             },
             _ => ast::Position::default(),
         };
