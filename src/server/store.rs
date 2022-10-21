@@ -32,9 +32,7 @@ fn get_analyzer() -> Result<
         flux::semantic::AnalyzerConfig::default(),
     ) {
         Ok(analyzer) => Ok(analyzer),
-        Err(err) => {
-            return Err(LspError::InternalError(format!("{}", err)))
-        }
+        Err(err) => Err(LspError::InternalError(format!("{}", err))),
     }
 }
 
