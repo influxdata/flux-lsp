@@ -46,38 +46,6 @@ fn node_to_location(
     }
 }
 
-/// Take a lsp::Range that contains a start and end lsp::Position, find the
-/// indexes of those points in the string, and replace that range with a new string.
-fn replace_string_in_range(
-    contents: &str,
-    range: lsp::Range,
-    new: &str,
-) -> String {
-    let mut string_range: (usize, usize) = (0, 0);
-    let lookup = line_col::LineColLookup::new(contents);
-    for i in 0..contents.len() {
-        let linecol = lookup.get(i);
-        if linecol.0 == (range.start.line as usize) + 1
-            && linecol.1 == (range.start.character as usize) + 1
-        {
-            string_range.0 = i;
-        }
-        if linecol.0 == (range.end.line as usize) + 1
-            && linecol.1 == (range.end.character as usize) + 1
-        {
-            string_range.1 = i + 1; // Range is not inclusive.
-            break;
-        }
-    }
-    if string_range.1 < string_range.0 {
-        log::error!("range end not found after range start");
-        return contents.into();
-    }
-    let mut new_contents: String = contents.into();
-    new_contents.replace_range(string_range.0..string_range.1, new);
-    new_contents
-}
-
 fn find_references<'a>(
     uri: &lsp::Url,
     node: Option<flux::semantic::walk::Node<'a>>,
@@ -391,10 +359,7 @@ impl LanguageServer for LspServer {
 
         Ok(lsp::InitializeResult {
             capabilities: lsp::ServerCapabilities {
-                call_hierarchy_provider: None,
                 code_action_provider: Some(lsp::CodeActionProviderCapability::Simple(true)),
-                code_lens_provider: None,
-                color_provider: None,
                 completion_provider: Some(lsp::CompletionOptions {
                     resolve_provider: None,
                     trigger_characters: Some(vec![
@@ -410,7 +375,6 @@ impl LanguageServer for LspServer {
                             work_done_progress: None,
                         },
                 }),
-                declaration_provider: None,
                 definition_provider: Some(lsp::OneOf::Left(true)),
                 document_formatting_provider: Some(lsp::OneOf::Left(
                     true,
@@ -418,9 +382,6 @@ impl LanguageServer for LspServer {
                 document_highlight_provider: Some(lsp::OneOf::Left(
                     true,
                 )),
-                document_link_provider: None,
-                document_on_type_formatting_provider: None,
-                document_range_formatting_provider: None,
                 document_symbol_provider: Some(lsp::OneOf::Left(
                     true,
                 )),
@@ -430,19 +391,14 @@ impl LanguageServer for LspServer {
                         work_done_progress: None,
                     }
                 }),
-                experimental: None,
                 folding_range_provider: Some(
                     lsp::FoldingRangeProviderCapability::Simple(true),
                 ),
                 hover_provider: Some(
                     lsp::HoverProviderCapability::Simple(true),
                 ),
-                implementation_provider: None,
-                linked_editing_range_provider: None,
-                moniker_provider: None,
                 references_provider: Some(lsp::OneOf::Left(true)),
                 rename_provider: Some(lsp::OneOf::Left(true)),
-                selection_range_provider: None,
                 semantic_tokens_provider: Some(lsp::SemanticTokensServerCapabilities::SemanticTokensOptions(lsp::SemanticTokensOptions{
                     work_done_progress_options: lsp::WorkDoneProgressOptions {
                         work_done_progress: None
@@ -473,9 +429,7 @@ impl LanguageServer for LspServer {
                         lsp::TextDocumentSyncKind::FULL,
                     ),
                 ),
-                type_definition_provider: None,
-                workspace: None,
-                workspace_symbol_provider: None,
+                ..Default::default()
             },
             server_info: Some(lsp::ServerInfo {
                 name: "flux-lsp".to_string(),
@@ -528,17 +482,7 @@ impl LanguageServer for LspServer {
                 let new_contents = params
                     .content_changes
                     .iter()
-                    .fold(value, |acc, change| {
-                        if let Some(range) = change.range {
-                            replace_string_in_range(
-                                &acc,
-                                range,
-                                &change.text,
-                            )
-                        } else {
-                            change.text.clone()
-                        }
-                    });
+                    .fold(value, |_acc, change| change.text.clone());
                 self.store.put(&key, &new_contents.clone());
                 self.publish_diagnostics(&key).await;
             }
