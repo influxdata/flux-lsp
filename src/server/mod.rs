@@ -482,7 +482,7 @@ impl LanguageServer for LspServer {
                 let new_contents = params
                     .content_changes
                     .iter()
-                    .fold(value, |_acc, change| change.text.clone() );
+                    .fold(value, |_acc, change| change.text.clone());
                 self.store.put(&key, &new_contents.clone());
                 self.publish_diagnostics(&key).await;
             }
