@@ -391,10 +391,7 @@ impl LanguageServer for LspServer {
 
         Ok(lsp::InitializeResult {
             capabilities: lsp::ServerCapabilities {
-                call_hierarchy_provider: None,
                 code_action_provider: Some(lsp::CodeActionProviderCapability::Simple(true)),
-                code_lens_provider: None,
-                color_provider: None,
                 completion_provider: Some(lsp::CompletionOptions {
                     resolve_provider: None,
                     trigger_characters: Some(vec![
@@ -410,7 +407,6 @@ impl LanguageServer for LspServer {
                             work_done_progress: None,
                         },
                 }),
-                declaration_provider: None,
                 definition_provider: Some(lsp::OneOf::Left(true)),
                 document_formatting_provider: Some(lsp::OneOf::Left(
                     true,
@@ -418,9 +414,6 @@ impl LanguageServer for LspServer {
                 document_highlight_provider: Some(lsp::OneOf::Left(
                     true,
                 )),
-                document_link_provider: None,
-                document_on_type_formatting_provider: None,
-                document_range_formatting_provider: None,
                 document_symbol_provider: Some(lsp::OneOf::Left(
                     true,
                 )),
@@ -430,19 +423,14 @@ impl LanguageServer for LspServer {
                         work_done_progress: None,
                     }
                 }),
-                experimental: None,
                 folding_range_provider: Some(
                     lsp::FoldingRangeProviderCapability::Simple(true),
                 ),
                 hover_provider: Some(
                     lsp::HoverProviderCapability::Simple(true),
                 ),
-                implementation_provider: None,
-                linked_editing_range_provider: None,
-                moniker_provider: None,
                 references_provider: Some(lsp::OneOf::Left(true)),
                 rename_provider: Some(lsp::OneOf::Left(true)),
-                selection_range_provider: None,
                 semantic_tokens_provider: Some(lsp::SemanticTokensServerCapabilities::SemanticTokensOptions(lsp::SemanticTokensOptions{
                     work_done_progress_options: lsp::WorkDoneProgressOptions {
                         work_done_progress: None
@@ -473,9 +461,7 @@ impl LanguageServer for LspServer {
                         lsp::TextDocumentSyncKind::FULL,
                     ),
                 ),
-                type_definition_provider: None,
-                workspace: None,
-                workspace_symbol_provider: None,
+                ..Default::default()
             },
             server_info: Some(lsp::ServerInfo {
                 name: "flux-lsp".to_string(),
