@@ -887,7 +887,6 @@ impl Composition {
         let mut analyzer = CompositionQueryAnalyzer::default();
         analyzer.analyze(expr_statement.clone());
 
-        let previous_len = analyzer.tag_values[&tag_key].len();
         match analyzer.tag_values.get_mut(&tag_key) {
             Some(tag_values) => {
                 tag_values.retain(|value| value.ne(&tag_value))
@@ -895,6 +894,7 @@ impl Composition {
             None => return Err(()),
         }
 
+        let previous_len = analyzer.tag_values[&tag_key].len();
         if previous_len == analyzer.tag_values[&tag_key].len() {
             return Err(());
         }
