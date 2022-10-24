@@ -46,38 +46,6 @@ fn node_to_location(
     }
 }
 
-/// Take a lsp::Range that contains a start and end lsp::Position, find the
-/// indexes of those points in the string, and replace that range with a new string.
-fn replace_string_in_range(
-    contents: &str,
-    range: lsp::Range,
-    new: &str,
-) -> String {
-    let mut string_range: (usize, usize) = (0, 0);
-    let lookup = line_col::LineColLookup::new(contents);
-    for i in 0..contents.len() {
-        let linecol = lookup.get(i);
-        if linecol.0 == (range.start.line as usize) + 1
-            && linecol.1 == (range.start.character as usize) + 1
-        {
-            string_range.0 = i;
-        }
-        if linecol.0 == (range.end.line as usize) + 1
-            && linecol.1 == (range.end.character as usize) + 1
-        {
-            string_range.1 = i + 1; // Range is not inclusive.
-            break;
-        }
-    }
-    if string_range.1 < string_range.0 {
-        log::error!("range end not found after range start");
-        return contents.into();
-    }
-    let mut new_contents: String = contents.into();
-    new_contents.replace_range(string_range.0..string_range.1, new);
-    new_contents
-}
-
 fn find_references<'a>(
     uri: &lsp::Url,
     node: Option<flux::semantic::walk::Node<'a>>,
@@ -514,17 +482,7 @@ impl LanguageServer for LspServer {
                 let new_contents = params
                     .content_changes
                     .iter()
-                    .fold(value, |acc, change| {
-                        if let Some(range) = change.range {
-                            replace_string_in_range(
-                                &acc,
-                                range,
-                                &change.text,
-                            )
-                        } else {
-                            change.text.clone()
-                        }
-                    });
+                    .fold(value, |_acc, change| change.text.clone() );
                 self.store.put(&key, &new_contents.clone());
                 self.publish_diagnostics(&key).await;
             }
