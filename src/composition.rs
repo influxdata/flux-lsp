@@ -4,6 +4,8 @@
 /// LSP server. It's spec can be found in the docs/ folder of source control.
 ///
 /// This module _only_ operates on an AST. It will never operate on semantic graph.
+use std::collections::HashMap;
+
 use flux::ast;
 
 static YIELD_IDENTIFIER: &str = "_editor_composition";
@@ -326,7 +328,7 @@ struct CompositionQueryAnalyzer {
     bucket: String,
     measurement: Option<String>,
     fields: Vec<String>,
-    tag_values: Vec<(String, String)>, // (TagName, TagValue)
+    tag_values: HashMap<String, Vec<String>>, // [(TagName, [TagValue1s])]
 }
 
 impl CompositionQueryAnalyzer {
@@ -370,19 +372,25 @@ impl CompositionQueryAnalyzer {
         }
 
         if !self.tag_values.is_empty() {
-            let (filter_keys, filter_values) = self
-                .tag_values
-                .iter()
-                .cloned()
-                .unzip::<String, String, Vec<String>, Vec<String>>();
-            inner = ast::Expression::PipeExpr(Box::new(pipe!(
-                inner,
-                filter!(
-                    filter_keys.as_slice(),
-                    filter_values.as_ref(),
-                    ast::LogicalOperator::AndOperator
-                )
-            )));
+            for (tag_key, tag_values) in self.tag_values.iter() {
+                // XXX: Chunchun (10/24/22)
+                // This is a work around for filter! signature
+                let mut filter_keys =
+                    vec!["".to_string(); tag_values.len()];
+                let tag_keys: Vec<String> = filter_keys
+                    .iter_mut()
+                    .map(|_| tag_key.clone())
+                    .collect();
+                print!("{:#?}", tag_keys);
+                inner = ast::Expression::PipeExpr(Box::new(pipe!(
+                    inner,
+                    filter!(
+                        tag_keys.as_slice(),
+                        tag_values.as_ref(),
+                        ast::LogicalOperator::OrOperator
+                    )
+                )));
+            }
         }
         pipe!(inner, yield_!())
     }
@@ -444,7 +452,12 @@ impl<'a> ast::walk::Visitor<'a> for CompositionQueryAnalyzer {
                             _ => {
                                 // Treat these all as tag filters.
                                 if let ast::Expression::StringLit(string_literal) = &binary_expr.right {
-                                    self.tag_values.push((ident.name.clone(), string_literal.value.clone()));
+                                    match self.tag_values.get_mut(&ident.name) {
+                                        Some(tag_value) => tag_value.push(string_literal.value.clone()),
+                                        None => {
+                                            self.tag_values.insert(ident.name.clone(), vec![string_literal.value.clone()]);
+                                        }
+                                    }
                                 }
                             },
                         }
@@ -584,7 +597,26 @@ impl Composition {
             bucket,
             measurement,
             fields: fields.unwrap_or_default(),
-            tag_values: tag_values.unwrap_or_default(),
+            tag_values: if let Some(tag_values) = tag_values {
+                let mut tags: HashMap<String, Vec<String>> =
+                    HashMap::new();
+                tag_values.iter().for_each(|(tag_key, tag_value)| {
+                    match tags.get_mut(tag_key) {
+                        Some(values) => {
+                            values.push(tag_value.clone())
+                        }
+                        None => {
+                            tags.insert(
+                                tag_key.clone(),
+                                vec![tag_value.clone()],
+                            );
+                        }
+                    }
+                });
+                tags
+            } else {
+                HashMap::new()
+            },
         };
         let statement = analyzer.build();
 
@@ -790,11 +822,22 @@ impl Composition {
         let mut analyzer = CompositionQueryAnalyzer::default();
         analyzer.analyze(expr_statement.clone());
 
-        let tag_pair = (tag_key, tag_value);
-        if analyzer.tag_values.contains(&tag_pair) {
+        if analyzer.tag_values.contains_key(&tag_key)
+            && analyzer.tag_values[&tag_key].contains(&tag_value)
+        {
             return Err(());
         } else {
-            analyzer.tag_values.push(tag_pair);
+            match analyzer.tag_values.get_mut(&tag_key) {
+                Some(tag_values) => {
+                    tag_values.push(tag_value.clone())
+                }
+                None => {
+                    analyzer.tag_values.insert(
+                        tag_key.clone(),
+                        vec![tag_value.clone()],
+                    );
+                }
+            }
         }
         let statement = analyzer.build();
 
@@ -844,11 +887,15 @@ impl Composition {
         let mut analyzer = CompositionQueryAnalyzer::default();
         analyzer.analyze(expr_statement.clone());
 
-        let tag_pair = (tag_key, tag_value);
-        let previous_len = analyzer.tag_values.len();
-        analyzer.tag_values.retain(|p| !p.eq(&tag_pair));
+        let previous_len = analyzer.tag_values[&tag_key].len();
+        match analyzer.tag_values.get_mut(&tag_key) {
+            Some(tag_values) => {
+                tag_values.retain(|value| value.ne(&tag_value))
+            }
+            None => return Err(()),
+        }
 
-        if previous_len == analyzer.tag_values.len() {
+        if previous_len == analyzer.tag_values[&tag_key].len() {
             return Err(());
         }
         let statement = analyzer.build();
@@ -882,6 +929,8 @@ impl Composition {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+
     use super::*;
 
     #[test]
@@ -942,15 +991,15 @@ query1 = from(bucket: "an-composition")
     }
 
     #[test]
-    fn test_query_analyzer() {
+    fn test_query_analyzer_analyze() {
         let fluxscript = r#"import "lib"
 
 from(bucket: "an-composition")
 |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
 |> filter(fn: (r) => r._measurement == "myMeasurement")
-|> filter(fn: (r) => r._field == "myField" || r._field == "myOtherField")
+|> filter(fn: (r) => r._field == "myField" or r._field == "myOtherField")
 |> filter(fn: (r) => exists r.anTag)
-|> filter(fn: (r) => r.myTag == "anValue")
+|> filter(fn: (r) => r.myTag == "anValue" or r.myTag == "anotherValue")
 |> filter(fn: (r) => r.myOtherTag == "anotherValue")
 |> filter(fn: (r) => exists r.anotherTag)
 |> yield(name: "_editor_composition")"#;
@@ -975,14 +1024,21 @@ from(bucket: "an-composition")
             analyzer.measurement
         );
         assert_eq!(vec!["myField", "myOtherField"], analyzer.fields);
+        // let mut tags: HashMap<&str, Vec<str>>;
         assert_eq!(
-            vec![
-                ("myTag".to_string(), "anValue".to_string()),
+            HashMap::from([
+                (
+                    "myTag".to_string(),
+                    vec![
+                        "anValue".to_string(),
+                        "anotherValue".to_string(),
+                    ],
+                ),
                 (
                     "myOtherTag".to_string(),
-                    "anotherValue".to_string()
-                )
-            ],
+                    vec!["anotherValue".to_string()],
+                ),
+            ]),
             analyzer.tag_values
         );
     }
@@ -1131,7 +1187,7 @@ from(bucket: "an-composition")
     |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
     |> filter(fn: (r) => r._measurement == "myMeasurement")
     |> filter(fn: (r) => r._field == "myField" or r._field == "myField2")
-    |> filter(fn: (r) => r.myTag == "myTagValue" and r.myTag == "myTagValue2")
+    |> filter(fn: (r) => r.myTag == "myTagValue" or r.myTag == "myTagValue2")
     |> yield(name: "_editor_composition")
 "#
             .to_string(),
