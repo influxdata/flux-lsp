@@ -643,23 +643,17 @@ impl Composition {
         };
 
         if let Some(expr_statement) = visitor.statement {
-            self.file.body = self
-                .file
-                .body
-                .iter()
-                .filter(|statement| match statement {
-                    ast::Statement::Expr(expression) => {
-                        if expr_statement == *expression.as_ref() {
-                            start_position =
-                                expression.base.location.start;
-                            return false;
-                        }
-                        true
+            self.file.body.retain(|statement| match statement {
+                ast::Statement::Expr(expression) => {
+                    if expr_statement == *expression.as_ref() {
+                        start_position =
+                            expression.base.location.start;
+                        return false;
                     }
-                    _ => true,
-                })
-                .cloned()
-                .collect();
+                    true
+                }
+                _ => true,
+            });
         }
 
         let mut analyzer = CompositionQueryAnalyzer {
