@@ -381,7 +381,6 @@ impl CompositionQueryAnalyzer {
                     .iter_mut()
                     .map(|_| tag_key.clone())
                     .collect();
-                print!("{:#?}", tag_keys);
                 inner = ast::Expression::PipeExpr(Box::new(pipe!(
                     inner,
                     filter!(
@@ -887,17 +886,32 @@ impl Composition {
         let mut analyzer = CompositionQueryAnalyzer::default();
         analyzer.analyze(expr_statement.clone());
 
-        match analyzer.tag_values.get_mut(&tag_key) {
-            Some(tag_values) => {
-                tag_values.retain(|value| value.ne(&tag_value))
-            }
-            None => return Err(()),
-        }
-
-        let previous_len = analyzer.tag_values[&tag_key].len();
-        if previous_len == analyzer.tag_values[&tag_key].len() {
+        if !analyzer.tag_values.contains_key(&tag_key) {
             return Err(());
         }
+
+        let previous_len: usize = analyzer.tag_values[&tag_key].len();
+
+        match analyzer.tag_values.get_mut(&tag_key) {
+            Some(tag_values) => {
+                tag_values.retain(|value| value.ne(&tag_value));
+
+                // remove the tag key if the tag values is an empty vec
+                if tag_values.is_empty() {
+                    analyzer.tag_values.remove(&tag_key);
+                }
+            }
+            None => {
+                return Err(());
+            }
+        }
+
+        if analyzer.tag_values.contains_key(&tag_key)
+            && previous_len == analyzer.tag_values[&tag_key].len()
+        {
+            return Err(());
+        }
+
         let statement = analyzer.build();
 
         self.file.body = self
@@ -1573,7 +1587,9 @@ from(bucket: "an-composition")
         let fluxscript = r#"from(bucket: "an-composition")
         |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
         |> filter(fn: (r) => r._measurement == "anMeasurement")
-        |> filter(fn: (r) => r.tagKey1 == "tagValue1" and r.tagKey2 == "tagValue2" and r.tagKey3 == "tagValue3")
+        |> filter(fn: (r) => r.tagKey1 == "tagValue1")
+        |> filter(fn: (r) => r.tagKey2 == "tagValue2")
+        |> filter(fn: (r) => r.tagKey3 == "tagValue3")
         |> yield(name: "_editor_composition")
     "#;
         let ast = flux::parser::parse_string("".into(), &fluxscript);
@@ -1591,7 +1607,8 @@ from(bucket: "an-composition")
             r#"from(bucket: "an-composition")
     |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
     |> filter(fn: (r) => r._measurement == "anMeasurement")
-    |> filter(fn: (r) => r.tagKey1 == "tagValue1" and r.tagKey3 == "tagValue3")
+    |> filter(fn: (r) => r.tagKey1 == "tagValue1")
+    |> filter(fn: (r) => r.tagKey3 == "tagValue3")
     |> yield(name: "_editor_composition")
 "#
             .to_string(),
