@@ -7,6 +7,8 @@ pub enum LspError {
     FileNotFound(String),
     InvalidArguments(Vec<serde_json::value::Value>),
     InvalidCommand(String),
+
+    CompositionNotFound(lspower::lsp::Url),
 }
 
 impl From<LspError> for Error {
@@ -40,6 +42,15 @@ impl From<LspError> for Error {
                 message: format!(
                     "Unknown command execution: {}",
                     command
+                ),
+                data: None,
+            },
+
+            LspError::CompositionNotFound(uri) => Error {
+                code: ErrorCode::InvalidParams,
+                message: format!(
+                    "Composition not found for uri: {}",
+                    uri
                 ),
                 data: None,
             },
