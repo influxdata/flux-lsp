@@ -1643,7 +1643,8 @@ from(bucket: "an-composition")
         let fluxscript = r#"from(bucket: "an-composition")
         |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
         |> filter(fn: (r) => r._measurement == "anMeasurement")
-        |> filter(fn: (r) => r.tagKey1 == "tagValue1" and r.tagKey3 == "tagValue3")
+        |> filter(fn: (r) => r.tagKey1 == "tagValue1")
+        |> filter(fn: (r) => r.tagKey3 == "tagValue3")
         |> yield(name: "_editor_composition")
     "#;
         let ast = flux::parser::parse_string("".into(), &fluxscript);
