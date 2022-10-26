@@ -1621,6 +1621,38 @@ from(bucket: "an-composition")
     }
 
     #[test]
+    fn composition_add_tag_value_with_old_and() {
+        let fluxscript = r#"from(bucket: "an-composition")
+        |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+        |> filter(fn: (r) => r._measurement == "anMeasurement")
+        |> filter(fn: (r) => r.tagKey1 == "tagValue1" and r.tagKey1 == "tagValue2" and r.tagKey2 == "tagValue1")
+        |> yield(name: "_editor_composition")
+    "#;
+        let ast = flux::parser::parse_string("".into(), &fluxscript);
+
+        let mut composition = Composition::new(ast);
+        // DON'T INITIALIZE THIS! WE'RE SIMULATING AN ALREADY INITIALIZED QUERY.
+        composition
+            .add_tag_value(
+                String::from("tagKey2"),
+                String::from("tagValue2"),
+            )
+            .unwrap();
+
+        assert_eq!(
+            r#"from(bucket: "an-composition")
+    |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+    |> filter(fn: (r) => r._measurement == "anMeasurement")
+    |> filter(fn: (r) => r.tagKey1 == "tagValue1" or r.tagKey1 == "tagValue2")
+    |> filter(fn: (r) => r.tagKey2 == "tagValue1" or r.tagKey2 == "tagValue2")
+    |> yield(name: "_editor_composition")
+"#
+            .to_string(),
+            composition.to_string()
+        )
+    }
+
+    #[test]
     fn composition_remove_tag_value() {
         let fluxscript = r#"from(bucket: "an-composition")
         |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
@@ -1705,5 +1737,37 @@ from(bucket: "an-composition")
                 String::from("tagValue2")
             )
             .is_err());
+    }
+
+    #[test]
+    fn composition_remove_tag_value_with_old_and() {
+        let fluxscript = r#"from(bucket: "an-composition")
+        |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+        |> filter(fn: (r) => r._measurement == "anMeasurement")
+        |> filter(fn: (r) => r.tagKey1 == "tagValue1" and r.tagKey1 == "tagValue2" and r.tagKey2 == "tagValue")
+        |> yield(name: "_editor_composition")
+    "#;
+        let ast = flux::parser::parse_string("".into(), &fluxscript);
+
+        let mut composition = Composition::new(ast);
+        // DON'T INITIALIZE THIS! WE'RE SIMULATING AN ALREADY INITIALIZED QUERY.
+        composition
+            .remove_tag_value(
+                String::from("tagKey1"),
+                String::from("tagValue2"),
+            )
+            .unwrap();
+
+        assert_eq!(
+            r#"from(bucket: "an-composition")
+    |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+    |> filter(fn: (r) => r._measurement == "anMeasurement")
+    |> filter(fn: (r) => r.tagKey1 == "tagValue1")
+    |> filter(fn: (r) => r.tagKey2 == "tagValue")
+    |> yield(name: "_editor_composition")
+"#
+            .to_string(),
+            composition.to_string()
+        )
     }
 }
