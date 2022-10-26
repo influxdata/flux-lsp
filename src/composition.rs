@@ -1073,6 +1073,60 @@ from(bucket: "an-composition")
         );
     }
 
+    #[test]
+    fn test_query_analyzer_build() {
+        let fluxscript = r#""#;
+        let ast = flux::parser::parse_string("".into(), &fluxscript);
+
+        let mut composition = Composition::new(ast);
+
+        composition
+            .initialize(
+                "an-composition".to_string(),
+                Some(String::from("myMeasurement")),
+                Some(vec![
+                    "myField".to_string(),
+                    "myOtherField".to_string(),
+                ]),
+                Some(vec![
+                    ("myTag".to_string(), "anValue".to_string()),
+                    ("myTag".to_string(), "anotherValue".to_string()),
+                    (
+                        "myOtherTag".to_string(),
+                        "anotherValue".to_string(),
+                    ),
+                    (
+                        "myOldTag1".to_string(),
+                        "myOldTagValue1".to_string(),
+                    ),
+                    (
+                        "myOldTag1".to_string(),
+                        "myOldTagValue2".to_string(),
+                    ),
+                    (
+                        "myOldTag2".to_string(),
+                        "myOldTagValue".to_string(),
+                    ),
+                ]),
+            )
+            .unwrap();
+
+        assert_eq!(
+            r#"from(bucket: "an-composition")
+    |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+    |> filter(fn: (r) => r._measurement == "myMeasurement")
+    |> filter(fn: (r) => r._field == "myField" or r._field == "myOtherField")
+    |> filter(fn: (r) => r.myTag == "anValue" or r.myTag == "anotherValue")
+    |> filter(fn: (r) => r.myOtherTag == "anotherValue")
+    |> filter(fn: (r) => r.myOldTag1 == "myOldTagValue1" or r.myOldTag1 == "myOldTagValue2")
+    |> filter(fn: (r) => r.myOldTag2 == "myOldTagValue")
+    |> yield(name: "_editor_composition")
+"#
+            .to_string(),
+            composition.to_string()
+        );
+    }
+
     /// Initializing composition for a file will add a composition-owned statement
     /// that will be the statement that filters will be added/removed.
     #[test]
