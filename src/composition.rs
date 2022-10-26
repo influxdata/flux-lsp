@@ -845,15 +845,13 @@ impl Composition {
             return Err(());
         } else {
             match analyzer.tag_values.get_mut(&tag_key) {
-                Some(tag_values) => {
-                    tag_values.push(tag_value.clone())
-                }
+                Some(tag_values) => tag_values.push(tag_value),
                 None => {
                     analyzer.tag_values.insert(
                         tag_key.clone(),
                         vec![tag_value.clone()],
                     );
-                    analyzer.tag_keys_order.push(tag_key.clone());
+                    analyzer.tag_keys_order.push(tag_key);
                 }
             }
         }
