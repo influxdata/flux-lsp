@@ -326,7 +326,7 @@ struct CompositionQueryAnalyzer {
     bucket: String,
     measurement: Option<String>,
     fields: Vec<String>,
-    tag_values: Vec<(String, Vec<String>)>, // [(TagName, [TagValue1s])]
+    tag_values: Vec<(String, Vec<String>)>, // [(TagName, [TagValues])]
 }
 
 impl CompositionQueryAnalyzer {
