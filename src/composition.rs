@@ -847,10 +847,9 @@ impl Composition {
             match analyzer.tag_values.get_mut(&tag_key) {
                 Some(tag_values) => tag_values.push(tag_value),
                 None => {
-                    analyzer.tag_values.insert(
-                        tag_key.clone(),
-                        vec![tag_value.clone()],
-                    );
+                    analyzer
+                        .tag_values
+                        .insert(tag_key.clone(), vec![tag_value]);
                     analyzer.tag_keys_order.push(tag_key);
                 }
             }
