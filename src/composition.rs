@@ -1020,6 +1020,7 @@ from(bucket: "an-composition")
 |> filter(fn: (r) => exists r.anTag)
 |> filter(fn: (r) => r.myTag == "anValue" or r.myTag == "anotherValue")
 |> filter(fn: (r) => r.myOtherTag == "anotherValue")
+|> filter(fn: (r) => r.myOldTag1 == "myOldTagValue1" and r.myOldTag1 == "myOldTagValue2" and r.myOldTag2 == "myOldTagValue")
 |> filter(fn: (r) => exists r.anotherTag)
 |> yield(name: "_editor_composition")"#;
         let ast = flux::parser::parse_string("".into(), &fluxscript);
@@ -1055,6 +1056,17 @@ from(bucket: "an-composition")
                 (
                     "myOtherTag".to_string(),
                     vec!["anotherValue".to_string()],
+                ),
+                (
+                    "myOldTag1".to_string(),
+                    vec![
+                        "myOldTagValue1".to_string(),
+                        "myOldTagValue2".to_string(),
+                    ]
+                ),
+                (
+                    "myOldTag2".to_string(),
+                    vec!["myOldTagValue".to_string()]
                 ),
             ],
             analyzer.tag_values
