@@ -4,8 +4,6 @@
 /// LSP server. It's spec can be found in the docs/ folder of source control.
 ///
 /// This module _only_ operates on an AST. It will never operate on semantic graph.
-use std::collections::HashMap;
-
 use flux::ast;
 
 static YIELD_IDENTIFIER: &str = "_editor_composition";
@@ -328,8 +326,7 @@ struct CompositionQueryAnalyzer {
     bucket: String,
     measurement: Option<String>,
     fields: Vec<String>,
-    tag_values: HashMap<String, Vec<String>>, // [(TagName, [TagValue1s])]
-    tag_keys_order: Vec<String>, // used to keep track of the order for tag keys
+    tag_values: Vec<(String, Vec<String>)>, // [(TagName, [TagValue1s])]
 }
 
 impl CompositionQueryAnalyzer {
@@ -373,10 +370,9 @@ impl CompositionQueryAnalyzer {
         }
 
         if !self.tag_values.is_empty() {
-            for tag_key in self.tag_keys_order.iter() {
+            for (tag_key, tag_values) in self.tag_values.iter() {
                 // XXX: Chunchun (10/24/22)
                 // This is a work around for filter! signature
-                let tag_values = self.tag_values[tag_key].clone();
                 let mut filter_keys =
                     vec!["".to_string(); tag_values.len()];
                 let tag_keys: Vec<String> = filter_keys
@@ -453,14 +449,18 @@ impl<'a> ast::walk::Visitor<'a> for CompositionQueryAnalyzer {
                             _ => {
                                 // Treat these all as tag filters.
                                 if let ast::Expression::StringLit(string_literal) = &binary_expr.right {
-                                    match self.tag_values.get_mut(&ident.name) {
-                                        Some(tag_value) => {
-                                            tag_value.push(string_literal.value.clone());
-                                        },
-                                        None => {
-                                            self.tag_values.insert(ident.name.clone(), vec![string_literal.value.clone()]);
-                                            self.tag_keys_order.push(ident.name.clone());
+                                    let mut inserted = false;
+                                    for (i, (tag_key, _)) in self.tag_values.iter().enumerate() {
+                                        if tag_key == &ident.name {
+                                            self.tag_values[i].1.push(string_literal.value.clone());
+                                            inserted = true;
+                                            break;
                                         }
+                                    }
+                                    if !inserted {
+                                        self.tag_values.push((
+                                            ident.name.clone(), vec![string_literal.value.clone()]
+                                        ));
                                     }
                                 }
                             },
@@ -601,36 +601,25 @@ impl Composition {
             bucket,
             measurement,
             fields: fields.unwrap_or_default(),
-            tag_values: if let Some(tag_values) = tag_values.clone() {
-                let mut tags: HashMap<String, Vec<String>> =
-                    HashMap::new();
+            tag_values: if let Some(tag_values) = tag_values {
+                let mut tags: Vec<(String, Vec<String>)> = vec![];
                 tag_values.iter().for_each(|(tag_key, tag_value)| {
-                    match tags.get_mut(tag_key) {
-                        Some(values) => {
-                            values.push(tag_value.clone())
+                    let mut inserted = false;
+                    for (i, (tk, _)) in tags.iter().enumerate() {
+                        if tag_key == tk {
+                            tags[i].1.push(tag_value.clone());
+                            inserted = true;
+                            break;
                         }
-                        None => {
-                            tags.insert(
-                                tag_key.clone(),
-                                vec![tag_value.clone()],
-                            );
-                        }
+                    }
+                    if !inserted {
+                        tags.push((
+                            tag_key.clone(),
+                            vec![tag_value.clone()],
+                        ));
                     }
                 });
                 tags
-            } else {
-                HashMap::new()
-            },
-            tag_keys_order: if let Some(tag_values) = tag_values {
-                let mut tag_keys: Vec<String> = vec![];
-                tag_values.iter().for_each(|(tag_key, _)| {
-                    if tag_keys.contains(tag_key) {
-                        // do nothing
-                    } else {
-                        tag_keys.push(tag_key.clone());
-                    }
-                });
-                tag_keys
             } else {
                 vec![]
             },
@@ -839,19 +828,22 @@ impl Composition {
         let mut analyzer = CompositionQueryAnalyzer::default();
         analyzer.analyze(expr_statement.clone());
 
-        if analyzer.tag_values.contains_key(&tag_key)
-            && analyzer.tag_values[&tag_key].contains(&tag_value)
-        {
+        if analyzer.tag_values.iter().any(|(tk, tvs)| {
+            tk == &tag_key && tvs.contains(&tag_value)
+        }) {
             return Err(());
         } else {
-            match analyzer.tag_values.get_mut(&tag_key) {
-                Some(tag_values) => tag_values.push(tag_value),
-                None => {
-                    analyzer
-                        .tag_values
-                        .insert(tag_key.clone(), vec![tag_value]);
-                    analyzer.tag_keys_order.push(tag_key);
+            let mut inserted = false;
+            for (i, (tk, _)) in analyzer.tag_values.iter().enumerate()
+            {
+                if tk == &tag_key {
+                    analyzer.tag_values[i].1.push(tag_value.clone());
+                    inserted = true;
+                    break;
                 }
+            }
+            if !inserted {
+                analyzer.tag_values.push((tag_key, vec![tag_value]));
             }
         }
         let statement = analyzer.build();
@@ -902,32 +894,28 @@ impl Composition {
         let mut analyzer = CompositionQueryAnalyzer::default();
         analyzer.analyze(expr_statement.clone());
 
-        if !analyzer.tag_values.contains_key(&tag_key) {
-            return Err(());
-        }
-
-        let previous_len: usize = analyzer.tag_values[&tag_key].len();
-
-        match analyzer.tag_values.get_mut(&tag_key) {
-            Some(tag_values) => {
-                tag_values.retain(|value| value != &tag_value);
-
-                // remove the tag key if the tag values is an empty vec
-                if tag_values.is_empty() {
-                    analyzer.tag_values.remove(&tag_key);
-                    analyzer
-                        .tag_keys_order
-                        .retain(|key| key != &tag_key);
+        let mut tag_key_exist = false;
+        for (i, (tk, tvs)) in analyzer.tag_values.iter().enumerate() {
+            if tk == &tag_key {
+                let previous_len: usize = tvs.clone().len();
+                tag_key_exist = true;
+                analyzer.tag_values[i]
+                    .1
+                    .retain(|value| value != &tag_value);
+                if previous_len == analyzer.tag_values[i].1.len() {
+                    return Err(());
                 }
-            }
-            None => {
-                return Err(());
+                // remove the tag key if the tag values is an empty vec
+                if analyzer.tag_values[i].1.is_empty() {
+                    analyzer
+                        .tag_values
+                        .retain(|(key, _)| key != &tag_key);
+                }
+                break;
             }
         }
 
-        if analyzer.tag_values.contains_key(&tag_key)
-            && previous_len == analyzer.tag_values[&tag_key].len()
-        {
+        if !tag_key_exist {
             return Err(());
         }
 
@@ -962,8 +950,6 @@ impl Composition {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
-
     use super::*;
 
     #[test]
@@ -1057,9 +1043,8 @@ from(bucket: "an-composition")
             analyzer.measurement
         );
         assert_eq!(vec!["myField", "myOtherField"], analyzer.fields);
-        // let mut tags: HashMap<&str, Vec<str>>;
         assert_eq!(
-            HashMap::from([
+            vec![
                 (
                     "myTag".to_string(),
                     vec![
@@ -1071,7 +1056,7 @@ from(bucket: "an-composition")
                     "myOtherTag".to_string(),
                     vec!["anotherValue".to_string()],
                 ),
-            ]),
+            ],
             analyzer.tag_values
         );
     }
