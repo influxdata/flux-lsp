@@ -182,28 +182,6 @@ async fn test_did_change_multiple() {
 }
 
 #[test]
-async fn test_did_save() {
-    let server = create_server();
-    open_file(
-        &server,
-        r#"from(bucket: "test") |> count()"#.to_string(),
-        None,
-    )
-    .await;
-
-    let uri = lsp::Url::parse("file:///home/user/file.flux").unwrap();
-
-    let params = lsp::DidSaveTextDocumentParams {
-        text_document: lsp::TextDocumentIdentifier::new(uri.clone()),
-        text: Some(r#"from(bucket: "test2")"#.to_string()),
-    };
-    server.did_save(params).await;
-
-    let contents = server.store.get(&uri).unwrap();
-    assert_eq!(r#"from(bucket: "test2")"#.to_string(), contents);
-}
-
-#[test]
 async fn test_did_close() {
     let server = create_server();
     open_file(&server, "from(".to_string(), None).await;
