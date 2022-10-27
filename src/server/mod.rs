@@ -425,8 +425,12 @@ impl LanguageServer for LspServer {
                     },
                 ),
                 text_document_sync: Some(
-                    lsp::TextDocumentSyncCapability::Kind(
-                        lsp::TextDocumentSyncKind::FULL,
+                    lsp::TextDocumentSyncCapability::Options(
+                        lsp::TextDocumentSyncOptions {
+                            open_close: Some(true),
+                            change: Some(lsp::TextDocumentSyncKind::FULL),
+                            ..Default::default()
+                        }
                     ),
                 ),
                 ..Default::default()
@@ -491,17 +495,6 @@ impl LanguageServer for LspServer {
                 key,
                 err
             ),
-        }
-    }
-
-    async fn did_save(
-        &self,
-        params: lsp::DidSaveTextDocumentParams,
-    ) -> () {
-        if let Some(text) = params.text {
-            let key = params.text_document.uri;
-            self.store.put(&key, &text);
-            self.publish_diagnostics(&key).await;
         }
     }
 
