@@ -5,6 +5,7 @@
 ///
 /// This module _only_ operates on an AST. It will never operate on semantic graph.
 use flux::ast;
+use itertools::Itertools;
 
 macro_rules! from {
     ($bucket_name:expr) => {
@@ -206,11 +207,8 @@ fn chained_binary_eq_expr(
 }
 
 macro_rules! filter {
-    ($values:expr, $operator:expr) => {
-        filter!(None, $values, $operator, chained_exists_expr($operator, $values).unwrap())
-    };
     ($key:expr, $values:expr, $operator:expr) => {
-        filter!($key, $values, $operator, chained_binary_eq_expr($operator, $key, $values).unwrap())
+        filter!($key, $values, $operator, chained_binary_eq_expr($operator, $key, $values).expect("chained_binary_eq_expr failed"))
     };
     ($key:expr, $values:expr, $operator:expr, $funBody:expr) => {
         ast::CallExpr {
@@ -332,19 +330,19 @@ impl CompositionStatementAnalyzer {
         }
 
         if !self.tag_values.is_empty() {
-            let (filter_keys, filter_values) = self
-                .tag_values
-                .iter()
-                .cloned()
-                .unzip::<String, String, Vec<String>, Vec<String>>();
-            inner = pipe!(
-                ast::Expression::PipeExpr(Box::new(inner)),
-                filter!(
-                    filter_keys.as_slice(),
-                    filter_values.as_ref(),
-                    ast::LogicalOperator::AndOperator
-                )
-            );
+            let tags = self.tag_values.iter().map(|(key, _value)| key).unique().collect::<Vec<&String>>();
+            tags.iter().for_each(|tag| {
+                let tag = tag.to_string();
+                let values = self.tag_values.iter().filter(|(key, _value)| key == &tag).map(|(_key, value)| value.to_string()).collect::<Vec<String>>();
+                inner = pipe!(
+                    ast::Expression::PipeExpr(Box::new(inner.clone())),
+                    filter!(
+                        vec![tag; values.len()].as_slice(),
+                        values.as_ref(),
+                        ast::LogicalOperator::OrOperator
+                    )
+                );
+            });
         }
         for call_expression in self.calls.iter() {
             inner = pipe!(
@@ -685,7 +683,8 @@ mod tests {
     |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
     |> filter(fn: (r) => r._measurement == "myMeasurement")
     |> filter(fn: (r) => r._field == "myField1" or r._field == "myField2")
-    |> filter(fn: (r) => r.myTagKey == "myTagValue" and r.myTagKey2 == "myTagValue2")
+    |> filter(fn: (r) => r.myTagKey == "myTagValue")
+    |> filter(fn: (r) => r.myTagKey2 == "myTagValue2")
 "#.to_string();
         assert_eq!(expected, composition.to_string());
     }
@@ -735,7 +734,8 @@ from(bucket: "myBucket")
     |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
     |> filter(fn: (r) => r._measurement == "myMeasurement")
     |> filter(fn: (r) => r._field == "myField1" or r._field == "myField2")
-    |> filter(fn: (r) => r.myTagKey == "myTagValue" and r.myTagKey2 == "myTagValue2")
+    |> filter(fn: (r) => r.myTagKey == "myTagValue")
+    |> filter(fn: (r) => r.myTagKey2 == "myTagValue2")
 
 from(bucket: "myExperimentalBucket")
     |> range(start: -12m)
@@ -784,7 +784,8 @@ from(bucket: "myBucket")
     |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
     |> filter(fn: (r) => r._measurement == "myMeasurement")
     |> filter(fn: (r) => r._field == "myField1" or r._field == "myField2")
-    |> filter(fn: (r) => r.myTagKey == "myTagValue" and r.myTagKey2 == "myTagValue2")
+    |> filter(fn: (r) => r.myTagKey == "myTagValue")
+    |> filter(fn: (r) => r.myTagKey2 == "myTagValue2")
 "#.to_string();
         assert_eq!(expected, composition.to_string());
     }
@@ -793,7 +794,7 @@ from(bucket: "myBucket")
     /// Composition struct is able to find its statement in the new ast and update
     /// it appropriately.
     #[test]
-    fn test_composition_set_file_preceding_var() {
+    fn test_composition_resolve_with_ast_preceding_var() {
         let fluxscript = "".to_string();
         let ast = flux::parser::parse_string("".into(), &fluxscript);
 
@@ -831,7 +832,8 @@ from(bucket: "myBucket")
     |> filter(
         fn: (r) => r._field == "myField1" or (r._field == "myField2" or r._field == "myField3"),
     )
-    |> filter(fn: (r) => r.myTagKey == "myTagValue" and r.myTagKey2 == "myTagValue2")
+    |> filter(fn: (r) => r.myTagKey == "myTagValue")
+    |> filter(fn: (r) => r.myTagKey2 == "myTagValue2")
 "#.to_string();
         assert_eq!(expected, composition.to_string());
     }
@@ -840,7 +842,7 @@ from(bucket: "myBucket")
     /// Composition struct is able to find its statement in the new ast and update
     /// it appropriately.
     #[test]
-    fn test_composition_set_file_preceding_expr() {
+    fn test_composition_resolve_with_ast_preceding_expr() {
         let fluxscript = "".to_string();
         let ast = flux::parser::parse_string("".into(), &fluxscript);
 
@@ -879,7 +881,8 @@ from(bucket: "myBucket")
     |> filter(
         fn: (r) => r._field == "myField1" or (r._field == "myField2" or r._field == "myField3"),
     )
-    |> filter(fn: (r) => r.myTagKey == "myTagValue" and r.myTagKey2 == "myTagValue2")
+    |> filter(fn: (r) => r.myTagKey == "myTagValue")
+    |> filter(fn: (r) => r.myTagKey2 == "myTagValue2")
 "#.to_string();
         assert_eq!(expected, composition.to_string());
     }
@@ -888,7 +891,7 @@ from(bucket: "myBucket")
     /// new statement matches buckets, the composition can still find its statement
     /// in the file.
     #[test]
-    fn test_composition_set_file_preceding_expr_matching_bucket() {
+    fn test_composition_resolve_with_ast_preceding_expr_matching_bucket() {
         let fluxscript = "".to_string();
         let ast = flux::parser::parse_string("".into(), &fluxscript);
 
@@ -927,7 +930,8 @@ from(bucket: "myBucket")
     |> filter(
         fn: (r) => r._field == "myField1" or (r._field == "myField2" or r._field == "myField3"),
     )
-    |> filter(fn: (r) => r.myTagKey == "myTagValue" and r.myTagKey2 == "myTagValue2")
+    |> filter(fn: (r) => r.myTagKey == "myTagValue")
+    |> filter(fn: (r) => r.myTagKey2 == "myTagValue2")
 "#.to_string();
         assert_eq!(expected, composition.to_string());
     }
@@ -936,7 +940,7 @@ from(bucket: "myBucket")
     /// new statement matches bucket and measurement, the composition can still find
     /// its statement in the file.
     #[test]
-    fn test_composition_set_file_preceding_expr_matching_bucket_and_measurement(
+    fn test_composition_resolve_with_ast_preceding_expr_matching_bucket_and_measurement(
     ) {
         let fluxscript = "".to_string();
         let ast = flux::parser::parse_string("".into(), &fluxscript);
@@ -978,7 +982,8 @@ from(bucket: "myBucket")
     |> filter(
         fn: (r) => r._field == "myField1" or (r._field == "myField2" or r._field == "myField3"),
     )
-    |> filter(fn: (r) => r.myTagKey == "myTagValue" and r.myTagKey2 == "myTagValue2")
+    |> filter(fn: (r) => r.myTagKey == "myTagValue")
+    |> filter(fn: (r) => r.myTagKey2 == "myTagValue2")
 "#.to_string();
         assert_eq!(expected, composition.to_string());
     }
@@ -987,7 +992,7 @@ from(bucket: "myBucket")
     /// new statement matches bucket and measurement, the composition can still find
     /// its statement in the file.
     #[test]
-    fn test_composition_set_file_preceding_expr_matching_bucket_and_measurement_and_fields(
+    fn test_composition_resolve_with_ast_preceding_expr_matching_bucket_and_measurement_and_fields(
     ) {
         let fluxscript = "".to_string();
         let ast = flux::parser::parse_string("".into(), &fluxscript);
@@ -1031,7 +1036,8 @@ from(bucket: "myBucket")
     |> filter(
         fn: (r) => r._field == "myField1" or (r._field == "myField2" or r._field == "myField3"),
     )
-    |> filter(fn: (r) => r.myTagKey == "myTagValue" and r.myTagKey2 == "myTagValue2")
+    |> filter(fn: (r) => r.myTagKey == "myTagValue")
+    |> filter(fn: (r) => r.myTagKey2 == "myTagValue2")
 "#.to_string();
         assert_eq!(expected, composition.to_string());
     }
@@ -1039,7 +1045,7 @@ from(bucket: "myBucket")
     /// When there are two statements that could both match the composition
     /// statement, an error occurs.
     #[test]
-    fn test_composition_set_file_preceding_expr_matching_all() {
+    fn test_composition_resolve_with_ast_preceding_expr_matching_all() {
         let fluxscript = "".to_string();
         let ast = flux::parser::parse_string("".into(), &fluxscript);
 
@@ -1073,7 +1079,7 @@ from(bucket: "myBucket")
     /// Composition struct is able to find its statement in the new ast and update
     /// it appropriately.
     #[test]
-    fn test_composition_set_file_following_expr() {
+    fn test_composition_resolve_with_ast_following_expr() {
         let fluxscript = "".to_string();
         let ast = flux::parser::parse_string("".into(), &fluxscript);
 
@@ -1111,7 +1117,8 @@ from(bucket: "anBucket")
     |> filter(
         fn: (r) => r._field == "myField1" or (r._field == "myField2" or r._field == "myField3"),
     )
-    |> filter(fn: (r) => r.myTagKey == "myTagValue" and r.myTagKey2 == "myTagValue2")
+    |> filter(fn: (r) => r.myTagKey == "myTagValue")
+    |> filter(fn: (r) => r.myTagKey2 == "myTagValue2")
 
 from(bucket: "anBucket")
     |> range(start: -12m)
@@ -1122,7 +1129,7 @@ from(bucket: "anBucket")
     /// When the query is modified to add new calls after the filter calls, those new calls
     /// are preserved after a composition change.
     #[test]
-    fn test_composition_set_file_add_calls() {
+    fn test_composition_resolve_with_ast_add_calls() {
         let fluxscript = "".to_string();
         let ast = flux::parser::parse_string("".into(), &fluxscript);
 
@@ -1159,7 +1166,8 @@ from(bucket: "anBucket")
     |> filter(
         fn: (r) => r._field == "myField1" or (r._field == "myField2" or r._field == "myField3"),
     )
-    |> filter(fn: (r) => r.myTagKey == "myTagValue" and r.myTagKey2 == "myTagValue2")
+    |> filter(fn: (r) => r.myTagKey == "myTagValue")
+    |> filter(fn: (r) => r.myTagKey2 == "myTagValue2")
     |> group(columns: ["myNonexistentColumn"])
     |> sort()
 "#.to_string();
@@ -1342,7 +1350,7 @@ from(bucket: "anBucket")
         assert_eq!(expected, composition.to_string());
     }
 
-    /// Additional tags are filtered using AND operators.
+    /// Tag filters are their own individual filter calls.
     #[test]
     fn test_add_tag_values() {
         let ast =
@@ -1364,10 +1372,46 @@ from(bucket: "anBucket")
 
         let expected = r#"from(bucket: "myBucket")
     |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
-    |> filter(fn: (r) => r.myTagKey == "myTagValue" and r.myTagKey2 == "myTagValue2")
+    |> filter(fn: (r) => r.myTagKey == "myTagValue")
+    |> filter(fn: (r) => r.myTagKey2 == "myTagValue2")
 "#;
         assert_eq!(expected, composition.to_string());
     }
+
+        /// Tags filters with multiple tag values result in a single
+        /// `filter` call with OR operators.
+        #[test]
+        fn test_add_tag_values_with_same_key() {
+            let ast =
+                flux::parser::parse_string("".into(), &"".to_string());
+            let mut composition = Composition::new(
+                ast,
+                "myBucket".into(),
+                None,
+                vec![],
+                vec![("myTagKey".into(), "myTagValue".into())],
+            );
+    
+            assert!(composition
+                .add_tag_value(
+                    "myTagKey".to_string(),
+                    "myTagValue3".to_string()
+                )
+                .is_ok());
+            assert!(composition
+                .add_tag_value(
+                    "myTagKey2".to_string(),
+                    "myTagValue2".to_string()
+                )
+                .is_ok());
+    
+            let expected = r#"from(bucket: "myBucket")
+    |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+    |> filter(fn: (r) => r.myTagKey == "myTagValue" or r.myTagKey == "myTagValue3")
+    |> filter(fn: (r) => r.myTagKey2 == "myTagValue2")
+"#;
+            assert_eq!(expected, composition.to_string());
+        }
 
     /// Adding a tag key/value that already exists in the composition results
     /// in an error.
