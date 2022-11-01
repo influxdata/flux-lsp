@@ -497,10 +497,10 @@ impl Composition {
         tag_values: Vec<(String, String)>,
     ) -> Self {
         let mut analyzer = CompositionStatementAnalyzer {
-            bucket: bucket,
-            measurement: measurement,
-            fields: fields,
-            tag_values: tag_values,
+            bucket,
+            measurement,
+            fields,
+            tag_values,
             ..Default::default()
         };
 
@@ -512,7 +512,7 @@ impl Composition {
             .position(|statement| {
                 matches!(statement, ast::Statement::Expr(_))
             })
-            .unwrap_or_else(|| file.body.len());
+            .unwrap_or(file.body.len());
 
         file.body.insert(
             statement_index,
@@ -587,7 +587,7 @@ impl Composition {
             log::error!(
                 "Too many matches for composition statement."
             );
-            return Err(());
+            Err(())
         } else {
             match matches.last() {
                 Some((index, analyzer)) => {

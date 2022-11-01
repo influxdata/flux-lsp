@@ -1510,8 +1510,9 @@ impl LanguageServer for LspServer {
                     Err(err) => panic!("{}", err),
                 };
 
-                if let Err(_) =
-                    composition.add_measurement(command_params.value)
+                if composition
+                    .add_measurement(command_params.value)
+                    .is_err()
                 {
                     return Err(LspError::InternalError(
                         "Failed to add measurement to composition."
@@ -1580,8 +1581,9 @@ impl LanguageServer for LspServer {
                     Err(err) => panic!("{}", err),
                 };
 
-                if let Err(_) =
-                    composition.add_field(command_params.value)
+                if composition
+                    .add_field(command_params.value)
+                    .is_err()
                 {
                     return Err(LspError::InternalError(
                         "Failed to add field to composition."
@@ -1650,8 +1652,9 @@ impl LanguageServer for LspServer {
                     Err(err) => panic!("{}", err),
                 };
 
-                if let Err(_) =
-                    composition.remove_field(command_params.value)
+                if composition
+                    .remove_field(command_params.value)
+                    .is_err()
                 {
                     return Err(LspError::InternalError(
                         "Failed to remove field from composition."
@@ -1720,10 +1723,13 @@ impl LanguageServer for LspServer {
                     Err(err) => panic!("{}", err),
                 };
 
-                if let Err(_) = composition.add_tag_value(
-                    command_params.tag,
-                    command_params.value,
-                ) {
+                if composition
+                    .add_tag_value(
+                        command_params.tag,
+                        command_params.value,
+                    )
+                    .is_err()
+                {
                     return Err(LspError::InternalError(
                         "Failed to add tagValue to composition."
                             .to_string(),
@@ -1791,10 +1797,13 @@ impl LanguageServer for LspServer {
                     Err(err) => panic!("{}", err),
                 };
 
-                if let Err(_) = composition.remove_tag_value(
-                    command_params.tag,
-                    command_params.value,
-                ) {
+                if composition
+                    .remove_tag_value(
+                        command_params.tag,
+                        command_params.value,
+                    )
+                    .is_err()
+                {
                     return Err(LspError::InternalError(
                         "Failed to remove tagValue from composition."
                             .to_string(),
