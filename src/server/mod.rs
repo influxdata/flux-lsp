@@ -513,26 +513,28 @@ impl LanguageServer for LspServer {
                 self.store.put(&key, &new_contents.clone());
                 self.publish_diagnostics(&key).await;
 
-                match self.state.lock() {
-                    Ok(mut state) => {
-                        if let Some(mut composition) =
-                            state.get_composition(&key)
-                        {
-                            match self.store.get_ast_file(&key) {
-                            Ok(file) => {
-                                let result = composition.resolve_with_ast(file);
-                                if result.is_err() {
-                                    state.drop_composition(&key);
-                                    if let Some(client) = &self.get_client() {
-                                        let _ = client.show_message(lsp::MessageType::ERROR, "A conflict has occured in the query composition. The composition has been aborted.");
+                if self.store.get_package_errors(&key).is_none() {
+                    match self.state.lock() {
+                        Ok(mut state) => {
+                            if let Some(mut composition) =
+                                state.get_composition(&key)
+                            {
+                                match self.store.get_ast_file(&key) {
+                                Ok(file) => {
+                                    let result = composition.resolve_with_ast(file);
+                                    if result.is_err() {
+                                        state.drop_composition(&key);
+                                        if let Some(client) = &self.get_client() {
+                                            let _ = client.show_message(lsp::MessageType::ERROR, "A conflict has occured in the query composition. The composition has been aborted.");
+                                        }
                                     }
                                 }
+                                Err(_) => log::error!("Found composition but did not find ast for key: {}", key),
                             }
-                            Err(_) => log::error!("Found composition but did not find ast for key: {}", key),
+                            }
                         }
-                        }
+                        Err(err) => panic!("{}", err),
                     }
-                    Err(err) => panic!("{}", err),
                 }
             }
             Err(err) => log::error!(

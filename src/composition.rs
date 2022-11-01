@@ -330,12 +330,24 @@ impl CompositionStatementAnalyzer {
         }
 
         if !self.tag_values.is_empty() {
-            let tags = self.tag_values.iter().map(|(key, _value)| key).unique().collect::<Vec<&String>>();
+            let tags = self
+                .tag_values
+                .iter()
+                .map(|(key, _value)| key)
+                .unique()
+                .collect::<Vec<&String>>();
             tags.iter().for_each(|tag| {
                 let tag = tag.to_string();
-                let values = self.tag_values.iter().filter(|(key, _value)| key == &tag).map(|(_key, value)| value.to_string()).collect::<Vec<String>>();
+                let values = self
+                    .tag_values
+                    .iter()
+                    .filter(|(key, _value)| key == &tag)
+                    .map(|(_key, value)| value.to_string())
+                    .collect::<Vec<String>>();
                 inner = pipe!(
-                    ast::Expression::PipeExpr(Box::new(inner.clone())),
+                    ast::Expression::PipeExpr(Box::new(
+                        inner.clone()
+                    )),
                     filter!(
                         vec![tag; values.len()].as_slice(),
                         values.as_ref(),
@@ -450,7 +462,10 @@ impl PartialEq for CompositionStatementAnalyzer {
     fn eq(&self, other: &Self) -> bool {
         // An analyzer is considered equal if the schema filters applied are the same. The calls made after that
         // are not (currently) considered.
-        self.bucket == other.bucket && self.measurement == other.measurement && self.fields == other.fields && self.tag_values == other.tag_values
+        self.bucket == other.bucket
+            && self.measurement == other.measurement
+            && self.fields == other.fields
+            && self.tag_values == other.tag_values
     }
 }
 impl Eq for CompositionStatementAnalyzer {}
@@ -566,7 +581,8 @@ impl Composition {
             })
             .filter(|(_index, analyzer)| {
                 analyzer.clone() == self.analyzer
-            }).collect::<Vec<(usize, CompositionStatementAnalyzer)>>();
+            })
+            .collect::<Vec<(usize, CompositionStatementAnalyzer)>>();
         if matches.len() > 1 {
             log::error!(
                 "Too many matches for composition statement."
@@ -891,7 +907,8 @@ from(bucket: "myBucket")
     /// new statement matches buckets, the composition can still find its statement
     /// in the file.
     #[test]
-    fn test_composition_resolve_with_ast_preceding_expr_matching_bucket() {
+    fn test_composition_resolve_with_ast_preceding_expr_matching_bucket(
+    ) {
         let fluxscript = "".to_string();
         let ast = flux::parser::parse_string("".into(), &fluxscript);
 
@@ -1045,7 +1062,8 @@ from(bucket: "myBucket")
     /// When there are two statements that could both match the composition
     /// statement, an error occurs.
     #[test]
-    fn test_composition_resolve_with_ast_preceding_expr_matching_all() {
+    fn test_composition_resolve_with_ast_preceding_expr_matching_all()
+    {
         let fluxscript = "".to_string();
         let ast = flux::parser::parse_string("".into(), &fluxscript);
 
@@ -1378,40 +1396,40 @@ from(bucket: "anBucket")
         assert_eq!(expected, composition.to_string());
     }
 
-        /// Tags filters with multiple tag values result in a single
-        /// `filter` call with OR operators.
-        #[test]
-        fn test_add_tag_values_with_same_key() {
-            let ast =
-                flux::parser::parse_string("".into(), &"".to_string());
-            let mut composition = Composition::new(
-                ast,
-                "myBucket".into(),
-                None,
-                vec![],
-                vec![("myTagKey".into(), "myTagValue".into())],
-            );
-    
-            assert!(composition
-                .add_tag_value(
-                    "myTagKey".to_string(),
-                    "myTagValue3".to_string()
-                )
-                .is_ok());
-            assert!(composition
-                .add_tag_value(
-                    "myTagKey2".to_string(),
-                    "myTagValue2".to_string()
-                )
-                .is_ok());
-    
-            let expected = r#"from(bucket: "myBucket")
+    /// Tags filters with multiple tag values result in a single
+    /// `filter` call with OR operators.
+    #[test]
+    fn test_add_tag_values_with_same_key() {
+        let ast =
+            flux::parser::parse_string("".into(), &"".to_string());
+        let mut composition = Composition::new(
+            ast,
+            "myBucket".into(),
+            None,
+            vec![],
+            vec![("myTagKey".into(), "myTagValue".into())],
+        );
+
+        assert!(composition
+            .add_tag_value(
+                "myTagKey".to_string(),
+                "myTagValue3".to_string()
+            )
+            .is_ok());
+        assert!(composition
+            .add_tag_value(
+                "myTagKey2".to_string(),
+                "myTagValue2".to_string()
+            )
+            .is_ok());
+
+        let expected = r#"from(bucket: "myBucket")
     |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
     |> filter(fn: (r) => r.myTagKey == "myTagValue" or r.myTagKey == "myTagValue3")
     |> filter(fn: (r) => r.myTagKey2 == "myTagValue2")
 "#;
-            assert_eq!(expected, composition.to_string());
-        }
+        assert_eq!(expected, composition.to_string());
+    }
 
     /// Adding a tag key/value that already exists in the composition results
     /// in an error.
