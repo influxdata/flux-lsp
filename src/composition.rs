@@ -406,7 +406,7 @@ impl<'a> ast::walk::Visitor<'a> for CompositionStatementAnalyzer {
                         }
                         "range" => return false,
                         "filter" => {
-                            // XXX: rockstar (28 Oct 2020) - a more appropriate way to handle this would
+                            // XXX: rockstar (28 Oct 2022) - a more appropriate way to handle this would
                             // be to hoist the BinaryExpr check logic up into this match arm. As it stands,
                             // we may end up over-matching the filters here to filter things that aren't
                             // schema-related.
