@@ -144,6 +144,135 @@ async fn test_did_change() {
     assert_eq!(r#"from(bucket: "bucket")"#, contents);
 }
 
+/// When a `textDocument/didChange` presents a file change for a file
+/// using composition, and that file makes an ambiguous composition, the
+/// composition is vacated from the server state.
+#[test]
+async fn test_did_change_vacates_composition() {
+    let server = create_server();
+    open_file(
+        &server,
+        r#"from(bucket: "bucket") |> first()"#.to_string(),
+        None,
+    )
+    .await;
+
+    match server.state.lock() {
+        Ok(mut state) => {
+            let ast = flux::parser::parse_string(
+                "".to_string(),
+                &r#"from(bucket: "bucket") |> first()"#,
+            );
+            let composition = composition::Composition::new(
+                ast,
+                "bucket".to_string(),
+                None,
+                vec![],
+                vec![],
+            );
+            state.set_composition(
+                lsp::Url::parse("file:///home/user/file.flux")
+                    .unwrap(),
+                composition,
+            );
+        }
+        Err(err) => panic!("{}", err),
+    }
+
+    let params = lsp::DidChangeTextDocumentParams {
+        text_document: lsp::VersionedTextDocumentIdentifier {
+            uri: lsp::Url::parse("file:///home/user/file.flux")
+                .unwrap(),
+            version: -2,
+        },
+        content_changes: vec![lsp::TextDocumentContentChangeEvent {
+            range: None,
+            range_length: None,
+            text: r#"from(bucket: "bucket")
+            
+from(bucket: "bucket")
+|> range(start: -12m)
+"#
+            .to_string(),
+        }],
+    };
+
+    server.did_change(params).await;
+
+    match server.state.lock() {
+        Ok(state) => {
+            let key = lsp::Url::parse("file:///home/user/file.flux")
+                .unwrap();
+            assert!(state.get_composition(&key).is_none())
+        }
+        Err(err) => panic!("{}", err),
+    };
+}
+
+/// When the user is mid-change, and the script isn't a parseable
+/// AST, don't try to modify the composition state at all.
+#[test]
+async fn test_did_change_bad_ast_doesnt_vacate_composition() {
+    let server = create_server();
+    open_file(
+        &server,
+        r#"from(bucket: "bucket") |> first()"#.to_string(),
+        None,
+    )
+    .await;
+
+    match server.state.lock() {
+        Ok(mut state) => {
+            let ast = flux::parser::parse_string(
+                "".to_string(),
+                &r#"from(bucket: "bucket") |> first()"#,
+            );
+            let composition = composition::Composition::new(
+                ast,
+                "bucket".to_string(),
+                None,
+                vec![],
+                vec![],
+            );
+            state.set_composition(
+                lsp::Url::parse("file:///home/user/file.flux")
+                    .unwrap(),
+                composition,
+            );
+        }
+        Err(err) => panic!("{}", err),
+    }
+
+    let params = lsp::DidChangeTextDocumentParams {
+        text_document: lsp::VersionedTextDocumentIdentifier {
+            uri: lsp::Url::parse("file:///home/user/file.flux")
+                .unwrap(),
+            version: -2,
+        },
+        content_changes: vec![lsp::TextDocumentContentChangeEvent {
+            range: None,
+            range_length: None,
+            text: r#"from(bucket: "bucket")
+            
+from(bucket: "bucket")
+|> range(start: 
+"#
+            .to_string(),
+        }],
+    };
+
+    server.did_change(params).await;
+
+    match server.state.lock() {
+        Ok(state) => {
+            let key = lsp::Url::parse("file:///home/user/file.flux")
+                .unwrap();
+            assert!(state.get_composition(&key).is_some())
+        }
+        Err(err) => panic!("{}", err),
+    };
+}
+
 #[test]
 async fn test_did_change_multiple() {
     let server = create_server();

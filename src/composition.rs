@@ -5,8 +5,7 @@
 ///
 /// This module _only_ operates on an AST. It will never operate on semantic graph.
 use flux::ast;
-
-static YIELD_IDENTIFIER: &str = "_editor_composition";
+use itertools::Itertools;
 
 macro_rules! from {
     ($bucket_name:expr) => {
@@ -208,11 +207,8 @@ fn chained_binary_eq_expr(
 }
 
 macro_rules! filter {
-    ($values:expr, $operator:expr) => {
-        filter!(None, $values, $operator, chained_exists_expr($operator, $values).unwrap())
-    };
     ($key:expr, $values:expr, $operator:expr) => {
-        filter!($key, $values, $operator, chained_binary_eq_expr($operator, $key, $values).unwrap())
+        filter!($key, $values, $operator, chained_binary_eq_expr($operator, $key, $values).expect("chained_binary_eq_expr failed"))
     };
     ($key:expr, $values:expr, $operator:expr, $funBody:expr) => {
         ast::CallExpr {
@@ -268,45 +264,6 @@ macro_rules! filter {
     };
 }
 
-macro_rules! yield_ {
-    () => {
-        ast::CallExpr {
-            arguments: vec![ast::Expression::Object(Box::new(
-                ast::ObjectExpr {
-                    base: ast::BaseNode::default(),
-                    properties: vec![ast::Property {
-                        base: ast::BaseNode::default(),
-                        key: ast::PropertyKey::Identifier(
-                            ast::Identifier {
-                                base: ast::BaseNode::default(),
-                                name: "name".into(),
-                            },
-                        ),
-                        value: Some(ast::Expression::StringLit(
-                            ast::StringLit {
-                                base: ast::BaseNode::default(),
-                                value: YIELD_IDENTIFIER.into(),
-                            },
-                        )),
-                        comma: vec![],
-                        separator: vec![],
-                    }],
-                    lbrace: vec![],
-                    rbrace: vec![],
-                    with: None,
-                },
-            ))],
-            base: ast::BaseNode::default(),
-            callee: ast::Expression::Identifier(ast::Identifier {
-                base: ast::BaseNode::default(),
-                name: "yield".into(),
-            }),
-            lparen: vec![],
-            rparen: vec![],
-        }
-    };
-}
-
 macro_rules! pipe {
     ($a:expr, $b:expr) => {
         ast::PipeExpr {
@@ -321,79 +278,96 @@ macro_rules! pipe {
 ///
 /// This struct is essentially a visitor, so it only provides a view into an existing
 /// Composition statement, it does not make changes.
-#[derive(Default)]
-struct CompositionQueryAnalyzer {
+#[derive(Clone, Default)]
+struct CompositionStatementAnalyzer {
     bucket: String,
     measurement: Option<String>,
     fields: Vec<String>,
-    tag_values: Vec<(String, Vec<String>)>, // [(TagName, [TagValues])]
+    tag_values: Vec<(String, String)>, // (TagName, TagValue)
+    calls: Vec<ast::CallExpr>,
 }
 
-impl CompositionQueryAnalyzer {
-    fn analyze(&mut self, statement: ast::ExprStmt) {
+impl CompositionStatementAnalyzer {
+    fn analyze(statement: ast::ExprStmt) -> Self {
+        let mut analyzer = Self::default();
         ast::walk::walk(
-            self,
+            &mut analyzer,
             flux::ast::walk::Node::from_stmt(&ast::Statement::Expr(
                 Box::new(statement),
             )),
         );
+        analyzer
     }
 
     fn build(&mut self) -> ast::PipeExpr {
-        let mut inner = ast::Expression::PipeExpr(Box::new(pipe!(
+        let mut inner = pipe!(
             ast::Expression::Call(Box::new(from!(self
                 .bucket
                 .to_owned()))),
             range!()
-        )));
+        );
 
         if let Some(measurement) = &self.measurement {
-            inner = ast::Expression::PipeExpr(Box::new(pipe!(
-                inner,
+            inner = pipe!(
+                ast::Expression::PipeExpr(Box::new(inner)),
                 filter!(
                     &["_measurement".to_string()],
                     &[measurement.to_owned()],
                     ast::LogicalOperator::OrOperator
                 )
-            )));
+            );
         }
 
         if !self.fields.is_empty() {
-            inner = ast::Expression::PipeExpr(Box::new(pipe!(
-                inner,
+            inner = pipe!(
+                ast::Expression::PipeExpr(Box::new(inner)),
                 filter!(
                     &vec!["_field".to_string(); self.fields.len()],
                     &self.fields,
                     ast::LogicalOperator::OrOperator
                 )
-            )));
+            );
         }
 
         if !self.tag_values.is_empty() {
-            for (tag_key, tag_values) in self.tag_values.iter() {
-                // XXX: Chunchun (10/24/22)
-                // This is a work around for filter! signature
-                let mut filter_keys =
-                    vec!["".to_string(); tag_values.len()];
-                let tag_keys: Vec<String> = filter_keys
-                    .iter_mut()
-                    .map(|_| tag_key.clone())
-                    .collect();
-                inner = ast::Expression::PipeExpr(Box::new(pipe!(
-                    inner,
+            let tags = self
+                .tag_values
+                .iter()
+                .map(|(key, _value)| key)
+                .unique()
+                .collect::<Vec<&String>>();
+            tags.iter().for_each(|tag| {
+                let tag = tag.to_string();
+                let values = self
+                    .tag_values
+                    .iter()
+                    .filter(|(key, _value)| key == &tag)
+                    .map(|(_key, value)| value.to_string())
+                    .collect::<Vec<String>>();
+                inner = pipe!(
+                    ast::Expression::PipeExpr(Box::new(
+                        inner.clone()
+                    )),
                     filter!(
-                        tag_keys.as_slice(),
-                        tag_values.as_ref(),
+                        vec![tag; values.len()].as_slice(),
+                        values.as_ref(),
                         ast::LogicalOperator::OrOperator
                     )
-                )));
-            }
+                );
+            });
         }
-        pipe!(inner, yield_!())
+        for call_expression in self.calls.iter() {
+            inner = pipe!(
+                ast::Expression::PipeExpr(Box::new(inner)),
+                call_expression.clone()
+            );
+        }
+
+        inner
     }
 }
 
-impl<'a> ast::walk::Visitor<'a> for CompositionQueryAnalyzer {
+impl<'a> ast::walk::Visitor<'a> for CompositionStatementAnalyzer {
     fn visit(&mut self, node: ast::walk::Node<'a>) -> bool {
         // Because we own the entire implementation of the Composition query statement, we can be super naive
         // about what the shape of these functions looks like. If the implementation ever gets more complex, than
@@ -403,23 +377,44 @@ impl<'a> ast::walk::Visitor<'a> for CompositionQueryAnalyzer {
                 if let ast::Expression::Identifier(identifier) =
                     &call_expr.callee
                 {
-                    if identifier.name.as_str() == "from" {
-                        if let ast::Expression::Object(object_expr) =
-                            &call_expr.arguments[0]
-                        {
-                            let ast::Property {
-                                base: _,
-                                key: _,
-                                separator: _,
-                                value,
-                                comma: _,
-                            } = &object_expr.properties[0];
-                            if let Some(ast::Expression::StringLit(
-                                ast::StringLit { base: _, value },
-                            )) = value
+                    match identifier.name.as_str() {
+                        "from" => {
+                            if let ast::Expression::Object(
+                                object_expr,
+                            ) = &call_expr.arguments[0]
                             {
-                                self.bucket = value.clone()
+                                let ast::Property {
+                                    base: _,
+                                    key: _,
+                                    separator: _,
+                                    value,
+                                    comma: _,
+                                } = &object_expr.properties[0];
+                                if let Some(
+                                    ast::Expression::StringLit(
+                                        ast::StringLit {
+                                            base: _,
+                                            value,
+                                        },
+                                    ),
+                                ) = value
+                                {
+                                    self.bucket = value.clone()
+                                }
                             }
+                            return false;
+                        }
+                        "range" => return false,
+                        "filter" => {
+                            // XXX: rockstar (28 Oct 2022) - a more appropriate way to handle this would
+                            // be to hoist the BinaryExpr check logic up into this match arm. As it stands,
+                            // we may end up over-matching the filters here to filter things that aren't
+                            // schema-related.
+                            return true;
+                        }
+                        _ => {
+                            self.calls.push(call_expr.clone());
+                            return false;
                         }
                     }
                 }
@@ -449,19 +444,7 @@ impl<'a> ast::walk::Visitor<'a> for CompositionQueryAnalyzer {
                             _ => {
                                 // Treat these all as tag filters.
                                 if let ast::Expression::StringLit(string_literal) = &binary_expr.right {
-                                    let mut inserted = false;
-                                    for (i, (tag_key, _)) in self.tag_values.iter().enumerate() {
-                                        if tag_key == &ident.name {
-                                            self.tag_values[i].1.push(string_literal.value.clone());
-                                            inserted = true;
-                                            break;
-                                        }
-                                    }
-                                    if !inserted {
-                                        self.tag_values.push((
-                                            ident.name.clone(), vec![string_literal.value.clone()]
-                                        ));
-                                    }
+                                    self.tag_values.push((ident.name.clone(), string_literal.value.clone()));
                                 }
                             },
                         }
@@ -475,68 +458,27 @@ impl<'a> ast::walk::Visitor<'a> for CompositionQueryAnalyzer {
     }
 }
 
-/// Find the composition statement.
-///
-/// The composition statement is identified as follows: a `from` function that contains
-/// a yield with the name "_editor_composition".
-#[derive(Default)]
-struct CompositionStatementFinderVisitor {
-    statement: Option<ast::ExprStmt>,
-}
-
-impl<'a> ast::walk::Visitor<'a>
-    for CompositionStatementFinderVisitor
-{
-    fn visit(&mut self, node: ast::walk::Node<'a>) -> bool {
-        if self.statement.is_some() {
-            // If the statement was found, don't keep looking.
-            return false;
-        }
-
-        if let ast::walk::Node::ExprStmt(expr_statement) = node {
-            if let ast::Expression::PipeExpr(expr) =
-                &expr_statement.expression
-            {
-                if let ast::Expression::Identifier(identifier) =
-                    &expr.call.callee
-                {
-                    if identifier.name == "yield" {
-                        expr.call.arguments.iter().any(|argument| {
-                            if let ast::Expression::Object(object) = argument {
-                                object.properties.iter().any(|property| {
-                                    if let ast::PropertyKey::Identifier(key) = &property.key {
-                                        if key.name == "name" {
-                                            // Because we would have generated this statement, we'll always be able to
-                                            // assert the simplicity of the yield name, i.e. it won't be a deeply nested
-                                            // expression.
-                                            if let Some(ast::Expression::StringLit(literal)) = &property.value {
-                                                if literal.value == YIELD_IDENTIFIER {
-                                                    self.statement = Some(expr_statement.clone());
-                                                    return true;
-                                                }
-                                            }
-                                        }
-                                    }
-                                    false
-                                })
-                            } else {
-                                false
-                            }
-                        });
-                        return false;
-                    }
-                }
-            }
-        }
-        true
+impl PartialEq for CompositionStatementAnalyzer {
+    fn eq(&self, other: &Self) -> bool {
+        // An analyzer is considered equal if the schema filters applied are the same. The calls made after that
+        // are not (currently) considered.
+        self.bucket == other.bucket
+            && self.measurement == other.measurement
+            && self.fields == other.fields
+            && self.tag_values == other.tag_values
     }
 }
+impl Eq for CompositionStatementAnalyzer {}
 
 type CompositionResult = Result<(), ()>;
 
 /// Composition acts as the public entry point into the composition functionality.
+#[derive(Clone)]
 pub(crate) struct Composition {
     file: ast::File,
+
+    statement_index: usize,
+    analyzer: CompositionStatementAnalyzer,
 }
 
 impl ToString for Composition {
@@ -547,147 +489,130 @@ impl ToString for Composition {
 }
 
 impl Composition {
-    pub(crate) fn new(file: ast::File) -> Self {
-        Self { file }
-    }
-
-    pub(crate) fn composition_string(&self) -> Option<String> {
-        let mut visitor =
-            CompositionStatementFinderVisitor::default();
-        flux::ast::walk::walk(
-            &mut visitor,
-            flux::ast::walk::Node::File(&self.file),
-        );
-
-        if let Some(expr_statement) = visitor.statement {
-            let file = ast::File {
-                base: ast::BaseNode::default(),
-                metadata: "".into(),
-                package: None,
-                name: "".into(),
-                imports: vec![],
-                eof: vec![],
-                body: vec![ast::Statement::Expr(Box::new(
-                    expr_statement,
-                ))],
-            };
-            match flux::formatter::convert_to_string(&file) {
-                Ok(text) => return Some(text),
-                _ => return None,
-            }
-        }
-        None
-    }
-
-    /// Initialize an ast::File for use in composition.
-    ///
-    /// This must be called before any other composition can be made, as it'll set up the
-    /// statement that will be managed by composition.
-    pub(crate) fn initialize(
-        &mut self,
+    pub(crate) fn new(
+        mut file: ast::File,
         bucket: String,
         measurement: Option<String>,
-        fields: Option<Vec<String>>,
-        tag_values: Option<Vec<(String, String)>>,
-    ) -> CompositionResult {
-        let mut visitor =
-            CompositionStatementFinderVisitor::default();
-        flux::ast::walk::walk(
-            &mut visitor,
-            flux::ast::walk::Node::File(&self.file),
-        );
-
-        let mut analyzer = CompositionQueryAnalyzer {
+        fields: Vec<String>,
+        tag_values: Vec<(String, String)>,
+    ) -> Self {
+        let mut analyzer = CompositionStatementAnalyzer {
             bucket,
             measurement,
-            fields: fields.unwrap_or_default(),
-            tag_values: if let Some(tag_values) = tag_values {
-                let mut tags: Vec<(String, Vec<String>)> = vec![];
-                tag_values.iter().for_each(|(tag_key, tag_value)| {
-                    let mut inserted = false;
-                    for (i, (tk, _)) in tags.iter().enumerate() {
-                        if tag_key == tk {
-                            tags[i].1.push(tag_value.clone());
-                            inserted = true;
-                            break;
-                        }
-                    }
-                    if !inserted {
-                        tags.push((
-                            tag_key.clone(),
-                            vec![tag_value.clone()],
-                        ));
-                    }
-                });
-                tags
-            } else {
-                vec![]
-            },
+            fields,
+            tag_values,
+            ..Default::default()
         };
-        let statement = analyzer.build();
 
-        if let Some(expr_statement) = visitor.statement {
-            self.file.body.retain(|statement| match statement {
-                ast::Statement::Expr(expression) => {
-                    expr_statement != *expression.as_ref()
-                }
-                _ => true,
-            });
-        }
+        // Find the index of the first expression statement in the ast file. The composition
+        // will be inserted before that first expression statement.
+        let statement_index = file
+            .body
+            .iter()
+            .position(|statement| {
+                matches!(statement, ast::Statement::Expr(_))
+            })
+            .unwrap_or(file.body.len());
 
-        self.file.body.insert(
-            0,
+        file.body.insert(
+            statement_index,
             ast::Statement::Expr(Box::new(ast::ExprStmt {
                 base: ast::BaseNode::default(),
                 expression: ast::Expression::PipeExpr(Box::new(
-                    statement,
+                    analyzer.build(),
                 )),
             })),
         );
-        Ok(())
+
+        Self {
+            file,
+            analyzer,
+            statement_index,
+        }
+    }
+
+    /// Sync the composition statement with the analyzer.
+    // This is, for obvious reasons, inefficient. It moves the items in the vec
+    // around a lot. Premature optimization and blah blah blah.
+    fn sync(&mut self) {
+        self.file.body.remove(self.statement_index);
+        self.file.body.insert(
+            self.statement_index,
+            ast::Statement::Expr(Box::new(ast::ExprStmt {
+                base: ast::BaseNode::default(),
+                expression: ast::Expression::PipeExpr(Box::new(
+                    self.analyzer.build(),
+                )),
+            })),
+        );
+    }
+
+    /// Resolve composition with a new ast File.
+    ///
+    /// This is the logic that re-attaches to the new composition. The logic
+    /// is complex, but the core of the work is the analyzer, which checks
+    /// all the statements to find the matching one.
+    ///
+    /// In the event the composition can't re-attach to the new AST, usually
+    /// through ambiguity, an error is returned. The Composition should then
+    /// be discarded.
+    pub fn resolve_with_ast(
+        &mut self,
+        file: ast::File,
+    ) -> Result<(), ()> {
+        self.file = file;
+        let matches = self
+            .file
+            .body
+            .iter()
+            .enumerate()
+            .filter(|(_index, statement)| {
+                matches!(statement, ast::Statement::Expr(_))
+            })
+            .map(|(index, statement)| {
+                let expression = match statement {
+                    ast::Statement::Expr(expr) => expr,
+                    _ => unreachable!("Previous filter failed"),
+                };
+                let analyzer = CompositionStatementAnalyzer::analyze(
+                    *expression.clone(),
+                );
+                (index, analyzer)
+            })
+            .filter(|(_index, analyzer)| {
+                analyzer.clone() == self.analyzer
+            })
+            .collect::<Vec<(usize, CompositionStatementAnalyzer)>>();
+        if matches.len() > 1 {
+            log::error!(
+                "Too many matches for composition statement."
+            );
+            Err(())
+        } else {
+            match matches.last() {
+                Some((index, analyzer)) => {
+                    self.statement_index = *index;
+                    self.analyzer = analyzer.clone();
+                    Ok(())
+                }
+                None => {
+                    log::error!("Could not find matching composition statement.");
+                    Err(())
+                }
+            }
+        }
     }
 
     pub(crate) fn add_measurement(
         &mut self,
         measurement: String,
     ) -> CompositionResult {
-        let mut visitor =
-            CompositionStatementFinderVisitor::default();
-        flux::ast::walk::walk(
-            &mut visitor,
-            flux::ast::walk::Node::File(&self.file),
-        );
-        if visitor.statement.is_none() {
-            return Err(());
-        }
-        let expr_statement =
-            visitor.statement.expect("Previous check failed.");
-
-        let mut analyzer = CompositionQueryAnalyzer::default();
-        analyzer.analyze(expr_statement.clone());
-        if analyzer.measurement.is_some() {
+        if self.analyzer.measurement.is_some() {
             return Err(());
         } else {
-            analyzer.measurement = Some(measurement)
+            self.analyzer.measurement = Some(measurement)
         }
-        let statement = analyzer.build();
-
-        self.file.body.retain(|statement| match statement {
-            ast::Statement::Expr(expression) => {
-                expr_statement != *expression.as_ref()
-            }
-            _ => true,
-        });
-
-        self.file.body.insert(
-            0,
-            ast::Statement::Expr(Box::new(ast::ExprStmt {
-                base: ast::BaseNode::default(),
-                expression: ast::Expression::PipeExpr(Box::new(
-                    statement,
-                )),
-            })),
-        );
+        self.sync();
         Ok(())
     }
 
@@ -695,45 +620,12 @@ impl Composition {
         &mut self,
         field: String,
     ) -> CompositionResult {
-        let mut visitor =
-            CompositionStatementFinderVisitor::default();
-        flux::ast::walk::walk(
-            &mut visitor,
-            flux::ast::walk::Node::File(&self.file),
-        );
-        if visitor.statement.is_none() {
-            return Err(());
-        }
-        let expr_statement =
-            visitor.statement.expect("Previous check failed.");
-
-        let mut analyzer = CompositionQueryAnalyzer::default();
-        analyzer.analyze(expr_statement.clone());
-
-        if analyzer.fields.contains(&field) {
+        if self.analyzer.fields.contains(&field) {
             return Err(());
         } else {
-            analyzer.fields.push(field);
+            self.analyzer.fields.push(field);
         }
-        let statement = analyzer.build();
-
-        self.file.body.retain(|statement| match statement {
-            ast::Statement::Expr(expression) => {
-                expr_statement != *expression.as_ref()
-            }
-            _ => true,
-        });
-
-        self.file.body.insert(
-            0,
-            ast::Statement::Expr(Box::new(ast::ExprStmt {
-                base: ast::BaseNode::default(),
-                expression: ast::Expression::PipeExpr(Box::new(
-                    statement,
-                )),
-            })),
-        );
-
+        self.sync();
         Ok(())
     }
 
@@ -741,46 +633,12 @@ impl Composition {
         &mut self,
         field: String,
     ) -> CompositionResult {
-        let mut visitor =
-            CompositionStatementFinderVisitor::default();
-        flux::ast::walk::walk(
-            &mut visitor,
-            flux::ast::walk::Node::File(&self.file),
-        );
-        if visitor.statement.is_none() {
+        if self.analyzer.fields.contains(&field) {
+            self.analyzer.fields.retain(|f| f != &field);
+        } else {
             return Err(());
         }
-        let expr_statement =
-            visitor.statement.expect("Previous check failed.");
-
-        let mut analyzer = CompositionQueryAnalyzer::default();
-        analyzer.analyze(expr_statement.clone());
-
-        let previous_len = analyzer.fields.len();
-        analyzer.fields.retain(|f| f != &field);
-
-        if previous_len == analyzer.fields.len() {
-            return Err(());
-        }
-        let statement = analyzer.build();
-
-        self.file.body.retain(|statement| match statement {
-            ast::Statement::Expr(expression) => {
-                expr_statement != *expression.as_ref()
-            }
-            _ => true,
-        });
-
-        self.file.body.insert(
-            0,
-            ast::Statement::Expr(Box::new(ast::ExprStmt {
-                base: ast::BaseNode::default(),
-                expression: ast::Expression::PipeExpr(Box::new(
-                    statement,
-                )),
-            })),
-        );
-
+        self.sync();
         Ok(())
     }
 
@@ -789,58 +647,13 @@ impl Composition {
         tag_key: String,
         tag_value: String,
     ) -> CompositionResult {
-        let mut visitor =
-            CompositionStatementFinderVisitor::default();
-        flux::ast::walk::walk(
-            &mut visitor,
-            flux::ast::walk::Node::File(&self.file),
-        );
-        if visitor.statement.is_none() {
-            return Err(());
-        }
-        let expr_statement =
-            visitor.statement.expect("Previous check failed.");
-
-        let mut analyzer = CompositionQueryAnalyzer::default();
-        analyzer.analyze(expr_statement.clone());
-
-        if analyzer.tag_values.iter().any(|(tk, tvs)| {
-            tk == &tag_key && tvs.contains(&tag_value)
-        }) {
+        let tag_pair = (tag_key, tag_value);
+        if self.analyzer.tag_values.contains(&tag_pair) {
             return Err(());
         } else {
-            let mut inserted = false;
-            for (i, (tk, _)) in analyzer.tag_values.iter().enumerate()
-            {
-                if tk == &tag_key {
-                    analyzer.tag_values[i].1.push(tag_value.clone());
-                    inserted = true;
-                    break;
-                }
-            }
-            if !inserted {
-                analyzer.tag_values.push((tag_key, vec![tag_value]));
-            }
+            self.analyzer.tag_values.push(tag_pair);
         }
-        let statement = analyzer.build();
-
-        self.file.body.retain(|statement| match statement {
-            ast::Statement::Expr(expression) => {
-                expr_statement != *expression.as_ref()
-            }
-            _ => true,
-        });
-
-        self.file.body.insert(
-            0,
-            ast::Statement::Expr(Box::new(ast::ExprStmt {
-                base: ast::BaseNode::default(),
-                expression: ast::Expression::PipeExpr(Box::new(
-                    statement,
-                )),
-            })),
-        );
-
+        self.sync();
         Ok(())
     }
 
@@ -849,65 +662,13 @@ impl Composition {
         tag_key: String,
         tag_value: String,
     ) -> CompositionResult {
-        let mut visitor =
-            CompositionStatementFinderVisitor::default();
-        flux::ast::walk::walk(
-            &mut visitor,
-            flux::ast::walk::Node::File(&self.file),
-        );
-        if visitor.statement.is_none() {
+        let tag_pair = (tag_key, tag_value);
+        if self.analyzer.tag_values.contains(&tag_pair) {
+            self.analyzer.tag_values.retain(|p| !p.eq(&tag_pair));
+        } else {
             return Err(());
         }
-        let expr_statement =
-            visitor.statement.expect("Previous check failed.");
-
-        let mut analyzer = CompositionQueryAnalyzer::default();
-        analyzer.analyze(expr_statement.clone());
-
-        let mut tag_key_exist = false;
-        for (i, (tk, tvs)) in analyzer.tag_values.iter().enumerate() {
-            if tk == &tag_key {
-                let previous_len: usize = tvs.clone().len();
-                tag_key_exist = true;
-                analyzer.tag_values[i]
-                    .1
-                    .retain(|value| value != &tag_value);
-                if previous_len == analyzer.tag_values[i].1.len() {
-                    return Err(());
-                }
-                // remove the tag key if the tag values is an empty vec
-                if analyzer.tag_values[i].1.is_empty() {
-                    analyzer
-                        .tag_values
-                        .retain(|(key, _)| key != &tag_key);
-                }
-                break;
-            }
-        }
-
-        if !tag_key_exist {
-            return Err(());
-        }
-
-        let statement = analyzer.build();
-
-        self.file.body.retain(|statement| match statement {
-            ast::Statement::Expr(expression) => {
-                expr_statement != *expression.as_ref()
-            }
-            _ => true,
-        });
-
-        self.file.body.insert(
-            0,
-            ast::Statement::Expr(Box::new(ast::ExprStmt {
-                base: ast::BaseNode::default(),
-                expression: ast::Expression::PipeExpr(Box::new(
-                    statement,
-                )),
-            })),
-        );
-
+        self.sync();
         Ok(())
     }
 }
@@ -916,822 +677,826 @@ impl Composition {
 mod tests {
     use super::*;
 
+    /// Initializing a composition will create a statement in the flux ast file
+    /// that is managed by the composition.
     #[test]
-    fn test_composition_string() {
-        let fluxscript = r#"from(bucket: "an-composition")
-|> yield(name: "_editor_composition")
-
-from(bucket: "an-composition")
-|> yield(name: "_another_id")
-"#;
-        let ast = flux::parser::parse_string("".into(), &fluxscript);
-        let composition = Composition::new(ast);
-
-        assert_eq!("from(bucket: \"an-composition\")\n    |> yield(name: \"_editor_composition\")\n".to_string(), composition.composition_string().unwrap());
-    }
-
-    #[test]
-    fn test_composition_string_not_found() {
-        let fluxscript = r#"from(bucket: "an-composition")
-|> yield(name: "_not_a_composition")
-
-from(bucket: "an-composition")
-|> yield(name: "_another_id")
-"#;
-        let ast = flux::parser::parse_string("".into(), &fluxscript);
-        let composition = Composition::new(ast);
-
-        assert!(composition.composition_string().is_none());
-    }
-
-    #[test]
-    fn test_composition_string_only_returns_composition() {
-        let fluxscript = r#"from(bucket: "an-composition")
-|> yield(name: "_editor_composition")
-
-query1 = from(bucket: "an-composition")
-"#;
-        let ast = flux::parser::parse_string("".into(), &fluxscript);
-        let composition = Composition::new(ast);
-
-        assert_eq!("from(bucket: \"an-composition\")\n    |> yield(name: \"_editor_composition\")\n".to_string(), composition.composition_string().unwrap());
-    }
-
-    #[test]
-    fn test_composition_string_will_return_updated_composition() {
-        let fluxscript = r#"from(bucket: "an-composition")
-|> yield(name: "_editor_composition")
-
-query1 = from(bucket: "an-composition")
-"#;
-        let ast = flux::parser::parse_string("".into(), &fluxscript);
-        let mut composition = Composition::new(ast);
-        composition
-            .add_measurement(String::from("myMeasurement"))
-            .unwrap();
-
-        assert_eq!("from(bucket: \"an-composition\")\n    |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n    |> filter(fn: (r) => r._measurement == \"myMeasurement\")\n    |> yield(name: \"_editor_composition\")\n".to_string(), composition.composition_string().unwrap());
-    }
-
-    #[test]
-    fn test_query_analyzer_analyze() {
-        let fluxscript = r#"import "lib"
-
-from(bucket: "an-composition")
-|> range(start: v.timeRangeStart, stop: v.timeRangeStop)
-|> filter(fn: (r) => r._measurement == "myMeasurement")
-|> filter(fn: (r) => r._field == "myField" or r._field == "myOtherField")
-|> filter(fn: (r) => exists r.anTag)
-|> filter(fn: (r) => r.myTag == "anValue" or r.myTag == "anotherValue")
-|> filter(fn: (r) => r.myOtherTag == "anotherValue")
-|> filter(fn: (r) => r.myOldTag1 == "myOldTagValue1" and r.myOldTag1 == "myOldTagValue2" and r.myOldTag2 == "myOldTagValue")
-|> filter(fn: (r) => exists r.anotherTag)
-|> yield(name: "_editor_composition")"#;
+    fn test_composition() {
+        let fluxscript = "".to_string();
         let ast = flux::parser::parse_string("".into(), &fluxscript);
 
-        let mut visitor =
-            CompositionStatementFinderVisitor::default();
-        flux::ast::walk::walk(
-            &mut visitor,
-            flux::ast::walk::Node::File(&ast),
-        );
-        let expr_statement =
-            visitor.statement.expect("Previous check failed.");
-
-        let mut analyzer = CompositionQueryAnalyzer::default();
-        analyzer.analyze(expr_statement.clone());
-
-        assert_eq!("an-composition".to_string(), analyzer.bucket);
-
-        assert_eq!(
-            Some("myMeasurement".to_string()),
-            analyzer.measurement
-        );
-        assert_eq!(vec!["myField", "myOtherField"], analyzer.fields);
-        assert_eq!(
+        let composition = Composition::new(
+            ast,
+            "myBucket".into(),
+            Some("myMeasurement".into()),
+            vec!["myField1".into(), "myField2".into()],
             vec![
-                (
-                    "myTag".to_string(),
-                    vec![
-                        "anValue".to_string(),
-                        "anotherValue".to_string(),
-                    ],
-                ),
-                (
-                    "myOtherTag".to_string(),
-                    vec!["anotherValue".to_string()],
-                ),
-                (
-                    "myOldTag1".to_string(),
-                    vec![
-                        "myOldTagValue1".to_string(),
-                        "myOldTagValue2".to_string(),
-                    ]
-                ),
-                (
-                    "myOldTag2".to_string(),
-                    vec!["myOldTagValue".to_string()]
-                ),
+                ("myTagKey".into(), "myTagValue".into()),
+                ("myTagKey2".into(), "myTagValue2".into()),
             ],
-            analyzer.tag_values
         );
-    }
 
-    #[test]
-    fn test_query_analyzer_build() {
-        let fluxscript = r#""#;
-        let ast = flux::parser::parse_string("".into(), &fluxscript);
-
-        let mut composition = Composition::new(ast);
-
-        composition
-            .initialize(
-                "an-composition".to_string(),
-                Some(String::from("myMeasurement")),
-                Some(vec![
-                    "myField".to_string(),
-                    "myOtherField".to_string(),
-                ]),
-                Some(vec![
-                    ("myTag".to_string(), "anValue".to_string()),
-                    ("myTag".to_string(), "anotherValue".to_string()),
-                    (
-                        "myOtherTag".to_string(),
-                        "anotherValue".to_string(),
-                    ),
-                    (
-                        "myOldTag1".to_string(),
-                        "myOldTagValue1".to_string(),
-                    ),
-                    (
-                        "myOldTag1".to_string(),
-                        "myOldTagValue2".to_string(),
-                    ),
-                    (
-                        "myOldTag2".to_string(),
-                        "myOldTagValue".to_string(),
-                    ),
-                ]),
-            )
-            .unwrap();
-
-        assert_eq!(
-            r#"from(bucket: "an-composition")
+        let expected = r#"from(bucket: "myBucket")
     |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
     |> filter(fn: (r) => r._measurement == "myMeasurement")
-    |> filter(fn: (r) => r._field == "myField" or r._field == "myOtherField")
-    |> filter(fn: (r) => r.myTag == "anValue" or r.myTag == "anotherValue")
-    |> filter(fn: (r) => r.myOtherTag == "anotherValue")
-    |> filter(fn: (r) => r.myOldTag1 == "myOldTagValue1" or r.myOldTag1 == "myOldTagValue2")
-    |> filter(fn: (r) => r.myOldTag2 == "myOldTagValue")
-    |> yield(name: "_editor_composition")
-"#
-            .to_string(),
-            composition.to_string()
-        );
+    |> filter(fn: (r) => r._field == "myField1" or r._field == "myField2")
+    |> filter(fn: (r) => r.myTagKey == "myTagValue")
+    |> filter(fn: (r) => r.myTagKey2 == "myTagValue2")
+"#.to_string();
+        assert_eq!(expected, composition.to_string());
     }
 
-    /// Initializing composition for a file will add a composition-owned statement
-    /// that will be the statement that filters will be added/removed.
+    /// Composition statements are added before the first expression statement, but after
+    /// any other statement types.
     #[test]
-    fn composition_initialize() {
-        let fluxscript = r#"from(bucket: "my-bucket") |> yield(name: "my-result")"#;
-        let ast = flux::parser::parse_string("".into(), &fluxscript);
+    fn test_composition_with_content() {
+        let fluxscript = r#"import "experimental"
 
-        let mut composition = Composition::new(ast);
+option task = {
+    name: "myTask",
+    every: 1h,
+    offset: 10m,
+    cron: "0 2 * * *",
+}
 
-        composition
-            .initialize(
-                String::from("an-composition"),
-                None,
-                None,
-                None,
-            )
-            .unwrap();
+myVar = 83
 
-        assert_eq!(
-            r#"from(bucket: "an-composition")
-    |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
-    |> yield(name: "_editor_composition")
-from(bucket: "my-bucket") |> yield(name: "my-result")
+from(bucket: "myExperimentalBucket")
+  |> range(start: -12m)
+  |> filter(fn: (r) => r._measurement == "anMeasurement")
+  |> pivot()
+  |> experimental.to(bucket: "myExperimentalBucketPivot")
 "#
-            .to_string(),
-            composition.to_string()
-        );
-    }
-
-    /// Initializing composition on a file already initialized acts as a "reset",
-    /// where buckets can be changed and filters removed.
-    #[test]
-    fn composition_initialize_reset() {
-        let fluxscript = r#"from(bucket: "an-composition")
-|> range(start: v.timeRangeStart, stop: v.timeRangeStop)
-|> filter(fn: (r) => r.myTag == "myValue")
-|> yield(name: "_editor_composition")"#;
+        .to_string();
         let ast = flux::parser::parse_string("".into(), &fluxscript);
 
-        let mut composition = Composition::new(ast);
-
-        composition
-            .initialize(
-                String::from("an-composition"),
-                None,
-                None,
-                None,
-            )
-            .unwrap();
-
-        assert_eq!(
-            r#"from(bucket: "an-composition")
-    |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
-    |> yield(name: "_editor_composition")
-"#
-            .to_string(),
-            composition.to_string()
+        let composition = Composition::new(
+            ast,
+            "myBucket".into(),
+            Some("myMeasurement".into()),
+            vec!["myField1".into(), "myField2".into()],
+            vec![
+                ("myTagKey".into(), "myTagValue".into()),
+                ("myTagKey2".into(), "myTagValue2".into()),
+            ],
         );
-    }
 
-    /// Initializing composition on a file which has import statements on first lines.
-    #[test]
-    fn composition_initialize_import_statement() {
-        let fluxscript = r#"import "lib""#;
-        let ast = flux::parser::parse_string("".into(), &fluxscript);
+        let expected = r#"import "experimental"
 
-        let mut composition = Composition::new(ast);
+option task = {name: "myTask", every: 1h, offset: 10m, cron: "0 2 * * *"}
 
-        composition
-            .initialize(
-                String::from("an-composition"),
-                None,
-                None,
-                None,
-            )
-            .unwrap();
+myVar = 83
 
-        assert_eq!(
-            r#"import "lib"
-
-from(bucket: "an-composition")
-    |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
-    |> yield(name: "_editor_composition")
-"#
-            .to_string(),
-            composition.to_string()
-        );
-    }
-
-    /// Initializing with a measurement will add a new |> filter call to go along
-    /// with the rest of the function.
-    #[test]
-    fn composition_initialize_with_measurement() {
-        let fluxscript = r#""#;
-        let ast = flux::parser::parse_string("".into(), &fluxscript);
-
-        let mut composition = Composition::new(ast);
-
-        composition
-            .initialize(
-                String::from("an-composition"),
-                Some(String::from("myMeasurement")),
-                None,
-                None,
-            )
-            .unwrap();
-
-        assert_eq!(
-            r#"from(bucket: "an-composition")
+from(bucket: "myBucket")
     |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
     |> filter(fn: (r) => r._measurement == "myMeasurement")
-    |> yield(name: "_editor_composition")
-"#
-            .to_string(),
-            composition.to_string()
-        );
+    |> filter(fn: (r) => r._field == "myField1" or r._field == "myField2")
+    |> filter(fn: (r) => r.myTagKey == "myTagValue")
+    |> filter(fn: (r) => r.myTagKey2 == "myTagValue2")
+
+from(bucket: "myExperimentalBucket")
+    |> range(start: -12m)
+    |> filter(fn: (r) => r._measurement == "anMeasurement")
+    |> pivot()
+    |> experimental.to(bucket: "myExperimentalBucketPivot")
+"#.to_string();
+        assert_eq!(expected, composition.to_string());
     }
 
-    /// Initializing composition with fields, tags, and tag values will populate the various
-    /// `filter` calls and return the complete query.
+    /// If there are only non-expression statements, add the composition to the end.
     #[test]
-    fn composition_initialize_with_extras() {
-        let fluxscript = r#""#;
+    fn test_composition_with_only_imports_and_variables() {
+        let fluxscript = r#"import "experimental"
+
+option task = {
+    name: "myTask",
+    every: 1h,
+    offset: 10m,
+    cron: "0 2 * * *",
+}
+
+myVar = 83
+"#
+        .to_string();
         let ast = flux::parser::parse_string("".into(), &fluxscript);
 
-        let mut composition = Composition::new(ast);
+        let composition = Composition::new(
+            ast,
+            "myBucket".into(),
+            Some("myMeasurement".into()),
+            vec!["myField1".into(), "myField2".into()],
+            vec![
+                ("myTagKey".into(), "myTagValue".into()),
+                ("myTagKey2".into(), "myTagValue2".into()),
+            ],
+        );
 
-        composition
-            .initialize(
-                String::from("an-composition"),
-                Some("myMeasurement".into()),
-                Some(vec!["myField".into(), "myField2".into()]),
-                Some(vec![
-                    ("myTag".into(), "myTagValue".into()),
-                    ("myTag".into(), "myTagValue2".into()),
-                ]),
-            )
-            .unwrap();
+        let expected = r#"import "experimental"
 
-        assert_eq!(
-            r#"from(bucket: "an-composition")
+option task = {name: "myTask", every: 1h, offset: 10m, cron: "0 2 * * *"}
+
+myVar = 83
+
+from(bucket: "myBucket")
     |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
     |> filter(fn: (r) => r._measurement == "myMeasurement")
-    |> filter(fn: (r) => r._field == "myField" or r._field == "myField2")
-    |> filter(fn: (r) => r.myTag == "myTagValue" or r.myTag == "myTagValue2")
-    |> yield(name: "_editor_composition")
-"#
-            .to_string(),
+    |> filter(fn: (r) => r._field == "myField1" or r._field == "myField2")
+    |> filter(fn: (r) => r.myTagKey == "myTagValue")
+    |> filter(fn: (r) => r.myTagKey2 == "myTagValue2")
+"#.to_string();
+        assert_eq!(expected, composition.to_string());
+    }
+
+    /// When a non-expression statement is added above the composition statement, the
+    /// Composition struct is able to find its statement in the new ast and update
+    /// it appropriately.
+    #[test]
+    fn test_composition_resolve_with_ast_preceding_var() {
+        let fluxscript = "".to_string();
+        let ast = flux::parser::parse_string("".into(), &fluxscript);
+
+        let mut composition = Composition::new(
+            ast,
+            "myBucket".into(),
+            Some("myMeasurement".into()),
+            vec!["myField1".into(), "myField2".into()],
+            vec![
+                ("myTagKey".into(), "myTagValue".into()),
+                ("myTagKey2".into(), "myTagValue2".into()),
+            ],
+        );
+
+        let new_fluxscript = format!(
+            r#"myVar = 83
+
+{}"#,
             composition.to_string()
         );
-    }
+        let new_ast =
+            flux::parser::parse_string("".into(), &new_fluxscript);
+        assert!(composition.resolve_with_ast(new_ast).is_ok());
 
-    #[test]
-    fn composition_add_measurement() {
-        let fluxscript = r#"from(bucket: "an-composition") |> range(start: v.timeRangeStart, stop: v.timeRangeStop) |> yield(name: "_editor_composition")"#;
-        let ast = flux::parser::parse_string("".into(), &fluxscript);
-        let mut composition = Composition::new(ast);
+        assert_eq!(1, composition.statement_index);
+        assert!(composition
+            .add_field("myField3".to_string())
+            .is_ok());
 
-        composition
-            .add_measurement(String::from("myMeasurement"))
-            .unwrap();
+        let expected = r#"myVar = 83
 
-        assert_eq!(
-            r#"from(bucket: "an-composition")
+from(bucket: "myBucket")
     |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
     |> filter(fn: (r) => r._measurement == "myMeasurement")
-    |> yield(name: "_editor_composition")
-"#
-            .to_string(),
-            composition.to_string()
-        )
+    |> filter(
+        fn: (r) => r._field == "myField1" or (r._field == "myField2" or r._field == "myField3"),
+    )
+    |> filter(fn: (r) => r.myTagKey == "myTagValue")
+    |> filter(fn: (r) => r.myTagKey2 == "myTagValue2")
+"#.to_string();
+        assert_eq!(expected, composition.to_string());
     }
 
+    /// When an expression statement is added above the composition statement, the
+    /// Composition struct is able to find its statement in the new ast and update
+    /// it appropriately.
     #[test]
-    fn composition_add_measurement_measurement_already_exists() {
-        let fluxscript = r#"from(bucket: "an-composition")
-        |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
-        |> filter(fn: (r) => r._measurement == "anMeasurement")
-        |> yield(name: "_editor_composition")
-    "#;
+    fn test_composition_resolve_with_ast_preceding_expr() {
+        let fluxscript = "".to_string();
         let ast = flux::parser::parse_string("".into(), &fluxscript);
 
-        let mut composition = Composition::new(ast);
-        // DON'T INITIALIZE THIS! WE'RE SIMULATING AN ALREADY INITIALIZED QUERY.
+        let mut composition = Composition::new(
+            ast,
+            "myBucket".into(),
+            Some("myMeasurement".into()),
+            vec!["myField1".into(), "myField2".into()],
+            vec![
+                ("myTagKey".into(), "myTagValue".into()),
+                ("myTagKey2".into(), "myTagValue2".into()),
+            ],
+        );
+
+        let new_fluxscript = format!(
+            r#"from(bucket: "anBucket")
+|> range(start: -12m)
+
+{}"#,
+            composition.to_string()
+        );
+        let new_ast =
+            flux::parser::parse_string("".into(), &new_fluxscript);
+        assert!(composition.resolve_with_ast(new_ast).is_ok());
+
+        assert_eq!(1, composition.statement_index);
+        assert!(composition
+            .add_field("myField3".to_string())
+            .is_ok());
+
+        let expected = r#"from(bucket: "anBucket")
+    |> range(start: -12m)
+from(bucket: "myBucket")
+    |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+    |> filter(fn: (r) => r._measurement == "myMeasurement")
+    |> filter(
+        fn: (r) => r._field == "myField1" or (r._field == "myField2" or r._field == "myField3"),
+    )
+    |> filter(fn: (r) => r.myTagKey == "myTagValue")
+    |> filter(fn: (r) => r.myTagKey2 == "myTagValue2")
+"#.to_string();
+        assert_eq!(expected, composition.to_string());
+    }
+
+    /// When an expression statement is added above the composition statement, and the
+    /// new statement matches buckets, the composition can still find its statement
+    /// in the file.
+    #[test]
+    fn test_composition_resolve_with_ast_preceding_expr_matching_bucket(
+    ) {
+        let fluxscript = "".to_string();
+        let ast = flux::parser::parse_string("".into(), &fluxscript);
+
+        let mut composition = Composition::new(
+            ast,
+            "myBucket".into(),
+            Some("myMeasurement".into()),
+            vec!["myField1".into(), "myField2".into()],
+            vec![
+                ("myTagKey".into(), "myTagValue".into()),
+                ("myTagKey2".into(), "myTagValue2".into()),
+            ],
+        );
+
+        let new_fluxscript = format!(
+            r#"from(bucket: "myBucket")
+|> range(start: -12m)
+
+{}"#,
+            composition.to_string()
+        );
+        let new_ast =
+            flux::parser::parse_string("".into(), &new_fluxscript);
+        assert!(composition.resolve_with_ast(new_ast).is_ok());
+
+        assert_eq!(1, composition.statement_index);
+        assert!(composition
+            .add_field("myField3".to_string())
+            .is_ok());
+
+        let expected = r#"from(bucket: "myBucket")
+    |> range(start: -12m)
+from(bucket: "myBucket")
+    |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+    |> filter(fn: (r) => r._measurement == "myMeasurement")
+    |> filter(
+        fn: (r) => r._field == "myField1" or (r._field == "myField2" or r._field == "myField3"),
+    )
+    |> filter(fn: (r) => r.myTagKey == "myTagValue")
+    |> filter(fn: (r) => r.myTagKey2 == "myTagValue2")
+"#.to_string();
+        assert_eq!(expected, composition.to_string());
+    }
+
+    /// When an expression statement is added above the composition statement, and the
+    /// new statement matches bucket and measurement, the composition can still find
+    /// its statement in the file.
+    #[test]
+    fn test_composition_resolve_with_ast_preceding_expr_matching_bucket_and_measurement(
+    ) {
+        let fluxscript = "".to_string();
+        let ast = flux::parser::parse_string("".into(), &fluxscript);
+
+        let mut composition = Composition::new(
+            ast,
+            "myBucket".into(),
+            Some("myMeasurement".into()),
+            vec!["myField1".into(), "myField2".into()],
+            vec![
+                ("myTagKey".into(), "myTagValue".into()),
+                ("myTagKey2".into(), "myTagValue2".into()),
+            ],
+        );
+
+        let new_fluxscript = format!(
+            r#"from(bucket: "myBucket")
+|> range(start: -12m)
+|> filter(fn: (r) => r._measurement == "myMeasurement")
+
+{}"#,
+            composition.to_string()
+        );
+        let new_ast =
+            flux::parser::parse_string("".into(), &new_fluxscript);
+        assert!(composition.resolve_with_ast(new_ast).is_ok());
+
+        assert_eq!(1, composition.statement_index);
+        assert!(composition
+            .add_field("myField3".to_string())
+            .is_ok());
+
+        let expected = r#"from(bucket: "myBucket")
+    |> range(start: -12m)
+    |> filter(fn: (r) => r._measurement == "myMeasurement")
+from(bucket: "myBucket")
+    |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+    |> filter(fn: (r) => r._measurement == "myMeasurement")
+    |> filter(
+        fn: (r) => r._field == "myField1" or (r._field == "myField2" or r._field == "myField3"),
+    )
+    |> filter(fn: (r) => r.myTagKey == "myTagValue")
+    |> filter(fn: (r) => r.myTagKey2 == "myTagValue2")
+"#.to_string();
+        assert_eq!(expected, composition.to_string());
+    }
+
+    /// When an expression statement is added above the composition statement, and the
+    /// new statement matches bucket and measurement, the composition can still find
+    /// its statement in the file.
+    #[test]
+    fn test_composition_resolve_with_ast_preceding_expr_matching_bucket_and_measurement_and_fields(
+    ) {
+        let fluxscript = "".to_string();
+        let ast = flux::parser::parse_string("".into(), &fluxscript);
+
+        let mut composition = Composition::new(
+            ast,
+            "myBucket".into(),
+            Some("myMeasurement".into()),
+            vec!["myField1".into(), "myField2".into()],
+            vec![
+                ("myTagKey".into(), "myTagValue".into()),
+                ("myTagKey2".into(), "myTagValue2".into()),
+            ],
+        );
+
+        let new_fluxscript = format!(
+            r#"from(bucket: "myBucket")
+|> range(start: -12m)
+|> filter(fn: (r) => r._measurement == "myMeasurement")
+|> filter(fn: (r) => r._field == "myField1" or r._field == "myField2")
+
+{}"#,
+            composition.to_string()
+        );
+        let new_ast =
+            flux::parser::parse_string("".into(), &new_fluxscript);
+        assert!(composition.resolve_with_ast(new_ast).is_ok());
+
+        assert_eq!(1, composition.statement_index);
+        assert!(composition
+            .add_field("myField3".to_string())
+            .is_ok());
+
+        let expected = r#"from(bucket: "myBucket")
+    |> range(start: -12m)
+    |> filter(fn: (r) => r._measurement == "myMeasurement")
+    |> filter(fn: (r) => r._field == "myField1" or r._field == "myField2")
+from(bucket: "myBucket")
+    |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+    |> filter(fn: (r) => r._measurement == "myMeasurement")
+    |> filter(
+        fn: (r) => r._field == "myField1" or (r._field == "myField2" or r._field == "myField3"),
+    )
+    |> filter(fn: (r) => r.myTagKey == "myTagValue")
+    |> filter(fn: (r) => r.myTagKey2 == "myTagValue2")
+"#.to_string();
+        assert_eq!(expected, composition.to_string());
+    }
+
+    /// When there are two statements that could both match the composition
+    /// statement, an error occurs.
+    #[test]
+    fn test_composition_resolve_with_ast_preceding_expr_matching_all()
+    {
+        let fluxscript = "".to_string();
+        let ast = flux::parser::parse_string("".into(), &fluxscript);
+
+        let mut composition = Composition::new(
+            ast,
+            "myBucket".into(),
+            Some("myMeasurement".into()),
+            vec!["myField1".into(), "myField2".into()],
+            vec![
+                ("myTagKey".into(), "myTagValue".into()),
+                ("myTagKey2".into(), "myTagValue2".into()),
+            ],
+        );
+
+        let new_fluxscript = format!(
+            r#"from(bucket: "myBucket")
+|> range(start: -12m)
+|> filter(fn: (r) => r._measurement == "myMeasurement")
+|> filter(fn: (r) => r._field == "myField1" or r._field == "myField2")
+|> filter(fn: (r) => r.myTagKey == "myTagValue" and r.myTagKey2 == "myTagValue2")
+
+{}"#,
+            composition.to_string()
+        );
+        let new_ast =
+            flux::parser::parse_string("".into(), &new_fluxscript);
+        assert!(composition.resolve_with_ast(new_ast).is_err());
+    }
+
+    /// When an expression statement is added after the composition statement, the
+    /// Composition struct is able to find its statement in the new ast and update
+    /// it appropriately.
+    #[test]
+    fn test_composition_resolve_with_ast_following_expr() {
+        let fluxscript = "".to_string();
+        let ast = flux::parser::parse_string("".into(), &fluxscript);
+
+        let mut composition = Composition::new(
+            ast,
+            "myBucket".into(),
+            Some("myMeasurement".into()),
+            vec!["myField1".into(), "myField2".into()],
+            vec![
+                ("myTagKey".into(), "myTagValue".into()),
+                ("myTagKey2".into(), "myTagValue2".into()),
+            ],
+        );
+
+        let new_fluxscript = format!(
+            r#"{}
+
+from(bucket: "anBucket")
+    |> range(start: -12m)
+"#,
+            composition.to_string()
+        );
+        let new_ast =
+            flux::parser::parse_string("".into(), &new_fluxscript);
+        assert!(composition.resolve_with_ast(new_ast).is_ok());
+
+        assert_eq!(0, composition.statement_index);
+        assert!(composition
+            .add_field("myField3".to_string())
+            .is_ok());
+
+        let expected = r#"from(bucket: "myBucket")
+    |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+    |> filter(fn: (r) => r._measurement == "myMeasurement")
+    |> filter(
+        fn: (r) => r._field == "myField1" or (r._field == "myField2" or r._field == "myField3"),
+    )
+    |> filter(fn: (r) => r.myTagKey == "myTagValue")
+    |> filter(fn: (r) => r.myTagKey2 == "myTagValue2")
+
+from(bucket: "anBucket")
+    |> range(start: -12m)
+"#.to_string();
+        assert_eq!(expected, composition.to_string());
+    }
+
+    /// When the query is modified to add new calls after the filter calls, those new calls
+    /// are preserved after a composition change.
+    #[test]
+    fn test_composition_resolve_with_ast_add_calls() {
+        let fluxscript = "".to_string();
+        let ast = flux::parser::parse_string("".into(), &fluxscript);
+
+        let mut composition = Composition::new(
+            ast,
+            "myBucket".into(),
+            Some("myMeasurement".into()),
+            vec!["myField1".into(), "myField2".into()],
+            vec![
+                ("myTagKey".into(), "myTagValue".into()),
+                ("myTagKey2".into(), "myTagValue2".into()),
+            ],
+        );
+
+        let new_fluxscript = format!(
+            r#"{}
+|> group(columns: ["myNonexistentColumn"])
+|> sort()
+"#,
+            composition.to_string()
+        );
+        let new_ast =
+            flux::parser::parse_string("".into(), &new_fluxscript);
+        assert!(composition.resolve_with_ast(new_ast).is_ok());
+
+        assert_eq!(0, composition.statement_index);
+        assert!(composition
+            .add_field("myField3".to_string())
+            .is_ok());
+
+        let expected = r#"from(bucket: "myBucket")
+    |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+    |> filter(fn: (r) => r._measurement == "myMeasurement")
+    |> filter(
+        fn: (r) => r._field == "myField1" or (r._field == "myField2" or r._field == "myField3"),
+    )
+    |> filter(fn: (r) => r.myTagKey == "myTagValue")
+    |> filter(fn: (r) => r.myTagKey2 == "myTagValue2")
+    |> group(columns: ["myNonexistentColumn"])
+    |> sort()
+"#.to_string();
+        assert_eq!(expected, composition.to_string());
+    }
+
+    /// A measurement filter can be added to a composition statement.
+    #[test]
+    fn test_composition_add_measurement() {
+        let ast =
+            flux::parser::parse_string("".into(), &"".to_string());
+        let mut composition = Composition::new(
+            ast,
+            "myBucket".into(),
+            None,
+            vec![],
+            vec![],
+        );
 
         assert!(composition
-            .add_measurement(String::from("myMeasurement"))
-            .is_err());
-    }
+            .add_measurement("myMeasurement".to_string())
+            .is_ok());
 
-    /// Modify existing composition, while retaining import statements on first lines.
-    #[test]
-    fn composition_add_measurement_import_statement() {
-        let fluxscript = r#"import "lib"
-
-from(bucket: "an-composition")
+        let expected = r#"from(bucket: "myBucket")
     |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
-    |> yield(name: "_editor_composition")
+    |> filter(fn: (r) => r._measurement == "myMeasurement")
 "#;
-        let ast = flux::parser::parse_string("".into(), &fluxscript);
-        let mut composition = Composition::new(ast);
+        assert_eq!(expected, composition.to_string());
+    }
 
-        composition
-            .add_measurement(String::from("myMeasurement"))
-            .unwrap();
-
-        assert_eq!(
-            r#"import "lib"
-
-from(bucket: "an-composition")
-    |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
-    |> filter(fn: (r) => r._measurement == "myMeasurement")
-    |> yield(name: "_editor_composition")
-"#
-            .to_string(),
-            composition.to_string()
+    /// Only one measurement can be added at one time. An error occurs if
+    /// the measurement has already been set.
+    #[test]
+    fn test_composition_add_measurement_already_set() {
+        let ast =
+            flux::parser::parse_string("".into(), &"".to_string());
+        let mut composition = Composition::new(
+            ast,
+            "myBucket".into(),
+            Some("myMeasurement".into()),
+            vec![],
+            vec![],
         );
+
+        assert!(composition
+            .add_measurement("myMeasurement".to_string())
+            .is_err());
     }
 
+    /// A field filter with multiple fields can be added.
     #[test]
-    fn composition_add_field() {
-        let fluxscript = r#"from(bucket: "an-composition")
-        |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
-        |> yield(name: "_editor_composition")
-    "#;
-        let ast = flux::parser::parse_string("".into(), &fluxscript);
+    fn test_composition_add_field() {
+        let ast =
+            flux::parser::parse_string("".into(), &"".to_string());
+        let mut composition = Composition::new(
+            ast,
+            "myBucket".into(),
+            None,
+            vec![],
+            vec![],
+        );
 
-        let mut composition = Composition::new(ast);
-        // DON'T INITIALIZE THIS! WE'RE SIMULATING AN ALREADY INITIALIZED QUERY.
-        composition.add_field(String::from("myField")).unwrap();
+        assert!(composition.add_field("myField".to_string()).is_ok());
 
-        assert_eq!(
-            r#"from(bucket: "an-composition")
+        let expected = r#"from(bucket: "myBucket")
     |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
     |> filter(fn: (r) => r._field == "myField")
-    |> yield(name: "_editor_composition")
-"#
-            .to_string(),
-            composition.to_string()
-        )
+"#;
+        assert_eq!(expected, composition.to_string());
     }
 
+    /// When multiple fields are added to the filter, the field values are OR'd
+    /// together.
     #[test]
-    fn composition_add_field_with_measurement() {
-        let fluxscript = r#"from(bucket: "an-composition")
-        |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
-        |> filter(fn: (r) => r._measurement == "anMeasurement")
-        |> yield(name: "_editor_composition")
-    "#;
-        let ast = flux::parser::parse_string("".into(), &fluxscript);
-
-        let mut composition = Composition::new(ast);
-        // DON'T INITIALIZE THIS! WE'RE SIMULATING AN ALREADY INITIALIZED QUERY.
-        composition.add_field(String::from("myField")).unwrap();
-
-        assert_eq!(
-            r#"from(bucket: "an-composition")
-    |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
-    |> filter(fn: (r) => r._measurement == "anMeasurement")
-    |> filter(fn: (r) => r._field == "myField")
-    |> yield(name: "_editor_composition")
-"#
-            .to_string(),
-            composition.to_string()
-        )
-    }
-
-    #[test]
-    fn composition_add_field_field_already_exists() {
-        let fluxscript = r#"from(bucket: "an-composition")
-        |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
-        |> filter(fn: (r) => r._measurement == "anMeasurement")
-        |> filter(fn: (r) => r._field == "anField")
-        |> yield(name: "_editor_composition")
-    "#;
-        let ast = flux::parser::parse_string("".into(), &fluxscript);
-
-        let mut composition = Composition::new(ast);
-        // DON'T INITIALIZE THIS! WE'RE SIMULATING AN ALREADY INITIALIZED QUERY.
+    fn test_composition_add_fields() {
+        let ast =
+            flux::parser::parse_string("".into(), &"".to_string());
+        let mut composition = Composition::new(
+            ast,
+            "myBucket".into(),
+            None,
+            vec!["myField".into()],
+            vec![],
+        );
 
         assert!(composition
-            .add_field(String::from("anField"))
+            .add_field("myField2".to_string())
+            .is_ok());
+
+        let expected = r#"from(bucket: "myBucket")
+    |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+    |> filter(fn: (r) => r._field == "myField" or r._field == "myField2")
+"#;
+        assert_eq!(expected, composition.to_string());
+    }
+
+    /// Adding a field that is already part of the composition results in an error.
+    #[test]
+    fn test_composition_add_field_already_added() {
+        let ast =
+            flux::parser::parse_string("".into(), &"".to_string());
+        let mut composition = Composition::new(
+            ast,
+            "myBucket".into(),
+            None,
+            vec!["myField".into()],
+            vec![],
+        );
+
+        assert!(composition
+            .add_field("myField".to_string())
             .is_err());
     }
 
+    /// Fields are removed from the composition.
     #[test]
-    fn composition_add_field_second_field() {
-        let fluxscript = r#"from(bucket: "an-composition")
-        |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
-        |> filter(fn: (r) => r._measurement == "anMeasurement")
-        |> filter(fn: (r) => r._field == "firstField")
-        |> yield(name: "_editor_composition")
-    "#;
-        let ast = flux::parser::parse_string("".into(), &fluxscript);
+    fn test_composition_remove_field() {
+        let ast =
+            flux::parser::parse_string("".into(), &"".to_string());
+        let mut composition = Composition::new(
+            ast,
+            "myBucket".into(),
+            None,
+            vec!["myField".into()],
+            vec![],
+        );
 
-        let mut composition = Composition::new(ast);
-        // DON'T INITIALIZE THIS! WE'RE SIMULATING AN ALREADY INITIALIZED QUERY.
-        composition.add_field(String::from("secondField")).unwrap();
-
-        assert_eq!(
-            r#"from(bucket: "an-composition")
-    |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
-    |> filter(fn: (r) => r._measurement == "anMeasurement")
-    |> filter(fn: (r) => r._field == "firstField" or r._field == "secondField")
-    |> yield(name: "_editor_composition")
-"#
-            .to_string(),
-            composition.to_string()
-        )
-    }
-
-    #[test]
-    fn composition_remove_field() {
-        let fluxscript = r#"from(bucket: "an-composition")
-        |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
-        |> filter(fn: (r) => r._measurement == "anMeasurement")
-        |> filter(fn: (r) => r._field == "anField")
-        |> yield(name: "_editor_composition")
-    "#;
-        let ast = flux::parser::parse_string("".into(), &fluxscript);
-
-        let mut composition = Composition::new(ast);
-        // DON'T INITIALIZE THIS! WE'RE SIMULATING AN ALREADY INITIALIZED QUERY.
-        composition.remove_field(String::from("anField")).unwrap();
-
-        assert_eq!(
-            r#"from(bucket: "an-composition")
-    |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
-    |> filter(fn: (r) => r._measurement == "anMeasurement")
-    |> yield(name: "_editor_composition")
-"#
-            .to_string(),
-            composition.to_string()
-        )
-    }
-
-    #[test]
-    fn composition_remove_field_multiple_fields() {
-        let fluxscript = r#"from(bucket: "an-composition")
-        |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
-        |> filter(fn: (r) => r._measurement == "anMeasurement")
-        |> filter(fn: (r) => r._field == "firstField" or r._field == "secondField" or r._field == "thirdField")
-        |> yield(name: "_editor_composition")
-    "#;
-        let ast = flux::parser::parse_string("".into(), &fluxscript);
-
-        let mut composition = Composition::new(ast);
-        // DON'T INITIALIZE THIS! WE'RE SIMULATING AN ALREADY INITIALIZED QUERY.
-        composition
-            .remove_field(String::from("secondField"))
-            .unwrap();
-
-        assert_eq!(
-            r#"from(bucket: "an-composition")
-    |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
-    |> filter(fn: (r) => r._measurement == "anMeasurement")
-    |> filter(fn: (r) => r._field == "firstField" or r._field == "thirdField")
-    |> yield(name: "_editor_composition")
-"#
-            .to_string(),
-            composition.to_string()
-        )
-    }
-
-    #[test]
-    fn composition_remove_field_field_not_exists() {
-        let fluxscript = r#"from(bucket: "an-composition")
-        |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
-        |> filter(fn: (r) => r._measurement == "anMeasurement")
-        |> filter(fn: (r) => r._field == "anField")
-        |> yield(name: "_editor_composition")
-    "#;
-        let ast = flux::parser::parse_string("".into(), &fluxscript);
-
-        let mut composition = Composition::new(ast);
-        // DON'T INITIALIZE THIS! WE'RE SIMULATING AN ALREADY INITIALIZED QUERY.
         assert!(composition
-            .remove_field(String::from("anotherField"))
+            .remove_field("myField".to_string())
+            .is_ok());
+
+        let expected = r#"from(bucket: "myBucket") |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+"#;
+        assert_eq!(expected, composition.to_string());
+    }
+
+    /// Removing a field that hasn't been added to the composition results
+    /// in an error.
+    #[test]
+    fn test_composition_remove_field_not_added() {
+        let ast =
+            flux::parser::parse_string("".into(), &"".to_string());
+        let mut composition = Composition::new(
+            ast,
+            "myBucket".into(),
+            None,
+            vec!["myField".into()],
+            vec![],
+        );
+
+        assert!(composition
+            .remove_field("myField2".to_string())
             .is_err());
     }
 
+    /// Filters for tag keys/values can be added to the composition.
     #[test]
-    fn composition_add_tag_value() {
-        let fluxscript = r#"from(bucket: "an-composition")
-        |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
-        |> yield(name: "_editor_composition")
-    "#;
-        let ast = flux::parser::parse_string("".into(), &fluxscript);
-
-        let mut composition = Composition::new(ast);
-        // DON'T INITIALIZE THIS! WE'RE SIMULATING AN ALREADY INITIALIZED QUERY.
-        composition
-            .add_tag_value(
-                String::from("tagKey"),
-                String::from("tagValue"),
-            )
-            .unwrap();
-
-        assert_eq!(
-            r#"from(bucket: "an-composition")
-    |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
-    |> filter(fn: (r) => r.tagKey == "tagValue")
-    |> yield(name: "_editor_composition")
-"#
-            .to_string(),
-            composition.to_string()
-        )
-    }
-
-    #[test]
-    fn composition_add_tag_value_tag_value_already_exists() {
-        let fluxscript = r#"from(bucket: "an-composition")
-        |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
-        |> filter(fn: (r) => r._measurement == "anMeasurement")
-        |> filter(fn: (r) => r.tagKey == "tagValue")
-        |> yield(name: "_editor_composition")
-    "#;
-        let ast = flux::parser::parse_string("".into(), &fluxscript);
-
-        let mut composition = Composition::new(ast);
-        // DON'T INITIALIZE THIS! WE'RE SIMULATING AN ALREADY INITIALIZED QUERY.
+    fn test_add_tag_value() {
+        let ast =
+            flux::parser::parse_string("".into(), &"".to_string());
+        let mut composition = Composition::new(
+            ast,
+            "myBucket".into(),
+            None,
+            vec![],
+            vec![],
+        );
 
         assert!(composition
             .add_tag_value(
-                String::from("tagKey"),
-                String::from("tagValue")
+                "myTagKey".to_string(),
+                "myTagValue".to_string()
             )
-            .is_err());
-    }
+            .is_ok());
 
-    #[test]
-    fn composition_add_tag_value_new_tagset() {
-        let fluxscript = r#"from(bucket: "an-composition")
-        |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
-        |> filter(fn: (r) => r._measurement == "anMeasurement")
-        |> filter(fn: (r) => r.tagKey1 == "tagValue1")
-        |> yield(name: "_editor_composition")
-    "#;
-        let ast = flux::parser::parse_string("".into(), &fluxscript);
-
-        let mut composition = Composition::new(ast);
-        // DON'T INITIALIZE THIS! WE'RE SIMULATING AN ALREADY INITIALIZED QUERY.
-        composition
-            .add_tag_value(
-                String::from("tagKey2"),
-                String::from("tagValue2"),
-            )
-            .unwrap();
-
-        assert_eq!(
-            r#"from(bucket: "an-composition")
+        let expected = r#"from(bucket: "myBucket")
     |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
-    |> filter(fn: (r) => r._measurement == "anMeasurement")
-    |> filter(fn: (r) => r.tagKey1 == "tagValue1")
-    |> filter(fn: (r) => r.tagKey2 == "tagValue2")
-    |> yield(name: "_editor_composition")
-"#
-            .to_string(),
-            composition.to_string()
-        )
+    |> filter(fn: (r) => r.myTagKey == "myTagValue")
+"#;
+        assert_eq!(expected, composition.to_string());
     }
 
+    /// Tag filters are their own individual filter calls.
     #[test]
-    fn composition_add_tag_value_same_tag_key() {
-        let fluxscript = r#"from(bucket: "an-composition")
-        |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
-        |> filter(fn: (r) => r._measurement == "anMeasurement")
-        |> filter(fn: (r) => r.tagKey1 == "tagValue1")
-        |> yield(name: "_editor_composition")
-    "#;
-        let ast = flux::parser::parse_string("".into(), &fluxscript);
+    fn test_add_tag_values() {
+        let ast =
+            flux::parser::parse_string("".into(), &"".to_string());
+        let mut composition = Composition::new(
+            ast,
+            "myBucket".into(),
+            None,
+            vec![],
+            vec![("myTagKey".into(), "myTagValue".into())],
+        );
 
-        let mut composition = Composition::new(ast);
-        // DON'T INITIALIZE THIS! WE'RE SIMULATING AN ALREADY INITIALIZED QUERY.
-        composition
-            .add_tag_value(
-                String::from("tagKey1"),
-                String::from("tagValue2"),
-            )
-            .unwrap();
-
-        assert_eq!(
-            r#"from(bucket: "an-composition")
-    |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
-    |> filter(fn: (r) => r._measurement == "anMeasurement")
-    |> filter(fn: (r) => r.tagKey1 == "tagValue1" or r.tagKey1 == "tagValue2")
-    |> yield(name: "_editor_composition")
-"#
-            .to_string(),
-            composition.to_string()
-        )
-    }
-
-    #[test]
-    fn composition_add_tag_value_with_old_and() {
-        let fluxscript = r#"from(bucket: "an-composition")
-        |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
-        |> filter(fn: (r) => r._measurement == "anMeasurement")
-        |> filter(fn: (r) => r.tagKey1 == "tagValue1" and r.tagKey1 == "tagValue2" and r.tagKey2 == "tagValue1")
-        |> yield(name: "_editor_composition")
-    "#;
-        let ast = flux::parser::parse_string("".into(), &fluxscript);
-
-        let mut composition = Composition::new(ast);
-        // DON'T INITIALIZE THIS! WE'RE SIMULATING AN ALREADY INITIALIZED QUERY.
-        composition
-            .add_tag_value(
-                String::from("tagKey2"),
-                String::from("tagValue2"),
-            )
-            .unwrap();
-
-        assert_eq!(
-            r#"from(bucket: "an-composition")
-    |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
-    |> filter(fn: (r) => r._measurement == "anMeasurement")
-    |> filter(fn: (r) => r.tagKey1 == "tagValue1" or r.tagKey1 == "tagValue2")
-    |> filter(fn: (r) => r.tagKey2 == "tagValue1" or r.tagKey2 == "tagValue2")
-    |> yield(name: "_editor_composition")
-"#
-            .to_string(),
-            composition.to_string()
-        )
-    }
-
-    #[test]
-    fn composition_remove_tag_value() {
-        let fluxscript = r#"from(bucket: "an-composition")
-        |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
-        |> filter(fn: (r) => r._measurement == "anMeasurement")
-        |> filter(fn: (r) => r._field == "anField")
-        |> filter(fn: (r) => r.tagKey == "tagValue")
-        |> yield(name: "_editor_composition")
-    "#;
-        let ast = flux::parser::parse_string("".into(), &fluxscript);
-
-        let mut composition = Composition::new(ast);
-        // DON'T INITIALIZE THIS! WE'RE SIMULATING AN ALREADY INITIALIZED QUERY.
-        composition
-            .remove_tag_value(
-                String::from("tagKey"),
-                String::from("tagValue"),
-            )
-            .unwrap();
-
-        assert_eq!(
-            r#"from(bucket: "an-composition")
-    |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
-    |> filter(fn: (r) => r._measurement == "anMeasurement")
-    |> filter(fn: (r) => r._field == "anField")
-    |> yield(name: "_editor_composition")
-"#
-            .to_string(),
-            composition.to_string()
-        )
-    }
-
-    #[test]
-    fn composition_remove_tag_value_multiple_tag_values() {
-        let fluxscript = r#"from(bucket: "an-composition")
-        |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
-        |> filter(fn: (r) => r._measurement == "anMeasurement")
-        |> filter(fn: (r) => r.tagKey1 == "tagValue1")
-        |> filter(fn: (r) => r.tagKey2 == "tagValue2")
-        |> filter(fn: (r) => r.tagKey3 == "tagValue3")
-        |> yield(name: "_editor_composition")
-    "#;
-        let ast = flux::parser::parse_string("".into(), &fluxscript);
-
-        let mut composition = Composition::new(ast);
-        // DON'T INITIALIZE THIS! WE'RE SIMULATING AN ALREADY INITIALIZED QUERY.
-        composition
-            .remove_tag_value(
-                String::from("tagKey2"),
-                String::from("tagValue2"),
-            )
-            .unwrap();
-
-        assert_eq!(
-            r#"from(bucket: "an-composition")
-    |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
-    |> filter(fn: (r) => r._measurement == "anMeasurement")
-    |> filter(fn: (r) => r.tagKey1 == "tagValue1")
-    |> filter(fn: (r) => r.tagKey3 == "tagValue3")
-    |> yield(name: "_editor_composition")
-"#
-            .to_string(),
-            composition.to_string()
-        )
-    }
-
-    #[test]
-    fn composition_remove_tag_value_tag_value_not_exists() {
-        let fluxscript = r#"from(bucket: "an-composition")
-        |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
-        |> filter(fn: (r) => r._measurement == "anMeasurement")
-        |> filter(fn: (r) => r.tagKey1 == "tagValue1")
-        |> filter(fn: (r) => r.tagKey3 == "tagValue3")
-        |> yield(name: "_editor_composition")
-    "#;
-        let ast = flux::parser::parse_string("".into(), &fluxscript);
-
-        let mut composition = Composition::new(ast);
-        // DON'T INITIALIZE THIS! WE'RE SIMULATING AN ALREADY INITIALIZED QUERY.
         assert!(composition
-            .remove_tag_value(
-                String::from("tagKey2"),
-                String::from("tagValue2")
+            .add_tag_value(
+                "myTagKey2".to_string(),
+                "myTagValue2".to_string()
+            )
+            .is_ok());
+
+        let expected = r#"from(bucket: "myBucket")
+    |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+    |> filter(fn: (r) => r.myTagKey == "myTagValue")
+    |> filter(fn: (r) => r.myTagKey2 == "myTagValue2")
+"#;
+        assert_eq!(expected, composition.to_string());
+    }
+
+    /// Tags filters with multiple tag values result in a single
+    /// `filter` call with OR operators.
+    #[test]
+    fn test_add_tag_values_with_same_key() {
+        let ast =
+            flux::parser::parse_string("".into(), &"".to_string());
+        let mut composition = Composition::new(
+            ast,
+            "myBucket".into(),
+            None,
+            vec![],
+            vec![("myTagKey".into(), "myTagValue".into())],
+        );
+
+        assert!(composition
+            .add_tag_value(
+                "myTagKey".to_string(),
+                "myTagValue3".to_string()
+            )
+            .is_ok());
+        assert!(composition
+            .add_tag_value(
+                "myTagKey2".to_string(),
+                "myTagValue2".to_string()
+            )
+            .is_ok());
+
+        let expected = r#"from(bucket: "myBucket")
+    |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+    |> filter(fn: (r) => r.myTagKey == "myTagValue" or r.myTagKey == "myTagValue3")
+    |> filter(fn: (r) => r.myTagKey2 == "myTagValue2")
+"#;
+        assert_eq!(expected, composition.to_string());
+    }
+
+    /// Adding a tag key/value that already exists in the composition results
+    /// in an error.
+    #[test]
+    fn test_add_tag_value_already_added() {
+        let ast =
+            flux::parser::parse_string("".into(), &"".to_string());
+        let mut composition = Composition::new(
+            ast,
+            "myBucket".into(),
+            None,
+            vec![],
+            vec![("myTagKey".into(), "myTagValue".into())],
+        );
+
+        assert!(composition
+            .add_tag_value(
+                "myTagKey".to_string(),
+                "myTagValue".to_string()
             )
             .is_err());
     }
 
+    /// A tag key/value pair can be removed from the composition.
     #[test]
-    fn composition_remove_tag_value_with_old_and() {
-        let fluxscript = r#"from(bucket: "an-composition")
-        |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
-        |> filter(fn: (r) => r._measurement == "anMeasurement")
-        |> filter(fn: (r) => r.tagKey1 == "tagValue1" and r.tagKey1 == "tagValue2" and r.tagKey2 == "tagValue")
-        |> yield(name: "_editor_composition")
-    "#;
-        let ast = flux::parser::parse_string("".into(), &fluxscript);
+    fn test_remove_tag_value() {
+        let ast =
+            flux::parser::parse_string("".into(), &"".to_string());
+        let mut composition = Composition::new(
+            ast,
+            "myBucket".into(),
+            None,
+            vec![],
+            vec![("myTagKey".into(), "myTagValue".into())],
+        );
 
-        let mut composition = Composition::new(ast);
-        // DON'T INITIALIZE THIS! WE'RE SIMULATING AN ALREADY INITIALIZED QUERY.
-        composition
+        assert!(composition
             .remove_tag_value(
-                String::from("tagKey1"),
-                String::from("tagValue2"),
+                "myTagKey".to_string(),
+                "myTagValue".to_string()
             )
-            .unwrap();
+            .is_ok());
 
-        assert_eq!(
-            r#"from(bucket: "an-composition")
-    |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
-    |> filter(fn: (r) => r._measurement == "anMeasurement")
-    |> filter(fn: (r) => r.tagKey1 == "tagValue1")
-    |> filter(fn: (r) => r.tagKey2 == "tagValue")
-    |> yield(name: "_editor_composition")
-"#
-            .to_string(),
-            composition.to_string()
-        )
+        let expected = r#"from(bucket: "myBucket") |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+"#;
+        assert_eq!(expected, composition.to_string());
+    }
+
+    /// Attempting to remove a tag key/value pair that wasn't added to the composition
+    /// results in an error.
+    #[test]
+    fn test_remove_tag_value_not_added() {
+        let ast =
+            flux::parser::parse_string("".into(), &"".to_string());
+        let mut composition = Composition::new(
+            ast,
+            "myBucket".into(),
+            None,
+            vec![],
+            vec![],
+        );
+
+        assert!(composition
+            .remove_tag_value(
+                "myTagKey".to_string(),
+                "myTagValue".to_string()
+            )
+            .is_err());
     }
 }

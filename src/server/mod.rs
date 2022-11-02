@@ -106,6 +106,7 @@ fn find_references<'a>(
 #[derive(Default)]
 struct LspServerState {
     buckets: Vec<String>,
+    compositions: HashMap<lsp::Url, composition::Composition>,
 }
 
 impl LspServerState {
@@ -118,6 +119,28 @@ impl LspServerState {
 
     pub fn set_buckets(&mut self, buckets: Vec<String>) {
         self.buckets = buckets;
+    }
+
+    /// Get a composition from the state
+    ///
+    /// We return a copy here, as the pointer across threads isn't supported.
+    pub fn get_composition(
+        &self,
+        uri: &lsp::Url,
+    ) -> Option<composition::Composition> {
+        self.compositions.get(uri).cloned()
+    }
+
+    pub fn set_composition(
+        &mut self,
+        uri: lsp::Url,
+        composition: composition::Composition,
+    ) {
+        self.compositions.insert(uri, composition);
+    }
+
+    pub fn drop_composition(&mut self, uri: &lsp::Url) {
+        self.compositions.remove(uri);
     }
 }
 
@@ -489,6 +512,30 @@ impl LanguageServer for LspServer {
                     .fold(value, |_acc, change| change.text.clone());
                 self.store.put(&key, &new_contents.clone());
                 self.publish_diagnostics(&key).await;
+
+                if self.store.get_package_errors(&key).is_none() {
+                    match self.state.lock() {
+                        Ok(mut state) => {
+                            if let Some(mut composition) =
+                                state.get_composition(&key)
+                            {
+                                match self.store.get_ast_file(&key) {
+                                Ok(file) => {
+                                    let result = composition.resolve_with_ast(file);
+                                    if result.is_err() {
+                                        state.drop_composition(&key);
+                                        if let Some(client) = &self.get_client() {
+                                            let _ = client.show_message(lsp::MessageType::ERROR, "A conflict has occured in the query composition. The composition has been aborted.");
+                                        }
+                                    }
+                                }
+                                Err(_) => log::error!("Found composition but did not find ast for key: {}", key),
+                            }
+                            }
+                        }
+                        Err(err) => panic!("{}", err),
+                    }
+                }
             }
             Err(err) => log::error!(
                 "Could not update key: {}\n{:?}",
@@ -502,8 +549,13 @@ impl LanguageServer for LspServer {
         &self,
         params: lsp::DidCloseTextDocumentParams,
     ) -> () {
-        let key = params.text_document.uri;
-        self.store.remove(&key);
+        self.store.remove(&params.text_document.uri);
+        match self.state.lock() {
+            Ok(mut state) => {
+                state.drop_composition(&params.text_document.uri)
+            }
+            Err(err) => panic!("{}", err),
+        }
     }
 
     async fn did_change_configuration(
@@ -1390,48 +1442,24 @@ impl LanguageServer for LspServer {
                 let file = self.store.get_ast_file(
                     &command_params.text_document.uri,
                 )?;
-                let mut composition =
-                    composition::Composition::new(file);
-                let old_text = composition.composition_string();
-
-                let status = composition.initialize(
+                let composition = composition::Composition::new(
+                    file,
                     command_params.bucket,
                     command_params.measurement,
-                    command_params.fields,
-                    command_params.tag_values,
+                    command_params.fields.unwrap_or_default(),
+                    command_params.tag_values.unwrap_or_default(),
                 );
-                if status.is_err() {
-                    return Err(LspError::InternalError(
-                        "Failed to initialize composition."
-                            .to_string(),
-                    )
-                    .into());
-                }
-                let new_text = composition
-                    .composition_string()
-                    .expect("bad composition state");
-
-                // index 0 is line 1, char 1 for line_col::LineColLookup.
-                // Will need to convert to zero indexing for applyEdit. (Range is zero indexed.)
-                // https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#range
-                let last_pos = match old_text {
-                    Some(text) => line_col::LineColLookup::new(&text)
-                        .get(text.len()),
-                    None => line_col::LineColLookup::new(&new_text)
-                        .get(new_text.len()),
-                };
 
                 let edit = lsp::WorkspaceEdit {
                     changes: Some(HashMap::from([(
                         command_params.text_document.uri.clone(),
                         vec![lsp::TextEdit {
-                            new_text: new_text.clone(),
-                            range: lsp::Range {
-                                start: lsp::Position::default(),
-                                end: lsp::Position {
-                                    line: last_pos.0 as u32 - 1,
-                                    character: last_pos.1 as u32 - 1,
-                                },
+                            new_text: composition.to_string(),
+                            range: {
+                                let file = self.store.get_ast_file(
+                                    &command_params.text_document.uri,
+                                )?;
+                                file.base.location.into()
                             },
                         }],
                     )])),
@@ -1439,25 +1467,16 @@ impl LanguageServer for LspServer {
                     change_annotations: None,
                 };
 
+                match self.state.lock() {
+                    Ok(mut state) => state.set_composition(
+                        command_params.text_document.uri,
+                        composition,
+                    ),
+                    Err(err) => panic!("{}", err),
+                }
                 if let Some(client) = self.get_client() {
-                    match client.apply_edit(edit, None).await {
-                        Ok(response) => {
-                            if response.applied {
-                                self.store.put(
-                                    &command_params.text_document.uri,
-                                    &new_text,
-                                );
-                            }
-                        }
-                        Err(err) => {
-                            return Err(LspError::InternalError(
-                                format!("{:?}", err),
-                            )
-                            .into())
-                        }
-                    };
+                    let _ = client.apply_edit(edit, None).await;
                 };
-
                 Ok(None)
             }
             Ok(LspServerCommand::AddMeasurementFilter) => {
@@ -1474,47 +1493,44 @@ impl LanguageServer for LspServer {
                         }
                     };
 
-                let file = self.store.get_ast_file(
-                    &command_params.text_document.uri,
-                )?;
-                let mut composition =
-                    composition::Composition::new(file);
-                let old_text = composition.composition_string();
+                let mut composition = match self.state.lock() {
+                    Ok(state) => match state.get_composition(
+                        &command_params.text_document.uri,
+                    ) {
+                        Some(composition) => composition,
+                        None => {
+                            return Err(
+                                LspError::CompositionNotFound(
+                                    command_params.text_document.uri,
+                                )
+                                .into(),
+                            )
+                        }
+                    },
+                    Err(err) => panic!("{}", err),
+                };
 
-                let status =
-                    composition.add_measurement(command_params.value);
-                if status.is_err() {
+                if composition
+                    .add_measurement(command_params.value)
+                    .is_err()
+                {
                     return Err(LspError::InternalError(
                         "Failed to add measurement to composition."
                             .to_string(),
                     )
                     .into());
                 }
-                let new_text = composition
-                    .composition_string()
-                    .expect("bad composition state");
-
-                // index 0 is line 1, char 1 for line_col::LineColLookup.
-                // Will need to convert to zero indexing for applyEdit. (Range is zero indexed.)
-                // https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#range
-                let last_pos = match old_text {
-                    Some(text) => line_col::LineColLookup::new(&text)
-                        .get(text.len()),
-                    None => line_col::LineColLookup::new(&new_text)
-                        .get(new_text.len()),
-                };
 
                 let edit = lsp::WorkspaceEdit {
                     changes: Some(HashMap::from([(
                         command_params.text_document.uri.clone(),
                         vec![lsp::TextEdit {
-                            new_text: new_text.clone(),
-                            range: lsp::Range {
-                                start: lsp::Position::default(),
-                                end: lsp::Position {
-                                    line: last_pos.0 as u32 - 1,
-                                    character: last_pos.1 as u32 - 1,
-                                },
+                            new_text: composition.to_string(),
+                            range: {
+                                let file = self.store.get_ast_file(
+                                    &command_params.text_document.uri,
+                                )?;
+                                file.base.location.into()
                             },
                         }],
                     )])),
@@ -1522,25 +1538,16 @@ impl LanguageServer for LspServer {
                     change_annotations: None,
                 };
 
+                match self.state.lock() {
+                    Ok(mut state) => state.set_composition(
+                        command_params.text_document.uri,
+                        composition,
+                    ),
+                    Err(err) => panic!("{}", err),
+                }
                 if let Some(client) = self.get_client() {
-                    match client.apply_edit(edit, None).await {
-                        Ok(response) => {
-                            if response.applied {
-                                self.store.put(
-                                    &command_params.text_document.uri,
-                                    &new_text,
-                                );
-                            }
-                        }
-                        Err(err) => {
-                            return Err(LspError::InternalError(
-                                format!("{:?}", err),
-                            )
-                            .into())
-                        }
-                    };
+                    let _ = client.apply_edit(edit, None).await;
                 };
-
                 Ok(None)
             }
             Ok(LspServerCommand::AddFieldFilter) => {
@@ -1557,47 +1564,44 @@ impl LanguageServer for LspServer {
                         }
                     };
 
-                let file = self.store.get_ast_file(
-                    &command_params.text_document.uri,
-                )?;
-                let mut composition =
-                    composition::Composition::new(file);
-                let old_text = composition.composition_string();
+                let mut composition = match self.state.lock() {
+                    Ok(state) => match state.get_composition(
+                        &command_params.text_document.uri,
+                    ) {
+                        Some(composition) => composition,
+                        None => {
+                            return Err(
+                                LspError::CompositionNotFound(
+                                    command_params.text_document.uri,
+                                )
+                                .into(),
+                            )
+                        }
+                    },
+                    Err(err) => panic!("{}", err),
+                };
 
-                let status =
-                    composition.add_field(command_params.value);
-                if status.is_err() {
+                if composition
+                    .add_field(command_params.value)
+                    .is_err()
+                {
                     return Err(LspError::InternalError(
                         "Failed to add field to composition."
                             .to_string(),
                     )
                     .into());
                 }
-                let new_text = composition
-                    .composition_string()
-                    .expect("bad composition state");
-
-                // index 0 is line 1, char 1 for line_col::LineColLookup.
-                // Will need to convert to zero indexing for applyEdit. (Range is zero indexed.)
-                // https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#range
-                let last_pos = match old_text {
-                    Some(text) => line_col::LineColLookup::new(&text)
-                        .get(text.len()),
-                    None => line_col::LineColLookup::new(&new_text)
-                        .get(new_text.len()),
-                };
 
                 let edit = lsp::WorkspaceEdit {
                     changes: Some(HashMap::from([(
                         command_params.text_document.uri.clone(),
                         vec![lsp::TextEdit {
-                            new_text: new_text.clone(),
-                            range: lsp::Range {
-                                start: lsp::Position::default(),
-                                end: lsp::Position {
-                                    line: last_pos.0 as u32 - 1,
-                                    character: last_pos.1 as u32 - 1,
-                                },
+                            new_text: composition.to_string(),
+                            range: {
+                                let file = self.store.get_ast_file(
+                                    &command_params.text_document.uri,
+                                )?;
+                                file.base.location.into()
                             },
                         }],
                     )])),
@@ -1605,25 +1609,16 @@ impl LanguageServer for LspServer {
                     change_annotations: None,
                 };
 
+                match self.state.lock() {
+                    Ok(mut state) => state.set_composition(
+                        command_params.text_document.uri,
+                        composition,
+                    ),
+                    Err(err) => panic!("{}", err),
+                }
                 if let Some(client) = self.get_client() {
-                    match client.apply_edit(edit, None).await {
-                        Ok(response) => {
-                            if response.applied {
-                                self.store.put(
-                                    &command_params.text_document.uri,
-                                    &new_text,
-                                );
-                            }
-                        }
-                        Err(err) => {
-                            return Err(LspError::InternalError(
-                                format!("{:?}", err),
-                            )
-                            .into())
-                        }
-                    };
+                    let _ = client.apply_edit(edit, None).await;
                 };
-
                 Ok(None)
             }
             Ok(LspServerCommand::RemoveFieldFilter) => {
@@ -1640,47 +1635,44 @@ impl LanguageServer for LspServer {
                         }
                     };
 
-                let file = self.store.get_ast_file(
-                    &command_params.text_document.uri,
-                )?;
-                let mut composition =
-                    composition::Composition::new(file);
-                let old_text = composition.composition_string();
+                let mut composition = match self.state.lock() {
+                    Ok(state) => match state.get_composition(
+                        &command_params.text_document.uri,
+                    ) {
+                        Some(composition) => composition,
+                        None => {
+                            return Err(
+                                LspError::CompositionNotFound(
+                                    command_params.text_document.uri,
+                                )
+                                .into(),
+                            )
+                        }
+                    },
+                    Err(err) => panic!("{}", err),
+                };
 
-                let status =
-                    composition.remove_field(command_params.value);
-                if status.is_err() {
+                if composition
+                    .remove_field(command_params.value)
+                    .is_err()
+                {
                     return Err(LspError::InternalError(
                         "Failed to remove field from composition."
                             .to_string(),
                     )
                     .into());
                 }
-                let new_text = composition
-                    .composition_string()
-                    .expect("bad composition state");
-
-                // index 0 is line 1, char 1 for line_col::LineColLookup.
-                // Will need to convert to zero indexing for applyEdit. (Range is zero indexed.)
-                // https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#range
-                let last_pos = match old_text {
-                    Some(text) => line_col::LineColLookup::new(&text)
-                        .get(text.len()),
-                    None => line_col::LineColLookup::new(&new_text)
-                        .get(new_text.len()),
-                };
 
                 let edit = lsp::WorkspaceEdit {
                     changes: Some(HashMap::from([(
                         command_params.text_document.uri.clone(),
                         vec![lsp::TextEdit {
-                            new_text: new_text.clone(),
-                            range: lsp::Range {
-                                start: lsp::Position::default(),
-                                end: lsp::Position {
-                                    line: last_pos.0 as u32 - 1,
-                                    character: last_pos.1 as u32 - 1,
-                                },
+                            new_text: composition.to_string(),
+                            range: {
+                                let file = self.store.get_ast_file(
+                                    &command_params.text_document.uri,
+                                )?;
+                                file.base.location.into()
                             },
                         }],
                     )])),
@@ -1688,25 +1680,16 @@ impl LanguageServer for LspServer {
                     change_annotations: None,
                 };
 
+                match self.state.lock() {
+                    Ok(mut state) => state.set_composition(
+                        command_params.text_document.uri,
+                        composition,
+                    ),
+                    Err(err) => panic!("{}", err),
+                }
                 if let Some(client) = self.get_client() {
-                    match client.apply_edit(edit, None).await {
-                        Ok(response) => {
-                            if response.applied {
-                                self.store.put(
-                                    &command_params.text_document.uri,
-                                    &new_text,
-                                );
-                            }
-                        }
-                        Err(err) => {
-                            return Err(LspError::InternalError(
-                                format!("{:?}", err),
-                            )
-                            .into())
-                        }
-                    };
+                    let _ = client.apply_edit(edit, None).await;
                 };
-
                 Ok(None)
             }
             Ok(LspServerCommand::AddTagValueFilter) => {
@@ -1723,49 +1706,47 @@ impl LanguageServer for LspServer {
                         }
                     };
 
-                let file = self.store.get_ast_file(
-                    &command_params.text_document.uri,
-                )?;
-                let mut composition =
-                    composition::Composition::new(file);
-                let old_text = composition.composition_string();
+                let mut composition = match self.state.lock() {
+                    Ok(state) => match state.get_composition(
+                        &command_params.text_document.uri,
+                    ) {
+                        Some(composition) => composition,
+                        None => {
+                            return Err(
+                                LspError::CompositionNotFound(
+                                    command_params.text_document.uri,
+                                )
+                                .into(),
+                            )
+                        }
+                    },
+                    Err(err) => panic!("{}", err),
+                };
 
-                let status = composition.add_tag_value(
-                    command_params.tag,
-                    command_params.value,
-                );
-                if status.is_err() {
+                if composition
+                    .add_tag_value(
+                        command_params.tag,
+                        command_params.value,
+                    )
+                    .is_err()
+                {
                     return Err(LspError::InternalError(
                         "Failed to add tagValue to composition."
                             .to_string(),
                     )
                     .into());
                 }
-                let new_text = composition
-                    .composition_string()
-                    .expect("bad composition state");
-
-                // index 0 is line 1, char 1 for line_col::LineColLookup.
-                // Will need to convert to zero indexing for applyEdit. (Range is zero indexed.)
-                // https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#range
-                let last_pos = match old_text {
-                    Some(text) => line_col::LineColLookup::new(&text)
-                        .get(text.len()),
-                    None => line_col::LineColLookup::new(&new_text)
-                        .get(new_text.len()),
-                };
 
                 let edit = lsp::WorkspaceEdit {
                     changes: Some(HashMap::from([(
                         command_params.text_document.uri.clone(),
                         vec![lsp::TextEdit {
-                            new_text: new_text.clone(),
-                            range: lsp::Range {
-                                start: lsp::Position::default(),
-                                end: lsp::Position {
-                                    line: last_pos.0 as u32 - 1,
-                                    character: last_pos.1 as u32 - 1,
-                                },
+                            new_text: composition.to_string(),
+                            range: {
+                                let file = self.store.get_ast_file(
+                                    &command_params.text_document.uri,
+                                )?;
+                                file.base.location.into()
                             },
                         }],
                     )])),
@@ -1773,25 +1754,16 @@ impl LanguageServer for LspServer {
                     change_annotations: None,
                 };
 
+                match self.state.lock() {
+                    Ok(mut state) => state.set_composition(
+                        command_params.text_document.uri,
+                        composition,
+                    ),
+                    Err(err) => panic!("{}", err),
+                }
                 if let Some(client) = self.get_client() {
-                    match client.apply_edit(edit, None).await {
-                        Ok(response) => {
-                            if response.applied {
-                                self.store.put(
-                                    &command_params.text_document.uri,
-                                    &new_text,
-                                );
-                            }
-                        }
-                        Err(err) => {
-                            return Err(LspError::InternalError(
-                                format!("{:?}", err),
-                            )
-                            .into())
-                        }
-                    };
+                    let _ = client.apply_edit(edit, None).await;
                 };
-
                 Ok(None)
             }
             Ok(LspServerCommand::RemoveTagValueFilter) => {
@@ -1808,49 +1780,47 @@ impl LanguageServer for LspServer {
                         }
                     };
 
-                let file = self.store.get_ast_file(
-                    &command_params.text_document.uri,
-                )?;
-                let mut composition =
-                    composition::Composition::new(file);
-                let old_text = composition.composition_string();
+                let mut composition = match self.state.lock() {
+                    Ok(state) => match state.get_composition(
+                        &command_params.text_document.uri,
+                    ) {
+                        Some(composition) => composition,
+                        None => {
+                            return Err(
+                                LspError::CompositionNotFound(
+                                    command_params.text_document.uri,
+                                )
+                                .into(),
+                            )
+                        }
+                    },
+                    Err(err) => panic!("{}", err),
+                };
 
-                let status = composition.remove_tag_value(
-                    command_params.tag,
-                    command_params.value,
-                );
-                if status.is_err() {
+                if composition
+                    .remove_tag_value(
+                        command_params.tag,
+                        command_params.value,
+                    )
+                    .is_err()
+                {
                     return Err(LspError::InternalError(
                         "Failed to remove tagValue from composition."
                             .to_string(),
                     )
                     .into());
                 }
-                let new_text = composition
-                    .composition_string()
-                    .expect("bad composition state");
-
-                // index 0 is line 1, char 1 for line_col::LineColLookup.
-                // Will need to convert to zero indexing for applyEdit. (Range is zero indexed.)
-                // https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#range
-                let last_pos = match old_text {
-                    Some(text) => line_col::LineColLookup::new(&text)
-                        .get(text.len()),
-                    None => line_col::LineColLookup::new(&new_text)
-                        .get(new_text.len()),
-                };
 
                 let edit = lsp::WorkspaceEdit {
                     changes: Some(HashMap::from([(
                         command_params.text_document.uri.clone(),
                         vec![lsp::TextEdit {
-                            new_text: new_text.clone(),
-                            range: lsp::Range {
-                                start: lsp::Position::default(),
-                                end: lsp::Position {
-                                    line: last_pos.0 as u32 - 1,
-                                    character: last_pos.1 as u32 - 1,
-                                },
+                            new_text: composition.to_string(),
+                            range: {
+                                let file = self.store.get_ast_file(
+                                    &command_params.text_document.uri,
+                                )?;
+                                file.base.location.into()
                             },
                         }],
                     )])),
@@ -1858,25 +1828,16 @@ impl LanguageServer for LspServer {
                     change_annotations: None,
                 };
 
+                match self.state.lock() {
+                    Ok(mut state) => state.set_composition(
+                        command_params.text_document.uri,
+                        composition,
+                    ),
+                    Err(err) => panic!("{}", err),
+                }
                 if let Some(client) = self.get_client() {
-                    match client.apply_edit(edit, None).await {
-                        Ok(response) => {
-                            if response.applied {
-                                self.store.put(
-                                    &command_params.text_document.uri,
-                                    &new_text,
-                                );
-                            }
-                        }
-                        Err(err) => {
-                            return Err(LspError::InternalError(
-                                format!("{:?}", err),
-                            )
-                            .into())
-                        }
-                    };
+                    let _ = client.apply_edit(edit, None).await;
                 };
-
                 Ok(None)
             }
             Ok(LspServerCommand::GetFunctionList) => Ok(Some(

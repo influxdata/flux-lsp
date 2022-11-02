@@ -58,6 +58,7 @@ wasm-bindgen = { version = "0.2.80", features = ["serde-serialize"], optional = 
 wasm-bindgen-futures = { version = "0.4.30", optional = true }
 web-sys = { version = "0.3.57", features = ["console"], optional = true }
 wee_alloc = { version = "0.4.5", optional = true }
+itertools = "0.10.5"
 
 [dev-dependencies]
 async-std = { version = "1.11.0", features = ["attributes"] }
