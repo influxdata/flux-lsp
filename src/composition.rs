@@ -47,86 +47,20 @@ macro_rules! from {
 }
 
 macro_rules! range {
-    () => {
+    ($arguments:expr) => {
         ast::CallExpr {
-            arguments: vec![ast::Expression::Object(
-                Box::new(ast::ObjectExpr {
-                    base: ast::BaseNode::default(),
-                    properties: vec![ast::Property {
-                        base: ast::BaseNode::default(),
-                        key: ast::PropertyKey::Identifier(
-                            ast::Identifier {
-                                base: ast::BaseNode::default(
-                                ),
-                                name: "start".into(),
-                            },
-                        ),
-                        value: Some(
-                            ast::Expression::Member(Box::new(ast::MemberExpr {
-                                base: ast::BaseNode::default(),
-                                lbrack: vec![],
-                                rbrack: vec![],
-                                object: ast::Expression::Identifier(
-                                    ast::Identifier {
-                                        base: ast::BaseNode::default(),
-                                        name: "v".into(),
-                                    }
-                                ),
-                                property: ast::PropertyKey::Identifier(ast::Identifier {
-                                    base: ast::BaseNode::default(),
-                                    name: "timeRangeStart".into(),
-                                })
-                            }))
-                        ),
-                        comma: vec![],
-                        separator: vec![],
-                    },
-                    ast::Property {
-                        base: ast::BaseNode::default(),
-                        key: ast::PropertyKey::Identifier(
-                            ast::Identifier {
-                                base: ast::BaseNode::default(
-                                ),
-                                name: "stop".into(),
-                            },
-                        ),
-                        value: Some(
-                            ast::Expression::Member(Box::new(ast::MemberExpr {
-                                base: ast::BaseNode::default(),
-                                lbrack: vec![],
-                                rbrack: vec![],
-                                object: ast::Expression::Identifier(
-                                    ast::Identifier {
-                                        base: ast::BaseNode::default(),
-                                        name: "v".into(),
-                                    }
-                                ),
-                                property: ast::PropertyKey::Identifier(ast::Identifier {
-                                    base: ast::BaseNode::default(),
-                                    name: "timeRangeStop".into(),
-                                })
-                            }))
-                        ),
-                        comma: vec![],
-                        separator: vec![],
-                    }
-                    ],
-                    lbrace: vec![],
-                    rbrace: vec![],
-                    with: None,
-                }),
-            )],
+            arguments: vec![ast::Expression::Object(Box::new(
+                $arguments,
+            ))],
             base: ast::BaseNode::default(),
-            callee: ast::Expression::Identifier(
-                ast::Identifier {
-                    base: ast::BaseNode::default(),
-                    name: "range".into(),
-                },
-            ),
+            callee: ast::Expression::Identifier(ast::Identifier {
+                base: ast::BaseNode::default(),
+                name: "range".into(),
+            }),
             lparen: vec![],
             rparen: vec![],
         }
-    }
+    };
 }
 
 macro_rules! binary_eq_expr {
@@ -285,6 +219,7 @@ struct CompositionStatementAnalyzer {
     fields: Vec<String>,
     tag_values: Vec<(String, String)>, // (TagName, TagValue)
     calls: Vec<ast::CallExpr>,
+    range_arguments: Option<ast::ObjectExpr>,
 }
 
 impl CompositionStatementAnalyzer {
@@ -300,11 +235,95 @@ impl CompositionStatementAnalyzer {
     }
 
     fn build(&mut self) -> ast::PipeExpr {
+        let range_arguments = if let Some(arguments) =
+            &self.range_arguments
+        {
+            arguments.clone()
+        } else {
+            ast::ObjectExpr {
+                base: ast::BaseNode::default(),
+                properties: vec![
+                    ast::Property {
+                        base: ast::BaseNode::default(),
+                        key: ast::PropertyKey::Identifier(
+                            ast::Identifier {
+                                base: ast::BaseNode::default(),
+                                name: "start".into(),
+                            },
+                        ),
+                        value: Some(ast::Expression::Member(
+                            Box::new(ast::MemberExpr {
+                                base: ast::BaseNode::default(),
+                                lbrack: vec![],
+                                rbrack: vec![],
+                                object: ast::Expression::Identifier(
+                                    ast::Identifier {
+                                        base: ast::BaseNode::default(
+                                        ),
+                                        name: "v".into(),
+                                    },
+                                ),
+                                property:
+                                    ast::PropertyKey::Identifier(
+                                        ast::Identifier {
+                                            base:
+                                                ast::BaseNode::default(
+                                                ),
+                                            name: "timeRangeStart"
+                                                .into(),
+                                        },
+                                    ),
+                            }),
+                        )),
+                        comma: vec![],
+                        separator: vec![],
+                    },
+                    ast::Property {
+                        base: ast::BaseNode::default(),
+                        key: ast::PropertyKey::Identifier(
+                            ast::Identifier {
+                                base: ast::BaseNode::default(),
+                                name: "stop".into(),
+                            },
+                        ),
+                        value: Some(ast::Expression::Member(
+                            Box::new(ast::MemberExpr {
+                                base: ast::BaseNode::default(),
+                                lbrack: vec![],
+                                rbrack: vec![],
+                                object: ast::Expression::Identifier(
+                                    ast::Identifier {
+                                        base: ast::BaseNode::default(
+                                        ),
+                                        name: "v".into(),
+                                    },
+                                ),
+                                property:
+                                    ast::PropertyKey::Identifier(
+                                        ast::Identifier {
+                                            base:
+                                                ast::BaseNode::default(
+                                                ),
+                                            name: "timeRangeStop"
+                                                .into(),
+                                        },
+                                    ),
+                            }),
+                        )),
+                        comma: vec![],
+                        separator: vec![],
+                    },
+                ],
+                lbrace: vec![],
+                rbrace: vec![],
+                with: None,
+            }
+        };
         let mut inner = pipe!(
             ast::Expression::Call(Box::new(from!(self
                 .bucket
                 .to_owned()))),
-            range!()
+            range!(range_arguments)
         );
 
         if let Some(measurement) = &self.measurement {
@@ -404,7 +423,13 @@ impl<'a> ast::walk::Visitor<'a> for CompositionStatementAnalyzer {
                             }
                             return false;
                         }
-                        "range" => return false,
+                        "range" => {
+                            self.range_arguments = call_expr.arguments.last().cloned().map(|expression| match expression {
+                                ast::Expression::Object(object) => *object,
+                                _ => unreachable!("CallExpr arguments can only be Expression::Objecs"),
+                            });
+                            return false;
+                        }
                         "filter" => {
                             // XXX: rockstar (28 Oct 2022) - a more appropriate way to handle this would
                             // be to hoist the BinaryExpr check logic up into this match arm. As it stands,
@@ -851,6 +876,37 @@ from(bucket: "myBucket")
     |> filter(fn: (r) => r.myTagKey == "myTagValue")
     |> filter(fn: (r) => r.myTagKey2 == "myTagValue2")
 "#.to_string();
+        assert_eq!(expected, composition.to_string());
+    }
+
+    /// A user can change the composition range and that range is retained
+    /// in the composition.
+    #[test]
+    fn test_composition_resolve_with_ast_range_change() {
+        let fluxscript = "".to_string();
+        let ast = flux::parser::parse_string("".into(), &fluxscript);
+
+        let mut composition = Composition::new(
+            ast,
+            "myBucket".into(),
+            Some("myMeasurement".into()),
+            vec![],
+            vec![],
+        );
+        let fluxscript = r#"from(bucket: "myBucket")
+    |> range(start: -24h)
+    |> filter(fn: (r) => r._measurement == "myMeasurement")
+"#;
+        let new_ast =
+            flux::parser::parse_string("".into(), &fluxscript);
+        assert!(composition.resolve_with_ast(new_ast).is_ok());
+        assert!(composition.add_field("myField".into()).is_ok());
+
+        let expected = r#"from(bucket: "myBucket")
+    |> range(start: -24h)
+    |> filter(fn: (r) => r._measurement == "myMeasurement")
+    |> filter(fn: (r) => r._field == "myField")
+"#;
         assert_eq!(expected, composition.to_string());
     }
 
