@@ -4,6 +4,7 @@
 /// The purpose of this module is to be the single source of truth for all
 /// things libflux. No other part of this library should
 use std::cmp::Ordering;
+use std::sync::Arc;
 
 use flux::semantic::types::MonoType;
 use lspower::lsp;
@@ -12,7 +13,7 @@ use std::iter::Iterator;
 
 lazy_static::lazy_static! {
     pub static ref STDLIB: Stdlib = Stdlib(flux::imports().expect("Could not initialize stdlib."));
-    pub static ref UNIVERSE: Package = Package::new("builtin", flux::prelude().expect("Could not initialize prelude"));
+    pub static ref UNIVERSE: Package = Package::new("builtin", Arc::new(flux::prelude().expect("Could not initialize prelude")));
 }
 
 /// Stdlib serves as the API for querying the flux stdlib.
@@ -55,13 +56,13 @@ pub struct Package {
     pub path: String,
     // XXX: rockstar (15 Jul 2022) - exports probably shouldn't be public, but
     // for the sake of migration, this is the easiest path forward.
-    pub exports: flux::semantic::PackageExports,
+    pub exports: Arc<flux::semantic::PackageExports>,
 }
 
 impl Package {
     fn new(
         path: &str,
-        exports: flux::semantic::PackageExports,
+        exports: Arc<flux::semantic::PackageExports>,
     ) -> Self {
         Self {
             path: path.into(),
