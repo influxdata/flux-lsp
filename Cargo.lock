@@ -633,19 +633,18 @@ dependencies = [
 
 [[package]]
 name = "flatbuffers"
-version = "2.1.2"
+version = "22.9.29"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "86b428b715fdbdd1c364b84573b5fdc0f84f8e423661b9f398735278bc7f2b6a"
+checksum = "8ce016b9901aef3579617931fbb2df8fc9a9f7cb95a16eb8acc8148209bb9e70"
 dependencies = [
  "bitflags",
- "smallvec",
  "thiserror",
 ]
 
 [[package]]
 name = "flux"
 version = "0.154.0"
-source = "git+https://github.com/influxdata/flux?tag=v0.187.0#a82eda2866821ba1c49c0b6d25354586ddf2e77e"
+source = "git+https://github.com/influxdata/flux?tag=v0.189.0#6cfedfb39bc0d70849844883a5d2929cc057f264"
 dependencies = [
  "anyhow",
  "env_logger",
@@ -660,7 +659,7 @@ dependencies = [
 [[package]]
 name = "flux-core"
 version = "0.154.0"
-source = "git+https://github.com/influxdata/flux?tag=v0.187.0#a82eda2866821ba1c49c0b6d25354586ddf2e77e"
+source = "git+https://github.com/influxdata/flux?tag=v0.189.0#6cfedfb39bc0d70849844883a5d2929cc057f264"
 dependencies = [
  "anyhow",
  "chrono",
@@ -679,6 +678,7 @@ dependencies = [
  "ordered-float",
  "pretty",
  "regex",
+ "salsa",
  "serde",
  "serde_derive",
  "serde_json",
@@ -1025,6 +1025,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9e69cdf6b85b5c8dce514f694089a2cf8b1a702f6cd28607bcb3cf296c9778db"
 
 [[package]]
+name = "lock_api"
+version = "0.4.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "435011366fe56583b16cf956f9df0095b405b82d76425bc8981c0e22e60ec4df"
+dependencies = [
+ "autocfg",
+ "scopeguard",
+]
+
+[[package]]
 name = "log"
 version = "0.4.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1212,6 +1222,31 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "427c3892f9e783d91cc128285287e70a59e206ca452770ece88a76f7a3eddd72"
 
 [[package]]
+name = "parking_lot"
+version = "0.11.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7d17b78036a60663b797adeaee46f5c9dfebb86948d1255007a1d6be0271ff99"
+dependencies = [
+ "instant",
+ "lock_api",
+ "parking_lot_core",
+]
+
+[[package]]
+name = "parking_lot_core"
+version = "0.8.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d76e8e1493bcac0d2766c42737f34458f1c8c50c0d23bcb24ea953affb273216"
+dependencies = [
+ "cfg-if 1.0.0",
+ "instant",
+ "libc",
+ "redox_syscall",
+ "smallvec",
+ "winapi",
+]
+
+[[package]]
 name = "percent-encoding"
 version = "2.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1361,6 +1396,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "redox_syscall"
+version = "0.2.16"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fb5a58c1855b4b6819d59012155603f0b22ad30cad752600aadfcb695265519a"
+dependencies = [
+ "bitflags",
+]
+
+[[package]]
 name = "regex"
 version = "1.5.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1390,6 +1434,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3582f63211428f83597b51b2ddb88e2a91a9d52d12831f9d08f5e624e8977422"
 
 [[package]]
+name = "rustc-hash"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "08d43f7aa6b08d49f382cde6a7982047c3426db949b1424bc4b7ec9ae12c6ce2"
+
+[[package]]
 name = "rustc_version"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1409,6 +1459,35 @@ name = "ryu"
 version = "1.0.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f3f6f92acf49d1b98f7a81226834412ada05458b7364277387724a237f062695"
+
+[[package]]
+name = "salsa"
+version = "0.17.0-pre.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9b223dccb46c32753144d0b51290da7230bb4aedcd8379d6b4c9a474c18bf17a"
+dependencies = [
+ "crossbeam-utils",
+ "indexmap",
+ "lock_api",
+ "log",
+ "oorandom",
+ "parking_lot",
+ "rustc-hash",
+ "salsa-macros",
+ "smallvec",
+]
+
+[[package]]
+name = "salsa-macros"
+version = "0.17.0-pre.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ac6c2e352df550bf019da7b16164ed2f7fa107c39653d1311d1bba42d1582ff7"
+dependencies = [
+ "heck 0.3.3",
+ "proc-macro2",
+ "quote",
+ "syn",
+]
 
 [[package]]
 name = "same-file"
