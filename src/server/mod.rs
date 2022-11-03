@@ -999,7 +999,7 @@ impl LanguageServer for LspServer {
                 {
                     Ok(client_capabilities) => {
                         if let Some(text_document) =
-                            (*client_capabilities)
+                            (client_capabilities)
                                 .text_document
                                 .as_ref()
                         {
