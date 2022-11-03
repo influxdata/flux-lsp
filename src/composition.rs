@@ -406,10 +406,15 @@ impl<'a> ast::walk::Visitor<'a> for CompositionStatementAnalyzer {
                         }
                         "range" => return false,
                         "filter" => {
-                            // XXX: rockstar (28 Oct 2022) - a more appropriate way to handle this would
-                            // be to hoist the BinaryExpr check logic up into this match arm. As it stands,
-                            // we may end up over-matching the filters here to filter things that aren't
-                            // schema-related.
+                            // In the case of _any_ other function calls, we can no longer expect
+                            // a filter call to be related to schema. It _might_ still be, but after
+                            // other calls, we have no guarantee.
+                            if !self.calls.is_empty() {
+                                self.calls.push(call_expr.clone());
+                                return false;
+                            }
+                            // We rely on the logic below for checking the binary expressions in the
+                            // filter to get schema data.
                             return true;
                         }
                         _ => {
@@ -804,6 +809,34 @@ from(bucket: "myBucket")
     |> filter(fn: (r) => r.myTagKey2 == "myTagValue2")
 "#.to_string();
         assert_eq!(expected, composition.to_string());
+    }
+
+    /// Any filter calls that are after a call that are not one
+    /// of from/range/filter cannot be used to determine schema requirements,
+    /// as the columns referenced may have originated in a previous call.
+    #[test]
+    fn test_composition_with_filters_after_other_calls() {
+        let ast = flux::parser::parse_string("".into(), &"");
+        let mut composition = Composition::new(
+            ast,
+            "myBucket".into(),
+            Some("myMeasurement".into()),
+            vec![],
+            vec![],
+        );
+
+        let fluxscript = r#"from(bucket: "myBucket")
+    |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+    |> filter(fn: (r) => r._measurement == "myMeasurement")
+    |> map(fn: (r) => ({r with myColumn: r._value / 100}))
+    |> filter(fn: (r) => r.myOtherColumn == "percent")
+"#
+        .to_string();
+        let ast = flux::parser::parse_string("".into(), &fluxscript);
+
+        assert!(composition.resolve_with_ast(ast).is_ok());
+        let expected: Vec<(String, String)> = vec![];
+        assert_eq!(expected, composition.analyzer.tag_values)
     }
 
     /// When a non-expression statement is added above the composition statement, the
