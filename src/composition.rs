@@ -431,48 +431,32 @@ impl<'a> ast::walk::Visitor<'a> for CompositionStatementAnalyzer {
                             return false;
                         }
                         "filter" => {
-                            // XXX: rockstar (28 Oct 2022) - a more appropriate way to handle this would
-                            // be to hoist the BinaryExpr check logic up into this match arm. As it stands,
-                            // we may end up over-matching the filters here to filter things that aren't
-                            // schema-related.
-                            return true;
+                            match &call_expr.arguments[..] {
+                                [ast::Expression::Object(obj_expr)] =>
+                                {
+                                    // Since `fn` is the only required argument for filters, then visit expression.
+                                    let mut expr_analyzer = CompositionFilterExprAnalyzer::new(self);
+                                    ast::walk::walk(&mut expr_analyzer, flux::ast::walk::Node::from_expr(
+                                        &ast::Expression::Object(obj_expr.to_owned())
+                                    ));
+                                    expr_analyzer.resolve();
+                                    if expr_analyzer.result.is_err() {
+                                        // TODO: bubble up error to user
+                                    }
+                                    if expr_analyzer.is_call {
+                                        self.calls
+                                            .push(call_expr.clone());
+                                    }
+                                    return false;
+                                }
+                                _ => {}
+                            }
+                            self.calls.push(call_expr.clone());
+                            return false;
                         }
                         _ => {
                             self.calls.push(call_expr.clone());
                             return false;
-                        }
-                    }
-                }
-            }
-            ast::walk::Node::BinaryExpr(binary_expr) => {
-                if binary_expr.operator
-                    == ast::Operator::EqualOperator
-                {
-                    if let ast::Expression::Member(left) =
-                        &binary_expr.left
-                    {
-                        if let ast::PropertyKey::Identifier(ident) =
-                            &left.property
-                        {
-                            match ident.name.as_ref() {
-                            "_measurement" => {
-                                if let ast::Expression::StringLit(string_literal) = &binary_expr.right {
-                                    self.measurement = Some(string_literal.value.clone());
-                                }
-                            },
-                            "_field" => {
-                                // This only matches when there is a single _field match.
-                                if let ast::Expression::StringLit(string_literal) = &binary_expr.right {
-                                    self.fields.push(string_literal.value.clone());
-                                }
-                            }
-                            _ => {
-                                // Treat these all as tag filters.
-                                if let ast::Expression::StringLit(string_literal) = &binary_expr.right {
-                                    self.tag_values.push((ident.name.clone(), string_literal.value.clone()));
-                                }
-                            },
-                        }
                         }
                     }
                 }
@@ -494,6 +478,127 @@ impl PartialEq for CompositionStatementAnalyzer {
     }
 }
 impl Eq for CompositionStatementAnalyzer {}
+
+struct CompositionFilterExprAnalyzer<'b> {
+    parent: &'b mut CompositionStatementAnalyzer,
+    analyzer: CompositionStatementAnalyzer,
+    result: Result<(), &'static str>,
+    is_call: bool,
+}
+
+impl<'b> CompositionFilterExprAnalyzer<'b> {
+    fn new(parent: &'b mut CompositionStatementAnalyzer) -> Self {
+        Self {
+            parent,
+            analyzer: CompositionStatementAnalyzer::default(),
+            result: Ok(()),
+            is_call: false,
+        }
+    }
+
+    fn resolve(&mut self) {
+        match (
+            self.result,
+            &self.analyzer.measurement,
+            self.analyzer.fields.len(),
+            self.analyzer.tag_values.len(),
+        ) {
+            (Ok(_), None, 0, 0) => self.is_call = true,
+            (Ok(_), Some(measurement), 0, 0) => {
+                self.parent.measurement = Some(measurement.clone());
+            }
+            (Ok(_), None, _, 0) => {
+                self.parent.fields.extend(std::mem::take(
+                    &mut self.analyzer.fields,
+                ));
+            }
+            (Ok(_), None, 0, _) => {
+                self.parent.tag_values.extend(std::mem::take(
+                    &mut self.analyzer.tag_values,
+                ));
+            }
+            (Ok(_), _, _, _) => self.is_call = true,
+            _ => {}
+        }
+    }
+}
+
+impl<'a, 'b> ast::walk::Visitor<'a>
+    for CompositionFilterExprAnalyzer<'b>
+{
+    fn visit(&mut self, node: ast::walk::Node<'a>) -> bool {
+        // TODO: add more match cases which determines error, or call_expr.
+        match node {
+            ast::walk::Node::BinaryExpr(binary_expr) => {
+                if binary_expr.operator
+                    == ast::Operator::EqualOperator
+                {
+                    if let ast::Expression::Member(left) =
+                        &binary_expr.left
+                    {
+                        if let ast::PropertyKey::Identifier(ident) =
+                            &left.property
+                        {
+                            match ident.name.as_ref() {
+                                "_measurement" => {
+                                    if let (
+                                        None,
+                                        ast::Expression::StringLit(
+                                            string_literal,
+                                        ),
+                                    ) = (
+                                        &self.parent.measurement,
+                                        &binary_expr.right,
+                                    ) {
+                                        self.analyzer.measurement =
+                                            Some(
+                                                string_literal
+                                                    .value
+                                                    .clone(),
+                                            );
+                                    } else {
+                                        self.result = Err("TODO: UX message to UI: tell user to have all measurement filters be grouped");
+                                    }
+                                }
+                                "_field" => {
+                                    // This only matches when there is a single _field match.
+                                    if let (
+                                        false,
+                                        ast::Expression::StringLit(
+                                            string_literal,
+                                        ),
+                                    ) = (
+                                        !self
+                                            .parent
+                                            .fields
+                                            .is_empty(),
+                                        &binary_expr.right,
+                                    ) {
+                                        self.analyzer.fields.push(
+                                            string_literal
+                                                .value
+                                                .clone(),
+                                        );
+                                    } else {
+                                        self.result = Err("TODO: UX message to UI: tell user to have all field filters be grouped");
+                                    }
+                                }
+                                _ => {
+                                    // Treat these all as tag filters.
+                                    if let ast::Expression::StringLit(string_literal) = &binary_expr.right {
+                                        self.analyzer.tag_values.push((ident.name.clone(), string_literal.value.clone()));
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            _ => {}
+        }
+        true
+    }
+}
 
 type CompositionResult = Result<(), ()>;
 
@@ -1246,6 +1351,82 @@ from(bucket: "anBucket")
     |> sort()
 "#.to_string();
         assert_eq!(expected, composition.to_string());
+    }
+
+    /// When the query is modified to add new calls, including filter calls,
+    /// in the middle of the composition block.
+    #[test]
+    fn test_composition_resolve_with_ast_add_filter_calls_in_middle()
+    {
+        let fluxscript = format!(
+            r#"from(bucket: "myBucket")
+|> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+|> filter(fn: (r) => r._measurement == "myMeasurement")
+|> filter(fn: (r) => r._value > 32)
+|> filter(fn: (r) => r._field == "myField1" or r._field == "myField2")
+|> group(columns: ["myNonexistentColumn"])
+|> sort()
+"#
+        );
+        let ast = flux::parser::parse_string("".into(), &fluxscript);
+
+        let mut composition = Composition::new(
+            ast,
+            "myBucket".into(),
+            Some("myMeasurement".into()),
+            vec!["myField1".into(), "myField2".into()],
+            vec![],
+        );
+
+        let new_ast =
+            flux::parser::parse_string("".into(), &fluxscript);
+        assert!(composition.resolve_with_ast(new_ast).is_ok());
+
+        assert_eq!(0, composition.statement_index);
+        assert!(composition
+            .add_field("myField3".to_string())
+            .is_ok());
+
+        let expected = r#"from(bucket: "myBucket")
+    |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+    |> filter(fn: (r) => r._measurement == "myMeasurement")
+    |> filter(
+        fn: (r) => r._field == "myField1" or (r._field == "myField2" or r._field == "myField3"),
+    )
+    |> filter(fn: (r) => r._value > 32)
+    |> group(columns: ["myNonexistentColumn"])
+    |> sort()
+"#.to_string();
+        assert_eq!(expected, composition.to_string());
+    }
+
+    /// Error when field filters are not in the same composition filter.
+    #[test]
+    fn test_composition_resolve_with_ast_field_filters_must_be_together(
+    ) {
+        let fluxscript = format!(
+            r#"from(bucket: "myBucket")
+|> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+|> filter(fn: (r) => r._measurement == "myMeasurement")
+|> filter(fn: (r) => r._field == "myField1" or r._value > 32)
+|> filter(fn: (r) => r._field == "myField1" or r._field == "myField2")
+|> group(columns: ["myNonexistentColumn"])
+|> sort()
+"#
+        );
+        let ast = flux::parser::parse_string("".into(), &fluxscript);
+
+        let mut composition = Composition::new(
+            ast,
+            "myBucket".into(),
+            Some("myMeasurement".into()),
+            vec!["myField1".into(), "myField2".into()],
+            vec![],
+        );
+
+        let new_ast =
+            flux::parser::parse_string("".into(), &fluxscript);
+        assert!(composition.resolve_with_ast(new_ast).is_err());
     }
 
     /// A measurement filter can be added to a composition statement.
