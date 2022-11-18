@@ -19,9 +19,9 @@ mod wasm;
 #[macro_use]
 extern crate pretty_assertions;
 
-#[cfg(feature = "wee_alloc")]
+#[cfg(feature = "dlmalloc")]
 #[global_allocator]
-static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
+static ALLOC: dlmalloc::GlobalDlmalloc = dlmalloc::GlobalDlmalloc;
 
 pub use server::LspServer;
 
