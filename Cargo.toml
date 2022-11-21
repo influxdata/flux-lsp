@@ -57,7 +57,6 @@ tower-service = { version = "0.3.1", optional = true }
 wasm-bindgen = { version = "0.2.80", features = ["serde-serialize"], optional = true }
 wasm-bindgen-futures = { version = "0.4.30", optional = true }
 web-sys = { version = "0.3.57", features = ["console"], optional = true }
-dlmalloc = { version = "0.2.4", features = ["global"], optional = true }
 itertools = "0.10.5"
 
 [dev-dependencies]
