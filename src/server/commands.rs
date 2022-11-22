@@ -5,7 +5,7 @@ use strum_macros::EnumIter;
 #[derive(EnumIter)]
 pub enum LspServerCommand {
     CompositionInitialize,
-    AddMeasurementFilter,
+    SetMeasurementFilter,
     AddFieldFilter,
     RemoveFieldFilter,
     AddTagValueFilter,
@@ -21,8 +21,8 @@ impl TryFrom<String> for LspServerCommand {
             "fluxComposition/initialize" => {
                 Ok(LspServerCommand::CompositionInitialize)
             }
-            "fluxComposition/addMeasurementFilter" => {
-                Ok(LspServerCommand::AddMeasurementFilter)
+            "fluxComposition/setMeasurementFilter" => {
+                Ok(LspServerCommand::SetMeasurementFilter)
             }
             "fluxComposition/addFieldFilter" => {
                 Ok(LspServerCommand::AddFieldFilter)
@@ -53,8 +53,8 @@ impl From<LspServerCommand> for String {
             LspServerCommand::CompositionInitialize => {
                 "fluxComposition/initialize".into()
             }
-            LspServerCommand::AddMeasurementFilter => {
-                "fluxComposition/addMeasurementFilter".into()
+            LspServerCommand::SetMeasurementFilter => {
+                "fluxComposition/setMeasurementFilter".into()
             }
             LspServerCommand::AddFieldFilter => {
                 "fluxComposition/addFieldFilter".into()

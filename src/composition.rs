@@ -633,15 +633,11 @@ impl Composition {
         }
     }
 
-    pub(crate) fn add_measurement(
+    pub(crate) fn set_measurement(
         &mut self,
         measurement: String,
     ) -> CompositionResult {
-        if self.analyzer.measurement.is_some() {
-            return Err(());
-        } else {
-            self.analyzer.measurement = Some(measurement)
-        }
+        self.analyzer.measurement = Some(measurement);
         self.sync();
         Ok(())
     }
@@ -1283,7 +1279,7 @@ from(bucket: "anBucket")
 
     /// A measurement filter can be added to a composition statement.
     #[test]
-    fn test_composition_add_measurement() {
+    fn test_composition_set_measurement() {
         let ast =
             flux::parser::parse_string("".into(), &"".to_string());
         let mut composition = Composition::new(
@@ -1295,7 +1291,7 @@ from(bucket: "anBucket")
         );
 
         assert!(composition
-            .add_measurement("myMeasurement".to_string())
+            .set_measurement("myMeasurement".to_string())
             .is_ok());
 
         let expected = r#"from(bucket: "myBucket")
@@ -1308,7 +1304,7 @@ from(bucket: "anBucket")
     /// Only one measurement can be added at one time. An error occurs if
     /// the measurement has already been set.
     #[test]
-    fn test_composition_add_measurement_already_set() {
+    fn test_composition_set_measurement_already_set() {
         let ast =
             flux::parser::parse_string("".into(), &"".to_string());
         let mut composition = Composition::new(
@@ -1320,8 +1316,14 @@ from(bucket: "anBucket")
         );
 
         assert!(composition
-            .add_measurement("myMeasurement".to_string())
-            .is_err());
+            .set_measurement("anotherMeasurement".to_string())
+            .is_ok());
+
+        let expected = r#"from(bucket: "myBucket")
+    |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+    |> filter(fn: (r) => r._measurement == "anotherMeasurement")
+"#;
+        assert_eq!(expected, composition.to_string());
     }
 
     /// A field filter with multiple fields can be added.

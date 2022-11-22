@@ -1479,7 +1479,7 @@ impl LanguageServer for LspServer {
                 };
                 Ok(None)
             }
-            Ok(LspServerCommand::AddMeasurementFilter) => {
+            Ok(LspServerCommand::SetMeasurementFilter) => {
                 let command_params: ValueFilterParams =
                     match serde_json::value::from_value(
                         params.arguments[0].clone(),
@@ -1511,7 +1511,7 @@ impl LanguageServer for LspServer {
                 };
 
                 if composition
-                    .add_measurement(command_params.value)
+                    .set_measurement(command_params.value)
                     .is_err()
                 {
                     return Err(LspError::InternalError(
