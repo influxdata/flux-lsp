@@ -145,6 +145,72 @@ async fn test_did_change() {
 }
 
 /// When a `textDocument/didChange` presents a file change for a file
+/// using composition, the updated file gets saved on the stateful composition.
+#[test]
+async fn test_did_change_updates_composition_file() {
+    let server = create_server();
+    open_file(&server, "".to_string(), None).await;
+
+    let uri = lsp::Url::parse("file:///home/user/file.flux").unwrap();
+    match server.state.lock() {
+        Ok(mut state) => {
+            let ast = flux::parser::parse_string("".to_string(), "");
+            let composition = composition::Composition::new(
+                ast,
+                "bucket".to_string(),
+                Some("myMeasurement".to_string()),
+                vec![],
+                vec![],
+            );
+            state.set_composition(uri.clone(), composition);
+            let composition_state = state.get_mut_composition(&uri);
+            assert!(composition_state.is_some());
+            assert_eq!(
+                composition_state.unwrap().to_string(),
+                r#"from(bucket: "bucket")
+    |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+    |> filter(fn: (r) => r._measurement == "myMeasurement")
+"#
+                .to_string(),
+            );
+        }
+        Err(err) => panic!("{}", err),
+    }
+
+    let changed_text = r#"from(bucket: "bucket")
+    |> range(start: -30m)
+    |> filter(fn: (r) => r._measurement == "myMeasurement")
+    |> first()
+"#
+    .to_string();
+    let params = lsp::DidChangeTextDocumentParams {
+        text_document: lsp::VersionedTextDocumentIdentifier {
+            uri: lsp::Url::parse("file:///home/user/file.flux")
+                .unwrap(),
+            version: -2,
+        },
+        content_changes: vec![lsp::TextDocumentContentChangeEvent {
+            range: None,
+            range_length: None,
+            text: changed_text.clone(),
+        }],
+    };
+
+    server.did_change(params).await;
+
+    match server.state.lock() {
+        Ok(mut state) => {
+            assert!(state.get_mut_composition(&uri).is_some());
+            assert_eq!(
+                state.get_mut_composition(&uri).unwrap().to_string(),
+                changed_text,
+            );
+        }
+        Err(err) => panic!("{}", err),
+    };
+}
+
+/// When a `textDocument/didChange` presents a file change for a file
 /// using composition, and that file makes an ambiguous composition, the
 /// composition is vacated from the server state.
 #[test]
@@ -200,10 +266,10 @@ from(bucket: "bucket")
     server.did_change(params).await;
 
     match server.state.lock() {
-        Ok(state) => {
+        Ok(mut state) => {
             let key = lsp::Url::parse("file:///home/user/file.flux")
                 .unwrap();
-            assert!(state.get_composition(&key).is_none())
+            assert!(state.get_mut_composition(&key).is_none())
         }
         Err(err) => panic!("{}", err),
     };
@@ -264,10 +330,10 @@ from(bucket: "bucket")
     server.did_change(params).await;
 
     match server.state.lock() {
-        Ok(state) => {
+        Ok(mut state) => {
             let key = lsp::Url::parse("file:///home/user/file.flux")
                 .unwrap();
-            assert!(state.get_composition(&key).is_some())
+            assert!(state.get_mut_composition(&key).is_some())
         }
         Err(err) => panic!("{}", err),
     };

@@ -561,6 +561,12 @@ impl Composition {
         }
     }
 
+    // Return a cloned copy of the composition file.
+    #[allow(dead_code)]
+    pub(crate) fn get_file(&self) -> ast::File {
+        self.file.clone()
+    }
+
     /// Sync the composition statement with the analyzer.
     // This is, for obvious reasons, inefficient. It moves the items in the vec
     // around a lot. Premature optimization and blah blah blah.
@@ -922,6 +928,17 @@ from(bucket: "myBucket")
             vec![],
             vec![],
         );
+
+        assert_eq!(
+            composition.to_string(),
+            r#"from(bucket: "myBucket")
+    |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+    |> filter(fn: (r) => r._measurement == "myMeasurement")
+"#
+            .to_string()
+        );
+
+        // introduce range change (e.g. did_change)
         let fluxscript = r#"from(bucket: "myBucket")
     |> range(start: -24h)
     |> filter(fn: (r) => r._measurement == "myMeasurement")
