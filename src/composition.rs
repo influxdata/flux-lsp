@@ -1,10 +1,12 @@
+use std::collections::HashMap;
+
 /// Composition functionality
 ///
 /// This module covers all the functionality that comes from the Composition feature of the
 /// LSP server. It's spec can be found in the docs/ folder of source control.
 ///
 /// This module _only_ operates on an AST. It will never operate on semantic graph.
-use flux::ast;
+use flux::ast::{self, SourceLocation};
 use itertools::Itertools;
 
 macro_rules! from {
@@ -565,6 +567,41 @@ impl Composition {
     #[allow(dead_code)]
     pub(crate) fn get_file(&self) -> ast::File {
         self.file.clone()
+    }
+
+    pub(crate) fn get_stmt_position(&self) -> Option<SourceLocation> {
+        self.file.body.get(self.statement_index).map(
+            |composition_stmt| {
+                composition_stmt.base().location.clone()
+            },
+        )
+    }
+
+    pub(crate) fn get_serialized_composition_state(
+        &self,
+    ) -> Result<serde_json::Value, serde_json::Error> {
+        serde_json::to_value(HashMap::from([
+            (
+                "bucket",
+                serde_json::to_value(self.analyzer.bucket.clone())?,
+            ),
+            (
+                "measurement",
+                serde_json::to_value(
+                    self.analyzer.measurement.clone(),
+                )?,
+            ),
+            (
+                "fields",
+                serde_json::to_value(self.analyzer.fields.clone())?,
+            ),
+            (
+                "tag_values",
+                serde_json::to_value(
+                    self.analyzer.tag_values.clone(),
+                )?,
+            ),
+        ]))
     }
 
     /// Sync the composition statement with the analyzer.

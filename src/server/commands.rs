@@ -1,6 +1,6 @@
 use lspower::lsp;
 use serde::{Deserialize, Serialize};
-use strum_macros::EnumIter;
+use strum_macros::{Display, EnumIter};
 
 #[derive(EnumIter)]
 pub enum LspServerCommand {
@@ -73,6 +73,35 @@ impl From<LspServerCommand> for String {
             }
         }
     }
+}
+
+#[derive(Debug)]
+pub enum LspClientCommand {
+    UpdateComposition,
+    CompositionDropped,
+    CompositionNotFound,
+}
+
+impl ToString for LspClientCommand {
+    fn to_string(&self) -> String {
+        match &self {
+            LspClientCommand::UpdateComposition => {
+                "fluxComposition/compositionState".into()
+            }
+            LspClientCommand::CompositionDropped => {
+                "fluxComposition/compositionEnded".into()
+            }
+            LspClientCommand::CompositionNotFound => {
+                "fluxComposition/compositionSyncFailed".into()
+            }
+        }
+    }
+}
+
+#[derive(Debug, Display)]
+pub enum LspMessageActionItem {
+    CompositionRange,
+    CompositionState,
 }
 
 #[derive(Deserialize, Serialize)]

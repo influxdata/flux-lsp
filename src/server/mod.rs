@@ -24,8 +24,9 @@ use strum::IntoEnumIterator;
 use crate::{completion, composition, lang, visitors::semantic};
 
 use self::commands::{
-    CompositionInitializeParams, LspServerCommand,
-    TagValueFilterParams, ValueFilterParams,
+    CompositionInitializeParams, LspClientCommand,
+    LspMessageActionItem, LspServerCommand, TagValueFilterParams,
+    ValueFilterParams,
 };
 use self::types::LspError;
 
@@ -513,28 +514,78 @@ impl LanguageServer for LspServer {
                 self.store.put(&key, &new_contents.clone());
                 self.publish_diagnostics(&key).await;
 
+                // let mut composition_position = None;
                 if self.store.get_package_errors(&key).is_none() {
-                    match self.state.lock() {
+                    let composition_state = match self.state.lock() {
                         Ok(mut state) => {
                             if let Some(composition) =
                                 state.get_mut_composition(&key)
                             {
                                 match self.store.get_ast_file(&key) {
-                                Ok(file) => {
-                                    let result = composition.resolve_with_ast(file);
-                                    if result.is_err() {
-                                        state.drop_composition(&key);
-                                        if let Some(client) = &self.get_client() {
-                                            let _ = client.show_message(lsp::MessageType::ERROR, "A conflict has occured in the query composition. The composition has been aborted.");
+                                    Ok(file) => {
+                                        let result = composition
+                                            .resolve_with_ast(file);
+                                        if result.is_err() {
+                                            state.drop_composition(
+                                                &key,
+                                            );
+                                            Err(LspClientCommand::CompositionDropped)
+                                        } else {
+                                            Ok(composition.clone())
                                         }
                                     }
+                                    Err(_) => {
+                                        log::error!("Found composition but did not find ast for key: {}", key);
+                                        Err(LspClientCommand::CompositionNotFound)
+                                    }
                                 }
-                                Err(_) => log::error!("Found composition but did not find ast for key: {}", key),
-                            }
+                            } else {
+                                Err(LspClientCommand::CompositionNotFound)
                             }
                         }
                         Err(err) => panic!("{}", err),
-                    }
+                    };
+
+                    if let Some(client) = self.get_client() {
+                        match composition_state {
+                            Ok(composition) => {
+                                let position = composition
+                                    .get_stmt_position()
+                                    .expect("Bad stmt position.");
+                                let range_action_item = lsp::MessageActionItem {
+                                    title: LspMessageActionItem::CompositionRange.to_string(),
+                                    properties: HashMap::from([("range".to_string(), lsp::MessageActionItemProperty::Object(
+                                        serde_json::to_value(HashMap::from([
+                                            ("start", position.start),
+                                            ("end", position.end)
+                                        ])).expect("Bad stmt position")
+                                    ))])
+                                };
+                                let composition_state_action_item = lsp::MessageActionItem {
+                                    title: LspMessageActionItem::CompositionState.to_string(),
+                                    properties: HashMap::from([
+                                        ("state".to_string(), lsp::MessageActionItemProperty::Object(
+                                        composition.get_serialized_composition_state().expect("Bad composition state")))])
+                                };
+                                let _ = client.show_message_request(
+                                    lsp::MessageType::INFO,
+                                    LspClientCommand::UpdateComposition.to_string(),
+                                    Some(vec![range_action_item, composition_state_action_item])
+                                ).await;
+                            }
+                            Err(error_type) => {
+                                let _ = client
+                                    .show_message_request(
+                                        lsp::MessageType::ERROR,
+                                        error_type.to_string(),
+                                        None,
+                                    )
+                                    .await;
+                            }
+                        };
+                    } else {
+                        log::error!("Failed to acquire client.");
+                    };
                 }
             }
             Err(err) => log::error!(
