@@ -6,9 +6,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex, RwLock};
 
 use flux::ast::walk::Node as AstNode;
-use flux::ast::{
-    self, Expression as AstExpression, Position, SourceLocation,
-};
+use flux::ast::{self, Expression as AstExpression};
 use flux::semantic::nodes::{
     ErrorKind as SemanticNodeErrorKind, Package as SemanticPackage,
 };
@@ -1452,24 +1450,17 @@ impl LanguageServer for LspServer {
                     command_params.tag_values.unwrap_or_default(),
                 );
 
-                let file = self.store.get_ast_file(
-                    &command_params.text_document.uri,
-                )?;
-                let mut location = file.base.location;
-                if !location.is_valid() {
-                    location = SourceLocation {
-                        start: Position { line: 1, column: 1 },
-                        end: Position { line: 1, column: 1 },
-                        ..SourceLocation::default()
-                    };
-                }
-
                 let edit = lsp::WorkspaceEdit {
                     changes: Some(HashMap::from([(
                         command_params.text_document.uri.clone(),
                         vec![lsp::TextEdit {
                             new_text: composition.to_string(),
-                            range: location.into(),
+                            range: {
+                                let file = self.store.get_ast_file(
+                                    &command_params.text_document.uri,
+                                )?;
+                                file.base.location.into()
+                            },
                         }],
                     )])),
                     document_changes: None,
@@ -1512,12 +1503,12 @@ impl LanguageServer for LspServer {
                                 .is_err()
                             {
                                 return Err(LspError::InternalError(
-                                    "Failed to add measurement to composition."
+                                    "Failed to set measurement to composition."
                                         .to_string(),
                                 )
                                 .into());
                             }
-                            composition.to_string().clone()
+                            composition.to_string()
                         }
                         None => {
                             return Err(
