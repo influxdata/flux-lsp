@@ -24,9 +24,9 @@ use strum::IntoEnumIterator;
 use crate::{completion, composition, lang, visitors::semantic};
 
 use self::commands::{
-    CompositionInitializeParams, LspClientCommand,
-    LspMessageActionItem, LspServerCommand, TagValueFilterParams,
-    ValueFilterParams,
+    ClientCommandNotification, CompositionInitializeParams,
+    LspClientCommand, LspMessageActionItem, LspServerCommand,
+    TagValueFilterParams, ValueFilterParams,
 };
 use self::types::LspError;
 
@@ -567,20 +567,22 @@ impl LanguageServer for LspServer {
                                         ("state".to_string(), lsp::MessageActionItemProperty::Object(
                                         composition.get_serialized_composition_state().expect("Bad composition state")))])
                                 };
-                                let _ = client.show_message_request(
-                                    lsp::MessageType::INFO,
-                                    LspClientCommand::UpdateComposition.to_string(),
-                                    Some(vec![range_action_item, composition_state_action_item])
-                                ).await;
+                                let params = lsp::ShowMessageRequestParams {
+                                    typ: lsp::MessageType::INFO,
+                                    message: LspClientCommand::UpdateComposition.to_string(),
+                                    actions: Some(vec![range_action_item, composition_state_action_item]),
+                                };
+                                let _ = client.send_custom_notification::<ClientCommandNotification>(params).await;
                             }
                             Err(error_type) => {
-                                let _ = client
-                                    .show_message_request(
-                                        lsp::MessageType::ERROR,
-                                        error_type.to_string(),
-                                        None,
-                                    )
-                                    .await;
+                                let params =
+                                    lsp::ShowMessageRequestParams {
+                                        typ: lsp::MessageType::INFO,
+                                        message: error_type
+                                            .to_string(),
+                                        actions: None,
+                                    };
+                                let _ = client.send_custom_notification::<ClientCommandNotification>(params).await;
                             }
                         };
                     } else {

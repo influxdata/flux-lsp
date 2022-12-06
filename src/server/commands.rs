@@ -1,4 +1,4 @@
-use lspower::lsp;
+use lspower::lsp::{self, notification::Notification};
 use serde::{Deserialize, Serialize};
 use strum_macros::{Display, EnumIter};
 
@@ -75,6 +75,13 @@ impl From<LspServerCommand> for String {
     }
 }
 
+pub struct ClientCommandNotification;
+
+impl Notification for ClientCommandNotification {
+    type Params = lsp::ShowMessageRequestParams;
+    const METHOD: &'static str = "window/showMessageRequest";
+}
+
 #[derive(Debug)]
 pub enum LspClientCommand {
     UpdateComposition,
@@ -92,7 +99,7 @@ impl ToString for LspClientCommand {
                 "fluxComposition/compositionEnded".into()
             }
             LspClientCommand::CompositionNotFound => {
-                "fluxComposition/compositionSyncFailed".into()
+                "fluxComposition/compositionNotFound".into()
             }
         }
     }
