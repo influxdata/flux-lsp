@@ -1495,30 +1495,69 @@ impl LanguageServer for LspServer {
                 let file = self.store.get_ast_file(
                     &command_params.text_document.uri,
                 )?;
-                let composition = composition::Composition::new(
-                    file,
+                let mut composition = composition::Composition::new(
+                    file.clone(),
                     command_params.bucket,
                     command_params.measurement,
                     command_params.fields.unwrap_or_default(),
                     command_params.tag_values.unwrap_or_default(),
                 );
 
-                let edit = lsp::WorkspaceEdit {
-                    changes: Some(HashMap::from([(
-                        command_params.text_document.uri.clone(),
-                        vec![lsp::TextEdit {
-                            new_text: composition.to_string(),
-                            range: {
-                                let file = self.store.get_ast_file(
-                                    &command_params.text_document.uri,
-                                )?;
-                                file.base.location.into()
-                            },
-                        }],
-                    )])),
-                    document_changes: None,
-                    change_annotations: None,
-                };
+                if composition.exists_in(&file)
+                    && composition.resolve_with_ast(file).is_ok()
+                {
+                    let position = composition
+                        .get_stmt_position()
+                        .expect("Bad stmt position.");
+                    let range_action_item = lsp::MessageActionItem {
+                        title: LspMessageActionItem::CompositionRange
+                            .to_string(),
+                        properties: HashMap::from([(
+                            "range".to_string(),
+                            lsp::MessageActionItemProperty::Object(
+                                serde_json::to_value(HashMap::from(
+                                    [
+                                        ("start", position.start),
+                                        ("end", position.end),
+                                    ],
+                                ))
+                                .expect("Bad stmt position"),
+                            ),
+                        )]),
+                    };
+                    let params = lsp::ShowMessageRequestParams {
+                        typ: lsp::MessageType::INFO,
+                        message: LspClientCommand::AlreadyExists
+                            .to_string(),
+                        actions: Some(vec![range_action_item]),
+                    };
+                    if let Some(client) = self.get_client() {
+                        let _ = client.send_custom_notification::<ClientCommandNotification>(params).await;
+                    };
+                } else {
+                    let edit = lsp::WorkspaceEdit {
+                        changes: Some(HashMap::from([(
+                            command_params.text_document.uri.clone(),
+                            vec![lsp::TextEdit {
+                                new_text: composition.to_string(),
+                                range: {
+                                    let file =
+                                        self.store.get_ast_file(
+                                            &command_params
+                                                .text_document
+                                                .uri,
+                                        )?;
+                                    file.base.location.into()
+                                },
+                            }],
+                        )])),
+                        document_changes: None,
+                        change_annotations: None,
+                    };
+                    if let Some(client) = self.get_client() {
+                        let _ = client.apply_edit(edit, None).await;
+                    };
+                }
 
                 match self.state.lock() {
                     Ok(mut state) => state.set_composition(
@@ -1527,9 +1566,6 @@ impl LanguageServer for LspServer {
                     ),
                     Err(err) => panic!("{}", err),
                 }
-                if let Some(client) = self.get_client() {
-                    let _ = client.apply_edit(edit, None).await;
-                };
                 Ok(None)
             }
             Ok(LspServerCommand::SetMeasurementFilter) => {
