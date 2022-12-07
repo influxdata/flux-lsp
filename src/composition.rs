@@ -449,6 +449,9 @@ impl<'a> ast::walk::Visitor<'a> for CompositionStatementAnalyzer {
                             return false;
                         }
                     }
+                } else {
+                    self.calls.push(call_expr.clone());
+                    return false;
                 }
             }
             ast::walk::Node::BinaryExpr(binary_expr) => {
