@@ -14,6 +14,9 @@ mod server;
 mod visitors;
 #[cfg(feature = "wasm")]
 mod wasm;
+#[cfg(feature = "wasm")]
+#[path = "logger.rs"]
+pub mod wasm_logger;
 
 #[cfg(test)]
 #[macro_use]

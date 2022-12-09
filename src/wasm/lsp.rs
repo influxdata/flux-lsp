@@ -1,6 +1,6 @@
 use std::mem;
 
-use crate::LspServer;
+use crate::{wasm_logger, LspServer};
 use futures::prelude::*;
 use lspower::{LspService, MessageStream};
 use tower_service::Service;
@@ -65,6 +65,8 @@ impl Default for Lsp {
     fn default() -> Self {
         #[cfg(feature = "console_error_panic_hook")]
         console_error_panic_hook::set_once();
+
+        let _ = wasm_logger::init();
 
         let (service, messages) =
             lspower::LspService::new(|client| {
