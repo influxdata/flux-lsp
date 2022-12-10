@@ -185,8 +185,7 @@ async fn test_did_change_updates_composition_file() {
     .to_string();
     let params = lsp::DidChangeTextDocumentParams {
         text_document: lsp::VersionedTextDocumentIdentifier {
-            uri: lsp::Url::parse("file:///home/user/file.flux")
-                .unwrap(),
+            uri: uri.clone(),
             version: -2,
         },
         content_changes: vec![lsp::TextDocumentContentChangeEvent {
