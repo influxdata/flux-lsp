@@ -1,5 +1,4 @@
 use wasm_bindgen::prelude::*;
-use web_sys::console;
 
 /// Flux provides an API for transforming, formatting, and checking syntax of flux source code.
 #[wasm_bindgen]
