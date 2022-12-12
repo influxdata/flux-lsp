@@ -124,11 +124,11 @@ impl LspServerState {
     /// Get a composition from the state
     ///
     /// We return a copy here, as the pointer across threads isn't supported.
-    pub fn get_composition(
-        &self,
+    pub fn get_mut_composition(
+        &mut self,
         uri: &lsp::Url,
-    ) -> Option<composition::Composition> {
-        self.compositions.get(uri).cloned()
+    ) -> Option<&mut composition::Composition> {
+        self.compositions.get_mut(uri)
     }
 
     pub fn set_composition(
@@ -516,8 +516,8 @@ impl LanguageServer for LspServer {
                 if self.store.get_package_errors(&key).is_none() {
                     match self.state.lock() {
                         Ok(mut state) => {
-                            if let Some(mut composition) =
-                                state.get_composition(&key)
+                            if let Some(composition) =
+                                state.get_mut_composition(&key)
                             {
                                 match self.store.get_ast_file(&key) {
                                 Ok(file) => {
@@ -1479,7 +1479,7 @@ impl LanguageServer for LspServer {
                 };
                 Ok(None)
             }
-            Ok(LspServerCommand::AddMeasurementFilter) => {
+            Ok(LspServerCommand::SetMeasurementFilter) => {
                 let command_params: ValueFilterParams =
                     match serde_json::value::from_value(
                         params.arguments[0].clone(),
@@ -1493,11 +1493,23 @@ impl LanguageServer for LspServer {
                         }
                     };
 
-                let mut composition = match self.state.lock() {
-                    Ok(state) => match state.get_composition(
+                let composition_text = match self.state.lock() {
+                    Ok(mut state) => match state.get_mut_composition(
                         &command_params.text_document.uri,
                     ) {
-                        Some(composition) => composition,
+                        Some(composition) => {
+                            if composition
+                                .set_measurement(command_params.value)
+                                .is_err()
+                            {
+                                return Err(LspError::InternalError(
+                                    "Failed to set measurement to composition."
+                                        .to_string(),
+                                )
+                                .into());
+                            }
+                            composition.to_string()
+                        }
                         None => {
                             return Err(
                                 LspError::CompositionNotFound(
@@ -1510,22 +1522,13 @@ impl LanguageServer for LspServer {
                     Err(err) => panic!("{}", err),
                 };
 
-                if composition
-                    .add_measurement(command_params.value)
-                    .is_err()
-                {
-                    return Err(LspError::InternalError(
-                        "Failed to add measurement to composition."
-                            .to_string(),
-                    )
-                    .into());
-                }
-
                 let edit = lsp::WorkspaceEdit {
                     changes: Some(HashMap::from([(
                         command_params.text_document.uri.clone(),
                         vec![lsp::TextEdit {
-                            new_text: composition.to_string(),
+                            new_text: composition_text
+                                .trim_end()
+                                .to_owned(),
                             range: {
                                 let file = self.store.get_ast_file(
                                     &command_params.text_document.uri,
@@ -1538,13 +1541,6 @@ impl LanguageServer for LspServer {
                     change_annotations: None,
                 };
 
-                match self.state.lock() {
-                    Ok(mut state) => state.set_composition(
-                        command_params.text_document.uri,
-                        composition,
-                    ),
-                    Err(err) => panic!("{}", err),
-                }
                 if let Some(client) = self.get_client() {
                     let _ = client.apply_edit(edit, None).await;
                 };
@@ -1564,11 +1560,23 @@ impl LanguageServer for LspServer {
                         }
                     };
 
-                let mut composition = match self.state.lock() {
-                    Ok(state) => match state.get_composition(
+                let composition_text = match self.state.lock() {
+                    Ok(mut state) => match state.get_mut_composition(
                         &command_params.text_document.uri,
                     ) {
-                        Some(composition) => composition,
+                        Some(composition) => {
+                            if composition
+                                .add_field(command_params.value)
+                                .is_err()
+                            {
+                                return Err(LspError::InternalError(
+                        "Failed to add field to composition."
+                            .to_string(),
+                    )
+                    .into());
+                            }
+                            composition.to_string().clone()
+                        }
                         None => {
                             return Err(
                                 LspError::CompositionNotFound(
@@ -1581,22 +1589,13 @@ impl LanguageServer for LspServer {
                     Err(err) => panic!("{}", err),
                 };
 
-                if composition
-                    .add_field(command_params.value)
-                    .is_err()
-                {
-                    return Err(LspError::InternalError(
-                        "Failed to add field to composition."
-                            .to_string(),
-                    )
-                    .into());
-                }
-
                 let edit = lsp::WorkspaceEdit {
                     changes: Some(HashMap::from([(
                         command_params.text_document.uri.clone(),
                         vec![lsp::TextEdit {
-                            new_text: composition.to_string(),
+                            new_text: composition_text
+                                .trim_end()
+                                .to_owned(),
                             range: {
                                 let file = self.store.get_ast_file(
                                     &command_params.text_document.uri,
@@ -1609,13 +1608,6 @@ impl LanguageServer for LspServer {
                     change_annotations: None,
                 };
 
-                match self.state.lock() {
-                    Ok(mut state) => state.set_composition(
-                        command_params.text_document.uri,
-                        composition,
-                    ),
-                    Err(err) => panic!("{}", err),
-                }
                 if let Some(client) = self.get_client() {
                     let _ = client.apply_edit(edit, None).await;
                 };
@@ -1635,11 +1627,23 @@ impl LanguageServer for LspServer {
                         }
                     };
 
-                let mut composition = match self.state.lock() {
-                    Ok(state) => match state.get_composition(
+                let composition_text = match self.state.lock() {
+                    Ok(mut state) => match state.get_mut_composition(
                         &command_params.text_document.uri,
                     ) {
-                        Some(composition) => composition,
+                        Some(composition) => {
+                            if composition
+                                .remove_field(command_params.value)
+                                .is_err()
+                            {
+                                return Err(LspError::InternalError(
+                        "Failed to remove field from composition."
+                            .to_string(),
+                    )
+                    .into());
+                            }
+                            composition.to_string().clone()
+                        }
                         None => {
                             return Err(
                                 LspError::CompositionNotFound(
@@ -1652,22 +1656,13 @@ impl LanguageServer for LspServer {
                     Err(err) => panic!("{}", err),
                 };
 
-                if composition
-                    .remove_field(command_params.value)
-                    .is_err()
-                {
-                    return Err(LspError::InternalError(
-                        "Failed to remove field from composition."
-                            .to_string(),
-                    )
-                    .into());
-                }
-
                 let edit = lsp::WorkspaceEdit {
                     changes: Some(HashMap::from([(
                         command_params.text_document.uri.clone(),
                         vec![lsp::TextEdit {
-                            new_text: composition.to_string(),
+                            new_text: composition_text
+                                .trim_end()
+                                .to_owned(),
                             range: {
                                 let file = self.store.get_ast_file(
                                     &command_params.text_document.uri,
@@ -1680,13 +1675,6 @@ impl LanguageServer for LspServer {
                     change_annotations: None,
                 };
 
-                match self.state.lock() {
-                    Ok(mut state) => state.set_composition(
-                        command_params.text_document.uri,
-                        composition,
-                    ),
-                    Err(err) => panic!("{}", err),
-                }
                 if let Some(client) = self.get_client() {
                     let _ = client.apply_edit(edit, None).await;
                 };
@@ -1706,11 +1694,26 @@ impl LanguageServer for LspServer {
                         }
                     };
 
-                let mut composition = match self.state.lock() {
-                    Ok(state) => match state.get_composition(
+                let composition_text = match self.state.lock() {
+                    Ok(mut state) => match state.get_mut_composition(
                         &command_params.text_document.uri,
                     ) {
-                        Some(composition) => composition,
+                        Some(composition) => {
+                            if composition
+                                .add_tag_value(
+                                    command_params.tag,
+                                    command_params.value,
+                                )
+                                .is_err()
+                            {
+                                return Err(LspError::InternalError(
+                        "Failed to add tagValue to composition."
+                            .to_string(),
+                    )
+                    .into());
+                            }
+                            composition.to_string().clone()
+                        }
                         None => {
                             return Err(
                                 LspError::CompositionNotFound(
@@ -1723,25 +1726,13 @@ impl LanguageServer for LspServer {
                     Err(err) => panic!("{}", err),
                 };
 
-                if composition
-                    .add_tag_value(
-                        command_params.tag,
-                        command_params.value,
-                    )
-                    .is_err()
-                {
-                    return Err(LspError::InternalError(
-                        "Failed to add tagValue to composition."
-                            .to_string(),
-                    )
-                    .into());
-                }
-
                 let edit = lsp::WorkspaceEdit {
                     changes: Some(HashMap::from([(
                         command_params.text_document.uri.clone(),
                         vec![lsp::TextEdit {
-                            new_text: composition.to_string(),
+                            new_text: composition_text
+                                .trim_end()
+                                .to_owned(),
                             range: {
                                 let file = self.store.get_ast_file(
                                     &command_params.text_document.uri,
@@ -1754,13 +1745,6 @@ impl LanguageServer for LspServer {
                     change_annotations: None,
                 };
 
-                match self.state.lock() {
-                    Ok(mut state) => state.set_composition(
-                        command_params.text_document.uri,
-                        composition,
-                    ),
-                    Err(err) => panic!("{}", err),
-                }
                 if let Some(client) = self.get_client() {
                     let _ = client.apply_edit(edit, None).await;
                 };
@@ -1780,11 +1764,26 @@ impl LanguageServer for LspServer {
                         }
                     };
 
-                let mut composition = match self.state.lock() {
-                    Ok(state) => match state.get_composition(
+                let composition_text = match self.state.lock() {
+                    Ok(mut state) => match state.get_mut_composition(
                         &command_params.text_document.uri,
                     ) {
-                        Some(composition) => composition,
+                        Some(composition) => {
+                            if composition
+                                .remove_tag_value(
+                                    command_params.tag,
+                                    command_params.value,
+                                )
+                                .is_err()
+                            {
+                                return Err(LspError::InternalError(
+                                    "Failed to remove tagValue from composition."
+                                        .to_string(),
+                                )
+                                .into());
+                            }
+                            composition.to_string().clone()
+                        }
                         None => {
                             return Err(
                                 LspError::CompositionNotFound(
@@ -1797,25 +1796,13 @@ impl LanguageServer for LspServer {
                     Err(err) => panic!("{}", err),
                 };
 
-                if composition
-                    .remove_tag_value(
-                        command_params.tag,
-                        command_params.value,
-                    )
-                    .is_err()
-                {
-                    return Err(LspError::InternalError(
-                        "Failed to remove tagValue from composition."
-                            .to_string(),
-                    )
-                    .into());
-                }
-
                 let edit = lsp::WorkspaceEdit {
                     changes: Some(HashMap::from([(
                         command_params.text_document.uri.clone(),
                         vec![lsp::TextEdit {
-                            new_text: composition.to_string(),
+                            new_text: composition_text
+                                .trim_end()
+                                .to_owned(),
                             range: {
                                 let file = self.store.get_ast_file(
                                     &command_params.text_document.uri,
@@ -1828,13 +1815,6 @@ impl LanguageServer for LspServer {
                     change_annotations: None,
                 };
 
-                match self.state.lock() {
-                    Ok(mut state) => state.set_composition(
-                        command_params.text_document.uri,
-                        composition,
-                    ),
-                    Err(err) => panic!("{}", err),
-                }
                 if let Some(client) = self.get_client() {
                     let _ = client.apply_edit(edit, None).await;
                 };
