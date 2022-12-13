@@ -534,10 +534,7 @@ impl LanguageServer for LspServer {
                                             Ok(composition.clone())
                                         }
                                     }
-                                    Err(_) => {
-                                        log::error!("Found composition but did not find ast for key: {}", key);
-                                        Err(LspClientCommand::CompositionNotFound)
-                                    }
+                                    Err(_) => Err(LspClientCommand::CompositionNotFound),
                                 }
                             } else {
                                 Err(LspClientCommand::CompositionNotFound)

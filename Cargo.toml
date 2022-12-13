@@ -56,6 +56,7 @@ tokio = { version = "1.17.0", features = ["io-std", "io-util", "macros", "net", 
 tower-service = { version = "0.3.1", optional = true }
 wasm-bindgen = { version = "0.2.80", features = ["serde-serialize"], optional = true }
 wasm-bindgen-futures = { version = "0.4.30", optional = true }
+wasm-logger = "0.2.0"
 web-sys = { version = "0.3.57", features = ["console"], optional = true }
 itertools = "0.10.5"
 
