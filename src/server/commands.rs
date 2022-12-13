@@ -1,6 +1,6 @@
-use lspower::lsp;
+use lspower::lsp::{self, notification::Notification};
 use serde::{Deserialize, Serialize};
-use strum_macros::EnumIter;
+use strum_macros::{Display, EnumIter};
 
 #[derive(EnumIter)]
 pub enum LspServerCommand {
@@ -73,6 +73,50 @@ impl From<LspServerCommand> for String {
             }
         }
     }
+}
+
+pub struct ClientCommandNotification;
+
+impl Notification for ClientCommandNotification {
+    type Params = lsp::ShowMessageRequestParams;
+    const METHOD: &'static str = "window/showMessageRequest";
+}
+
+#[derive(Debug)]
+pub enum LspClientCommand {
+    UpdateComposition,
+    CompositionDropped,
+    CompositionNotFound,
+    ExecuteCommandFailed,
+    AlreadyExists,
+}
+
+impl ToString for LspClientCommand {
+    fn to_string(&self) -> String {
+        match &self {
+            LspClientCommand::UpdateComposition => {
+                "fluxComposition/compositionState".into()
+            }
+            LspClientCommand::CompositionDropped => {
+                "fluxComposition/compositionEnded".into()
+            }
+            LspClientCommand::CompositionNotFound => {
+                "fluxComposition/compositionNotFound".into()
+            }
+            LspClientCommand::ExecuteCommandFailed => {
+                "fluxComposition/executeCommandFailed".into()
+            }
+            LspClientCommand::AlreadyExists => {
+                "fluxComposition/alreadyInitialized".into()
+            }
+        }
+    }
+}
+
+#[derive(Debug, Display)]
+pub enum LspMessageActionItem {
+    CompositionRange,
+    CompositionState,
 }
 
 #[derive(Deserialize, Serialize)]

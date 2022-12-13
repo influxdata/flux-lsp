@@ -1,10 +1,12 @@
+use std::collections::HashMap;
+
 /// Composition functionality
 ///
 /// This module covers all the functionality that comes from the Composition feature of the
 /// LSP server. It's spec can be found in the docs/ folder of source control.
 ///
 /// This module _only_ operates on an AST. It will never operate on semantic graph.
-use flux::ast;
+use flux::ast::{self, SourceLocation};
 use itertools::Itertools;
 
 macro_rules! from {
@@ -447,6 +449,9 @@ impl<'a> ast::walk::Visitor<'a> for CompositionStatementAnalyzer {
                             return false;
                         }
                     }
+                } else {
+                    self.calls.push(call_expr.clone());
+                    return false;
                 }
             }
             ast::walk::Node::BinaryExpr(binary_expr) => {
@@ -567,6 +572,41 @@ impl Composition {
         self.file.clone()
     }
 
+    pub(crate) fn get_stmt_position(&self) -> Option<SourceLocation> {
+        self.file.body.get(self.statement_index).map(
+            |composition_stmt| {
+                composition_stmt.base().location.clone()
+            },
+        )
+    }
+
+    pub(crate) fn get_serialized_composition_state(
+        &self,
+    ) -> Result<serde_json::Value, serde_json::Error> {
+        serde_json::to_value(HashMap::from([
+            (
+                "bucket",
+                serde_json::to_value(self.analyzer.bucket.clone())?,
+            ),
+            (
+                "measurement",
+                serde_json::to_value(
+                    self.analyzer.measurement.clone(),
+                )?,
+            ),
+            (
+                "fields",
+                serde_json::to_value(self.analyzer.fields.clone())?,
+            ),
+            (
+                "tag_values",
+                serde_json::to_value(
+                    self.analyzer.tag_values.clone(),
+                )?,
+            ),
+        ]))
+    }
+
     /// Sync the composition statement with the analyzer.
     // This is, for obvious reasons, inefficient. It moves the items in the vec
     // around a lot. Premature optimization and blah blah blah.
@@ -597,28 +637,7 @@ impl Composition {
         file: ast::File,
     ) -> Result<(), ()> {
         self.file = file;
-        let matches = self
-            .file
-            .body
-            .iter()
-            .enumerate()
-            .filter(|(_index, statement)| {
-                matches!(statement, ast::Statement::Expr(_))
-            })
-            .map(|(index, statement)| {
-                let expression = match statement {
-                    ast::Statement::Expr(expr) => expr,
-                    _ => unreachable!("Previous filter failed"),
-                };
-                let analyzer = CompositionStatementAnalyzer::analyze(
-                    *expression.clone(),
-                );
-                (index, analyzer)
-            })
-            .filter(|(_index, analyzer)| {
-                analyzer.clone() == self.analyzer
-            })
-            .collect::<Vec<(usize, CompositionStatementAnalyzer)>>();
+        let matches = self.find_matches_in_file(&self.file);
         if matches.len() > 1 {
             log::error!(
                 "Too many matches for composition statement."
@@ -637,6 +656,37 @@ impl Composition {
                 }
             }
         }
+    }
+
+    pub fn exists_in(&self, file: &ast::File) -> bool {
+        let matches = self.find_matches_in_file(file);
+        !matches.is_empty() && matches.last().is_some()
+    }
+
+    fn find_matches_in_file(
+        &self,
+        file: &ast::File,
+    ) -> Vec<(usize, CompositionStatementAnalyzer)> {
+        file.body
+            .iter()
+            .enumerate()
+            .filter(|(_index, statement)| {
+                matches!(statement, ast::Statement::Expr(_))
+            })
+            .map(|(index, statement)| {
+                let expression = match statement {
+                    ast::Statement::Expr(expr) => expr,
+                    _ => unreachable!("Previous filter failed"),
+                };
+                let analyzer = CompositionStatementAnalyzer::analyze(
+                    *expression.clone(),
+                );
+                (index, analyzer)
+            })
+            .filter(|(_index, analyzer)| {
+                analyzer.clone() == self.analyzer
+            })
+            .collect::<Vec<(usize, CompositionStatementAnalyzer)>>()
     }
 
     pub(crate) fn set_measurement(
@@ -864,6 +914,35 @@ from(bucket: "myBucket")
         assert!(composition.resolve_with_ast(ast).is_ok());
         let expected: Vec<(String, String)> = vec![];
         assert_eq!(expected, composition.analyzer.tag_values)
+    }
+
+    /// When file already contains compositon, return true.
+    #[test]
+    fn test_composition_exists_in() {
+        let fluxscript = "".to_string();
+        let ast = flux::parser::parse_string("".into(), &fluxscript);
+
+        let mut composition = Composition::new(
+            ast.clone(),
+            "myBucket".into(),
+            Some("myMeasurement".into()),
+            vec!["myField1".into(), "myField2".into()],
+            vec![
+                ("myTagKey".into(), "myTagValue".into()),
+                ("myTagKey2".into(), "myTagValue2".into()),
+            ],
+        );
+        assert!(!composition.exists_in(&ast));
+
+        // after applyEdit --> triggers did_change
+        let new_fluxscript =
+            format!(r#"{}"#, composition.to_string());
+        let new_ast =
+            flux::parser::parse_string("".into(), &new_fluxscript);
+        assert!(composition
+            .resolve_with_ast(new_ast.clone())
+            .is_ok()); // triggered in did_change
+        assert!(composition.exists_in(&new_ast));
     }
 
     /// When a non-expression statement is added above the composition statement, the
