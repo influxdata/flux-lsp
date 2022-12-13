@@ -87,6 +87,7 @@ pub enum LspClientCommand {
     UpdateComposition,
     CompositionDropped,
     CompositionNotFound,
+    ExecuteCommandFailed,
     AlreadyExists,
 }
 
@@ -101,6 +102,9 @@ impl ToString for LspClientCommand {
             }
             LspClientCommand::CompositionNotFound => {
                 "fluxComposition/compositionNotFound".into()
+            }
+            LspClientCommand::ExecuteCommandFailed => {
+                "fluxComposition/executeCommandFailed".into()
             }
             LspClientCommand::AlreadyExists => {
                 "fluxComposition/alreadyInitialized".into()

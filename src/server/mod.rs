@@ -572,7 +572,7 @@ impl LanguageServer for LspServer {
                                     message: LspClientCommand::UpdateComposition.to_string(),
                                     actions: Some(vec![range_action_item, composition_state_action_item]),
                                 };
-                                let _ = client.send_custom_notification::<ClientCommandNotification>(params).await;
+                                client.send_custom_notification::<ClientCommandNotification>(params).await;
                             }
                             Err(error_type) => {
                                 let params =
@@ -582,7 +582,7 @@ impl LanguageServer for LspServer {
                                             .to_string(),
                                         actions: None,
                                     };
-                                let _ = client.send_custom_notification::<ClientCommandNotification>(params).await;
+                                client.send_custom_notification::<ClientCommandNotification>(params).await;
                             }
                         };
                     } else {
@@ -1532,7 +1532,7 @@ impl LanguageServer for LspServer {
                         actions: Some(vec![range_action_item]),
                     };
                     if let Some(client) = self.get_client() {
-                        let _ = client.send_custom_notification::<ClientCommandNotification>(params).await;
+                        client.send_custom_notification::<ClientCommandNotification>(params).await;
                     };
                 } else {
                     let edit = lsp::WorkspaceEdit {
@@ -1555,7 +1555,17 @@ impl LanguageServer for LspServer {
                         change_annotations: None,
                     };
                     if let Some(client) = self.get_client() {
-                        let _ = client.apply_edit(edit, None).await;
+                        let edit_applied =
+                            client.apply_edit(edit, None).await;
+                        if edit_applied.is_err() {
+                            let params =
+                                    lsp::ShowMessageRequestParams {
+                                        typ: lsp::MessageType::ERROR,
+                                        message: LspClientCommand::ExecuteCommandFailed.to_string(),
+                                        actions: None,
+                                    };
+                            client.send_custom_notification::<ClientCommandNotification>(params).await;
+                        }
                     };
                 }
 
@@ -1631,7 +1641,18 @@ impl LanguageServer for LspServer {
                 };
 
                 if let Some(client) = self.get_client() {
-                    let _ = client.apply_edit(edit, None).await;
+                    let edit_applied =
+                        client.apply_edit(edit, None).await;
+                    if edit_applied.is_err() {
+                        let params = lsp::ShowMessageRequestParams {
+                            typ: lsp::MessageType::ERROR,
+                            message:
+                                LspClientCommand::ExecuteCommandFailed
+                                    .to_string(),
+                            actions: None,
+                        };
+                        client.send_custom_notification::<ClientCommandNotification>(params).await;
+                    }
                 };
                 Ok(None)
             }
@@ -1698,7 +1719,18 @@ impl LanguageServer for LspServer {
                 };
 
                 if let Some(client) = self.get_client() {
-                    let _ = client.apply_edit(edit, None).await;
+                    let edit_applied =
+                        client.apply_edit(edit, None).await;
+                    if edit_applied.is_err() {
+                        let params = lsp::ShowMessageRequestParams {
+                            typ: lsp::MessageType::ERROR,
+                            message:
+                                LspClientCommand::ExecuteCommandFailed
+                                    .to_string(),
+                            actions: None,
+                        };
+                        client.send_custom_notification::<ClientCommandNotification>(params).await;
+                    }
                 };
                 Ok(None)
             }
@@ -1765,7 +1797,18 @@ impl LanguageServer for LspServer {
                 };
 
                 if let Some(client) = self.get_client() {
-                    let _ = client.apply_edit(edit, None).await;
+                    let edit_applied =
+                        client.apply_edit(edit, None).await;
+                    if edit_applied.is_err() {
+                        let params = lsp::ShowMessageRequestParams {
+                            typ: lsp::MessageType::ERROR,
+                            message:
+                                LspClientCommand::ExecuteCommandFailed
+                                    .to_string(),
+                            actions: None,
+                        };
+                        client.send_custom_notification::<ClientCommandNotification>(params).await;
+                    }
                 };
                 Ok(None)
             }
@@ -1835,7 +1878,18 @@ impl LanguageServer for LspServer {
                 };
 
                 if let Some(client) = self.get_client() {
-                    let _ = client.apply_edit(edit, None).await;
+                    let edit_applied =
+                        client.apply_edit(edit, None).await;
+                    if edit_applied.is_err() {
+                        let params = lsp::ShowMessageRequestParams {
+                            typ: lsp::MessageType::ERROR,
+                            message:
+                                LspClientCommand::ExecuteCommandFailed
+                                    .to_string(),
+                            actions: None,
+                        };
+                        client.send_custom_notification::<ClientCommandNotification>(params).await;
+                    }
                 };
                 Ok(None)
             }
@@ -1905,7 +1959,18 @@ impl LanguageServer for LspServer {
                 };
 
                 if let Some(client) = self.get_client() {
-                    let _ = client.apply_edit(edit, None).await;
+                    let edit_applied =
+                        client.apply_edit(edit, None).await;
+                    if edit_applied.is_err() {
+                        let params = lsp::ShowMessageRequestParams {
+                            typ: lsp::MessageType::ERROR,
+                            message:
+                                LspClientCommand::ExecuteCommandFailed
+                                    .to_string(),
+                            actions: None,
+                        };
+                        client.send_custom_notification::<ClientCommandNotification>(params).await;
+                    }
                 };
                 Ok(None)
             }
