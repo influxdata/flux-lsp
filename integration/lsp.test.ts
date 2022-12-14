@@ -133,6 +133,10 @@ describe('LSP Server', () => {
 });
 
 describe('module', () => {
+    beforeAll(async () => {
+        const { initLog } = await import('@influxdata/flux-lsp-node');
+        initLog();
+    })
 
     it('can parse Flux source' , async () => {
         const { parse } = await import('@influxdata/flux-lsp-node');

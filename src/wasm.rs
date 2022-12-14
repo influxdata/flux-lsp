@@ -15,8 +15,10 @@ use log::Level;
 use wasm_bindgen::prelude::*;
 use wasm_logger;
 
-#[wasm_bindgen(start)]
-pub fn init() {
+/// Initialize logging
+#[allow(non_snake_case, dead_code)]
+#[wasm_bindgen]
+pub fn initLog() {
     wasm_logger::init(wasm_logger::Config::new(Level::Info));
 }
 
