@@ -16,7 +16,7 @@ case $BUILD_MODE in
         ;;
     "dev")
         BUILD_FLAG="--dev"
-        BUILD_MODE_ARGS="${BUILD_MODE_ARGS},console_log"
+        BUILD_MODE_ARGS="${BUILD_MODE_ARGS}"
         ;;
     *)
         echo "Invalid build mode: ${BUILD_MODE}"

@@ -2,12 +2,10 @@ use std::mem;
 
 use crate::LspServer;
 use futures::prelude::*;
-use log::Level;
 use lspower::{LspService, MessageStream};
 use tower_service::Service;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::future_to_promise;
-use wasm_logger;
 
 // MessageProcessor calls handlers for recieved messages.
 struct MessageProcessor {
@@ -67,8 +65,6 @@ impl Default for Lsp {
     fn default() -> Self {
         #[cfg(feature = "console_error_panic_hook")]
         console_error_panic_hook::set_once();
-
-        wasm_logger::init(wasm_logger::Config::new(Level::Info));
 
         let (service, messages) =
             lspower::LspService::new(|client| {

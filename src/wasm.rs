@@ -11,16 +11,13 @@ pub use self::lang::Flux;
 pub use self::lsp::Lsp;
 
 use flux::{ast, formatter, parser};
+use log::Level;
 use wasm_bindgen::prelude::*;
+use wasm_logger;
 
-/// Initialize logging - this requires the "console_log" feature to function,
-/// as this library adds 180k to the wasm binary being shipped.
-#[allow(non_snake_case, dead_code)]
-#[wasm_bindgen]
-pub fn initLog() {
-    #[cfg(feature = "console_log")]
-    console_log::init_with_level(log::Level::Trace)
-        .expect("error initializing log");
+#[wasm_bindgen(start)]
+pub fn main() {
+    wasm_logger::init(wasm_logger::Config::new(Level::Info));
 }
 
 /// Parse flux into an AST representation. The AST will be generated regardless

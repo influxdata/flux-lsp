@@ -1,11 +1,6 @@
 describe('LSP Server', () => {
     let server;
 
-    beforeAll(async () => {
-        const { initLog } = await import('@influxdata/flux-lsp-node');
-        initLog();
-    });
-
     beforeEach(async () => {
         const { Lsp } = await import('@influxdata/flux-lsp-node');
         server = new Lsp();
