@@ -131,6 +131,7 @@ describe('LSP Server', () => {
         expect(diagnostics[0]).toStrictEqual({"message": "undefined identifier x", "range": {"end": {"character": 14, "line": 0}, "start": {"character": 13, "line": 0}}, "severity": 1, "source": "flux"});
     });
 });
+
 describe('module', () => {
 
     it('can parse Flux source' , async () => {
@@ -152,5 +153,19 @@ describe('module', () => {
         // Format into new source
         const src = format_from_js_file(ast);
         expect(src).toBe('x = 2\n');
+    })
+
+    it('always parses, even if invalid flux' , async () => {
+        const { parse } = await import('@influxdata/flux-lsp-node');
+        const ast = parse('from(bucket: " |>');
+        expect(ast.body.length == 1);
+    })
+
+    it('will fail to stringify ast if invalid flux' , async () => {
+        const { parse, format_from_js_file } = await import('@influxdata/flux-lsp-node');
+        const ast = parse('from(bucket: " |>');
+        expect(() => {
+            format_from_js_file(ast)
+        }).toThrow();
     })
 })
