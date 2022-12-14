@@ -155,17 +155,33 @@ describe('module', () => {
         expect(src).toBe('x = 2\n');
     })
 
-    it('always parses, even if invalid flux' , async () => {
-        const { parse } = await import('@influxdata/flux-lsp-node');
-        const ast = parse('from(bucket: " |>');
-        expect(ast.body.length == 1);
+    it('can recognize valid flux', async () => {
+        const { is_valid_flux } = await import('@influxdata/flux-lsp-node');
+        const res = is_valid_flux('from(bucket: "foo")');
+        expect(res);
     })
 
-    it('will fail to stringify ast if invalid flux' , async () => {
-        const { parse, format_from_js_file } = await import('@influxdata/flux-lsp-node');
-        const ast = parse('from(bucket: " |>');
-        expect(() => {
-            format_from_js_file(ast)
-        }).toThrow();
+    describe('invalid flux', () => {
+        const script = 'from(bucket: " |>';
+
+        it('always parses' , async () => {
+            const { parse } = await import('@influxdata/flux-lsp-node');
+            const ast = parse(script);
+            expect(ast.body.length == 1);
+        })
+
+        it('will fail to stringify ast if invalid flux' , async () => {
+            const { parse, format_from_js_file } = await import('@influxdata/flux-lsp-node');
+            const ast = parse(script);
+            expect(() => {
+                format_from_js_file(ast)
+            }).toThrow();
+        })
+
+        it('will fail is_valid_flux', async () => {
+            const { is_valid_flux } = await import('@influxdata/flux-lsp-node');
+            const res = is_valid_flux(script);
+            expect(res == false);
+        })
     })
 })

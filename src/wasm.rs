@@ -57,6 +57,13 @@ pub fn format_from_js_file(
     }
 }
 
+/// Validate flux script.
+#[wasm_bindgen]
+pub fn is_valid_flux(script: &str) -> bool {
+    let flux = Flux::new(&script);
+    flux.is_valid()
+}
+
 #[cfg(test)]
 #[allow(deprecated, clippy::wildcard_imports, clippy::unwrap_used)]
 mod test {
