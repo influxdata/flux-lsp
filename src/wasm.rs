@@ -16,7 +16,7 @@ use wasm_bindgen::prelude::*;
 use wasm_logger;
 
 #[wasm_bindgen(start)]
-pub fn main() {
+pub fn init() {
     wasm_logger::init(wasm_logger::Config::new(Level::Info));
 }
 
