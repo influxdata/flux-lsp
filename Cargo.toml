@@ -18,7 +18,7 @@ lto = true
 default = ["cmd"]
 strict = []
 cmd = ["clap", "simplelog", "tokio", "tower-service", "lspower/runtime-tokio"]
-wasm = ["futures", "js-sys", "lspower/runtime-agnostic", "tower-service", "wasm-bindgen", "wasm-bindgen-futures"]
+wasm = ["futures", "js-sys", "fluxlang", "lspower/runtime-agnostic", "tower-service", "wasm-bindgen", "wasm-bindgen-futures"]
 fluxlang = []
 
 [lib]
@@ -38,7 +38,6 @@ async-trait = "0.1.53"
 clap = { version = "3.1.9", features = ["derive"], optional = true }
 combinations = "0.1.0"
 console_error_panic_hook = { version = "0.1.7", optional = true }
-console_log = { version = "0.2", optional = true }
 flux = { git = "https://github.com/influxdata/flux", tag= "v0.191.0", features = ["lsp"], default-features = false }
 futures = { version = "0.3.21", optional = true }
 Inflector = "0.11.4"
