@@ -215,7 +215,7 @@
     "safe-buffer": "^5.1.2",
     "safer-buffer": "^2.1.2",
     "saxes": "^5.0.1",
-    "semver": "^6.3.0",
+    "semver": "^7.5.2",
     "shebang-command": "^2.0.0",
     "shebang-regex": "^3.0.0",
     "signal-exit": "^3.0.3",
