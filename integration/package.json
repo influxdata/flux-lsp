@@ -239,7 +239,7 @@
     "tmpl": "^1.0.4",
     "to-fast-properties": "^2.0.0",
     "to-regex-range": "^5.0.1",
-    "tough-cookie": "^4.0.0",
+    "tough-cookie": "^4.1.3",
     "tr46": "^2.1.0",
     "ts-jest": "^27.0.3",
     "type-check": "^0.3.2",
