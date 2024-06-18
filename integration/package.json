@@ -27,7 +27,7 @@
     "babel-preset-jest": "^27.0.6",
     "balanced-match": "^1.0.2",
     "brace-expansion": "^1.1.11",
-    "braces": "^3.0.2",
+    "braces": "^3.0.3",
     "browser-process-hrtime": "^1.0.0",
     "browserslist": "^4.16.6",
     "bser": "^2.1.1",
