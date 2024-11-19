@@ -50,7 +50,7 @@
     "concat-map": "^0.0.1",
     "convert-source-map": "^1.8.0",
     "core-js-compat": "^3.15.2",
-    "cross-spawn": "^7.0.3",
+    "cross-spawn": "^7.0.6",
     "cssom": "^0.4.4",
     "cssstyle": "^2.3.0",
     "data-urls": "^2.0.0",
