@@ -26,7 +26,7 @@ use crate::{completion, composition, lang, visitors::semantic};
 use self::commands::{
     ClientCommandNotification, CompositionInitializeParams,
     LspClientCommand, LspMessageActionItem, LspServerCommand,
-    TagValueFilterParams, ValueFilterParams,
+    TagValueFilterParams, ValueFilterParams, ClientNotification,
 };
 use self::types::LspError;
 
@@ -573,13 +573,12 @@ impl LanguageServer for LspServer {
                             }
                             Err(error_type) => {
                                 let params =
-                                    lsp::ShowMessageRequestParams {
+                                    lsp::ShowMessageParams {
                                         typ: lsp::MessageType::INFO,
                                         message: error_type
                                             .to_string(),
-                                        actions: None,
                                     };
-                                client.send_custom_notification::<ClientCommandNotification>(params).await;
+                                client.send_custom_notification::<ClientNotification>(params).await;
                             }
                         };
                     } else {
@@ -1483,7 +1482,7 @@ impl LanguageServer for LspServer {
                         Ok(value) => value,
                         Err(err) => {
                             return Err(LspError::InternalError(
-                                format!("{:?}", err),
+                        format!("Failed to decode params: {:?} while initializing composition: {:?} ", stringify!(params.arguments[0]),err)
                             )
                             .into())
                         }
@@ -1556,12 +1555,11 @@ impl LanguageServer for LspServer {
                             client.apply_edit(edit, None).await;
                         if edit_applied.is_err() {
                             let params =
-                                    lsp::ShowMessageRequestParams {
+                                    lsp::ShowMessageParams {
                                         typ: lsp::MessageType::ERROR,
                                         message: LspClientCommand::ExecuteCommandFailed.to_string(),
-                                        actions: None,
                                     };
-                            client.send_custom_notification::<ClientCommandNotification>(params).await;
+                            client.send_custom_notification::<ClientNotification>(params).await;
                         }
                     };
                 }
@@ -1583,7 +1581,7 @@ impl LanguageServer for LspServer {
                         Ok(value) => value,
                         Err(err) => {
                             return Err(LspError::InternalError(
-                                format!("{:?}", err),
+                        format!("Failed to decode params: {:?} while setting measurement filter: {:?} ", stringify!(params.arguments[0]),err)
                             )
                             .into())
                         }
@@ -1641,14 +1639,13 @@ impl LanguageServer for LspServer {
                     let edit_applied =
                         client.apply_edit(edit, None).await;
                     if edit_applied.is_err() {
-                        let params = lsp::ShowMessageRequestParams {
+                        let params = lsp::ShowMessageParams {
                             typ: lsp::MessageType::ERROR,
                             message:
                                 LspClientCommand::ExecuteCommandFailed
                                     .to_string(),
-                            actions: None,
                         };
-                        client.send_custom_notification::<ClientCommandNotification>(params).await;
+                        client.send_custom_notification::<ClientNotification>(params).await;
                     }
                 };
                 Ok(None)
@@ -1661,7 +1658,7 @@ impl LanguageServer for LspServer {
                         Ok(value) => value,
                         Err(err) => {
                             return Err(LspError::InternalError(
-                                format!("{:?}", err),
+                        format!("Failed to decode params: {:?} while adding filter field: {:?} to composition: ", stringify!(params.arguments[0]),err)
                             )
                             .into())
                         }
@@ -1677,7 +1674,7 @@ impl LanguageServer for LspServer {
                                 .is_err()
                             {
                                 return Err(LspError::InternalError(
-                        "Failed to add field to composition."
+                        format!("Failed to add field: {:?} to composition.", stringify!(command_params.value))
                             .to_string(),
                     )
                     .into());
@@ -1719,14 +1716,13 @@ impl LanguageServer for LspServer {
                     let edit_applied =
                         client.apply_edit(edit, None).await;
                     if edit_applied.is_err() {
-                        let params = lsp::ShowMessageRequestParams {
+                        let params = lsp::ShowMessageParams {
                             typ: lsp::MessageType::ERROR,
                             message:
                                 LspClientCommand::ExecuteCommandFailed
                                     .to_string(),
-                            actions: None,
                         };
-                        client.send_custom_notification::<ClientCommandNotification>(params).await;
+                        client.send_custom_notification::<ClientNotification>(params).await;
                     }
                 };
                 Ok(None)
@@ -1739,7 +1735,7 @@ impl LanguageServer for LspServer {
                         Ok(value) => value,
                         Err(err) => {
                             return Err(LspError::InternalError(
-                                format!("{:?}", err),
+                        format!("Failed to decode params: {:?} while removing filter field: {:?} ", stringify!(params.arguments[0]),err)
                             )
                             .into())
                         }
@@ -1755,7 +1751,7 @@ impl LanguageServer for LspServer {
                                 .is_err()
                             {
                                 return Err(LspError::InternalError(
-                        "Failed to remove field from composition."
+                        format!("Failed to remove field: {:?} from composition", stringify!(command_params.value))
                             .to_string(),
                     )
                     .into());
@@ -1797,14 +1793,13 @@ impl LanguageServer for LspServer {
                     let edit_applied =
                         client.apply_edit(edit, None).await;
                     if edit_applied.is_err() {
-                        let params = lsp::ShowMessageRequestParams {
+                        let params = lsp::ShowMessageParams {
                             typ: lsp::MessageType::ERROR,
                             message:
                                 LspClientCommand::ExecuteCommandFailed
                                     .to_string(),
-                            actions: None,
                         };
-                        client.send_custom_notification::<ClientCommandNotification>(params).await;
+                        client.send_custom_notification::<ClientNotification>(params).await;
                     }
                 };
                 Ok(None)
@@ -1817,7 +1812,7 @@ impl LanguageServer for LspServer {
                         Ok(value) => value,
                         Err(err) => {
                             return Err(LspError::InternalError(
-                                format!("{:?}", err),
+                        format!("Failed to decode params: {:?} while add tagValue filter: {:?} ", stringify!(params.arguments[0]),err)
                             )
                             .into())
                         }
@@ -1836,7 +1831,7 @@ impl LanguageServer for LspServer {
                                 .is_err()
                             {
                                 return Err(LspError::InternalError(
-                        "Failed to add tagValue to composition."
+                        format!("Failed to add tagValue: {:?} : {:?} filter", stringify!(command_params.tag), stringify!(command_params.value))
                             .to_string(),
                     )
                     .into());
@@ -1878,14 +1873,13 @@ impl LanguageServer for LspServer {
                     let edit_applied =
                         client.apply_edit(edit, None).await;
                     if edit_applied.is_err() {
-                        let params = lsp::ShowMessageRequestParams {
+                        let params = lsp::ShowMessageParams {
                             typ: lsp::MessageType::ERROR,
                             message:
                                 LspClientCommand::ExecuteCommandFailed
                                     .to_string(),
-                            actions: None,
                         };
-                        client.send_custom_notification::<ClientCommandNotification>(params).await;
+                        client.send_custom_notification::<ClientNotification>(params).await;
                     }
                 };
                 Ok(None)
@@ -1898,7 +1892,7 @@ impl LanguageServer for LspServer {
                         Ok(value) => value,
                         Err(err) => {
                             return Err(LspError::InternalError(
-                                format!("{:?}", err),
+                        format!("Failed to decode params: {:?} while removing tag filter: {:?} ", stringify!(params.arguments[0]),err)
                             )
                             .into())
                         }
@@ -1917,7 +1911,7 @@ impl LanguageServer for LspServer {
                                 .is_err()
                             {
                                 return Err(LspError::InternalError(
-                                    "Failed to remove tagValue from composition."
+                        format!("Failed to remove tag: {:?} : {:?} filter", stringify!(command_params.tag), stringify!(command_params.value))
                                         .to_string(),
                                 )
                                 .into());
@@ -1959,14 +1953,13 @@ impl LanguageServer for LspServer {
                     let edit_applied =
                         client.apply_edit(edit, None).await;
                     if edit_applied.is_err() {
-                        let params = lsp::ShowMessageRequestParams {
+                        let params = lsp::ShowMessageParams {
                             typ: lsp::MessageType::ERROR,
                             message:
                                 LspClientCommand::ExecuteCommandFailed
                                     .to_string(),
-                            actions: None,
                         };
-                        client.send_custom_notification::<ClientCommandNotification>(params).await;
+                        client.send_custom_notification::<ClientNotification>(params).await;
                     }
                 };
                 Ok(None)

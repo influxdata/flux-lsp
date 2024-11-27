@@ -76,6 +76,12 @@ impl From<LspServerCommand> for String {
 }
 
 pub struct ClientCommandNotification;
+pub struct ClientNotification;
+
+impl Notification for ClientNotification {
+    type Params = lsp::ShowMessageParams;
+    const METHOD: &'static str = "window/showMessage";
+}
 
 impl Notification for ClientCommandNotification {
     type Params = lsp::ShowMessageRequestParams;
