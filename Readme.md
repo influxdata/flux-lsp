@@ -1,3 +1,6 @@
+> [!IMPORTANT]
+> Flux LSP is no longer maintained and has been archived. The [Flux](https://github.com/influxdata/flux) language is no longer actively developed and is in maintenance mode.
+
 # Flux LSP
 
 [![LICENSE](https://img.shields.io/github/license/influxdata/flux-lsp.svg)](https://github.com/influxdata/flux-lsp/blob/master/LICENSE)
